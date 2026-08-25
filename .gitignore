@@ -1,0 +1,15 @@
+# Binaries and test artifacts
+bin/
+coverage.out
+*.exe
+
+# Runtime data and local configuration
+data/
+.env
+
+# Editors / operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+

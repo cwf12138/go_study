@@ -1,0 +1,569 @@
+openapi: 3.1.0
+info:
+  title: StudyFlow API
+  version: 1.0.0
+  description: 学习目标、任务、间隔复习、专注会话和实时事件 API。
+servers:
+  - url: http://localhost:8080
+tags:
+  - name: Auth
+  - name: Goals
+  - name: Tasks
+  - name: Review
+  - name: Focus
+  - name: Insights
+paths:
+  /healthz:
+    get:
+      summary: 进程健康状态
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/auth/register:
+    post:
+      tags: [Auth]
+      summary: 注册并获取访问令牌
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthEnvelope"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: 登录
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthEnvelope"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/v1/me:
+    get:
+      tags: [Auth]
+      security: [{ bearerAuth: [] }]
+      summary: 当前用户
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/v1/goals:
+    post:
+      tags: [Goals]
+      security: [{ bearerAuth: [] }]
+      summary: 创建学习目标
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGoalRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Goal" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+    get:
+      tags: [Goals]
+      security: [{ bearerAuth: [] }]
+      summary: 列出当前用户的目标
+      responses:
+        "200":
+          description: Goal list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoalListEnvelope"
+  /api/v1/tasks:
+    post:
+      tags: [Tasks]
+      security: [{ bearerAuth: [] }]
+      summary: 创建学习任务
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/StudyTask" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+    get:
+      tags: [Tasks]
+      security: [{ bearerAuth: [] }]
+      summary: 查询任务
+      parameters:
+        - in: query
+          name: status
+          schema: { $ref: "#/components/schemas/TaskStatus" }
+        - in: query
+          name: goal_id
+          schema: { type: string }
+        - in: query
+          name: due_before
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: Task list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/StudyTask" }
+                  meta: { $ref: "#/components/schemas/ListMeta" }
+  /api/v1/goals/{goal_id}/status:
+    patch:
+      tags: [Goals]
+      security: [{ bearerAuth: [] }]
+      summary: 完成、归档或重新激活目标
+      parameters:
+        - in: path
+          name: goal_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [active, completed, archived] }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Goal" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/tasks/{task_id}/status:
+    patch:
+      tags: [Tasks]
+      security: [{ bearerAuth: [] }]
+      summary: 推进任务状态
+      parameters:
+        - $ref: "#/components/parameters/TaskID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: "#/components/schemas/TaskStatus" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/StudyTask" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/decks:
+    post:
+      tags: [Review]
+      security: [{ bearerAuth: [] }]
+      summary: 创建卡组
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, maxLength: 120 }
+                description: { type: string }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Deck" }
+    get:
+      tags: [Review]
+      security: [{ bearerAuth: [] }]
+      summary: 列出卡组
+      responses:
+        "200":
+          description: Deck list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Deck" }
+                  meta: { $ref: "#/components/schemas/ListMeta" }
+  /api/v1/decks/{deck_id}/cards:
+    post:
+      tags: [Review]
+      security: [{ bearerAuth: [] }]
+      summary: 在卡组中创建卡片
+      parameters:
+        - in: path
+          name: deck_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prompt, answer]
+              properties:
+                prompt: { type: string }
+                answer: { type: string }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Card" }
+  /api/v1/cards/due:
+    get:
+      tags: [Review]
+      security: [{ bearerAuth: [] }]
+      summary: 获取到期卡片
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          description: Due cards
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Card" }
+                  meta: { $ref: "#/components/schemas/ListMeta" }
+  /api/v1/cards/{card_id}/reviews:
+    post:
+      tags: [Review]
+      security: [{ bearerAuth: [] }]
+      summary: 提交复习结果
+      parameters:
+        - in: path
+          name: card_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating]
+              properties:
+                rating: { type: integer, minimum: 1, maximum: 4 }
+      responses:
+        "200":
+          description: Review scheduled
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/focus-sessions:
+    post:
+      tags: [Focus]
+      security: [{ bearerAuth: [] }]
+      summary: 开始专注会话
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [planned_minutes]
+              properties:
+                task_id: { type: string }
+                planned_minutes: { type: integer, minimum: 1, maximum: 240 }
+      responses:
+        "201":
+          description: Started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/FocusSession" }
+  /api/v1/focus-sessions/{session_id}/finish:
+    patch:
+      tags: [Focus]
+      security: [{ bearerAuth: [] }]
+      summary: 完成或放弃专注会话
+      parameters:
+        - in: path
+          name: session_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                abandoned: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Finished
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/FocusSession" }
+  /api/v1/dashboard:
+    get:
+      tags: [Insights]
+      security: [{ bearerAuth: [] }]
+      summary: 获取学习仪表盘
+      responses:
+        "200":
+          description: Dashboard
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Dashboard" }
+  /api/v1/events/stream:
+    get:
+      tags: [Insights]
+      security: [{ bearerAuth: [] }]
+      summary: 订阅当前用户的 SSE 领域事件
+      responses:
+        "200":
+          description: Server-Sent Events stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    TaskID:
+      in: path
+      name: task_id
+      required: true
+      schema: { type: string }
+  responses:
+    BadRequest:
+      description: Invalid input
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Unauthorized:
+      description: Invalid or missing access token
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Conflict:
+      description: Duplicate resource or invalid state transition
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name: { type: string, maxLength: 80 }
+        email: { type: string, format: email }
+        password: { type: string, format: password, minLength: 8, maxLength: 128 }
+    User:
+      type: object
+      required: [id, email, name, role, created_at]
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+        name: { type: string }
+        role: { type: string, enum: [student, admin] }
+        created_at: { type: string, format: date-time }
+    AuthEnvelope:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            user: { $ref: "#/components/schemas/User" }
+            token: { type: string }
+    CreateGoalRequest:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, maxLength: 160 }
+        description: { type: string }
+        target_minutes: { type: integer, minimum: 0 }
+        deadline: { type: string, format: date-time }
+    Goal:
+      type: object
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        target_minutes: { type: integer }
+        deadline: { type: string, format: date-time }
+        status: { type: string, enum: [active, completed, archived] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    GoalListEnvelope:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/Goal" }
+        meta: { $ref: "#/components/schemas/ListMeta" }
+    TaskStatus:
+      type: string
+      enum: [todo, in_progress, done, cancelled]
+    CreateTaskRequest:
+      type: object
+      required: [title]
+      properties:
+        goal_id: { type: string }
+        title: { type: string, maxLength: 200 }
+        description: { type: string }
+        estimated_minutes: { type: integer, minimum: 0, maximum: 1440 }
+        priority: { type: string, enum: [low, medium, high], default: medium }
+        due_at: { type: string, format: date-time }
+        tags:
+          type: array
+          items: { type: string }
+    StudyTask:
+      allOf:
+        - $ref: "#/components/schemas/CreateTaskRequest"
+        - type: object
+          properties:
+            id: { type: string }
+            user_id: { type: string }
+            status: { $ref: "#/components/schemas/TaskStatus" }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+            completed_at: { type: string, format: date-time }
+    Deck:
+      type: object
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        created_at: { type: string, format: date-time }
+    Card:
+      type: object
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        deck_id: { type: string }
+        prompt: { type: string }
+        answer: { type: string }
+        ease_factor: { type: number }
+        interval_days: { type: integer }
+        repetitions: { type: integer }
+        due_at: { type: string, format: date-time }
+    FocusSession:
+      type: object
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        task_id: { type: string }
+        planned_minutes: { type: integer }
+        actual_minutes: { type: integer }
+        status: { type: string, enum: [running, completed, abandoned] }
+        started_at: { type: string, format: date-time }
+        ended_at: { type: string, format: date-time }
+    Dashboard:
+      type: object
+      properties:
+        active_goals: { type: integer }
+        pending_tasks: { type: integer }
+        completed_tasks: { type: integer }
+        due_cards: { type: integer }
+        focus_minutes_today: { type: integer }
+        focus_minutes_week: { type: integer }
+        tasks_by_priority:
+          type: object
+          additionalProperties: { type: integer }
+    ListMeta:
+      type: object
+      properties:
+        count: { type: integer }
+    ErrorEnvelope:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
