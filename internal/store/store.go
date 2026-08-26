@@ -41,6 +41,7 @@ type Repository interface {
 
 	CreateFocusSession(context.Context, domain.FocusSession) error
 	FocusSessionByID(context.Context, string) (domain.FocusSession, error)
+	ActiveFocusSession(context.Context, string) (domain.FocusSession, error)
 	UpdateFocusSession(context.Context, domain.FocusSession) error
 	ListFocusSessions(context.Context, string, time.Time) ([]domain.FocusSession, error)
 }

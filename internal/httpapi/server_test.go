@@ -53,6 +53,38 @@ func TestRegisterCreateGoalAndAuthorization(t *testing.T) {
 	if list.Code != http.StatusOK || !strings.Contains(list.Body.String(), "Learn concurrency") {
 		t.Fatalf("list goals status = %d, body = %s", list.Code, list.Body.String())
 	}
+	focus := performJSON(t, handler, http.MethodPost, "/api/v1/focus-sessions", auth.Data.Token, map[string]any{
+		"planned_minutes": 25,
+	})
+	if focus.Code != http.StatusCreated {
+		t.Fatalf("start focus status = %d, body = %s", focus.Code, focus.Body.String())
+	}
+	var startedFocus struct {
+		Data struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(focus.Body.Bytes(), &startedFocus); err != nil || startedFocus.Data.ID == "" {
+		t.Fatalf("decode focus response: %v, body = %s", err, focus.Body.String())
+	}
+	active := performJSON(t, handler, http.MethodGet, "/api/v1/focus-sessions/active", auth.Data.Token, nil)
+	if active.Code != http.StatusOK || !strings.Contains(active.Body.String(), "\"status\":\"running\"") {
+		t.Fatalf("active focus status = %d, body = %s", active.Code, active.Body.String())
+	}
+	secondFocus := performJSON(t, handler, http.MethodPost, "/api/v1/focus-sessions", auth.Data.Token, map[string]any{
+		"planned_minutes": 15,
+	})
+	if secondFocus.Code != http.StatusConflict {
+		t.Fatalf("second focus status = %d, want %d", secondFocus.Code, http.StatusConflict)
+	}
+	paused := performJSON(t, handler, http.MethodPost, "/api/v1/focus-sessions/"+startedFocus.Data.ID+"/pause", auth.Data.Token, nil)
+	if paused.Code != http.StatusOK || !strings.Contains(paused.Body.String(), "\"status\":\"paused\"") {
+		t.Fatalf("pause focus status = %d, body = %s", paused.Code, paused.Body.String())
+	}
+	resumed := performJSON(t, handler, http.MethodPost, "/api/v1/focus-sessions/"+startedFocus.Data.ID+"/resume", auth.Data.Token, nil)
+	if resumed.Code != http.StatusOK || !strings.Contains(resumed.Body.String(), "\"status\":\"running\"") {
+		t.Fatalf("resume focus status = %d, body = %s", resumed.Code, resumed.Body.String())
+	}
 }
 
 func performJSON(t *testing.T, handler http.Handler, method, path, token string, body any) *httptest.ResponseRecorder {

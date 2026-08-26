@@ -250,6 +250,11 @@ func (m *Memory) ApplyReview(_ context.Context, card domain.Card, review domain.
 func (m *Memory) CreateFocusSession(_ context.Context, session domain.FocusSession) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	for _, existing := range m.sessions {
+		if existing.UserID == session.UserID && (existing.Status == domain.FocusRunning || existing.Status == domain.FocusPaused) {
+			return domain.ErrConflict
+		}
+	}
 	m.sessions[session.ID] = session
 	return nil
 }
@@ -261,7 +266,27 @@ func (m *Memory) FocusSessionByID(_ context.Context, id string) (domain.FocusSes
 	if !ok {
 		return domain.FocusSession{}, domain.ErrNotFound
 	}
-	return session, nil
+	return normalizeFocusSession(session), nil
+}
+
+func (m *Memory) ActiveFocusSession(_ context.Context, userID string) (domain.FocusSession, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	var active domain.FocusSession
+	found := false
+	for _, session := range m.sessions {
+		if session.UserID != userID || (session.Status != domain.FocusRunning && session.Status != domain.FocusPaused) {
+			continue
+		}
+		if !found || session.StartedAt.After(active.StartedAt) {
+			active = session
+			found = true
+		}
+	}
+	if !found {
+		return domain.FocusSession{}, domain.ErrNotFound
+	}
+	return normalizeFocusSession(active), nil
 }
 
 func (m *Memory) UpdateFocusSession(_ context.Context, session domain.FocusSession) error {
@@ -397,7 +422,7 @@ func (m *Memory) LoadJSON(path string) error {
 		m.reviews[item.ID] = item
 	}
 	for _, item := range s.Sessions {
-		m.sessions[item.ID] = item
+		m.sessions[item.ID] = normalizeFocusSession(item)
 	}
 	return nil
 }
@@ -405,4 +430,15 @@ func (m *Memory) LoadJSON(path string) error {
 func cloneTask(task domain.StudyTask) domain.StudyTask {
 	task.Tags = append([]string(nil), task.Tags...)
 	return task
+}
+
+func normalizeFocusSession(session domain.FocusSession) domain.FocusSession {
+	if session.Phase == "" {
+		session.Phase = domain.FocusPhaseFocus
+		session.PhaseStartedAt = session.StartedAt
+		if session.Status == domain.FocusRunning || session.Status == domain.FocusPaused {
+			session.PhaseRemainingSeconds = session.PlannedMinutes * 60
+		}
+	}
+	return session
 }

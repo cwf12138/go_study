@@ -344,9 +344,75 @@ paths:
               properties:
                 task_id: { type: string }
                 planned_minutes: { type: integer, minimum: 1, maximum: 240 }
+                break_enabled: { type: boolean, default: false, description: "Split focus time into two segments with a fixed 5-minute break." }
       responses:
         "201":
           description: Started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/FocusSession" }
+  /api/v1/focus-sessions/active:
+    get:
+      tags: [Focus]
+      security: [{ bearerAuth: [] }]
+      summary: 获取当前正在进行的专注会话
+      responses:
+        "200":
+          description: Active focus session; data is null when no session is active.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    anyOf:
+                      - $ref: "#/components/schemas/FocusSession"
+                      - type: "null"
+  /api/v1/focus-sessions/{session_id}/pause:
+    post:
+      tags: [Focus]
+      security: [{ bearerAuth: [] }]
+      summary: 暂停当前的专注或休息倒计时
+      parameters:
+        - $ref: "#/components/parameters/FocusSessionID"
+      responses:
+        "200":
+          description: Paused
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/FocusSession" }
+  /api/v1/focus-sessions/{session_id}/resume:
+    post:
+      tags: [Focus]
+      security: [{ bearerAuth: [] }]
+      summary: 继续已暂停的倒计时
+      parameters:
+        - $ref: "#/components/parameters/FocusSessionID"
+      responses:
+        "200":
+          description: Resumed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/FocusSession" }
+  /api/v1/focus-sessions/{session_id}/advance:
+    post:
+      tags: [Focus]
+      security: [{ bearerAuth: [] }]
+      summary: 在一个到期阶段后进入休息或第二段专注
+      parameters:
+        - $ref: "#/components/parameters/FocusSessionID"
+      responses:
+        "200":
+          description: Advanced to the next phase
           content:
             application/json:
               schema:
@@ -359,10 +425,7 @@ paths:
       security: [{ bearerAuth: [] }]
       summary: 完成或放弃专注会话
       parameters:
-        - in: path
-          name: session_id
-          required: true
-          schema: { type: string }
+        - $ref: "#/components/parameters/FocusSessionID"
       requestBody:
         required: true
         content:
@@ -415,6 +478,11 @@ components:
     TaskID:
       in: path
       name: task_id
+      required: true
+      schema: { type: string }
+    FocusSessionID:
+      in: path
+      name: session_id
       required: true
       schema: { type: string }
   responses:
@@ -540,8 +608,15 @@ components:
         task_id: { type: string }
         planned_minutes: { type: integer }
         actual_minutes: { type: integer }
-        status: { type: string, enum: [running, completed, abandoned] }
+        focused_seconds: { type: integer }
+        break_enabled: { type: boolean }
+        break_minutes: { type: integer, example: 5 }
+        phase: { type: string, enum: [focus, focus_first, break, focus_second] }
+        phase_started_at: { type: string, format: date-time }
+        phase_remaining_seconds: { type: integer }
+        status: { type: string, enum: [running, paused, completed, abandoned] }
         started_at: { type: string, format: date-time }
+        paused_at: { type: string, format: date-time }
         ended_at: { type: string, format: date-time }
     Dashboard:
       type: object
@@ -552,6 +627,8 @@ components:
         due_cards: { type: integer }
         focus_minutes_today: { type: integer }
         focus_minutes_week: { type: integer }
+        focus_sessions_today: { type: integer }
+        completed_tasks_today: { type: integer }
         tasks_by_priority:
           type: object
           additionalProperties: { type: integer }

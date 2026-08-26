@@ -66,6 +66,7 @@
             <div class="summary-grid">
               <article class="metric-card accent-blue"><span>进行中的目标</span><strong id="metric-goals">–</strong><small>向长期方向持续投入</small></article>
               <article class="metric-card accent-violet"><span>待完成任务</span><strong id="metric-tasks">–</strong><small>优先处理最重要的事</small></article>
+              <article class="metric-card accent-cyan"><span>今日完成任务</span><strong id="metric-completed">–</strong><small id="today-sessions">完成 0 个专注会话</small></article>
               <article class="metric-card accent-orange"><span>今日待复习</span><strong id="metric-cards">–</strong><small>主动回忆加深理解</small></article>
               <article class="metric-card accent-green"><span>今日专注分钟</span><strong id="metric-focus">–</strong><small id="week-focus">本周 0 分钟</small></article>
             </div>
@@ -105,8 +106,8 @@
           <section id="panel-focus" class="panel">
             <div class="section-intro"><div><p class="eyebrow">FOCUS</p><h3>专注会话</h3><p>用一个明确时段，留出不被打扰的深度学习空间。</p></div></div>
             <div class="two-column">
-              <article class="surface focus-hero"><p class="eyebrow">CURRENT SESSION</p><div id="focus-clock" class="focus-clock">00:00</div><h3 id="focus-state">尚未开始专注</h3><p id="focus-description">选择一个任务和时长，开始第一段深度工作。</p><div class="focus-actions"><button id="finish-focus" class="danger hidden" type="button">结束会话</button><button id="abandon-focus" class="quiet hidden" type="button">放弃</button></div></article>
-              <article class="surface form-surface"><h3>开始专注</h3><form id="focus-form" class="form-grid"><label>关联任务（可选）<select id="focus-task"><option value="">不关联任务</option></select></label><label>计划时长（分钟）<input id="focus-minutes" type="number" min="1" max="240" value="25" required></label><button id="start-focus" class="primary" type="submit">开始专注</button></form><p class="hint">完成时会将实际时长计入仪表盘。</p></article>
+              <article class="surface focus-hero"><p class="eyebrow">COUNTDOWN</p><div id="focus-timer" class="focus-timer" style="--progress:0%"><div class="focus-timer-inner"><div id="focus-clock" class="focus-clock">25:00</div><small id="focus-remaining-label">设置时长后开始倒计时</small></div></div><h3 id="focus-state">尚未开始专注</h3><p id="focus-description">选择一个任务和时长，开始第一段深度工作。</p><div class="focus-actions"><button id="pause-focus" class="quiet hidden" type="button">暂停</button><button id="resume-focus" class="primary hidden" type="button">继续</button><button id="finish-focus" class="danger hidden" type="button">完成并记录</button><button id="abandon-focus" class="quiet hidden" type="button">放弃</button></div></article>
+              <article class="surface form-surface"><h3>开始专注</h3><form id="focus-form" class="form-grid"><label>关联任务（可选）<select id="focus-task"><option value="">不关联任务</option></select></label><label>计划专注时长（分钟）<input id="focus-minutes" type="number" min="1" max="240" value="25" required></label><div class="duration-presets" aria-label="常用专注时长"><button type="button" data-focus-duration="15">15 分钟</button><button type="button" data-focus-duration="25">25 分钟</button><button type="button" data-focus-duration="45">45 分钟</button><button type="button" data-focus-duration="60">60 分钟</button></div><label class="check-label"><input id="focus-break-enabled" type="checkbox">中途休息 5 分钟（专注时长均分为两段）</label><label class="check-label"><input id="focus-complete-task" type="checkbox" checked>结束专注时，同步完成关联任务</label><button id="start-focus" class="primary" type="submit">开始倒计时</button></form><p class="hint">开启中途休息后，会按“前半段专注 → 休息 5 分钟 → 后半段专注”执行；休息和暂停均不计入专注时长。</p></article>
             </div>
           </section>
         </div>
@@ -115,4 +116,3 @@
     <script src="/static/app.js" defer></script>
   </body>
 </html>
-

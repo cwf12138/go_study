@@ -11,6 +11,8 @@
     dueCards: [],
     currentView: "dashboard",
     focus: loadFocus(),
+    isFinishingFocus: false,
+    isUpdatingFocus: false,
     toastTimer: null,
   };
 
@@ -133,19 +135,48 @@
   }
 
   async function refresh() {
-    const [dashboard, goals, tasks, dueCards, decks] = await Promise.all([
+    const [dashboard, goals, tasks, dueCards, decks, activeFocus] = await Promise.all([
       api("/api/v1/dashboard"),
       api("/api/v1/goals"),
       api("/api/v1/tasks"),
       api("/api/v1/cards/due?limit=50"),
       api("/api/v1/decks"),
+      api("/api/v1/focus-sessions/active"),
     ]);
     state.dashboard = dashboard;
     state.goals = goals;
     state.tasks = tasks;
     state.dueCards = dueCards;
     state.decks = decks;
+    syncActiveFocus(activeFocus);
     render();
+  }
+
+  function syncActiveFocus(session) {
+    if (!session) {
+      if (state.focus) {
+        state.focus = null;
+        persistFocus();
+      }
+      return;
+    }
+    const completeTask = state.focus?.id === session.id ? state.focus.completeTask : true;
+    state.focus = {
+      id: session.id,
+      userID: state.user.id,
+      taskID: session.task_id,
+      startedAt: session.started_at,
+      plannedMinutes: session.planned_minutes,
+      breakEnabled: session.break_enabled,
+      breakMinutes: session.break_minutes,
+      phase: session.phase,
+      phaseStartedAt: session.phase_started_at,
+      phaseRemainingSeconds: session.phase_remaining_seconds,
+      status: session.status,
+      completeTask,
+      autoFinishAttempted: false,
+    };
+    persistFocus();
   }
 
   function render() {
@@ -161,6 +192,8 @@
     const data = state.dashboard || {};
     $("#metric-goals").textContent = data.active_goals ?? 0;
     $("#metric-tasks").textContent = data.pending_tasks ?? 0;
+    $("#metric-completed").textContent = data.completed_tasks_today ?? 0;
+    $("#today-sessions").textContent = `完成 ${data.focus_sessions_today ?? 0} 个专注会话`;
     $("#metric-cards").textContent = data.due_cards ?? 0;
     $("#metric-focus").textContent = data.focus_minutes_today ?? 0;
     $("#week-focus").textContent = `本周 ${data.focus_minutes_week ?? 0} 分钟`;
@@ -228,28 +261,90 @@
   function renderFocus() {
     const active = state.focus;
     const form = $("#focus-form");
+    const paused = active?.status === "paused";
+    const updating = state.isFinishingFocus || state.isUpdatingFocus;
+    $("#pause-focus").classList.toggle("hidden", !active || paused);
+    $("#resume-focus").classList.toggle("hidden", !active || !paused);
     $("#finish-focus").classList.toggle("hidden", !active);
     $("#abandon-focus").classList.toggle("hidden", !active);
-    $("#start-focus").disabled = Boolean(active);
+    $("#pause-focus").disabled = updating;
+    $("#resume-focus").disabled = updating;
+    $("#finish-focus").disabled = updating;
+    $("#abandon-focus").disabled = updating;
+    $("#start-focus").disabled = Boolean(active) || updating;
     form.querySelectorAll("input,select").forEach((field) => { field.disabled = Boolean(active); });
+    $$("[data-focus-duration]").forEach((button) => { button.disabled = Boolean(active); });
     if (!active) {
-      $("#focus-clock").textContent = "00:00";
+      renderReadyCountdown();
       $("#focus-state").textContent = "尚未开始专注";
       $("#focus-description").textContent = "选择一个任务和时长，开始第一段深度工作。";
       return;
     }
     const task = state.tasks.find((item) => item.id === active.taskID);
-    $("#focus-state").textContent = "正在专注";
-    $("#focus-description").textContent = task ? `当前任务：${task.title}` : "正在进行一段不关联任务的专注时间。";
+    $("#focus-state").textContent = paused ? `${focusPhaseLabel(active.phase)}已暂停` : focusPhaseLabel(active.phase);
+    const taskDescription = task ? `当前任务：${task.title}` : "正在进行一段不关联任务的专注时间。";
+    $("#focus-description").textContent = active.phase === "break" ? "休息 5 分钟，放松一下再继续。" : taskDescription;
     updateFocusClock();
   }
 
+  function renderReadyCountdown() {
+    const plannedMinutes = clampPlannedMinutes($("#focus-minutes").value);
+    $("#focus-clock").textContent = formatDuration(plannedMinutes * 60);
+    $("#focus-remaining-label").textContent = `计划 ${plannedMinutes} 分钟`;
+    $("#focus-timer").style.setProperty("--progress", "0%");
+  }
+
   function updateFocusClock() {
-    if (!state.focus) return;
-    const seconds = Math.max(0, Math.floor((Date.now() - new Date(state.focus.startedAt).getTime()) / 1000));
+    if (!state.focus) {
+      if (state.user) renderReadyCountdown();
+      return;
+    }
+    const totalSeconds = phaseTotalSeconds(state.focus);
+    const remainingSeconds = phaseRemainingSeconds(state.focus);
+    const progress = Math.min(100, ((totalSeconds - remainingSeconds) / totalSeconds) * 100);
+    $("#focus-clock").textContent = formatDuration(remainingSeconds);
+    $("#focus-remaining-label").textContent = state.focus.status === "paused"
+      ? `已暂停 · 还剩 ${formatDuration(remainingSeconds)}`
+      : remainingSeconds > 0 ? `剩余 ${formatDuration(remainingSeconds)}` : "时间到，正在进入下一阶段…";
+    $("#focus-timer").style.setProperty("--progress", `${progress}%`);
+    if (remainingSeconds === 0 && state.focus.status === "running" && !state.isFinishingFocus && !state.isUpdatingFocus && !state.focus.autoFinishAttempted) {
+      state.focus.autoFinishAttempted = true;
+      persistFocus();
+      if (state.focus.phase === "focus_first" || state.focus.phase === "break") {
+        advanceFocus(true);
+      } else {
+        finishFocus(false, true);
+      }
+    }
+  }
+
+  function phaseRemainingSeconds(focus) {
+    if (focus.status !== "running") return Math.max(0, focus.phaseRemainingSeconds);
+    const elapsed = Math.max(0, Math.floor((Date.now() - new Date(focus.phaseStartedAt).getTime()) / 1000));
+    return Math.max(0, focus.phaseRemainingSeconds - elapsed);
+  }
+
+  function phaseTotalSeconds(focus) {
+    const total = focus.plannedMinutes * 60;
+    if (focus.phase === "focus_first") return Math.ceil(total / 2);
+    if (focus.phase === "focus_second") return Math.floor(total / 2);
+    if (focus.phase === "break") return focus.breakMinutes * 60;
+    return total;
+  }
+
+  function focusPhaseLabel(phase) {
+    return ({ focus: "正在专注", focus_first: "第一段专注", break: "休息时间", focus_second: "第二段专注" }[phase] || "专注会话");
+  }
+
+  function clampPlannedMinutes(value) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.min(240, Math.max(1, Math.round(parsed))) : 25;
+  }
+
+  function formatDuration(seconds) {
     const minutes = String(Math.floor(seconds / 60)).padStart(2, "0");
     const rest = String(seconds % 60).padStart(2, "0");
-    $("#focus-clock").textContent = `${minutes}:${rest}`;
+    return `${minutes}:${rest}`;
   }
 
   function renderSelects() {
@@ -308,6 +403,13 @@
       if (rating) await reviewCard(rating.dataset.id, Number(rating.dataset.rate));
     });
     $("#task-filter").addEventListener("change", renderTasks);
+    $$("[data-focus-duration]").forEach((button) => button.addEventListener("click", () => {
+      $("#focus-minutes").value = button.dataset.focusDuration;
+      renderReadyCountdown();
+    }));
+    $("#focus-minutes").addEventListener("input", () => {
+      if (!state.focus) renderReadyCountdown();
+    });
 
     $("#login-form").addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -335,6 +437,8 @@
     $("#deck-form").addEventListener("submit", (event) => submitForm(event, () => api("/api/v1/decks", { method: "POST", body: JSON.stringify({ name: $("#deck-name").value, description: $("#deck-description").value }) }), "卡组已创建。"));
     $("#card-form").addEventListener("submit", (event) => submitForm(event, () => api(`/api/v1/decks/${$("#card-deck").value}/cards`, { method: "POST", body: JSON.stringify({ prompt: $("#card-prompt").value, answer: $("#card-answer").value }) }), "复习卡已添加，今天就可以开始复习。"));
     $("#focus-form").addEventListener("submit", startFocus);
+    $("#pause-focus").addEventListener("click", pauseFocus);
+    $("#resume-focus").addEventListener("click", resumeFocus);
     $("#finish-focus").addEventListener("click", () => finishFocus(false));
     $("#abandon-focus").addEventListener("click", () => finishFocus(true));
   }
@@ -360,31 +464,102 @@
     const button = $("#start-focus");
     button.disabled = true;
     try {
-      const session = await api("/api/v1/focus-sessions", { method: "POST", body: JSON.stringify({ task_id: $("#focus-task").value, planned_minutes: Number($("#focus-minutes").value) }) });
-      state.focus = { id: session.id, userID: state.user.id, taskID: session.task_id, startedAt: session.started_at };
-      persistFocus();
+      const plannedMinutes = clampPlannedMinutes($("#focus-minutes").value);
+      const breakEnabled = $("#focus-break-enabled").checked;
+      const session = await api("/api/v1/focus-sessions", { method: "POST", body: JSON.stringify({ task_id: $("#focus-task").value, planned_minutes: plannedMinutes, break_enabled: breakEnabled }) });
+      state.focus = { id: session.id, completeTask: $("#focus-complete-task").checked };
+      syncActiveFocus(session);
       renderFocus();
-      notify("专注会话已开始，享受这一段不被打扰的时间。 ");
+      notify(breakEnabled ? "倒计时已开始：前半段专注后将自动休息 5 分钟。" : `${session.planned_minutes} 分钟倒计时已开始，享受这一段不被打扰的时间。`);
     } catch (error) {
       notify(error.message, "error");
       button.disabled = false;
     }
   }
 
-  async function finishFocus(abandoned) {
-    if (!state.focus) return;
+  async function pauseFocus() {
+    await updateFocusSession("pause", "已暂停，时间不会继续流逝。");
+  }
+
+  async function resumeFocus() {
+    await updateFocusSession("resume", "已继续倒计时。");
+  }
+
+  async function advanceFocus(automatic = false) {
+    if (!state.focus || state.isUpdatingFocus) return;
+    state.isUpdatingFocus = true;
+    renderFocus();
     try {
-      await api(`/api/v1/focus-sessions/${state.focus.id}/finish`, { method: "PATCH", body: JSON.stringify({ abandoned }) });
+      const session = await api(`/api/v1/focus-sessions/${state.focus.id}/advance`, { method: "POST" });
+      syncActiveFocus(session);
+      renderFocus();
+      notify(session.phase === "break" ? "第一段专注完成，开始休息 5 分钟。" : automatic ? "休息结束，开始第二段专注。" : "已进入下一阶段。");
+    } catch (error) {
+      notify(error.message, "error");
+    } finally {
+      state.isUpdatingFocus = false;
+      renderFocus();
+    }
+  }
+
+  async function updateFocusSession(action, message) {
+    if (!state.focus || state.isUpdatingFocus) return;
+    state.isUpdatingFocus = true;
+    renderFocus();
+    try {
+      const session = await api(`/api/v1/focus-sessions/${state.focus.id}/${action}`, { method: "POST" });
+      syncActiveFocus(session);
+      renderFocus();
+      notify(message);
+    } catch (error) {
+      notify(error.message, "error");
+    } finally {
+      state.isUpdatingFocus = false;
+      renderFocus();
+    }
+  }
+
+  async function finishFocus(abandoned, automatic = false) {
+    if (!state.focus || state.isFinishingFocus) return;
+    const completedFocus = state.focus;
+    state.isFinishingFocus = true;
+    renderFocus();
+    try {
+      await api(`/api/v1/focus-sessions/${completedFocus.id}/finish`, { method: "PATCH", body: JSON.stringify({ abandoned }) });
       state.focus = null;
       persistFocus();
-      renderFocus();
       await refresh();
-      notify(abandoned ? "已放弃本次专注会话。" : "专注会话已完成，做得好。" );
-    } catch (error) { notify(error.message, "error"); }
+      if (!abandoned && completedFocus.completeTask && completedFocus.taskID) {
+        const task = state.tasks.find((item) => item.id === completedFocus.taskID);
+        if (task && task.status !== "done" && task.status !== "cancelled") {
+          try {
+            await api(`/api/v1/tasks/${completedFocus.taskID}/status`, { method: "PATCH", body: JSON.stringify({ status: "done" }) });
+            await refresh();
+            notify("专注会话和关联任务均已完成，做得好。");
+            return;
+          } catch (error) {
+            notify(`专注已记录，但任务未自动完成：${error.message}`, "error");
+            return;
+          }
+        }
+      }
+      notify(abandoned ? "已放弃本次专注会话。" : automatic ? "倒计时结束，专注会话已自动完成。" : "专注会话已完成，做得好。");
+    } catch (error) {
+      notify(error.message, "error");
+      if (automatic) refresh().catch(() => undefined);
+    } finally {
+      state.isFinishingFocus = false;
+      renderFocus();
+    }
   }
 
   async function bootstrap() {
     bindEvents();
+    window.setInterval(updateFocusClock, 250);
+    window.setInterval(() => {
+      if (state.user) refresh().catch(() => undefined);
+    }, 60_000);
+    renderReadyCountdown();
     if (!state.token) return;
     try {
       const user = await api("/api/v1/me");
@@ -392,10 +567,6 @@
     } catch {
       leaveApp();
     }
-    window.setInterval(() => {
-      if (state.user) refresh().catch(() => undefined);
-      updateFocusClock();
-    }, 1000);
   }
 
   bootstrap();

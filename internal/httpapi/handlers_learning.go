@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/example/studyflow/internal/domain"
+	"github.com/example/studyflow/internal/service"
 )
 
 func (s *Server) createDeck(w http.ResponseWriter, r *http.Request) {
@@ -89,17 +90,56 @@ func (s *Server) startFocus(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		TaskID         string `json:"task_id"`
 		PlannedMinutes int    `json:"planned_minutes"`
+		BreakEnabled   bool   `json:"break_enabled"`
 	}
 	if err := decodeJSON(w, r, &body); err != nil {
 		writeError(w, invalidJSON(err))
 		return
 	}
-	session, err := s.service.StartFocus(r.Context(), claimsFromContext(r.Context()).Subject, body.TaskID, body.PlannedMinutes)
+	session, err := s.service.StartFocus(r.Context(), claimsFromContext(r.Context()).Subject, service.StartFocusInput{
+		TaskID: body.TaskID, PlannedMinutes: body.PlannedMinutes, BreakEnabled: body.BreakEnabled,
+	})
 	if err != nil {
 		writeError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, envelope{"data": session})
+}
+
+func (s *Server) pauseFocus(w http.ResponseWriter, r *http.Request) {
+	session, err := s.service.PauseFocus(r.Context(), claimsFromContext(r.Context()).Subject, r.PathValue("session_id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{"data": session})
+}
+
+func (s *Server) resumeFocus(w http.ResponseWriter, r *http.Request) {
+	session, err := s.service.ResumeFocus(r.Context(), claimsFromContext(r.Context()).Subject, r.PathValue("session_id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{"data": session})
+}
+
+func (s *Server) advanceFocus(w http.ResponseWriter, r *http.Request) {
+	session, err := s.service.AdvanceFocus(r.Context(), claimsFromContext(r.Context()).Subject, r.PathValue("session_id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{"data": session})
+}
+
+func (s *Server) activeFocus(w http.ResponseWriter, r *http.Request) {
+	session, err := s.service.ActiveFocus(r.Context(), claimsFromContext(r.Context()).Subject)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{"data": session})
 }
 
 func (s *Server) finishFocus(w http.ResponseWriter, r *http.Request) {

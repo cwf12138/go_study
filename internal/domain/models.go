@@ -116,27 +116,46 @@ type FocusStatus string
 
 const (
 	FocusRunning   FocusStatus = "running"
+	FocusPaused    FocusStatus = "paused"
 	FocusCompleted FocusStatus = "completed"
 	FocusAbandoned FocusStatus = "abandoned"
 )
 
+type FocusPhase string
+
+const (
+	FocusPhaseFocus       FocusPhase = "focus"
+	FocusPhaseFocusFirst  FocusPhase = "focus_first"
+	FocusPhaseBreak       FocusPhase = "break"
+	FocusPhaseFocusSecond FocusPhase = "focus_second"
+)
+
 type FocusSession struct {
-	ID             string      `json:"id"`
-	UserID         string      `json:"user_id"`
-	TaskID         string      `json:"task_id,omitempty"`
-	PlannedMinutes int         `json:"planned_minutes"`
-	ActualMinutes  int         `json:"actual_minutes"`
-	Status         FocusStatus `json:"status"`
-	StartedAt      time.Time   `json:"started_at"`
-	EndedAt        *time.Time  `json:"ended_at,omitempty"`
+	ID                    string      `json:"id"`
+	UserID                string      `json:"user_id"`
+	TaskID                string      `json:"task_id,omitempty"`
+	PlannedMinutes        int         `json:"planned_minutes"`
+	ActualMinutes         int         `json:"actual_minutes"`
+	FocusedSeconds        int         `json:"focused_seconds"`
+	BreakEnabled          bool        `json:"break_enabled"`
+	BreakMinutes          int         `json:"break_minutes"`
+	Phase                 FocusPhase  `json:"phase"`
+	PhaseStartedAt        time.Time   `json:"phase_started_at"`
+	PhaseRemainingSeconds int         `json:"phase_remaining_seconds"`
+	Status                FocusStatus `json:"status"`
+	StartedAt             time.Time   `json:"started_at"`
+	PausedAt              *time.Time  `json:"paused_at,omitempty"`
+	EndedAt               *time.Time  `json:"ended_at,omitempty"`
 }
 
 type Dashboard struct {
-	ActiveGoals       int            `json:"active_goals"`
-	PendingTasks      int            `json:"pending_tasks"`
-	CompletedTasks    int            `json:"completed_tasks"`
-	DueCards          int            `json:"due_cards"`
-	FocusMinutesToday int            `json:"focus_minutes_today"`
-	FocusMinutesWeek  int            `json:"focus_minutes_week"`
-	TasksByPriority   map[string]int `json:"tasks_by_priority"`
+	ActiveGoals         int            `json:"active_goals"`
+	PendingTasks        int            `json:"pending_tasks"`
+	CompletedTasks      int            `json:"completed_tasks"`
+	CompletedTasksToday int            `json:"completed_tasks_today"`
+	DueCards            int            `json:"due_cards"`
+	FocusMinutesToday   int            `json:"focus_minutes_today"`
+	FocusMinutesWeek    int            `json:"focus_minutes_week"`
+	FocusSessionsToday  int            `json:"focus_sessions_today"`
+	TasksByPriority     map[string]int `json:"tasks_by_priority"`
 }
