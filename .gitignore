@@ -2,6 +2,7 @@
 bin/
 coverage.out
 *.exe
+.studyflow-gocache/
 
 # Runtime data and local configuration
 data/
@@ -12,4 +13,3 @@ data/
 .vscode/
 .DS_Store
 Thumbs.db
-

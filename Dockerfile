@@ -9,9 +9,10 @@ FROM alpine:3.20
 RUN addgroup -S app && adduser -S -G app app
 WORKDIR /app
 COPY --from=build /out/studyflow /usr/local/bin/studyflow
+COPY --from=build /src/internal/httpapi/assets /app/assets
 RUN mkdir -p /app/data && chown -R app:app /app
 USER app
 EXPOSE 8080
 VOLUME ["/app/data"]
+ENV FRONTEND_DIR=/app/assets
 ENTRYPOINT ["studyflow"]
-

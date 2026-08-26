@@ -40,11 +40,15 @@ go run ./cmd/api
 
 服务默认监听 `http://localhost:8080`。无需设置环境变量；开发默认值已经可用。数据保存在 `data/studyflow.json`。
 
+启动后直接打开 [http://localhost:8080/](http://localhost:8080/)，即可进入浏览器学习控制台。它支持注册、登录、目标、任务、间隔复习和专注会话的完整操作；`/healthz` 仍然只用于健康检查，返回 JSON 是正常行为。
+
 也可以使用容器：
 
 ```bash
 docker compose up --build
 ```
+
+浏览器页面位于 `internal/httpapi/assets/`，由 Go 服务直接托管，不需要 Node 或前端构建步骤。若将编译产物移动到项目目录之外，可通过 `FRONTEND_DIR` 指向包含 `index.html`、`app.js` 与 `styles.css` 的资源目录；Docker 镜像已经自动完成这一配置。
 
 健康检查：
 
@@ -161,4 +165,3 @@ make build      # 输出 bin/studyflow
 ## License
 
 MIT
-

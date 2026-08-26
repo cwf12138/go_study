@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"time"
@@ -15,11 +16,18 @@ type Server struct {
 	bus     *event.Bus
 	logger  *slog.Logger
 	started time.Time
+	assets  fs.FS
 }
 
 func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.Bus, logger *slog.Logger) http.Handler {
-	s := &Server{service: svc, bus: bus, logger: logger, started: time.Now()}
+	assets, err := frontendFS()
+	if err != nil {
+		panic("frontend assets are unavailable: " + err.Error())
+	}
+	s := &Server{service: svc, bus: bus, logger: logger, started: time.Now(), assets: assets}
 	root := http.NewServeMux()
+	root.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(assets))))
+	root.HandleFunc("/", s.home)
 	root.HandleFunc("GET /healthz", s.health)
 	root.HandleFunc("GET /readyz", s.ready)
 	root.HandleFunc("POST /api/v1/auth/register", s.register)
