@@ -21,4 +21,3 @@ vet:
 
 clean:
 	go clean
-

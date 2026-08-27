@@ -11,6 +11,7 @@
     dueCards: [],
     currentView: "dashboard",
     focus: loadFocus(),
+    dailyFocusGoalMinutes: 60,
     isFinishingFocus: false,
     isUpdatingFocus: false,
     toastTimer: null,
@@ -82,6 +83,15 @@
     else localStorage.removeItem("studyflow.focus");
   }
 
+  function loadDailyFocusGoal() {
+    const value = Number(localStorage.getItem(`studyflow.dailyFocusGoal.${state.user?.id || "default"}`));
+    return Number.isFinite(value) ? clampDailyFocusGoal(value) : 60;
+  }
+
+  function persistDailyFocusGoal() {
+    localStorage.setItem(`studyflow.dailyFocusGoal.${state.user?.id || "default"}`, String(state.dailyFocusGoalMinutes));
+  }
+
   function authTab(tab) {
     const registering = tab === "register";
     $$("[data-auth-tab]").forEach((button) => button.classList.toggle("active", button.dataset.authTab === tab));
@@ -91,6 +101,7 @@
 
   function enterApp(user) {
     state.user = user;
+    state.dailyFocusGoalMinutes = loadDailyFocusGoal();
     if (state.focus && state.focus.userID !== user.id) {
       state.focus = null;
       persistFocus();
@@ -111,6 +122,7 @@
     state.decks = [];
     state.dueCards = [];
     state.focus = null;
+    state.dailyFocusGoalMinutes = 60;
     localStorage.removeItem("studyflow.token");
     persistFocus();
     $("#app-view").classList.add("hidden");
@@ -263,6 +275,7 @@
     const form = $("#focus-form");
     const paused = active?.status === "paused";
     const updating = state.isFinishingFocus || state.isUpdatingFocus;
+    const stateLabel = $("#focus-state");
     $("#pause-focus").classList.toggle("hidden", !active || paused);
     $("#resume-focus").classList.toggle("hidden", !active || !paused);
     $("#finish-focus").classList.toggle("hidden", !active);
@@ -274,14 +287,20 @@
     $("#start-focus").disabled = Boolean(active) || updating;
     form.querySelectorAll("input,select").forEach((field) => { field.disabled = Boolean(active); });
     $$("[data-focus-duration]").forEach((button) => { button.disabled = Boolean(active); });
+    renderFocusProgress();
+    renderFocusTaskPreview();
     if (!active) {
       renderReadyCountdown();
-      $("#focus-state").textContent = "尚未开始专注";
+      $("#focus-session-step").textContent = "准备开始";
+      stateLabel.textContent = "尚未开始专注";
+      stateLabel.className = "focus-state is-idle";
       $("#focus-description").textContent = "选择一个任务和时长，开始第一段深度工作。";
       return;
     }
     const task = state.tasks.find((item) => item.id === active.taskID);
-    $("#focus-state").textContent = paused ? `${focusPhaseLabel(active.phase)}已暂停` : focusPhaseLabel(active.phase);
+    $("#focus-session-step").textContent = focusSessionStep(active);
+    stateLabel.textContent = paused ? `${focusPhaseLabel(active.phase)} · 已暂停` : focusPhaseLabel(active.phase);
+    stateLabel.className = `focus-state ${paused ? "is-paused" : active.phase === "break" ? "is-break" : "is-running"}`;
     const taskDescription = task ? `当前任务：${task.title}` : "正在进行一段不关联任务的专注时间。";
     $("#focus-description").textContent = active.phase === "break" ? "休息 5 分钟，放松一下再继续。" : taskDescription;
     updateFocusClock();
@@ -290,8 +309,8 @@
   function renderReadyCountdown() {
     const plannedMinutes = clampPlannedMinutes($("#focus-minutes").value);
     $("#focus-clock").textContent = formatDuration(plannedMinutes * 60);
-    $("#focus-remaining-label").textContent = `计划 ${plannedMinutes} 分钟`;
     $("#focus-timer").style.setProperty("--progress", "0%");
+    renderFocusTicks(0);
   }
 
   function updateFocusClock() {
@@ -303,10 +322,8 @@
     const remainingSeconds = phaseRemainingSeconds(state.focus);
     const progress = Math.min(100, ((totalSeconds - remainingSeconds) / totalSeconds) * 100);
     $("#focus-clock").textContent = formatDuration(remainingSeconds);
-    $("#focus-remaining-label").textContent = state.focus.status === "paused"
-      ? `已暂停 · 还剩 ${formatDuration(remainingSeconds)}`
-      : remainingSeconds > 0 ? `剩余 ${formatDuration(remainingSeconds)}` : "时间到，正在进入下一阶段…";
     $("#focus-timer").style.setProperty("--progress", `${progress}%`);
+    renderFocusTicks(progress);
     if (remainingSeconds === 0 && state.focus.status === "running" && !state.isFinishingFocus && !state.isUpdatingFocus && !state.focus.autoFinishAttempted) {
       state.focus.autoFinishAttempted = true;
       persistFocus();
@@ -334,6 +351,62 @@
 
   function focusPhaseLabel(phase) {
     return ({ focus: "正在专注", focus_first: "第一段专注", break: "休息时间", focus_second: "第二段专注" }[phase] || "专注会话");
+  }
+
+  function focusSessionStep(focus) {
+    if (!focus.breakEnabled) return "完整专注时段";
+    return ({ focus_first: "第 1 段 / 共 3 段", break: "休息 / 共 3 段", focus_second: "第 3 段 / 共 3 段" }[focus.phase] || "专注时段");
+  }
+
+  function renderFocusTicks(progress) {
+    const container = $(".focus-timer-ticks");
+    if (!container) return;
+    const tickCount = 24;
+    if (container.childElementCount !== tickCount) {
+      container.innerHTML = Array.from({ length: tickCount }, (_, index) => `<span class="focus-tick ${index % 4 === 0 ? "is-major" : ""}" data-focus-tick style="--tick-index:${index}"></span>`).join("");
+    }
+    const completed = Math.floor((Math.max(0, Math.min(100, progress)) / 100) * tickCount);
+    container.querySelectorAll("[data-focus-tick]").forEach((tick, index) => {
+      tick.classList.toggle("is-complete", index < completed);
+      tick.classList.toggle("is-current", progress > 0 && index === completed && completed < tickCount);
+    });
+  }
+
+  function renderFocusProgress() {
+    const data = state.dashboard || {};
+    const today = Number(data.focus_minutes_today || 0);
+    const week = Number(data.focus_minutes_week || 0);
+    const goal = state.dailyFocusGoalMinutes;
+    const progress = Math.min(100, Math.round((today / goal) * 100));
+    $("#focus-today-minutes").textContent = today;
+    $("#focus-week-minutes").textContent = week;
+    $("#focus-daily-ring").style.setProperty("--daily-progress", `${progress}%`);
+    $("#focus-daily-goal-value").textContent = goal % 60 === 0 ? goal / 60 : goal;
+    $("#focus-daily-goal-unit").textContent = goal % 60 === 0 ? "小时" : "分钟";
+    $("#focus-progress-caption").textContent = today > 0
+      ? `今日已完成 ${today} 分钟，达成每日目标的 ${progress}%。`
+      : `每日目标 ${goal} 分钟，先开始一个小节奏。`;
+    const goalForm = $("#daily-goal-form");
+    if (goalForm.classList.contains("hidden")) $("#daily-goal-minutes").value = goal;
+  }
+
+  function renderFocusTaskPreview() {
+    const container = $("#focus-task-preview");
+    if (!container) return;
+    const tasks = state.tasks.filter((task) => task.status !== "done" && task.status !== "cancelled").slice(0, 5);
+    const selectedTaskID = state.focus?.taskID || $("#focus-task")?.value;
+    if (!tasks.length) {
+      container.className = "focus-task-preview empty-state";
+      container.textContent = "还没有待办任务。先创建一项足够小、可以立刻开始的任务。";
+      return;
+    }
+    container.className = "focus-task-preview";
+    container.innerHTML = tasks.map((task) => `<button class="focus-task-item ${task.id === selectedTaskID ? "selected" : ""}" type="button" data-focus-task-select="${task.id}" ${state.focus ? "disabled" : ""}><span class="focus-task-check" aria-hidden="true"></span><span class="focus-task-content"><strong>${escapeHTML(task.title)}</strong><small>${task.estimated_minutes ? `预计 ${task.estimated_minutes} 分钟` : "未设置预计时长"}</small></span><span class="priority-${task.priority}">●</span></button>`).join("");
+  }
+
+  function clampDailyFocusGoal(value) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.min(720, Math.max(10, Math.round(parsed / 5) * 5)) : 60;
   }
 
   function clampPlannedMinutes(value) {
@@ -401,6 +474,12 @@
       if (taskButton) await changeTaskStatus(taskButton.dataset.id, taskButton.dataset.taskStatus);
       const rating = event.target.closest("[data-rate]");
       if (rating) await reviewCard(rating.dataset.id, Number(rating.dataset.rate));
+      const focusTaskButton = event.target.closest("[data-focus-task-select]");
+      if (focusTaskButton && !state.focus) {
+        $("#focus-task").value = focusTaskButton.dataset.focusTaskSelect;
+        renderFocusTaskPreview();
+        notify("已关联该任务，设置时长后即可开始专注。");
+      }
     });
     $("#task-filter").addEventListener("change", renderTasks);
     $$("[data-focus-duration]").forEach((button) => button.addEventListener("click", () => {
@@ -409,6 +488,24 @@
     }));
     $("#focus-minutes").addEventListener("input", () => {
       if (!state.focus) renderReadyCountdown();
+    });
+    $("#focus-task").addEventListener("change", renderFocusTaskPreview);
+    $("#edit-daily-goal").addEventListener("click", () => {
+      const form = $("#daily-goal-form");
+      form.classList.toggle("hidden");
+      if (!form.classList.contains("hidden")) {
+        $("#daily-goal-minutes").value = state.dailyFocusGoalMinutes;
+        $("#daily-goal-minutes").focus();
+        $("#daily-goal-minutes").select();
+      }
+    });
+    $("#daily-goal-form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      state.dailyFocusGoalMinutes = clampDailyFocusGoal($("#daily-goal-minutes").value);
+      persistDailyFocusGoal();
+      $("#daily-goal-form").classList.add("hidden");
+      renderFocusProgress();
+      notify(`每日专注目标已设置为 ${state.dailyFocusGoalMinutes} 分钟。`);
     });
 
     $("#login-form").addEventListener("submit", async (event) => {
