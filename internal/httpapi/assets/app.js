@@ -6,6 +6,9 @@
     user: null,
     dashboard: null,
     goals: [],
+    goalPage: [],
+    goalMeta: { count: 0, total: 0, page: 1, page_size: 8, total_pages: 0 },
+    goalQuery: { status: "", sort: "created_at", order: "desc", page: 1, pageSize: 8 },
     tasks: [],
     decks: [],
     dueCards: [],
@@ -27,13 +30,14 @@
     .replaceAll("'", "&#039;");
 
   async function api(path, options = {}) {
-    const headers = new Headers(options.headers || {});
+    const { returnEnvelope = false, ...requestOptions } = options;
+    const headers = new Headers(requestOptions.headers || {});
     if (state.token) headers.set("Authorization", `Bearer ${state.token}`);
-    if (options.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+    if (requestOptions.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
 
     let response;
     try {
-      response = await fetch(path, { ...options, headers });
+      response = await fetch(path, { ...requestOptions, headers });
     } catch {
       throw new Error("无法连接到服务，请确认 Go API 正在运行。");
     }
@@ -43,7 +47,7 @@
       if (response.status === 401 && state.token) leaveApp();
       throw new Error(payload?.error?.message || `请求失败（${response.status}）`);
     }
-    return payload.data;
+    return returnEnvelope ? payload : payload.data;
   }
 
   function notify(message, type = "success") {
@@ -61,6 +65,22 @@
     return new Intl.DateTimeFormat("zh-CN", withTime
       ? { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }
       : { year: "numeric", month: "short", day: "numeric" }).format(date);
+  }
+
+  function deadlineStatus(value) {
+    if (!value) return "未设置截止日期";
+    const deadline = new Date(value);
+    if (Number.isNaN(deadline.getTime())) return "未设置截止日期";
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const deadlineDay = new Date(deadline);
+    deadlineDay.setHours(0, 0, 0, 0);
+    const days = Math.round((deadlineDay.getTime() - today.getTime()) / 86400000);
+    if (days > 1) return `剩余 ${days} 天`;
+    if (days === 1) return "明天截止";
+    if (days === 0) return "今天截止";
+    if (days === -1) return "已逾期 1 天";
+    return `已逾期 ${Math.abs(days)} 天`;
   }
 
   function toISO(value) {
@@ -118,6 +138,9 @@
     state.user = null;
     state.dashboard = null;
     state.goals = [];
+    state.goalPage = [];
+    state.goalMeta = { count: 0, total: 0, page: 1, page_size: 8, total_pages: 0 };
+    state.goalQuery = { status: "", sort: "created_at", order: "desc", page: 1, pageSize: 8 };
     state.tasks = [];
     state.decks = [];
     state.dueCards = [];
@@ -146,17 +169,31 @@
     $(".sidebar").classList.remove("open");
   }
 
+  function goalListURL() {
+    const query = new URLSearchParams({
+      page: String(state.goalQuery.page),
+      page_size: String(state.goalQuery.pageSize),
+      sort: state.goalQuery.sort,
+      order: state.goalQuery.order,
+    });
+    if (state.goalQuery.status) query.set("status", state.goalQuery.status);
+    return `/api/v1/goals?${query.toString()}`;
+  }
+
   async function refresh() {
-    const [dashboard, goals, tasks, dueCards, decks, activeFocus] = await Promise.all([
+    const [dashboard, goalPageResponse, activeGoalsResponse, tasks, dueCards, decks, activeFocus] = await Promise.all([
       api("/api/v1/dashboard"),
-      api("/api/v1/goals"),
+      api(goalListURL(), { returnEnvelope: true }),
+      api("/api/v1/goals?status=active&sort=title&order=asc&page=1&page_size=50", { returnEnvelope: true }),
       api("/api/v1/tasks"),
       api("/api/v1/cards/due?limit=50"),
       api("/api/v1/decks"),
       api("/api/v1/focus-sessions/active"),
     ]);
     state.dashboard = dashboard;
-    state.goals = goals;
+    state.goalPage = goalPageResponse.data || [];
+    state.goalMeta = goalPageResponse.meta || state.goalMeta;
+    state.goals = activeGoalsResponse.data || [];
     state.tasks = tasks;
     state.dueCards = dueCards;
     state.decks = decks;
@@ -224,19 +261,57 @@
 
   function renderGoals() {
     const container = $("#goals-list");
-    if (!state.goals.length) {
+    const items = state.goalPage;
+    $("#goal-status-filter").value = state.goalQuery.status;
+    $("#goal-sort").value = state.goalQuery.sort;
+    $("#goal-order").value = state.goalQuery.order;
+    if (!items.length) {
       container.className = "goal-list empty-state";
-      container.textContent = "还没有目标。先创建一个值得长期投入的方向。";
+      container.textContent = state.goalMeta.total
+        ? "这个页面暂时没有目标。调整筛选条件或返回上一页试试。"
+        : state.goalQuery.status ? "当前状态下还没有目标。调整筛选条件或创建一个新目标吧。" : "还没有目标。先创建一个值得长期投入的方向。";
+      renderGoalPagination();
       return;
     }
     container.className = "goal-list";
-    container.innerHTML = state.goals.map((goal) => {
-      const progress = goal.status === "completed" ? 100 : goal.status === "archived" ? 0 : 35;
+    container.innerHTML = items.map((goal) => {
       const actions = goal.status === "active"
         ? `<button class="quiet" type="button" data-goal-status="completed" data-id="${goal.id}">完成</button><button class="quiet" type="button" data-goal-status="archived" data-id="${goal.id}">归档</button>`
         : `<button class="quiet" type="button" data-goal-status="active" data-id="${goal.id}">重新激活</button>`;
-      return `<article class="list-row"><div class="row-main"><div class="row-actions"><h4>${escapeHTML(goal.title)}</h4><span class="pill ${goal.status === "completed" ? "done" : goal.status === "archived" ? "cancelled" : "in_progress"}">${goalStatusLabel(goal.status)}</span></div><p>${escapeHTML(goal.description || "尚未添加目标说明")} · 计划 ${goal.target_minutes} 分钟${goal.deadline ? ` · 截止 ${formatDate(goal.deadline)}` : ""}</p><div class="goal-progress"><span style="width:${progress}%"></span></div></div><div class="row-actions">${actions}</div></article>`;
+      const deadline = goal.deadline
+        ? `截止 ${formatDate(goal.deadline, true)} · ${deadlineStatus(goal.deadline)}`
+        : deadlineStatus(goal.deadline);
+      return `<article class="list-row goal-row"><div class="row-main"><div class="row-actions"><h4>${escapeHTML(goal.title)}</h4><span class="pill ${goal.status === "completed" ? "done" : goal.status === "archived" ? "cancelled" : "in_progress"}">${goalStatusLabel(goal.status)}</span></div><p>${escapeHTML(goal.description || "尚未添加目标说明")}</p><small class="goal-created-at">创建于 ${formatDate(goal.created_at, true)}</small><small class="goal-created-at">${deadline}</small></div><div class="row-actions">${actions}</div></article>`;
     }).join("");
+    renderGoalPagination();
+  }
+
+  function renderGoalPagination() {
+    const meta = state.goalMeta;
+    const pagination = $("#goals-pagination");
+    const summary = $("#goals-summary");
+    const page = Number(meta.page || 1);
+    const totalPages = Number(meta.total_pages || 0);
+    const total = Number(meta.total || 0);
+    summary.textContent = total ? `共 ${total} 个目标 · 第 ${page}/${totalPages} 页` : "共 0 个目标";
+    if (totalPages <= 1) {
+      pagination.className = "pagination hidden";
+      pagination.innerHTML = "";
+      return;
+    }
+    const buttons = [];
+    const addPage = (value) => buttons.push(`<button class="page-button ${value === page ? "active" : ""}" type="button" data-goal-page="${value}" ${value === page ? "aria-current=\"page\"" : ""}>${value}</button>`);
+    buttons.push(`<button class="page-button" type="button" data-goal-page="${page - 1}" ${page === 1 ? "disabled" : ""}>上一页</button>`);
+    const start = Math.max(1, page - 2);
+    const end = Math.min(totalPages, page + 2);
+    if (start > 1) addPage(1);
+    if (start > 2) buttons.push("<span class=\"pagination-ellipsis\">…</span>");
+    for (let current = start; current <= end; current += 1) addPage(current);
+    if (end < totalPages - 1) buttons.push("<span class=\"pagination-ellipsis\">…</span>");
+    if (end < totalPages) addPage(totalPages);
+    buttons.push(`<button class="page-button" type="button" data-goal-page="${page + 1}" ${page === totalPages ? "disabled" : ""}>下一页</button>`);
+    pagination.className = "pagination";
+    pagination.innerHTML = buttons.join("");
   }
 
   function renderTasks() {
@@ -446,11 +521,12 @@
 
   async function submitForm(event, action, success) {
     event.preventDefault();
-    const button = event.currentTarget.querySelector("button[type=submit]");
+    const form = event.currentTarget;
+    const button = form.querySelector("button[type=submit]");
     button.disabled = true;
     try {
       await action();
-      event.currentTarget.reset();
+      form.reset();
       await refresh();
       notify(success);
     } catch (error) {
@@ -474,6 +550,8 @@
       if (taskButton) await changeTaskStatus(taskButton.dataset.id, taskButton.dataset.taskStatus);
       const rating = event.target.closest("[data-rate]");
       if (rating) await reviewCard(rating.dataset.id, Number(rating.dataset.rate));
+      const goalPageButton = event.target.closest("[data-goal-page]");
+      if (goalPageButton && !goalPageButton.disabled) await updateGoalQuery({ page: Number(goalPageButton.dataset.goalPage) });
       const focusTaskButton = event.target.closest("[data-focus-task-select]");
       if (focusTaskButton && !state.focus) {
         $("#focus-task").value = focusTaskButton.dataset.focusTaskSelect;
@@ -482,6 +560,9 @@
       }
     });
     $("#task-filter").addEventListener("change", renderTasks);
+    $("#goal-status-filter").addEventListener("change", () => updateGoalQuery({ status: $("#goal-status-filter").value, page: 1 }));
+    $("#goal-sort").addEventListener("change", () => updateGoalQuery({ sort: $("#goal-sort").value, page: 1 }));
+    $("#goal-order").addEventListener("change", () => updateGoalQuery({ order: $("#goal-order").value, page: 1 }));
     $$("[data-focus-duration]").forEach((button) => button.addEventListener("click", () => {
       $("#focus-minutes").value = button.dataset.focusDuration;
       renderReadyCountdown();
@@ -529,7 +610,10 @@
       } catch (error) { notify(error.message, "error"); }
     });
 
-    $("#goal-form").addEventListener("submit", (event) => submitForm(event, () => api("/api/v1/goals", { method: "POST", body: JSON.stringify({ title: $("#goal-title").value, description: $("#goal-description").value, target_minutes: Number($("#goal-minutes").value || 0), deadline: toISO($("#goal-deadline").value) }) }), "目标已创建。"));
+    $("#goal-form").addEventListener("submit", (event) => {
+      state.goalQuery.page = 1;
+      return submitForm(event, () => api("/api/v1/goals", { method: "POST", body: JSON.stringify({ title: $("#goal-title").value, description: $("#goal-description").value, deadline: toISO($("#goal-deadline").value) }) }), "目标已创建。");
+    });
     $("#task-form").addEventListener("submit", (event) => submitForm(event, () => api("/api/v1/tasks", { method: "POST", body: JSON.stringify({ goal_id: $("#task-goal").value, title: $("#task-title").value, description: $("#task-description").value, estimated_minutes: Number($("#task-minutes").value || 0), priority: $("#task-priority").value, due_at: toISO($("#task-due").value), tags: $("#task-tags").value.split(",").map((tag) => tag.trim()).filter(Boolean) }) }), "任务已创建。"));
     $("#deck-form").addEventListener("submit", (event) => submitForm(event, () => api("/api/v1/decks", { method: "POST", body: JSON.stringify({ name: $("#deck-name").value, description: $("#deck-description").value }) }), "卡组已创建。"));
     $("#card-form").addEventListener("submit", (event) => submitForm(event, () => api(`/api/v1/decks/${$("#card-deck").value}/cards`, { method: "POST", body: JSON.stringify({ prompt: $("#card-prompt").value, answer: $("#card-answer").value }) }), "复习卡已添加，今天就可以开始复习。"));
@@ -538,6 +622,16 @@
     $("#resume-focus").addEventListener("click", resumeFocus);
     $("#finish-focus").addEventListener("click", () => finishFocus(false));
     $("#abandon-focus").addEventListener("click", () => finishFocus(true));
+  }
+
+  async function updateGoalQuery(nextQuery) {
+    const page = Math.max(1, Number(nextQuery.page ?? state.goalQuery.page));
+    state.goalQuery = { ...state.goalQuery, ...nextQuery, page };
+    try {
+      await refresh();
+    } catch (error) {
+      notify(error.message, "error");
+    }
   }
 
   async function changeGoalStatus(id, status) {

@@ -27,15 +27,14 @@ const (
 )
 
 type Goal struct {
-	ID            string     `json:"id"`
-	UserID        string     `json:"user_id"`
-	Title         string     `json:"title"`
-	Description   string     `json:"description"`
-	TargetMinutes int        `json:"target_minutes"`
-	Deadline      *time.Time `json:"deadline,omitempty"`
-	Status        GoalStatus `json:"status"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	ID          string     `json:"id"`
+	UserID      string     `json:"user_id"`
+	Title       string     `json:"title"`
+	Description string     `json:"description"`
+	Deadline    *time.Time `json:"deadline,omitempty"`
+	Status      GoalStatus `json:"status"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 type TaskStatus string

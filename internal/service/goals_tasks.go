@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -12,16 +13,15 @@ import (
 )
 
 type CreateGoalInput struct {
-	Title         string
-	Description   string
-	TargetMinutes int
-	Deadline      *time.Time
+	Title       string
+	Description string
+	Deadline    *time.Time
 }
 
 func (s *Service) CreateGoal(ctx context.Context, userID string, input CreateGoalInput) (domain.Goal, error) {
 	input.Title = strings.TrimSpace(input.Title)
-	if input.Title == "" || len(input.Title) > 160 || input.TargetMinutes < 0 {
-		return domain.Goal{}, fmt.Errorf("%w: title is required and target_minutes cannot be negative", domain.ErrInvalidInput)
+	if input.Title == "" || len(input.Title) > 160 {
+		return domain.Goal{}, fmt.Errorf("%w: title is required", domain.ErrInvalidInput)
 	}
 	now := s.now().UTC()
 	if input.Deadline != nil && input.Deadline.Before(now) {
@@ -29,8 +29,8 @@ func (s *Service) CreateGoal(ctx context.Context, userID string, input CreateGoa
 	}
 	goal := domain.Goal{
 		ID: platform.NewID(), UserID: userID, Title: input.Title,
-		Description: strings.TrimSpace(input.Description), TargetMinutes: input.TargetMinutes,
-		Deadline: input.Deadline, Status: domain.GoalActive, CreatedAt: now, UpdatedAt: now,
+		Description: strings.TrimSpace(input.Description),
+		Deadline:    input.Deadline, Status: domain.GoalActive, CreatedAt: now, UpdatedAt: now,
 	}
 	if err := s.repo.CreateGoal(ctx, goal); err != nil {
 		return domain.Goal{}, err
@@ -39,8 +39,134 @@ func (s *Service) CreateGoal(ctx context.Context, userID string, input CreateGoa
 	return goal, nil
 }
 
-func (s *Service) ListGoals(ctx context.Context, userID string) ([]domain.Goal, error) {
-	return s.repo.ListGoals(ctx, userID)
+type GoalSort string
+
+const (
+	GoalSortCreatedAt GoalSort = "created_at"
+	GoalSortUpdatedAt GoalSort = "updated_at"
+	GoalSortDeadline  GoalSort = "deadline"
+	GoalSortTitle     GoalSort = "title"
+)
+
+type SortOrder string
+
+const (
+	SortAscending  SortOrder = "asc"
+	SortDescending SortOrder = "desc"
+)
+
+type ListGoalsInput struct {
+	Status   domain.GoalStatus
+	SortBy   GoalSort
+	Order    SortOrder
+	Page     int
+	PageSize int
+}
+
+type GoalListPage struct {
+	Items      []domain.Goal
+	Count      int
+	Total      int
+	Page       int
+	PageSize   int
+	TotalPages int
+}
+
+func (s *Service) ListGoals(ctx context.Context, userID string, input ListGoalsInput) (GoalListPage, error) {
+	input, err := normalizeGoalListInput(input)
+	if err != nil {
+		return GoalListPage{}, err
+	}
+	items, err := s.repo.ListGoals(ctx, userID)
+	if err != nil {
+		return GoalListPage{}, err
+	}
+	if input.Status != "" {
+		filtered := items[:0]
+		for _, goal := range items {
+			if goal.Status == input.Status {
+				filtered = append(filtered, goal)
+			}
+		}
+		items = filtered
+	}
+	sort.Slice(items, func(i, j int) bool { return lessGoal(items[i], items[j], input.SortBy, input.Order) })
+
+	total := len(items)
+	totalPages := (total + input.PageSize - 1) / input.PageSize
+	if totalPages > 0 && input.Page > totalPages {
+		input.Page = totalPages
+	}
+	start := (input.Page - 1) * input.PageSize
+	if start > total {
+		start = total
+	}
+	end := min(start+input.PageSize, total)
+	pageItems := items[start:end]
+	return GoalListPage{
+		Items: pageItems, Count: len(pageItems), Total: total,
+		Page: input.Page, PageSize: input.PageSize, TotalPages: totalPages,
+	}, nil
+}
+
+func normalizeGoalListInput(input ListGoalsInput) (ListGoalsInput, error) {
+	if input.Status != "" && input.Status != domain.GoalActive && input.Status != domain.GoalCompleted && input.Status != domain.GoalArchived {
+		return ListGoalsInput{}, fmt.Errorf("%w: status must be active, completed, or archived", domain.ErrInvalidInput)
+	}
+	if input.SortBy == "" {
+		input.SortBy = GoalSortCreatedAt
+	}
+	if input.SortBy != GoalSortCreatedAt && input.SortBy != GoalSortUpdatedAt && input.SortBy != GoalSortDeadline && input.SortBy != GoalSortTitle {
+		return ListGoalsInput{}, fmt.Errorf("%w: unsupported sort field", domain.ErrInvalidInput)
+	}
+	if input.Order == "" {
+		input.Order = SortDescending
+	}
+	if input.Order != SortAscending && input.Order != SortDescending {
+		return ListGoalsInput{}, fmt.Errorf("%w: order must be asc or desc", domain.ErrInvalidInput)
+	}
+	if input.Page == 0 {
+		input.Page = 1
+	}
+	if input.Page < 1 {
+		return ListGoalsInput{}, fmt.Errorf("%w: page must be at least 1", domain.ErrInvalidInput)
+	}
+	if input.PageSize == 0 {
+		input.PageSize = 8
+	}
+	if input.PageSize < 1 || input.PageSize > 50 {
+		return ListGoalsInput{}, fmt.Errorf("%w: page_size must be between 1 and 50", domain.ErrInvalidInput)
+	}
+	return input, nil
+}
+
+func lessGoal(left, right domain.Goal, sortBy GoalSort, order SortOrder) bool {
+	if sortBy == GoalSortDeadline && left.Deadline == nil && right.Deadline != nil {
+		return false
+	}
+	if sortBy == GoalSortDeadline && left.Deadline != nil && right.Deadline == nil {
+		return true
+	}
+	var comparison int
+	switch sortBy {
+	case GoalSortUpdatedAt:
+		comparison = left.UpdatedAt.Compare(right.UpdatedAt)
+	case GoalSortDeadline:
+		if left.Deadline != nil && right.Deadline != nil {
+			comparison = left.Deadline.Compare(*right.Deadline)
+		}
+	case GoalSortTitle:
+		comparison = strings.Compare(strings.ToLower(left.Title), strings.ToLower(right.Title))
+	default:
+		comparison = left.CreatedAt.Compare(right.CreatedAt)
+	}
+	if comparison == 0 {
+		comparison = strings.Compare(left.ID, right.ID)
+	}
+	if order == SortAscending {
+		return comparison < 0
+	}
+	return comparison > 0
 }
 
 func (s *Service) ChangeGoalStatus(ctx context.Context, userID, goalID string, status domain.GoalStatus) (domain.Goal, error) {

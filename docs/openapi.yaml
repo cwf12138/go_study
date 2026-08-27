@@ -104,6 +104,25 @@ paths:
       tags: [Goals]
       security: [{ bearerAuth: [] }]
       summary: 列出当前用户的目标
+      parameters:
+        - in: query
+          name: status
+          description: 按目标状态筛选；未提供时返回全部状态
+          schema: { type: string, enum: [active, completed, archived] }
+        - in: query
+          name: sort
+          description: 排序字段，默认 created_at
+          schema: { type: string, enum: [created_at, updated_at, deadline, title], default: created_at }
+        - in: query
+          name: order
+          description: 排序方向，默认 desc
+          schema: { type: string, enum: [asc, desc], default: desc }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: page_size
+          schema: { type: integer, minimum: 1, maximum: 50, default: 8 }
       responses:
         "200":
           description: Goal list
@@ -532,7 +551,6 @@ components:
       properties:
         title: { type: string, maxLength: 160 }
         description: { type: string }
-        target_minutes: { type: integer, minimum: 0 }
         deadline: { type: string, format: date-time }
     Goal:
       type: object
@@ -541,7 +559,6 @@ components:
         user_id: { type: string }
         title: { type: string }
         description: { type: string }
-        target_minutes: { type: integer }
         deadline: { type: string, format: date-time }
         status: { type: string, enum: [active, completed, archived] }
         created_at: { type: string, format: date-time }
@@ -636,6 +653,10 @@ components:
       type: object
       properties:
         count: { type: integer }
+        total: { type: integer }
+        page: { type: integer }
+        page_size: { type: integer }
+        total_pages: { type: integer }
     ErrorEnvelope:
       type: object
       properties:

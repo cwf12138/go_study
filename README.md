@@ -75,7 +75,7 @@ export TOKEN="上一步返回的 token"
 curl -X POST http://localhost:8080/api/v1/goals \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"title":"掌握 Go 并发","description":"通过项目实践学习","target_minutes":1200}'
+  -d '{"title":"掌握 Go 并发","description":"通过项目实践学习","deadline":"2026-12-31T16:00:00Z"}'
 ```
 
 创建任务、卡组、卡片后，可以获取今日应复习内容：

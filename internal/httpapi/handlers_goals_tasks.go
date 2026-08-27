@@ -3,6 +3,7 @@ package httpapi
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,17 +14,16 @@ import (
 
 func (s *Server) createGoal(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Title         string     `json:"title"`
-		Description   string     `json:"description"`
-		TargetMinutes int        `json:"target_minutes"`
-		Deadline      *time.Time `json:"deadline"`
+		Title       string     `json:"title"`
+		Description string     `json:"description"`
+		Deadline    *time.Time `json:"deadline"`
 	}
 	if err := decodeJSON(w, r, &body); err != nil {
 		writeError(w, invalidJSON(err))
 		return
 	}
 	goal, err := s.service.CreateGoal(r.Context(), claimsFromContext(r.Context()).Subject, service.CreateGoalInput{
-		Title: body.Title, Description: body.Description, TargetMinutes: body.TargetMinutes, Deadline: body.Deadline,
+		Title: body.Title, Description: body.Description, Deadline: body.Deadline,
 	})
 	if err != nil {
 		writeError(w, err)
@@ -33,12 +33,36 @@ func (s *Server) createGoal(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listGoals(w http.ResponseWriter, r *http.Request) {
-	items, err := s.service.ListGoals(r.Context(), claimsFromContext(r.Context()).Subject)
+	query := r.URL.Query()
+	input := service.ListGoalsInput{
+		Status: domain.GoalStatus(strings.TrimSpace(query.Get("status"))),
+		SortBy: service.GoalSort(strings.TrimSpace(query.Get("sort"))),
+		Order:  service.SortOrder(strings.TrimSpace(query.Get("order"))),
+	}
+	var err error
+	if value := query.Get("page"); value != "" {
+		input.Page, err = strconv.Atoi(value)
+		if err != nil {
+			writeError(w, fmt.Errorf("%w: page must be an integer", domain.ErrInvalidInput))
+			return
+		}
+	}
+	if value := query.Get("page_size"); value != "" {
+		input.PageSize, err = strconv.Atoi(value)
+		if err != nil {
+			writeError(w, fmt.Errorf("%w: page_size must be an integer", domain.ErrInvalidInput))
+			return
+		}
+	}
+	page, err := s.service.ListGoals(r.Context(), claimsFromContext(r.Context()).Subject, input)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, envelope{"data": items, "meta": envelope{"count": len(items)}})
+	writeJSON(w, http.StatusOK, envelope{"data": page.Items, "meta": envelope{
+		"count": page.Count, "total": page.Total, "page": page.Page,
+		"page_size": page.PageSize, "total_pages": page.TotalPages,
+	}})
 }
 
 func (s *Server) changeGoalStatus(w http.ResponseWriter, r *http.Request) {

@@ -77,10 +77,10 @@
           </section>
 
           <section id="panel-goals" class="panel">
-            <div class="section-intro"><div><p class="eyebrow">GOALS</p><h3>学习目标</h3><p>把抽象的愿望转化为可投入时间的方向。</p></div></div>
+            <div class="section-intro"><div><p class="eyebrow">GOALS</p><h3>学习目标</h3><p>为重要的学习方向设定边界、截止日期与清晰状态。</p></div></div>
             <div class="two-column wide-left">
-              <article class="surface"><div id="goals-list" class="goal-list empty-state">正在加载目标…</div></article>
-              <article class="surface form-surface"><h3>新建目标</h3><form id="goal-form" class="form-grid"><label>目标名称<input id="goal-title" required maxlength="160" placeholder="例如：掌握 Go 并发"></label><label>目标说明<textarea id="goal-description" rows="3" placeholder="为什么它重要？"></textarea></label><label>计划投入（分钟）<input id="goal-minutes" type="number" min="0" value="600"></label><label>截止日期（可选）<input id="goal-deadline" type="datetime-local"></label><button class="primary" type="submit">创建目标</button></form></article>
+              <article class="surface goals-surface"><div class="goals-toolbar"><label>状态<select id="goal-status-filter"><option value="">全部状态</option><option value="active">进行中</option><option value="completed">已完成</option><option value="archived">已归档</option></select></label><label>排序<select id="goal-sort"><option value="created_at">创建时间</option><option value="updated_at">更新时间</option><option value="deadline">截止日期</option><option value="title">目标名称</option></select></label><label>顺序<select id="goal-order"><option value="desc">从新到旧</option><option value="asc">从旧到新</option></select></label><span id="goals-summary" class="goals-summary">正在加载…</span></div><div id="goals-list" class="goal-list empty-state">正在加载目标…</div><nav id="goals-pagination" class="pagination hidden" aria-label="目标列表分页"></nav></article>
+              <article class="surface form-surface"><h3>新建目标</h3><form id="goal-form" class="form-grid"><label>目标名称<input id="goal-title" required maxlength="160" placeholder="例如：掌握 Go 并发"></label><label>目标说明<textarea id="goal-description" rows="3" placeholder="为什么它重要？"></textarea></label><label>截止日期（可选）<input id="goal-deadline" type="datetime-local"></label><button class="primary" type="submit">创建目标</button></form></article>
             </div>
           </section>
 

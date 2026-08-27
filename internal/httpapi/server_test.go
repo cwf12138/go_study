@@ -39,9 +39,7 @@ func TestRegisterCreateGoalAndAuthorization(t *testing.T) {
 		t.Fatalf("decode auth response: %v, body = %s", err, register.Body.String())
 	}
 
-	goal := performJSON(t, handler, http.MethodPost, "/api/v1/goals", auth.Data.Token, map[string]any{
-		"title": "Learn concurrency", "target_minutes": 600,
-	})
+	goal := performJSON(t, handler, http.MethodPost, "/api/v1/goals", auth.Data.Token, map[string]any{"title": "Learn concurrency"})
 	if goal.Code != http.StatusCreated {
 		t.Fatalf("create goal status = %d, body = %s", goal.Code, goal.Body.String())
 	}
@@ -84,6 +82,95 @@ func TestRegisterCreateGoalAndAuthorization(t *testing.T) {
 	resumed := performJSON(t, handler, http.MethodPost, "/api/v1/focus-sessions/"+startedFocus.Data.ID+"/resume", auth.Data.Token, nil)
 	if resumed.Code != http.StatusOK || !strings.Contains(resumed.Body.String(), "\"status\":\"running\"") {
 		t.Fatalf("resume focus status = %d, body = %s", resumed.Code, resumed.Body.String())
+	}
+}
+
+func TestListGoalsSupportsPaginationFilteringAndSorting(t *testing.T) {
+	repository := store.NewMemory()
+	bus := event.NewBus()
+	tokens := security.NewTokenManager("integration-test-secret-long-enough", "test", time.Hour)
+	svc := service.New(repository, tokens, bus)
+	handler := NewHandler(svc, tokens, bus, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	register := performJSON(t, handler, http.MethodPost, "/api/v1/auth/register", "", map[string]any{
+		"name": "Lin", "email": "lin@example.com", "password": "safe-password-123",
+	})
+	if register.Code != http.StatusCreated {
+		t.Fatalf("register status = %d, body = %s", register.Code, register.Body.String())
+	}
+	var auth struct {
+		Data struct {
+			Token string `json:"token"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(register.Body.Bytes(), &auth); err != nil {
+		t.Fatalf("decode auth response: %v", err)
+	}
+
+	createGoal := func(title string) struct {
+		ID        string    `json:"id"`
+		CreatedAt time.Time `json:"created_at"`
+	} {
+		t.Helper()
+		response := performJSON(t, handler, http.MethodPost, "/api/v1/goals", auth.Data.Token, map[string]any{"title": title})
+		if response.Code != http.StatusCreated {
+			t.Fatalf("create %q status = %d, body = %s", title, response.Code, response.Body.String())
+		}
+		var created struct {
+			Data struct {
+				ID        string    `json:"id"`
+				CreatedAt time.Time `json:"created_at"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(response.Body.Bytes(), &created); err != nil {
+			t.Fatalf("decode created goal: %v", err)
+		}
+		if created.Data.ID == "" || created.Data.CreatedAt.IsZero() {
+			t.Fatalf("created goal is missing id or created_at: %s", response.Body.String())
+		}
+		return created.Data
+	}
+
+	alpha := createGoal("Alpha")
+	_ = createGoal("Zebra")
+	done := createGoal("Completed target")
+	changeStatus := performJSON(t, handler, http.MethodPatch, "/api/v1/goals/"+done.ID+"/status", auth.Data.Token, map[string]any{"status": "completed"})
+	if changeStatus.Code != http.StatusOK {
+		t.Fatalf("complete goal status = %d, body = %s", changeStatus.Code, changeStatus.Body.String())
+	}
+	list := performJSON(t, handler, http.MethodGet, "/api/v1/goals?status=active&sort=title&order=asc&page=1&page_size=1", auth.Data.Token, nil)
+	if list.Code != http.StatusOK {
+		t.Fatalf("list goals status = %d, body = %s", list.Code, list.Body.String())
+	}
+	var page struct {
+		Data []struct {
+			ID    string `json:"id"`
+			Title string `json:"title"`
+		} `json:"data"`
+		Meta struct {
+			Count      int `json:"count"`
+			Total      int `json:"total"`
+			Page       int `json:"page"`
+			PageSize   int `json:"page_size"`
+			TotalPages int `json:"total_pages"`
+		} `json:"meta"`
+	}
+	if err := json.Unmarshal(list.Body.Bytes(), &page); err != nil {
+		t.Fatalf("decode paged goals: %v", err)
+	}
+	if len(page.Data) != 1 || page.Data[0].ID != alpha.ID || page.Data[0].Title != "Alpha" {
+		t.Fatalf("unexpected first page data: %#v", page.Data)
+	}
+	if strings.Contains(list.Body.String(), "\"target_minutes\"") || strings.Contains(list.Body.String(), "\"progress\"") {
+		t.Fatalf("goal list exposes removed progress fields: %s", list.Body.String())
+	}
+	if page.Meta.Count != 1 || page.Meta.Total != 2 || page.Meta.Page != 1 || page.Meta.PageSize != 1 || page.Meta.TotalPages != 2 {
+		t.Fatalf("unexpected pagination metadata: %#v", page.Meta)
+	}
+
+	invalidSort := performJSON(t, handler, http.MethodGet, "/api/v1/goals?sort=priority", auth.Data.Token, nil)
+	if invalidSort.Code != http.StatusBadRequest {
+		t.Fatalf("invalid sort status = %d, want %d", invalidSort.Code, http.StatusBadRequest)
 	}
 }
 

@@ -12,7 +12,7 @@ $headers = @{ Authorization = "Bearer $($auth.data.token)" }
 $goal = Invoke-RestMethod -Method Post -Uri "$baseUrl/api/v1/goals" -Headers $headers -ContentType "application/json" -Body (@{
     title = "Master Go backend engineering"
     description = "Extend StudyFlow with production adapters"
-    target_minutes = 1200
+    deadline = "2026-12-31T16:00:00Z"
 } | ConvertTo-Json)
 
 $task = Invoke-RestMethod -Method Post -Uri "$baseUrl/api/v1/tasks" -Headers $headers -ContentType "application/json" -Body (@{
