@@ -47,6 +47,7 @@
         <nav class="nav" aria-label="主导航">
           <button class="nav-link active" type="button" data-view="dashboard"><span>◫</span>概览</button>
           <button class="nav-link" type="button" data-view="goals"><span>◎</span>学习目标</button>
+          <button class="nav-link" type="button" data-view="moods"><span>☺</span>心情日记</button>
           <button class="nav-link" type="button" data-view="tasks"><span>✓</span>学习任务</button>
           <button class="nav-link" type="button" data-view="review"><span>↻</span>间隔复习</button>
           <button class="nav-link" type="button" data-view="focus"><span>◷</span>专注会话</button>
@@ -58,7 +59,7 @@
         <header class="topbar">
           <button id="mobile-menu" class="icon-button mobile-only" type="button" aria-label="打开菜单">☰</button>
           <div><p id="page-kicker" class="eyebrow">今天也在前进</p><h2 id="page-title">学习概览</h2></div>
-          <div class="user-actions"><span id="user-name"></span><button id="logout" class="quiet" type="button">退出</button></div>
+          <div class="user-actions"><button id="theme-toggle" class="theme-toggle" type="button" aria-label="切换至夜间模式" title="切换主题"><span aria-hidden="true">☾</span><span id="theme-toggle-label">夜间</span></button><span id="user-name"></span><button id="logout" class="quiet" type="button">退出</button></div>
         </header>
 
         <div class="content">
@@ -81,6 +82,36 @@
             <div class="two-column wide-left">
               <article class="surface goals-surface"><div class="goals-toolbar"><label>状态<select id="goal-status-filter"><option value="">全部状态</option><option value="active">进行中</option><option value="completed">已完成</option><option value="archived">已归档</option></select></label><label>排序<select id="goal-sort"><option value="created_at">创建时间</option><option value="updated_at">更新时间</option><option value="deadline">截止日期</option><option value="title">目标名称</option></select></label><label>顺序<select id="goal-order"><option value="desc">从新到旧</option><option value="asc">从旧到新</option></select></label><span id="goals-summary" class="goals-summary">正在加载…</span></div><div id="goals-list" class="goal-list empty-state">正在加载目标…</div><nav id="goals-pagination" class="pagination hidden" aria-label="目标列表分页"></nav></article>
               <article class="surface form-surface"><h3>新建目标</h3><form id="goal-form" class="form-grid"><label>目标名称<input id="goal-title" required maxlength="160" placeholder="例如：掌握 Go 并发"></label><label>目标说明<textarea id="goal-description" rows="3" placeholder="为什么它重要？"></textarea></label><label>截止日期（可选）<input id="goal-deadline" type="datetime-local"></label><button class="primary" type="submit">创建目标</button></form></article>
+            </div>
+          </section>
+
+          <section id="panel-moods" class="panel">
+            <div class="section-intro"><div><p class="eyebrow">MOOD JOURNAL</p><h3>心情日记</h3><p>用一个表情记录一天，也给情绪留下一段只属于自己的文字。</p></div></div>
+            <div class="mood-workspace">
+              <div class="mood-main-column">
+                <article class="surface mood-calendar-card">
+                  <div class="mood-calendar-head"><div><p class="eyebrow">CALENDAR</p><h3 id="mood-month-title">本月</h3></div><div class="mood-month-actions"><button id="mood-prev-month" class="mood-icon-button" type="button" aria-label="上一个月">‹</button><button id="mood-next-month" class="mood-icon-button" type="button" aria-label="下一个月">›</button></div></div>
+                  <div class="mood-weekdays" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+                  <div id="mood-calendar" class="mood-calendar" aria-label="心情日历"></div>
+                  <div class="mood-legend"><span>😣 很糟</span><span>🙁 低落</span><span>😐 平静</span><span>🙂 不错</span><span>😄 很好</span></div>
+                </article>
+                <article class="surface mood-trend-card"><div class="mood-entry-head"><div><p class="eyebrow">MOOD TREND</p><h3>本月心情走势</h3></div><span id="mood-trend-caption" class="mood-trend-caption">等待记录</span></div><div id="mood-trend" class="mood-trend" role="img" aria-label="本月心情走势图"></div></article>
+              </div>
+              <div class="mood-side-column">
+                <article class="surface mood-entry-card">
+                  <div class="mood-entry-head"><div><p class="eyebrow">DAILY CHECK-IN</p><h3 id="mood-selected-date">选择一天</h3></div><button id="delete-mood-entry" class="text-button danger-text" type="button">删除记录</button></div>
+                  <form id="mood-form" class="mood-form">
+                    <input id="mood-value" type="hidden" value="neutral">
+                    <div><span class="mood-field-label">今天感觉如何？</span><div class="mood-picker" role="radiogroup" aria-label="选择心情"><button type="button" data-mood-choice="awful" aria-label="很糟">😣<small>很糟</small></button><button type="button" data-mood-choice="low" aria-label="低落">🙁<small>低落</small></button><button type="button" data-mood-choice="neutral" aria-label="平静">😐<small>平静</small></button><button type="button" data-mood-choice="good" aria-label="不错">🙂<small>不错</small></button><button type="button" data-mood-choice="great" aria-label="很好">😄<small>很好</small></button></div></div>
+                    <div class="mood-level-grid"><label>压力 <output id="mood-stress-value">3</output><input id="mood-stress" type="range" min="1" max="5" value="3"></label><label>精力 <output id="mood-energy-value">3</output><input id="mood-energy" type="range" min="1" max="5" value="3"></label></div>
+                    <div><span class="mood-field-label">今天发生了什么？</span><div id="mood-activities" class="mood-activities"><button type="button" data-mood-activity="学习">学习</button><button type="button" data-mood-activity="工作">工作</button><button type="button" data-mood-activity="运动">运动</button><button type="button" data-mood-activity="社交">社交</button><button type="button" data-mood-activity="休息">休息</button><button type="button" data-mood-activity="睡眠不足">睡眠不足</button></div></div>
+                    <label>日记<textarea id="mood-note" rows="5" maxlength="6000" placeholder="写下今天值得记住的片段、感受或念头…"></textarea></label>
+                    <label>关键词（逗号分隔）<input id="mood-tags" maxlength="600" placeholder="例如：考试、朋友、成就感"></label>
+                    <button class="primary" type="submit">保存这一天</button>
+                  </form>
+                </article>
+                <article class="surface mood-insights-card"><div class="mood-entry-head"><div><p class="eyebrow">MONTHLY INSIGHTS</p><h3>本月回顾</h3></div><span id="mood-logged-days" class="pill">0 天</span></div><div class="mood-metrics"><div><span>平均心情</span><strong id="mood-average">–</strong></div><div><span>连续记录</span><strong id="mood-streak">0</strong></div><div><span>平均压力</span><strong id="mood-stress-average">–</strong></div><div><span>平均精力</span><strong id="mood-energy-average">–</strong></div></div><div id="mood-distribution" class="mood-distribution"></div><div class="mood-activity-summary"><span>常见活动</span><div id="mood-top-activities">本月还没有活动记录</div></div></article>
+              </div>
             </div>
           </section>
 

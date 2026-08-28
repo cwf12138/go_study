@@ -19,6 +19,7 @@ type Memory struct {
 	users    map[string]domain.User
 	emails   map[string]string
 	goals    map[string]domain.Goal
+	moods    map[string]domain.MoodEntry
 	tasks    map[string]domain.StudyTask
 	decks    map[string]domain.Deck
 	cards    map[string]domain.Card
@@ -31,6 +32,7 @@ func NewMemory() *Memory {
 		users:    make(map[string]domain.User),
 		emails:   make(map[string]string),
 		goals:    make(map[string]domain.Goal),
+		moods:    make(map[string]domain.MoodEntry),
 		tasks:    make(map[string]domain.StudyTask),
 		decks:    make(map[string]domain.Deck),
 		cards:    make(map[string]domain.Card),
@@ -109,6 +111,47 @@ func (m *Memory) ListGoals(_ context.Context, userID string) ([]domain.Goal, err
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].CreatedAt.After(items[j].CreatedAt) })
 	return items, nil
+}
+
+func (m *Memory) UpsertMoodEntry(_ context.Context, entry domain.MoodEntry) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.moods[moodKey(entry.UserID, entry.Date)] = cloneMoodEntry(entry)
+	return nil
+}
+
+func (m *Memory) MoodEntryByDate(_ context.Context, userID, date string) (domain.MoodEntry, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	entry, ok := m.moods[moodKey(userID, date)]
+	if !ok {
+		return domain.MoodEntry{}, domain.ErrNotFound
+	}
+	return cloneMoodEntry(entry), nil
+}
+
+func (m *Memory) ListMoodEntries(_ context.Context, userID, month string) ([]domain.MoodEntry, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	items := make([]domain.MoodEntry, 0)
+	for _, entry := range m.moods {
+		if entry.UserID == userID && strings.HasPrefix(entry.Date, month+"-") {
+			items = append(items, cloneMoodEntry(entry))
+		}
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].Date < items[j].Date })
+	return items, nil
+}
+
+func (m *Memory) DeleteMoodEntry(_ context.Context, userID, date string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	key := moodKey(userID, date)
+	if _, ok := m.moods[key]; !ok {
+		return domain.ErrNotFound
+	}
+	delete(m.moods, key)
+	return nil
 }
 
 func (m *Memory) CreateTask(_ context.Context, task domain.StudyTask) error {
@@ -322,6 +365,7 @@ type snapshot struct {
 	SavedAt  time.Time             `json:"saved_at"`
 	Users    []persistedUser       `json:"users"`
 	Goals    []domain.Goal         `json:"goals"`
+	Moods    []domain.MoodEntry    `json:"moods"`
 	Tasks    []domain.StudyTask    `json:"tasks"`
 	Decks    []domain.Deck         `json:"decks"`
 	Cards    []domain.Card         `json:"cards"`
@@ -337,6 +381,9 @@ func (m *Memory) SaveJSON(path string) error {
 	}
 	for _, item := range m.goals {
 		s.Goals = append(s.Goals, item)
+	}
+	for _, item := range m.moods {
+		s.Moods = append(s.Moods, cloneMoodEntry(item))
 	}
 	for _, item := range m.tasks {
 		s.Tasks = append(s.Tasks, cloneTask(item))
@@ -396,6 +443,7 @@ func (m *Memory) LoadJSON(path string) error {
 	m.users = make(map[string]domain.User, len(s.Users))
 	m.emails = make(map[string]string, len(s.Users))
 	m.goals = make(map[string]domain.Goal, len(s.Goals))
+	m.moods = make(map[string]domain.MoodEntry, len(s.Moods))
 	m.tasks = make(map[string]domain.StudyTask, len(s.Tasks))
 	m.decks = make(map[string]domain.Deck, len(s.Decks))
 	m.cards = make(map[string]domain.Card, len(s.Cards))
@@ -408,6 +456,9 @@ func (m *Memory) LoadJSON(path string) error {
 	}
 	for _, item := range s.Goals {
 		m.goals[item.ID] = item
+	}
+	for _, item := range s.Moods {
+		m.moods[moodKey(item.UserID, item.Date)] = cloneMoodEntry(item)
 	}
 	for _, item := range s.Tasks {
 		m.tasks[item.ID] = cloneTask(item)
@@ -430,6 +481,16 @@ func (m *Memory) LoadJSON(path string) error {
 func cloneTask(task domain.StudyTask) domain.StudyTask {
 	task.Tags = append([]string(nil), task.Tags...)
 	return task
+}
+
+func moodKey(userID, date string) string {
+	return userID + "\x00" + date
+}
+
+func cloneMoodEntry(entry domain.MoodEntry) domain.MoodEntry {
+	entry.Activities = append([]string(nil), entry.Activities...)
+	entry.Tags = append([]string(nil), entry.Tags...)
+	return entry
 }
 
 func normalizeFocusSession(session domain.FocusSession) domain.FocusSession {

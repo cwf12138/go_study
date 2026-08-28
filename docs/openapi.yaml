@@ -8,6 +8,7 @@ servers:
 tags:
   - name: Auth
   - name: Goals
+  - name: Moods
   - name: Tasks
   - name: Review
   - name: Focus
@@ -130,6 +131,75 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GoalListEnvelope"
+  /api/v1/moods:
+    get:
+      tags: [Moods]
+      security: [{ bearerAuth: [] }]
+      summary: 获取指定月份的心情日记
+      parameters:
+        - in: query
+          name: month
+          required: true
+          schema: { type: string, pattern: '^\\d{4}-\\d{2}$', example: '2026-08' }
+      responses:
+        "200":
+          description: Mood entries for the month
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoodListEnvelope"
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/v1/moods/insights:
+    get:
+      tags: [Moods]
+      security: [{ bearerAuth: [] }]
+      summary: 获取指定月份的心情统计
+      parameters:
+        - in: query
+          name: month
+          required: true
+          schema: { type: string, pattern: '^\\d{4}-\\d{2}$', example: '2026-08' }
+      responses:
+        "200":
+          description: Monthly mood insights
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MoodInsights" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/v1/moods/{date}:
+    put:
+      tags: [Moods]
+      security: [{ bearerAuth: [] }]
+      summary: 创建或更新某一天的心情日记
+      parameters:
+        - $ref: "#/components/parameters/MoodDate"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveMoodEntryRequest" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MoodEntry" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+    delete:
+      tags: [Moods]
+      security: [{ bearerAuth: [] }]
+      summary: 删除某一天的心情日记
+      parameters:
+        - $ref: "#/components/parameters/MoodDate"
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/tasks:
     post:
       tags: [Tasks]
@@ -494,6 +564,11 @@ components:
       scheme: bearer
       bearerFormat: JWT
   parameters:
+    MoodDate:
+      in: path
+      name: date
+      required: true
+      schema: { type: string, pattern: '^\\d{4}-\\d{2}-\\d{2}$', example: '2026-08-29' }
     TaskID:
       in: path
       name: task_id
@@ -569,6 +644,60 @@ components:
         data:
           type: array
           items: { $ref: "#/components/schemas/Goal" }
+        meta: { $ref: "#/components/schemas/ListMeta" }
+    SaveMoodEntryRequest:
+      type: object
+      required: [mood, stress, energy]
+      properties:
+        mood: { type: string, enum: [awful, low, neutral, good, great] }
+        note: { type: string, maxLength: 6000 }
+        activities:
+          type: array
+          maxItems: 12
+          items: { type: string, maxLength: 48 }
+        tags:
+          type: array
+          maxItems: 12
+          items: { type: string, maxLength: 48 }
+        stress: { type: integer, minimum: 1, maximum: 5 }
+        energy: { type: integer, minimum: 1, maximum: 5 }
+    MoodEntry:
+      allOf:
+        - $ref: "#/components/schemas/SaveMoodEntryRequest"
+        - type: object
+          properties:
+            id: { type: string }
+            user_id: { type: string }
+            date: { type: string, pattern: '^\\d{4}-\\d{2}-\\d{2}$' }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+    MoodActivityCount:
+      type: object
+      properties:
+        name: { type: string }
+        count: { type: integer, minimum: 0 }
+    MoodInsights:
+      type: object
+      properties:
+        month: { type: string, pattern: '^\\d{4}-\\d{2}$' }
+        logged_days: { type: integer, minimum: 0 }
+        average_mood: { type: number, minimum: 0, maximum: 5 }
+        average_stress: { type: number, minimum: 0, maximum: 5 }
+        average_energy: { type: number, minimum: 0, maximum: 5 }
+        longest_streak: { type: integer, minimum: 0 }
+        dominant_mood: { type: string, enum: [awful, low, neutral, good, great] }
+        mood_distribution:
+          type: object
+          additionalProperties: { type: integer, minimum: 0 }
+        top_activities:
+          type: array
+          items: { $ref: "#/components/schemas/MoodActivityCount" }
+    MoodListEnvelope:
+      type: object
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/MoodEntry" }
         meta: { $ref: "#/components/schemas/ListMeta" }
     TaskStatus:
       type: string

@@ -174,6 +174,58 @@ func TestListGoalsSupportsPaginationFilteringAndSorting(t *testing.T) {
 	}
 }
 
+func TestMoodDiaryCanBeSavedUpdatedListedAndDeleted(t *testing.T) {
+	repository := store.NewMemory()
+	bus := event.NewBus()
+	tokens := security.NewTokenManager("mood-http-test-secret-long-enough", "test", time.Hour)
+	handler := NewHandler(service.New(repository, tokens, bus), tokens, bus, slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	register := performJSON(t, handler, http.MethodPost, "/api/v1/auth/register", "", map[string]any{
+		"name": "Mood learner", "email": "mood@example.com", "password": "safe-password-123",
+	})
+	var auth struct {
+		Data struct {
+			Token string `json:"token"`
+		} `json:"data"`
+	}
+	if register.Code != http.StatusCreated || json.Unmarshal(register.Body.Bytes(), &auth) != nil || auth.Data.Token == "" {
+		t.Fatalf("register mood user failed: status = %d, body = %s", register.Code, register.Body.String())
+	}
+
+	payload := map[string]any{
+		"mood": "good", "note": "完成了一次舒适的学习节奏", "activities": []string{"学习", "散步"}, "tags": []string{"go"}, "stress": 2, "energy": 4,
+	}
+	saved := performJSON(t, handler, http.MethodPut, "/api/v1/moods/2026-08-29", auth.Data.Token, payload)
+	if saved.Code != http.StatusOK || !strings.Contains(saved.Body.String(), "\"mood\":\"good\"") {
+		t.Fatalf("save mood status = %d, body = %s", saved.Code, saved.Body.String())
+	}
+
+	updated := performJSON(t, handler, http.MethodPut, "/api/v1/moods/2026-08-29", auth.Data.Token, map[string]any{
+		"mood": "great", "note": "更新后的日记", "activities": []string{"学习"}, "tags": []string{}, "stress": 1, "energy": 5,
+	})
+	if updated.Code != http.StatusOK || !strings.Contains(updated.Body.String(), "更新后的日记") {
+		t.Fatalf("update mood status = %d, body = %s", updated.Code, updated.Body.String())
+	}
+	list := performJSON(t, handler, http.MethodGet, "/api/v1/moods?month=2026-08", auth.Data.Token, nil)
+	if list.Code != http.StatusOK || !strings.Contains(list.Body.String(), "\"count\":1") || !strings.Contains(list.Body.String(), "\"mood\":\"great\"") {
+		t.Fatalf("list moods status = %d, body = %s", list.Code, list.Body.String())
+	}
+	insights := performJSON(t, handler, http.MethodGet, "/api/v1/moods/insights?month=2026-08", auth.Data.Token, nil)
+	if insights.Code != http.StatusOK || !strings.Contains(insights.Body.String(), "\"logged_days\":1") || !strings.Contains(insights.Body.String(), "\"average_mood\":5") {
+		t.Fatalf("mood insights status = %d, body = %s", insights.Code, insights.Body.String())
+	}
+	deleted := performJSON(t, handler, http.MethodDelete, "/api/v1/moods/2026-08-29", auth.Data.Token, nil)
+	if deleted.Code != http.StatusNoContent {
+		t.Fatalf("delete mood status = %d, body = %s", deleted.Code, deleted.Body.String())
+	}
+	invalid := performJSON(t, handler, http.MethodPut, "/api/v1/moods/2026-08-29", auth.Data.Token, map[string]any{
+		"mood": "unknown", "stress": 2, "energy": 4,
+	})
+	if invalid.Code != http.StatusBadRequest {
+		t.Fatalf("invalid mood status = %d, want %d", invalid.Code, http.StatusBadRequest)
+	}
+}
+
 func performJSON(t *testing.T, handler http.Handler, method, path, token string, body any) *httptest.ResponseRecorder {
 	t.Helper()
 	var payload io.Reader

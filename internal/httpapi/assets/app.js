@@ -9,6 +9,11 @@
     goalPage: [],
     goalMeta: { count: 0, total: 0, page: 1, page_size: 8, total_pages: 0 },
     goalQuery: { status: "", sort: "created_at", order: "desc", page: 1, pageSize: 8 },
+    moodEntries: [],
+    moodInsights: null,
+    moodMonth: monthKey(new Date()),
+    moodSelectedDate: localDateKey(new Date()),
+    theme: loadTheme(),
     tasks: [],
     decks: [],
     dueCards: [],
@@ -28,6 +33,14 @@
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+
+  const moodOptions = [
+    { value: "awful", emoji: "😣", label: "很糟" },
+    { value: "low", emoji: "🙁", label: "低落" },
+    { value: "neutral", emoji: "😐", label: "平静" },
+    { value: "good", emoji: "🙂", label: "不错" },
+    { value: "great", emoji: "😄", label: "很好" },
+  ];
 
   async function api(path, options = {}) {
     const { returnEnvelope = false, ...requestOptions } = options;
@@ -89,6 +102,17 @@
     return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
   }
 
+  function localDateKey(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  function monthKey(date) {
+    return localDateKey(date).slice(0, 7);
+  }
+
   function loadFocus() {
     try {
       const value = JSON.parse(localStorage.getItem("studyflow.focus") || "null");
@@ -110,6 +134,25 @@
 
   function persistDailyFocusGoal() {
     localStorage.setItem(`studyflow.dailyFocusGoal.${state.user?.id || "default"}`, String(state.dailyFocusGoalMinutes));
+  }
+
+  function loadTheme() {
+    return localStorage.getItem("studyflow.theme") === "dark" ? "dark" : "light";
+  }
+
+  function applyTheme(theme, persist = false) {
+    state.theme = theme === "dark" ? "dark" : "light";
+    document.documentElement.dataset.theme = state.theme;
+    const dark = state.theme === "dark";
+    $("#theme-toggle").setAttribute("aria-label", dark ? "切换至浅色模式" : "切换至夜间模式");
+    $("#theme-toggle").setAttribute("title", dark ? "切换至浅色模式" : "切换至夜间模式");
+    $("#theme-toggle").querySelector('[aria-hidden="true"]').textContent = dark ? "☀" : "☾";
+    $("#theme-toggle-label").textContent = dark ? "浅色" : "夜间";
+    if (persist) localStorage.setItem("studyflow.theme", state.theme);
+  }
+
+  function toggleTheme() {
+    applyTheme(state.theme === "dark" ? "light" : "dark", true);
   }
 
   function authTab(tab) {
@@ -141,6 +184,10 @@
     state.goalPage = [];
     state.goalMeta = { count: 0, total: 0, page: 1, page_size: 8, total_pages: 0 };
     state.goalQuery = { status: "", sort: "created_at", order: "desc", page: 1, pageSize: 8 };
+    state.moodEntries = [];
+    state.moodInsights = null;
+    state.moodMonth = monthKey(new Date());
+    state.moodSelectedDate = localDateKey(new Date());
     state.tasks = [];
     state.decks = [];
     state.dueCards = [];
@@ -157,6 +204,7 @@
     const labels = {
       dashboard: ["今天也在前进", "学习概览"],
       goals: ["GOALS", "学习目标"],
+      moods: ["MOOD JOURNAL", "心情日记"],
       tasks: ["TASKS", "学习任务"],
       review: ["SPACED REPETITION", "间隔复习"],
       focus: ["FOCUS", "专注会话"],
@@ -181,10 +229,12 @@
   }
 
   async function refresh() {
-    const [dashboard, goalPageResponse, activeGoalsResponse, tasks, dueCards, decks, activeFocus] = await Promise.all([
+    const [dashboard, goalPageResponse, activeGoalsResponse, moods, moodInsights, tasks, dueCards, decks, activeFocus] = await Promise.all([
       api("/api/v1/dashboard"),
       api(goalListURL(), { returnEnvelope: true }),
       api("/api/v1/goals?status=active&sort=title&order=asc&page=1&page_size=50", { returnEnvelope: true }),
+      api(`/api/v1/moods?month=${state.moodMonth}`),
+      api(`/api/v1/moods/insights?month=${state.moodMonth}`),
       api("/api/v1/tasks"),
       api("/api/v1/cards/due?limit=50"),
       api("/api/v1/decks"),
@@ -194,6 +244,8 @@
     state.goalPage = goalPageResponse.data || [];
     state.goalMeta = goalPageResponse.meta || state.goalMeta;
     state.goals = activeGoalsResponse.data || [];
+    state.moodEntries = moods || [];
+    state.moodInsights = moodInsights || null;
     state.tasks = tasks;
     state.dueCards = dueCards;
     state.decks = decks;
@@ -231,6 +283,7 @@
   function render() {
     renderDashboard();
     renderGoals();
+    renderMoods();
     renderTasks();
     renderReview();
     renderFocus();
@@ -312,6 +365,163 @@
     buttons.push(`<button class="page-button" type="button" data-goal-page="${page + 1}" ${page === totalPages ? "disabled" : ""}>下一页</button>`);
     pagination.className = "pagination";
     pagination.innerHTML = buttons.join("");
+  }
+
+  function renderMoods() {
+    const calendar = $("#mood-calendar");
+    if (!calendar) return;
+    const [year, month] = state.moodMonth.split("-").map(Number);
+    const firstDay = new Date(year, month - 1, 1);
+    const leadingDays = (firstDay.getDay() + 6) % 7;
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const entryByDate = new Map(state.moodEntries.map((entry) => [entry.date, entry]));
+    const cells = [];
+    for (let index = 0; index < leadingDays; index += 1) cells.push('<span class="mood-day empty" aria-hidden="true"></span>');
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = `${state.moodMonth}-${String(day).padStart(2, "0")}`;
+      const entry = entryByDate.get(date);
+      const option = moodOptions.find((item) => item.value === entry?.mood);
+      const classes = ["mood-day"];
+      if (entry) classes.push("has-entry");
+      if (date === state.moodSelectedDate) classes.push("selected");
+      if (date === localDateKey(new Date())) classes.push("today");
+      cells.push(`<button class="${classes.join(" ")}" type="button" data-mood-date="${date}" aria-label="${date}${option ? `，${option.label}` : "，尚未记录"}"><span class="mood-date">${day}</span><span class="mood-face">${option?.emoji || ""}</span></button>`);
+    }
+    calendar.innerHTML = cells.join("");
+    $("#mood-month-title").textContent = new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long" }).format(firstDay);
+    renderMoodForm(entryByDate.get(state.moodSelectedDate));
+    renderMoodInsights();
+    renderMoodTrend();
+  }
+
+  function renderMoodForm(entry) {
+    const mood = entry?.mood || "neutral";
+    $("#mood-selected-date").textContent = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "long" }).format(new Date(`${state.moodSelectedDate}T12:00:00`));
+    $("#mood-value").value = mood;
+    $$('[data-mood-choice]').forEach((button) => {
+      const selected = button.dataset.moodChoice === mood;
+      button.classList.toggle("selected", selected);
+      button.setAttribute("aria-checked", String(selected));
+    });
+    $("#mood-note").value = entry?.note || "";
+    $("#mood-tags").value = (entry?.tags || []).join(", ");
+    $("#mood-stress").value = entry?.stress || 3;
+    $("#mood-energy").value = entry?.energy || 3;
+    $("#mood-stress-value").textContent = $("#mood-stress").value;
+    $("#mood-energy-value").textContent = $("#mood-energy").value;
+    const activities = new Set(entry?.activities || []);
+    $$('[data-mood-activity]').forEach((button) => button.classList.toggle("selected", activities.has(button.dataset.moodActivity)));
+    $("#delete-mood-entry").disabled = !entry;
+  }
+
+  function renderMoodInsights() {
+    const insights = state.moodInsights || {};
+    const loggedDays = Number(insights.logged_days || 0);
+    const average = (value) => Number(value || 0) ? Number(value).toFixed(1) : "–";
+    $("#mood-logged-days").textContent = `${loggedDays} 天`;
+    $("#mood-average").textContent = average(insights.average_mood);
+    $("#mood-streak").textContent = insights.longest_streak || 0;
+    $("#mood-stress-average").textContent = average(insights.average_stress);
+    $("#mood-energy-average").textContent = average(insights.average_energy);
+    const distribution = insights.mood_distribution || {};
+    $("#mood-distribution").innerHTML = moodOptions.map((option) => {
+      const count = Number(distribution[option.value] || 0);
+      const width = loggedDays ? Math.round(count * 100 / loggedDays) : 0;
+      return `<div class="mood-distribution-row"><span>${option.emoji} ${option.label}</span><div class="mood-distribution-track"><span style="width:${width}%"></span></div><strong>${count}</strong></div>`;
+    }).join("");
+    const activities = insights.top_activities || [];
+    $("#mood-top-activities").innerHTML = activities.length
+      ? `<div class="mood-activity-tags">${activities.map((activity) => `<span>${escapeHTML(activity.name)} · ${activity.count}</span>`).join("")}</div>`
+      : "本月还没有活动记录";
+  }
+
+  function renderMoodTrend() {
+    const container = $("#mood-trend");
+    const caption = $("#mood-trend-caption");
+    const entries = state.moodEntries.map((entry) => ({ ...entry, score: moodOptions.findIndex((option) => option.value === entry.mood) + 1 })).filter((entry) => entry.score > 0);
+    if (!entries.length) {
+      caption.textContent = "等待记录";
+      container.className = "mood-trend empty-state";
+      container.textContent = "记录几天心情后，这里会呈现你的变化轨迹。";
+      return;
+    }
+    const [year, month] = state.moodMonth.split("-").map(Number);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const width = 560;
+    const height = 190;
+    const left = 33;
+    const right = 14;
+    const top = 15;
+    const bottom = 31;
+    const x = (day) => left + ((day - 1) / Math.max(1, daysInMonth - 1)) * (width - left - right);
+    const y = (score) => top + ((5 - score) / 4) * (height - top - bottom);
+    const points = entries.map((entry) => ({ ...entry, day: Number(entry.date.slice(-2)), x: x(Number(entry.date.slice(-2))), y: y(entry.score) }));
+    const average = Number(state.moodInsights?.average_mood || 0).toFixed(1);
+    caption.textContent = `已记录 ${entries.length} 天 · 平均 ${average}`;
+    const grid = moodOptions.map((option, index) => `<line x1="${left}" y1="${y(index + 1)}" x2="${width - right}" y2="${y(index + 1)}" class="mood-trend-grid"/><text x="3" y="${y(index + 1) + 4}" class="mood-trend-label">${option.emoji}</text>`).join("");
+    const polyline = points.map((point) => `${point.x},${point.y}`).join(" ");
+    const dots = points.map((point) => {
+      const option = moodOptions[point.score - 1];
+      return `<circle cx="${point.x}" cy="${point.y}" r="5" class="mood-trend-dot"><title>${point.date} · ${option.label}</title></circle>`;
+    }).join("");
+    const labels = [1, Math.ceil(daysInMonth / 2), daysInMonth].map((day) => `<text x="${x(day)}" y="${height - 8}" text-anchor="middle" class="mood-trend-axis">${day}日</text>`).join("");
+    container.className = "mood-trend";
+    container.innerHTML = `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true">${grid}<polyline points="${polyline}" class="mood-trend-line"/>${dots}${labels}</svg>`;
+  }
+
+  async function refreshMoods() {
+    const [entries, insights] = await Promise.all([
+      api(`/api/v1/moods?month=${state.moodMonth}`),
+      api(`/api/v1/moods/insights?month=${state.moodMonth}`),
+    ]);
+    state.moodEntries = entries || [];
+    state.moodInsights = insights || null;
+    renderMoods();
+  }
+
+  async function shiftMoodMonth(offset) {
+    const [year, month] = state.moodMonth.split("-").map(Number);
+    const next = new Date(year, month - 1 + offset, 1);
+    state.moodMonth = monthKey(next);
+    if (!state.moodSelectedDate.startsWith(state.moodMonth)) state.moodSelectedDate = `${state.moodMonth}-01`;
+    try {
+      await refreshMoods();
+    } catch (error) {
+      notify(error.message, "error");
+    }
+  }
+
+  async function saveMoodEntry(event) {
+    event.preventDefault();
+    const button = event.currentTarget.querySelector('button[type="submit"]');
+    button.disabled = true;
+    try {
+      const activities = $$('[data-mood-activity].selected').map((item) => item.dataset.moodActivity);
+      const tags = $("#mood-tags").value.split(",").map((tag) => tag.trim()).filter(Boolean);
+      await api(`/api/v1/moods/${state.moodSelectedDate}`, { method: "PUT", body: JSON.stringify({ mood: $("#mood-value").value, note: $("#mood-note").value, activities, tags, stress: Number($("#mood-stress").value), energy: Number($("#mood-energy").value) }) });
+      await refreshMoods();
+      notify("心情日记已保存。");
+    } catch (error) {
+      notify(error.message, "error");
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function deleteMoodEntry() {
+    const exists = state.moodEntries.some((entry) => entry.date === state.moodSelectedDate);
+    if (!exists) return;
+    const button = $("#delete-mood-entry");
+    button.disabled = true;
+    try {
+      await api(`/api/v1/moods/${state.moodSelectedDate}`, { method: "DELETE" });
+      await refreshMoods();
+      notify("当天的心情记录已删除。");
+    } catch (error) {
+      notify(error.message, "error");
+    } finally {
+      button.disabled = false;
+    }
   }
 
   function renderTasks() {
@@ -538,6 +748,7 @@
 
   function bindEvents() {
     $$("[data-auth-tab]").forEach((button) => button.addEventListener("click", () => authTab(button.dataset.authTab)));
+    $("#theme-toggle").addEventListener("click", toggleTheme);
     $("#logout").addEventListener("click", () => { leaveApp(); notify("已退出登录"); });
     $("#mobile-menu").addEventListener("click", () => $(".sidebar").classList.toggle("open"));
     $$("[data-view]").forEach((button) => button.addEventListener("click", () => showView(button.dataset.view)));
@@ -558,6 +769,22 @@
         renderFocusTaskPreview();
         notify("已关联该任务，设置时长后即可开始专注。");
       }
+      const moodDay = event.target.closest("[data-mood-date]");
+      if (moodDay) {
+        state.moodSelectedDate = moodDay.dataset.moodDate;
+        renderMoods();
+      }
+      const moodChoice = event.target.closest("[data-mood-choice]");
+      if (moodChoice) {
+        $("#mood-value").value = moodChoice.dataset.moodChoice;
+        $$('[data-mood-choice]').forEach((button) => {
+          const selected = button === moodChoice;
+          button.classList.toggle("selected", selected);
+          button.setAttribute("aria-checked", String(selected));
+        });
+      }
+      const moodActivity = event.target.closest("[data-mood-activity]");
+      if (moodActivity) moodActivity.classList.toggle("selected");
     });
     $("#task-filter").addEventListener("change", renderTasks);
     $("#goal-status-filter").addEventListener("change", () => updateGoalQuery({ status: $("#goal-status-filter").value, page: 1 }));
@@ -571,6 +798,12 @@
       if (!state.focus) renderReadyCountdown();
     });
     $("#focus-task").addEventListener("change", renderFocusTaskPreview);
+    $("#mood-prev-month").addEventListener("click", () => shiftMoodMonth(-1));
+    $("#mood-next-month").addEventListener("click", () => shiftMoodMonth(1));
+    $("#mood-stress").addEventListener("input", () => { $("#mood-stress-value").textContent = $("#mood-stress").value; });
+    $("#mood-energy").addEventListener("input", () => { $("#mood-energy-value").textContent = $("#mood-energy").value; });
+    $("#mood-form").addEventListener("submit", saveMoodEntry);
+    $("#delete-mood-entry").addEventListener("click", deleteMoodEntry);
     $("#edit-daily-goal").addEventListener("click", () => {
       const form = $("#daily-goal-form");
       form.classList.toggle("hidden");
@@ -745,6 +978,7 @@
   }
 
   async function bootstrap() {
+    applyTheme(state.theme);
     bindEvents();
     window.setInterval(updateFocusClock, 250);
     window.setInterval(() => {

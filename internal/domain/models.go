@@ -37,6 +37,49 @@ type Goal struct {
 	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
+type Mood string
+
+const (
+	MoodAwful   Mood = "awful"
+	MoodLow     Mood = "low"
+	MoodNeutral Mood = "neutral"
+	MoodGood    Mood = "good"
+	MoodGreat   Mood = "great"
+)
+
+// MoodEntry is a private daily check-in. Date always uses the YYYY-MM-DD form
+// so a calendar day remains stable regardless of the server time zone.
+type MoodEntry struct {
+	ID         string    `json:"id"`
+	UserID     string    `json:"user_id"`
+	Date       string    `json:"date"`
+	Mood       Mood      `json:"mood"`
+	Note       string    `json:"note"`
+	Activities []string  `json:"activities"`
+	Tags       []string  `json:"tags"`
+	Stress     int       `json:"stress"`
+	Energy     int       `json:"energy"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+type MoodActivityCount struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
+type MoodInsights struct {
+	Month            string              `json:"month"`
+	LoggedDays       int                 `json:"logged_days"`
+	AverageMood      float64             `json:"average_mood"`
+	AverageStress    float64             `json:"average_stress"`
+	AverageEnergy    float64             `json:"average_energy"`
+	LongestStreak    int                 `json:"longest_streak"`
+	DominantMood     Mood                `json:"dominant_mood,omitempty"`
+	MoodDistribution map[string]int      `json:"mood_distribution"`
+	TopActivities    []MoodActivityCount `json:"top_activities"`
+}
+
 type TaskStatus string
 
 const (

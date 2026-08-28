@@ -15,6 +15,15 @@ $goal = Invoke-RestMethod -Method Post -Uri "$baseUrl/api/v1/goals" -Headers $he
     deadline = "2026-12-31T16:00:00Z"
 } | ConvertTo-Json)
 
+$mood = Invoke-RestMethod -Method Put -Uri "$baseUrl/api/v1/moods/$((Get-Date).ToString('yyyy-MM-dd'))" -Headers $headers -ContentType "application/json" -Body (@{
+    mood = "good"
+    note = "Built a useful study routine today."
+    activities = @("study", "walk")
+    tags = @("go", "momentum")
+    stress = 2
+    energy = 4
+} | ConvertTo-Json)
+
 $task = Invoke-RestMethod -Method Post -Uri "$baseUrl/api/v1/tasks" -Headers $headers -ContentType "application/json" -Body (@{
     goal_id = $goal.data.id
     title = "Understand event bus concurrency"

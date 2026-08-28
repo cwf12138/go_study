@@ -25,6 +25,11 @@ type Repository interface {
 	UpdateGoal(context.Context, domain.Goal) error
 	ListGoals(context.Context, string) ([]domain.Goal, error)
 
+	UpsertMoodEntry(context.Context, domain.MoodEntry) error
+	MoodEntryByDate(context.Context, string, string) (domain.MoodEntry, error)
+	ListMoodEntries(context.Context, string, string) ([]domain.MoodEntry, error)
+	DeleteMoodEntry(context.Context, string, string) error
+
 	CreateTask(context.Context, domain.StudyTask) error
 	TaskByID(context.Context, string) (domain.StudyTask, error)
 	UpdateTask(context.Context, domain.StudyTask) error

@@ -23,7 +23,7 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 
 	home := httptest.NewRecorder()
 	handler.ServeHTTP(home, httptest.NewRequest(http.MethodGet, "/", nil))
-	if home.Code != http.StatusOK || !strings.Contains(home.Body.String(), "StudyFlow") {
+	if home.Code != http.StatusOK || !strings.Contains(home.Body.String(), "StudyFlow") || !strings.Contains(home.Body.String(), "mood-trend") || !strings.Contains(home.Body.String(), "theme-toggle") {
 		t.Fatalf("home status = %d, body = %q", home.Code, home.Body.String())
 	}
 	if contentType := home.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "text/html") {

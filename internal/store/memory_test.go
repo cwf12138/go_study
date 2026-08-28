@@ -19,6 +19,9 @@ func TestSnapshotRoundTripPreservesCredentialsAndData(t *testing.T) {
 	if err := first.CreateTask(ctx, domain.StudyTask{ID: "t1", UserID: user.ID, Title: "Read Go blog", Tags: []string{"go"}}); err != nil {
 		t.Fatal(err)
 	}
+	if err := first.UpsertMoodEntry(ctx, domain.MoodEntry{ID: "m1", UserID: user.ID, Date: "2026-08-29", Mood: domain.MoodGood, Note: "A steady day", Activities: []string{"study"}, Stress: 2, Energy: 4}); err != nil {
+		t.Fatal(err)
+	}
 	path := filepath.Join(t.TempDir(), "snapshot.json")
 	if err := first.SaveJSON(path); err != nil {
 		t.Fatalf("SaveJSON() error = %v", err)
@@ -38,5 +41,9 @@ func TestSnapshotRoundTripPreservesCredentialsAndData(t *testing.T) {
 	tasks, err := second.ListTasks(ctx, user.ID, TaskFilter{})
 	if err != nil || len(tasks) != 1 || tasks[0].Title != "Read Go blog" {
 		t.Fatalf("unexpected tasks: %+v, error: %v", tasks, err)
+	}
+	moods, err := second.ListMoodEntries(ctx, user.ID, "2026-08")
+	if err != nil || len(moods) != 1 || moods[0].Note != "A steady day" {
+		t.Fatalf("unexpected moods: %+v, error: %v", moods, err)
 	}
 }
