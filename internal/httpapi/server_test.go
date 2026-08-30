@@ -664,6 +664,62 @@ func TestExportHTTPProvidesPortableFormatsWithoutPasswordHash(t *testing.T) {
 	}
 }
 
+func TestVocabularyCatalogHTTPImportsAndPaginatesLargeBook(t *testing.T) {
+	repository := store.NewMemory()
+	bus := event.NewBus()
+	tokens := security.NewTokenManager("catalog-http-secret-long-enough", "test", time.Hour)
+	handler := NewHandler(service.New(repository, tokens, bus), tokens, bus, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	register := performJSON(t, handler, http.MethodPost, "/api/v1/auth/register", "", map[string]any{
+		"name": "Exam learner", "email": "exam@example.com", "password": "safe-password-123",
+	})
+	var auth struct {
+		Data struct {
+			Token string `json:"token"`
+		} `json:"data"`
+	}
+	if register.Code != http.StatusCreated || json.Unmarshal(register.Body.Bytes(), &auth) != nil {
+		t.Fatalf("register exam user: %s", register.Body.String())
+	}
+	catalogs := performJSON(t, handler, http.MethodGet, "/api/v1/vocabulary/catalogs", auth.Data.Token, nil)
+	if catalogs.Code != http.StatusOK || !strings.Contains(catalogs.Body.String(), `"id":"ielts"`) || !strings.Contains(catalogs.Body.String(), `"word_count":5040`) || !strings.Contains(catalogs.Body.String(), `"license":"MIT"`) {
+		t.Fatalf("catalog list status=%d body=%s", catalogs.Code, catalogs.Body.String())
+	}
+	installed := performJSON(t, handler, http.MethodPost, "/api/v1/vocabulary/catalogs/ielts/import", auth.Data.Token, map[string]any{"daily_new_limit": 10})
+	if installed.Code != http.StatusOK || !strings.Contains(installed.Body.String(), `"added":5040`) || !strings.Contains(installed.Body.String(), `"source_id":"ielts"`) {
+		t.Fatalf("catalog import status=%d body=%s", installed.Code, installed.Body.String())
+	}
+	var imported struct {
+		Data struct {
+			Book struct {
+				ID string `json:"id"`
+			} `json:"book"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(installed.Body.Bytes(), &imported); err != nil || imported.Data.Book.ID == "" {
+		t.Fatalf("decode catalog import: %v", err)
+	}
+	page := performJSON(t, handler, http.MethodGet, "/api/v1/words?book_id="+imported.Data.Book.ID+"&page=2&page_size=25", auth.Data.Token, nil)
+	var paged struct {
+		Data []any `json:"data"`
+		Meta struct {
+			Total      int `json:"total"`
+			Page       int `json:"page"`
+			PageSize   int `json:"page_size"`
+			TotalPages int `json:"total_pages"`
+		} `json:"meta"`
+	}
+	if err := json.Unmarshal(page.Body.Bytes(), &paged); err != nil || page.Code != http.StatusOK || len(paged.Data) != 25 || paged.Meta.Total != 5040 || paged.Meta.Page != 2 || paged.Meta.PageSize != 25 || paged.Meta.TotalPages != 202 {
+		t.Fatalf("unexpected vocabulary page status=%d meta=%+v count=%d err=%v", page.Code, paged.Meta, len(paged.Data), err)
+	}
+	queue := performJSON(t, handler, http.MethodGet, "/api/v1/words/queue?book_id="+imported.Data.Book.ID+"&limit=100", auth.Data.Token, nil)
+	var queued struct {
+		Data []any `json:"data"`
+	}
+	if err := json.Unmarshal(queue.Body.Bytes(), &queued); err != nil || queue.Code != http.StatusOK || len(queued.Data) != 10 {
+		t.Fatalf("unexpected catalog queue status=%d count=%d err=%v", queue.Code, len(queued.Data), err)
+	}
+}
+
 func performJSON(t *testing.T, handler http.Handler, method, path, token string, body any) *httptest.ResponseRecorder {
 	t.Helper()
 	var payload io.Reader

@@ -63,6 +63,8 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 	private.HandleFunc("GET /api/v1/words", s.listVocabularyWords)
 	private.HandleFunc("GET /api/v1/words/queue", s.vocabularyQueue)
 	private.HandleFunc("GET /api/v1/vocabulary/overview", s.vocabularyOverview)
+	private.HandleFunc("GET /api/v1/vocabulary/catalogs", s.listVocabularyCatalogs)
+	private.HandleFunc("POST /api/v1/vocabulary/catalogs/{catalog_id}/import", s.importVocabularyCatalog)
 	private.HandleFunc("POST /api/v1/words/{word_id}/reviews", s.reviewVocabularyWord)
 	private.HandleFunc("DELETE /api/v1/words/{word_id}", s.deleteVocabularyWord)
 	private.HandleFunc("GET /api/v1/planner/preferences", s.plannerPreferences)

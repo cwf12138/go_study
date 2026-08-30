@@ -23,11 +23,15 @@
     vocabularyWords: [],
     vocabularyQueue: [],
     vocabularyOverview: null,
+    vocabularyCatalogs: [],
     vocabularyBookID: "",
     vocabularyMode: "flashcard",
     vocabularyRevealed: false,
     vocabularySearch: "",
     vocabularyStage: "",
+    vocabularyPage: 1,
+    vocabularyPageSize: 100,
+    vocabularyMeta: { total: 0, page: 1, total_pages: 1 },
     plannerWeekStart: mondayKey(new Date()),
     plannerWeek: null,
     plannerSelectedBlockID: "",
@@ -44,6 +48,7 @@
     isFinishingFocus: false,
     isUpdatingFocus: false,
     toastTimer: null,
+    vocabularySearchTimer: null,
   };
 
   const $ = (selector) => document.querySelector(selector);
@@ -245,11 +250,14 @@
     state.vocabularyWords = [];
     state.vocabularyQueue = [];
     state.vocabularyOverview = null;
+    state.vocabularyCatalogs = [];
     state.vocabularyBookID = "";
     state.vocabularyMode = "flashcard";
     state.vocabularyRevealed = false;
     state.vocabularySearch = "";
     state.vocabularyStage = "";
+    state.vocabularyPage = 1;
+    state.vocabularyMeta = { total: 0, page: 1, total_pages: 1 };
     state.plannerWeekStart = mondayKey(new Date());
     state.plannerWeek = null;
     state.plannerSelectedBlockID = "";
@@ -310,14 +318,14 @@
         : (books[0]?.id || "");
       if (!selectedBookID) return { books, selectedBookID, words: [], queue: [], overview: null };
       const bookQuery = `book_id=${encodeURIComponent(selectedBookID)}`;
-      const [words, queue, overview] = await Promise.all([
-        api(`/api/v1/words?${bookQuery}`),
+      const [wordPage, queue, overview] = await Promise.all([
+        api(`/api/v1/words?${bookQuery}&page=1&page_size=${state.vocabularyPageSize}`, { returnEnvelope: true }),
         api(`/api/v1/words/queue?${bookQuery}&limit=100`),
         api(`/api/v1/vocabulary/overview?${bookQuery}`),
       ]);
-      return { books, selectedBookID, words, queue, overview };
+      return { books, selectedBookID, words: wordPage.data || [], wordMeta: wordPage.meta || {}, queue, overview };
     });
-    const [dashboard, goalPageResponse, activeGoalsResponse, moods, moodInsights, tasks, todoLists, todos, vocabulary, plannerWeek, learningInsights, weeklyReview, dueCards, decks, activeFocus] = await Promise.all([
+    const [dashboard, goalPageResponse, activeGoalsResponse, moods, moodInsights, tasks, todoLists, todos, vocabulary, vocabularyCatalogs, plannerWeek, learningInsights, weeklyReview, dueCards, decks, activeFocus] = await Promise.all([
       api("/api/v1/dashboard"),
       api(goalListURL(), { returnEnvelope: true }),
       api("/api/v1/goals?status=active&sort=title&order=asc&page=1&page_size=50", { returnEnvelope: true }),
@@ -327,6 +335,7 @@
       todoListsRequest,
       todosRequest,
       vocabularyRequest,
+      api("/api/v1/vocabulary/catalogs"),
       api(`/api/v1/planner/week?week_start=${encodeURIComponent(state.plannerWeekStart)}`),
       api(`/api/v1/analytics/learning?days=${state.insightsDays}`),
       api(`/api/v1/reviews/weekly?week_start=${encodeURIComponent(state.weeklyReviewWeekStart)}`),
@@ -346,8 +355,10 @@
     state.wordBooks = vocabulary.books || [];
     state.vocabularyBookID = vocabulary.selectedBookID || "";
     state.vocabularyWords = vocabulary.words || [];
+    state.vocabularyMeta = vocabulary.wordMeta || { total: state.vocabularyWords.length, page: 1, total_pages: 1 };
     state.vocabularyQueue = vocabulary.queue || [];
     state.vocabularyOverview = vocabulary.overview || null;
+    state.vocabularyCatalogs = vocabularyCatalogs || [];
     state.plannerWeek = plannerWeek || null;
     state.learningInsights = learningInsights || null;
     state.weeklyReview = weeklyReview || null;
@@ -1200,6 +1211,7 @@
   }
 
   function renderVocabulary() {
+    renderVocabularyCatalogs();
     const overview = state.vocabularyOverview || {};
     const currentBook = state.wordBooks.find((book) => book.id === state.vocabularyBookID);
     const word = currentVocabularyWord();
@@ -1211,7 +1223,7 @@
     $("#vocab-queue-progress").textContent = word ? `待复习 ${state.vocabularyQueue.length}` : "今日完成";
 
     $("#vocab-books").innerHTML = state.wordBooks.map((book) => {
-      const count = book.id === state.vocabularyBookID ? `${state.vocabularyWords.length} 词` : `每日 ${book.daily_new_limit} 新词`;
+      const count = book.id === state.vocabularyBookID ? `${state.vocabularyMeta.total || 0} 词` : `每日 ${book.daily_new_limit} 新词`;
       return `<button class="vocab-book-button ${book.id === state.vocabularyBookID ? "active" : ""}" type="button" data-vocab-book="${book.id}"><span><strong>${escapeHTML(book.name)}</strong><small>${escapeHTML(book.description || book.language?.toUpperCase() || "词书")}</small></span><b>${count}</b></button>`;
     }).join("");
 
@@ -1242,12 +1254,7 @@
       }
     }
 
-    const search = state.vocabularySearch.toLowerCase();
-    const words = state.vocabularyWords.filter((item) => {
-      const matchesStage = !state.vocabularyStage || item.stage === state.vocabularyStage;
-      const matchesSearch = !search || item.term.toLowerCase().includes(search) || item.definition.toLowerCase().includes(search);
-      return matchesStage && matchesSearch;
-    });
+    const words = state.vocabularyWords;
     const library = $("#vocab-word-list");
     if (!words.length) {
       library.className = "vocab-word-list empty-state";
@@ -1256,17 +1263,63 @@
       library.className = "vocab-word-list";
       library.innerHTML = words.map((item) => `<article class="vocab-word-row"><div class="vocab-word-main"><div><h4>${escapeHTML(item.term)}</h4>${item.phonetic ? `<span>${escapeHTML(item.phonetic)}</span>` : ""}</div><p>${escapeHTML(item.definition)}</p>${(item.tags || []).map((tag) => `<span class="tag">#${escapeHTML(tag)}</span>`).join("")}</div><div class="vocab-word-meta"><span class="vocab-stage ${item.stage}">${vocabularyStageLabel(item.stage)}</span><small>${item.stage === "new" ? `创建于 ${formatDate(item.created_at)}` : `下次 ${formatDate(item.due_at, true)}`}</small><button class="vocab-delete" type="button" data-vocab-delete="${item.id}" aria-label="删除单词 ${escapeHTML(item.term)}" title="删除单词">×</button></div></article>`).join("");
     }
+    const totalPages = Number(state.vocabularyMeta.total_pages || 1);
+    $("#vocab-library-total").textContent = `${Number(state.vocabularyMeta.total || 0).toLocaleString()} 个匹配单词`;
+    $("#vocab-pagination").classList.toggle("hidden", totalPages <= 1);
+    $("#vocab-page-label").textContent = `第 ${state.vocabularyPage} / ${totalPages} 页`;
+    $("#vocab-page-prev").disabled = state.vocabularyPage <= 1;
+    $("#vocab-page-next").disabled = state.vocabularyPage >= totalPages;
+  }
+
+  function renderVocabularyCatalogs() {
+    const container = $("#vocab-catalogs");
+    if (!container) return;
+    if (!state.vocabularyCatalogs.length) {
+      container.innerHTML = '<div class="empty-state">内置词书暂时不可用。</div>';
+      return;
+    }
+    container.innerHTML = state.vocabularyCatalogs.map((catalog) => {
+      const complete = catalog.installed && catalog.installed_word_count >= catalog.word_count;
+      const progress = catalog.word_count ? Math.min(100, Number(catalog.installed_word_count || 0) / catalog.word_count * 100) : 0;
+      return `<article class="vocab-catalog ${catalog.installed ? "installed" : ""}"><div class="vocab-catalog-badge">${escapeHTML(catalog.exam)}</div><div class="vocab-catalog-main"><div><h4>${escapeHTML(catalog.name)}</h4><span>${catalog.word_count.toLocaleString()} 词 · ${escapeHTML(catalog.license)} 许可</span></div><p>${escapeHTML(catalog.description)}</p><div class="vocab-catalog-track"><span style="width:${progress}%"></span></div><small>${catalog.installed ? `已安装 ${catalog.installed_word_count.toLocaleString()} / ${catalog.word_count.toLocaleString()} 词` : `来源 ${escapeHTML(catalog.source_name)} · 可离线学习`}</small></div><button class="${complete ? "quiet" : "primary"}" type="button" data-vocab-catalog="${catalog.id}" ${complete ? "disabled" : ""}>${complete ? "已安装" : catalog.installed ? "补全词书" : "安装词书"}</button></article>`;
+    }).join("");
+  }
+
+  async function importVocabularyCatalog(catalogID, button) {
+    const catalog = state.vocabularyCatalogs.find((item) => item.id === catalogID);
+    if (!catalog || button.disabled) return;
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = "正在安装…";
+    try {
+      const result = await api(`/api/v1/vocabulary/catalogs/${encodeURIComponent(catalogID)}/import`, { method: "POST", body: JSON.stringify({ daily_new_limit: 20 }) });
+      state.vocabularyBookID = result.book.id;
+      state.vocabularyPage = 1;
+      state.vocabularySearch = "";
+      state.vocabularyStage = "";
+      await refresh();
+      showView("vocabulary");
+      notify(`${result.book.name} 已安装：新增 ${result.added.toLocaleString()} 词，跳过 ${result.skipped.toLocaleString()} 词。`);
+    } catch (error) {
+      button.disabled = false;
+      button.textContent = original;
+      notify(error.message, "error");
+    }
   }
 
   async function refreshVocabulary() {
     if (!state.vocabularyBookID) return;
     const bookQuery = `book_id=${encodeURIComponent(state.vocabularyBookID)}`;
-    const [words, queue, overview] = await Promise.all([
-      api(`/api/v1/words?${bookQuery}`),
+    const wordQuery = new URLSearchParams({ book_id: state.vocabularyBookID, page: String(state.vocabularyPage), page_size: String(state.vocabularyPageSize) });
+    if (state.vocabularySearch) wordQuery.set("q", state.vocabularySearch);
+    if (state.vocabularyStage) wordQuery.set("stage", state.vocabularyStage);
+    const [wordPage, queue, overview] = await Promise.all([
+      api(`/api/v1/words?${wordQuery}`, { returnEnvelope: true }),
       api(`/api/v1/words/queue?${bookQuery}&limit=100`),
       api(`/api/v1/vocabulary/overview?${bookQuery}`),
     ]);
-    state.vocabularyWords = words || [];
+    state.vocabularyWords = wordPage.data || [];
+    state.vocabularyMeta = wordPage.meta || { total: state.vocabularyWords.length, page: 1, total_pages: 1 };
     state.vocabularyQueue = queue || [];
     state.vocabularyOverview = overview || null;
     state.vocabularyRevealed = false;
@@ -1276,6 +1329,11 @@
   async function selectVocabularyBook(bookID) {
     if (!bookID || bookID === state.vocabularyBookID) return;
     state.vocabularyBookID = bookID;
+    state.vocabularyPage = 1;
+    state.vocabularySearch = "";
+    state.vocabularyStage = "";
+    $("#vocab-search").value = "";
+    $("#vocab-stage-filter").value = "";
     try {
       await refreshVocabulary();
       renderSelects();
@@ -1605,6 +1663,8 @@
       if (removePlannerWindow) removePlannerWindow.closest(".planner-window-row")?.remove();
       const vocabularyBook = event.target.closest("[data-vocab-book]");
       if (vocabularyBook) await selectVocabularyBook(vocabularyBook.dataset.vocabBook);
+      const vocabularyCatalog = event.target.closest("[data-vocab-catalog]");
+      if (vocabularyCatalog) await importVocabularyCatalog(vocabularyCatalog.dataset.vocabCatalog, vocabularyCatalog);
       const vocabularyMode = event.target.closest("[data-vocab-mode]");
       if (vocabularyMode) {
         state.vocabularyMode = vocabularyMode.dataset.vocabMode;
@@ -1680,12 +1740,17 @@
     });
     $("#vocab-search").addEventListener("input", () => {
       state.vocabularySearch = $("#vocab-search").value.trim();
-      renderVocabulary();
+      state.vocabularyPage = 1;
+      window.clearTimeout(state.vocabularySearchTimer);
+      state.vocabularySearchTimer = window.setTimeout(() => refreshVocabulary().catch((error) => notify(error.message, "error")), 260);
     });
     $("#vocab-stage-filter").addEventListener("change", () => {
       state.vocabularyStage = $("#vocab-stage-filter").value;
-      renderVocabulary();
+      state.vocabularyPage = 1;
+      refreshVocabulary().catch((error) => notify(error.message, "error"));
     });
+    $("#vocab-page-prev").addEventListener("click", () => { if (state.vocabularyPage > 1) { state.vocabularyPage--; refreshVocabulary().catch((error) => notify(error.message, "error")); } });
+    $("#vocab-page-next").addEventListener("click", () => { if (state.vocabularyPage < Number(state.vocabularyMeta.total_pages || 1)) { state.vocabularyPage++; refreshVocabulary().catch((error) => notify(error.message, "error")); } });
     $("#vocab-reveal").addEventListener("click", () => {
       state.vocabularyRevealed = true;
       renderVocabulary();

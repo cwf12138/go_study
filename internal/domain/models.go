@@ -189,6 +189,10 @@ type WordBook struct {
 	Description   string    `json:"description"`
 	Language      string    `json:"language"`
 	DailyNewLimit int       `json:"daily_new_limit"`
+	SourceID      string    `json:"source_id,omitempty"`
+	SourceName    string    `json:"source_name,omitempty"`
+	SourceURL     string    `json:"source_url,omitempty"`
+	License       string    `json:"license,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }
@@ -204,6 +208,7 @@ type VocabularyWord struct {
 	ExampleTranslation string          `json:"example_translation"`
 	Notes              string          `json:"notes"`
 	Tags               []string        `json:"tags"`
+	SourceRank         int             `json:"source_rank,omitempty"`
 	Stage              VocabularyStage `json:"stage"`
 	EaseFactor         float64         `json:"ease_factor"`
 	IntervalDays       int             `json:"interval_days"`
@@ -496,10 +501,10 @@ type KnowledgeLink struct {
 }
 
 type KnowledgeNoteDetail struct {
-	Note            KnowledgeNote    `json:"note"`
-	Backlinks       []KnowledgeLink  `json:"backlinks"`
-	OutgoingLinks   []KnowledgeLink  `json:"outgoing_links"`
-	UnresolvedLinks []KnowledgeLink  `json:"unresolved_links"`
+	Note            KnowledgeNote   `json:"note"`
+	Backlinks       []KnowledgeLink `json:"backlinks"`
+	OutgoingLinks   []KnowledgeLink `json:"outgoing_links"`
+	UnresolvedLinks []KnowledgeLink `json:"unresolved_links"`
 }
 
 type KnowledgeGraphNode struct {

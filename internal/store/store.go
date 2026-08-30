@@ -57,6 +57,7 @@ type Repository interface {
 	WordBookByID(context.Context, string) (domain.WordBook, error)
 	ListWordBooks(context.Context, string) ([]domain.WordBook, error)
 	CreateVocabularyWord(context.Context, domain.VocabularyWord) error
+	CreateVocabularyWords(context.Context, []domain.VocabularyWord) error
 	VocabularyWordByID(context.Context, string) (domain.VocabularyWord, error)
 	DeleteVocabularyWord(context.Context, string) error
 	ListVocabularyWords(context.Context, string, string) ([]domain.VocabularyWord, error)

@@ -368,6 +368,13 @@ func (m *Memory) ListTodos(_ context.Context, userID string, filter TodoFilter) 
 func (m *Memory) CreateWordBook(_ context.Context, book domain.WordBook) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if book.SourceID != "" {
+		for _, existing := range m.wordBooks {
+			if existing.UserID == book.UserID && existing.SourceID == book.SourceID {
+				return domain.ErrConflict
+			}
+		}
+	}
 	m.wordBooks[book.ID] = book
 	return nil
 }
@@ -407,6 +414,34 @@ func (m *Memory) CreateVocabularyWord(_ context.Context, word domain.VocabularyW
 	return nil
 }
 
+func (m *Memory) CreateVocabularyWords(_ context.Context, words []domain.VocabularyWord) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	seen := make(map[string]struct{}, len(words))
+	terms := make(map[string]struct{}, len(m.words)+len(words))
+	for _, existing := range m.words {
+		terms[existing.UserID+"\x00"+existing.BookID+"\x00"+strings.ToLower(existing.Term)] = struct{}{}
+	}
+	for _, word := range words {
+		if _, exists := m.words[word.ID]; exists {
+			return domain.ErrConflict
+		}
+		if _, exists := seen[word.ID]; exists {
+			return domain.ErrConflict
+		}
+		seen[word.ID] = struct{}{}
+		termKey := word.UserID + "\x00" + word.BookID + "\x00" + strings.ToLower(word.Term)
+		if _, exists := terms[termKey]; exists {
+			return domain.ErrConflict
+		}
+		terms[termKey] = struct{}{}
+	}
+	for _, word := range words {
+		m.words[word.ID] = cloneVocabularyWord(word)
+	}
+	return nil
+}
+
 func (m *Memory) VocabularyWordByID(_ context.Context, id string) (domain.VocabularyWord, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -443,6 +478,15 @@ func (m *Memory) ListVocabularyWords(_ context.Context, userID, bookID string) (
 	}
 	sort.Slice(items, func(i, j int) bool {
 		if items[i].DueAt.Equal(items[j].DueAt) {
+			if items[i].SourceRank != items[j].SourceRank {
+				if items[i].SourceRank == 0 {
+					return false
+				}
+				if items[j].SourceRank == 0 {
+					return true
+				}
+				return items[i].SourceRank < items[j].SourceRank
+			}
 			return strings.ToLower(items[i].Term) < strings.ToLower(items[j].Term)
 		}
 		return items[i].DueAt.Before(items[j].DueAt)

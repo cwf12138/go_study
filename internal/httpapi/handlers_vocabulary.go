@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -67,7 +68,37 @@ func (s *Server) listVocabularyWords(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, envelope{"data": items, "meta": envelope{"count": len(items)}})
+	total := len(items)
+	page, pageSize := 1, 0
+	if value := r.URL.Query().Get("page_size"); value != "" {
+		pageSize, err = strconv.Atoi(value)
+		if err != nil || pageSize < 1 || pageSize > 200 {
+			writeError(w, fmt.Errorf("%w: page_size must be between 1 and 200", domain.ErrInvalidInput))
+			return
+		}
+		if value := r.URL.Query().Get("page"); value != "" {
+			page, err = strconv.Atoi(value)
+			if err != nil || page < 1 {
+				writeError(w, fmt.Errorf("%w: page must be a positive integer", domain.ErrInvalidInput))
+				return
+			}
+		}
+		start := (page - 1) * pageSize
+		if start >= total {
+			items = []domain.VocabularyWord{}
+		} else {
+			end := min(start+pageSize, total)
+			items = items[start:end]
+		}
+	}
+	totalPages := 1
+	if pageSize > 0 {
+		totalPages = (total + pageSize - 1) / pageSize
+		if totalPages == 0 {
+			totalPages = 1
+		}
+	}
+	writeJSON(w, http.StatusOK, envelope{"data": items, "meta": envelope{"count": len(items), "total": total, "page": page, "page_size": pageSize, "total_pages": totalPages}})
 }
 
 func (s *Server) vocabularyQueue(w http.ResponseWriter, r *http.Request) {
@@ -112,4 +143,29 @@ func (s *Server) deleteVocabularyWord(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) listVocabularyCatalogs(w http.ResponseWriter, r *http.Request) {
+	items, err := s.service.ListVocabularyCatalogs(r.Context(), claimsFromContext(r.Context()).Subject)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{"data": items, "meta": envelope{"count": len(items)}})
+}
+
+func (s *Server) importVocabularyCatalog(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		DailyNewLimit int `json:"daily_new_limit"`
+	}
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeError(w, invalidJSON(err))
+		return
+	}
+	result, err := s.service.ImportVocabularyCatalog(r.Context(), claimsFromContext(r.Context()).Subject, r.PathValue("catalog_id"), service.ImportVocabularyCatalogInput{DailyNewLimit: body.DailyNewLimit})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{"data": result})
 }

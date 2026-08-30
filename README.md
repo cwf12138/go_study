@@ -167,6 +167,24 @@ make run        # 启动服务
 make build      # 输出 bin/studyflow
 ```
 
+## 内置 IELTS / TOEFL 词书
+
+“单词学习”页面可一键安装两本离线考试词书：IELTS 5,040 词与
+TOEFL 6,974 词。安装操作采用单次批量写入，重复安装只补充缺失词条；
+词库管理使用后端搜索和分页，因此不会一次向浏览器渲染数千个条目。
+新词顺序依据 ECDICT 的现代语料频率，安装后继续使用项目现有的每日新词
+上限、拼写练习和间隔复习算法。
+
+词表来自 [ECDICT](https://github.com/skywind3000/ECDICT) 的 `ielts` 与
+`toefl` 考试标签，遵循 MIT 许可证。完整来源说明及许可证位于
+`internal/vocabdata/catalogs/`。若需基于新版上游 CSV 重建：
+
+```bash
+go run ./tools/build_exam_catalogs.go -input /path/to/ecdict.csv
+```
+
+IELTS 与 TOEFL 名称仅用于描述考试分类，不代表相关考试机构对本项目的认可。
+
 ## License
 
 MIT
