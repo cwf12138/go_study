@@ -15,29 +15,49 @@ import (
 )
 
 type Memory struct {
-	mu       sync.RWMutex
-	users    map[string]domain.User
-	emails   map[string]string
-	goals    map[string]domain.Goal
-	moods    map[string]domain.MoodEntry
-	tasks    map[string]domain.StudyTask
-	decks    map[string]domain.Deck
-	cards    map[string]domain.Card
-	reviews  map[string]domain.Review
-	sessions map[string]domain.FocusSession
+	mu                sync.RWMutex
+	users             map[string]domain.User
+	emails            map[string]string
+	goals             map[string]domain.Goal
+	moods             map[string]domain.MoodEntry
+	tasks             map[string]domain.StudyTask
+	todoLists         map[string]domain.TodoList
+	todos             map[string]domain.TodoItem
+	wordBooks         map[string]domain.WordBook
+	words             map[string]domain.VocabularyWord
+	wordReviews       map[string]domain.VocabularyReview
+	plannerPrefs      map[string]domain.PlannerPreferences
+	planBlocks        map[string]domain.StudyPlanBlock
+	plannerReports    map[string]domain.PlannerReport
+	weeklyReflections map[string]domain.WeeklyReflection
+	knowledgeNotes    map[string]domain.KnowledgeNote
+	decks             map[string]domain.Deck
+	cards             map[string]domain.Card
+	reviews           map[string]domain.Review
+	sessions          map[string]domain.FocusSession
 }
 
 func NewMemory() *Memory {
 	return &Memory{
-		users:    make(map[string]domain.User),
-		emails:   make(map[string]string),
-		goals:    make(map[string]domain.Goal),
-		moods:    make(map[string]domain.MoodEntry),
-		tasks:    make(map[string]domain.StudyTask),
-		decks:    make(map[string]domain.Deck),
-		cards:    make(map[string]domain.Card),
-		reviews:  make(map[string]domain.Review),
-		sessions: make(map[string]domain.FocusSession),
+		users:             make(map[string]domain.User),
+		emails:            make(map[string]string),
+		goals:             make(map[string]domain.Goal),
+		moods:             make(map[string]domain.MoodEntry),
+		tasks:             make(map[string]domain.StudyTask),
+		todoLists:         make(map[string]domain.TodoList),
+		todos:             make(map[string]domain.TodoItem),
+		wordBooks:         make(map[string]domain.WordBook),
+		words:             make(map[string]domain.VocabularyWord),
+		wordReviews:       make(map[string]domain.VocabularyReview),
+		plannerPrefs:      make(map[string]domain.PlannerPreferences),
+		planBlocks:        make(map[string]domain.StudyPlanBlock),
+		plannerReports:    make(map[string]domain.PlannerReport),
+		weeklyReflections: make(map[string]domain.WeeklyReflection),
+		knowledgeNotes:    make(map[string]domain.KnowledgeNote),
+		decks:             make(map[string]domain.Deck),
+		cards:             make(map[string]domain.Card),
+		reviews:           make(map[string]domain.Review),
+		sessions:          make(map[string]domain.FocusSession),
 	}
 }
 
@@ -100,6 +120,16 @@ func (m *Memory) UpdateGoal(_ context.Context, goal domain.Goal) error {
 	return nil
 }
 
+func (m *Memory) DeleteGoal(_ context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.goals[id]; !ok {
+		return domain.ErrNotFound
+	}
+	delete(m.goals, id)
+	return nil
+}
+
 func (m *Memory) ListGoals(_ context.Context, userID string) ([]domain.Goal, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -143,6 +173,19 @@ func (m *Memory) ListMoodEntries(_ context.Context, userID, month string) ([]dom
 	return items, nil
 }
 
+func (m *Memory) ListAllMoodEntries(_ context.Context, userID string) ([]domain.MoodEntry, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	items := make([]domain.MoodEntry, 0)
+	for _, entry := range m.moods {
+		if entry.UserID == userID {
+			items = append(items, cloneMoodEntry(entry))
+		}
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].Date > items[j].Date })
+	return items, nil
+}
+
 func (m *Memory) DeleteMoodEntry(_ context.Context, userID, date string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -181,6 +224,16 @@ func (m *Memory) UpdateTask(_ context.Context, task domain.StudyTask) error {
 	return nil
 }
 
+func (m *Memory) DeleteTask(_ context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.tasks[id]; !ok {
+		return domain.ErrNotFound
+	}
+	delete(m.tasks, id)
+	return nil
+}
+
 func (m *Memory) ListTasks(_ context.Context, userID string, filter TaskFilter) ([]domain.StudyTask, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -202,6 +255,431 @@ func (m *Memory) ListTasks(_ context.Context, userID string, filter TaskFilter) 
 			return true
 		}
 		return items[i].DueAt.Before(*items[j].DueAt)
+	})
+	return items, nil
+}
+
+func (m *Memory) CreateTodoList(_ context.Context, list domain.TodoList) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if list.Kind == domain.TodoListInbox {
+		for _, existing := range m.todoLists {
+			if existing.UserID == list.UserID && existing.Kind == domain.TodoListInbox {
+				return domain.ErrConflict
+			}
+		}
+	}
+	m.todoLists[list.ID] = list
+	return nil
+}
+
+func (m *Memory) TodoListByID(_ context.Context, id string) (domain.TodoList, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	list, ok := m.todoLists[id]
+	if !ok {
+		return domain.TodoList{}, domain.ErrNotFound
+	}
+	return list, nil
+}
+
+func (m *Memory) DeleteTodoList(_ context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.todoLists[id]; !ok {
+		return domain.ErrNotFound
+	}
+	delete(m.todoLists, id)
+	return nil
+}
+
+func (m *Memory) ListTodoLists(_ context.Context, userID string) ([]domain.TodoList, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	items := make([]domain.TodoList, 0)
+	for _, list := range m.todoLists {
+		if list.UserID == userID {
+			items = append(items, list)
+		}
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Kind == domain.TodoListInbox {
+			return true
+		}
+		if items[j].Kind == domain.TodoListInbox {
+			return false
+		}
+		return strings.ToLower(items[i].Name) < strings.ToLower(items[j].Name)
+	})
+	return items, nil
+}
+
+func (m *Memory) CreateTodo(_ context.Context, todo domain.TodoItem) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.todos[todo.ID] = cloneTodo(todo)
+	return nil
+}
+
+func (m *Memory) TodoByID(_ context.Context, id string) (domain.TodoItem, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	todo, ok := m.todos[id]
+	if !ok {
+		return domain.TodoItem{}, domain.ErrNotFound
+	}
+	return cloneTodo(todo), nil
+}
+
+func (m *Memory) UpdateTodo(_ context.Context, todo domain.TodoItem) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.todos[todo.ID]; !ok {
+		return domain.ErrNotFound
+	}
+	m.todos[todo.ID] = cloneTodo(todo)
+	return nil
+}
+
+func (m *Memory) DeleteTodo(_ context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.todos[id]; !ok {
+		return domain.ErrNotFound
+	}
+	delete(m.todos, id)
+	return nil
+}
+
+func (m *Memory) ListTodos(_ context.Context, userID string, filter TodoFilter) ([]domain.TodoItem, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	items := make([]domain.TodoItem, 0)
+	for _, todo := range m.todos {
+		if todo.UserID != userID || (filter.ListID != "" && todo.ListID != filter.ListID) || (filter.Status != "" && todo.Status != filter.Status) {
+			continue
+		}
+		items = append(items, cloneTodo(todo))
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].CreatedAt.After(items[j].CreatedAt) })
+	return items, nil
+}
+
+func (m *Memory) CreateWordBook(_ context.Context, book domain.WordBook) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.wordBooks[book.ID] = book
+	return nil
+}
+
+func (m *Memory) WordBookByID(_ context.Context, id string) (domain.WordBook, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	book, ok := m.wordBooks[id]
+	if !ok {
+		return domain.WordBook{}, domain.ErrNotFound
+	}
+	return book, nil
+}
+
+func (m *Memory) ListWordBooks(_ context.Context, userID string) ([]domain.WordBook, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	items := make([]domain.WordBook, 0)
+	for _, book := range m.wordBooks {
+		if book.UserID == userID {
+			items = append(items, book)
+		}
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].CreatedAt.Before(items[j].CreatedAt) })
+	return items, nil
+}
+
+func (m *Memory) CreateVocabularyWord(_ context.Context, word domain.VocabularyWord) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, existing := range m.words {
+		if existing.UserID == word.UserID && existing.BookID == word.BookID && strings.EqualFold(existing.Term, word.Term) {
+			return domain.ErrConflict
+		}
+	}
+	m.words[word.ID] = cloneVocabularyWord(word)
+	return nil
+}
+
+func (m *Memory) VocabularyWordByID(_ context.Context, id string) (domain.VocabularyWord, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	word, ok := m.words[id]
+	if !ok {
+		return domain.VocabularyWord{}, domain.ErrNotFound
+	}
+	return cloneVocabularyWord(word), nil
+}
+
+func (m *Memory) DeleteVocabularyWord(_ context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.words[id]; !ok {
+		return domain.ErrNotFound
+	}
+	delete(m.words, id)
+	for reviewID, review := range m.wordReviews {
+		if review.WordID == id {
+			delete(m.wordReviews, reviewID)
+		}
+	}
+	return nil
+}
+
+func (m *Memory) ListVocabularyWords(_ context.Context, userID, bookID string) ([]domain.VocabularyWord, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	items := make([]domain.VocabularyWord, 0)
+	for _, word := range m.words {
+		if word.UserID == userID && (bookID == "" || word.BookID == bookID) {
+			items = append(items, cloneVocabularyWord(word))
+		}
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].DueAt.Equal(items[j].DueAt) {
+			return strings.ToLower(items[i].Term) < strings.ToLower(items[j].Term)
+		}
+		return items[i].DueAt.Before(items[j].DueAt)
+	})
+	return items, nil
+}
+
+func (m *Memory) ApplyVocabularyReview(_ context.Context, word domain.VocabularyWord, review domain.VocabularyReview) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.words[word.ID]; !ok {
+		return domain.ErrNotFound
+	}
+	m.words[word.ID] = cloneVocabularyWord(word)
+	m.wordReviews[review.ID] = review
+	return nil
+}
+
+func (m *Memory) ListVocabularyReviews(_ context.Context, userID string, since time.Time) ([]domain.VocabularyReview, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	items := make([]domain.VocabularyReview, 0)
+	for _, review := range m.wordReviews {
+		if review.UserID == userID && !review.ReviewedAt.Before(since) {
+			items = append(items, review)
+		}
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].ReviewedAt.After(items[j].ReviewedAt) })
+	return items, nil
+}
+
+func (m *Memory) UpsertPlannerPreferences(_ context.Context, preferences domain.PlannerPreferences) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.plannerPrefs[preferences.UserID] = clonePlannerPreferences(preferences)
+	return nil
+}
+
+func (m *Memory) PlannerPreferences(_ context.Context, userID string) (domain.PlannerPreferences, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	preferences, ok := m.plannerPrefs[userID]
+	if !ok {
+		return domain.PlannerPreferences{}, domain.ErrNotFound
+	}
+	return clonePlannerPreferences(preferences), nil
+}
+
+func (m *Memory) CreatePlanBlock(_ context.Context, block domain.StudyPlanBlock) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, exists := m.planBlocks[block.ID]; exists {
+		return domain.ErrConflict
+	}
+	m.planBlocks[block.ID] = block
+	return nil
+}
+
+func (m *Memory) PlanBlockByID(_ context.Context, id string) (domain.StudyPlanBlock, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	block, ok := m.planBlocks[id]
+	if !ok {
+		return domain.StudyPlanBlock{}, domain.ErrNotFound
+	}
+	return block, nil
+}
+
+func (m *Memory) UpdatePlanBlock(_ context.Context, block domain.StudyPlanBlock) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.planBlocks[block.ID]; !ok {
+		return domain.ErrNotFound
+	}
+	m.planBlocks[block.ID] = block
+	return nil
+}
+
+func (m *Memory) DeletePlanBlock(_ context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.planBlocks[id]; !ok {
+		return domain.ErrNotFound
+	}
+	delete(m.planBlocks, id)
+	return nil
+}
+
+func (m *Memory) ListPlanBlocks(_ context.Context, userID string, start, end time.Time) ([]domain.StudyPlanBlock, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	items := make([]domain.StudyPlanBlock, 0)
+	for _, block := range m.planBlocks {
+		if block.UserID == userID && block.StartAt.Before(end) && block.EndAt.After(start) {
+			items = append(items, block)
+		}
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].StartAt.Equal(items[j].StartAt) {
+			return items[i].CreatedAt.Before(items[j].CreatedAt)
+		}
+		return items[i].StartAt.Before(items[j].StartAt)
+	})
+	return items, nil
+}
+
+func (m *Memory) ReplaceGeneratedPlanBlocks(_ context.Context, userID string, start, end time.Time, blocks []domain.StudyPlanBlock) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for id, block := range m.planBlocks {
+		if block.UserID == userID && block.AutoGenerated && !block.Locked && block.StartAt.Before(end) && block.EndAt.After(start) && block.Status != domain.PlanBlockCompleted {
+			delete(m.planBlocks, id)
+		}
+	}
+	for _, block := range blocks {
+		if _, exists := m.planBlocks[block.ID]; exists {
+			return domain.ErrConflict
+		}
+		m.planBlocks[block.ID] = block
+	}
+	return nil
+}
+
+func (m *Memory) UpsertPlannerReport(_ context.Context, report domain.PlannerReport) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.plannerReports[plannerReportKey(report.UserID, report.WeekStart)] = clonePlannerReport(report)
+	return nil
+}
+
+func (m *Memory) PlannerReport(_ context.Context, userID, weekStart string) (domain.PlannerReport, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	report, ok := m.plannerReports[plannerReportKey(userID, weekStart)]
+	if !ok {
+		return domain.PlannerReport{}, domain.ErrNotFound
+	}
+	return clonePlannerReport(report), nil
+}
+
+func (m *Memory) ListPlannerReports(_ context.Context, userID string) ([]domain.PlannerReport, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	items := make([]domain.PlannerReport, 0)
+	for _, report := range m.plannerReports {
+		if report.UserID == userID {
+			items = append(items, clonePlannerReport(report))
+		}
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].WeekStart > items[j].WeekStart })
+	return items, nil
+}
+
+func (m *Memory) UpsertWeeklyReflection(_ context.Context, reflection domain.WeeklyReflection) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.weeklyReflections[weeklyReflectionKey(reflection.UserID, reflection.WeekStart)] = cloneWeeklyReflection(reflection)
+	return nil
+}
+
+func (m *Memory) WeeklyReflection(_ context.Context, userID, weekStart string) (domain.WeeklyReflection, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	reflection, ok := m.weeklyReflections[weeklyReflectionKey(userID, weekStart)]
+	if !ok {
+		return domain.WeeklyReflection{}, domain.ErrNotFound
+	}
+	return cloneWeeklyReflection(reflection), nil
+}
+
+func (m *Memory) ListWeeklyReflections(_ context.Context, userID string) ([]domain.WeeklyReflection, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	items := make([]domain.WeeklyReflection, 0)
+	for _, reflection := range m.weeklyReflections {
+		if reflection.UserID == userID {
+			items = append(items, cloneWeeklyReflection(reflection))
+		}
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].WeekStart > items[j].WeekStart })
+	return items, nil
+}
+
+func (m *Memory) CreateKnowledgeNote(_ context.Context, note domain.KnowledgeNote) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, exists := m.knowledgeNotes[note.ID]; exists {
+		return domain.ErrConflict
+	}
+	m.knowledgeNotes[note.ID] = cloneKnowledgeNote(note)
+	return nil
+}
+
+func (m *Memory) KnowledgeNoteByID(_ context.Context, id string) (domain.KnowledgeNote, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	note, exists := m.knowledgeNotes[id]
+	if !exists {
+		return domain.KnowledgeNote{}, domain.ErrNotFound
+	}
+	return cloneKnowledgeNote(note), nil
+}
+
+func (m *Memory) UpdateKnowledgeNote(_ context.Context, note domain.KnowledgeNote) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, exists := m.knowledgeNotes[note.ID]; !exists {
+		return domain.ErrNotFound
+	}
+	m.knowledgeNotes[note.ID] = cloneKnowledgeNote(note)
+	return nil
+}
+
+func (m *Memory) DeleteKnowledgeNote(_ context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, exists := m.knowledgeNotes[id]; !exists {
+		return domain.ErrNotFound
+	}
+	delete(m.knowledgeNotes, id)
+	return nil
+}
+
+func (m *Memory) ListKnowledgeNotes(_ context.Context, userID string) ([]domain.KnowledgeNote, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	items := make([]domain.KnowledgeNote, 0)
+	for _, note := range m.knowledgeNotes {
+		if note.UserID == userID {
+			items = append(items, cloneKnowledgeNote(note))
+		}
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Pinned != items[j].Pinned {
+			return items[i].Pinned
+		}
+		return items[i].UpdatedAt.After(items[j].UpdatedAt)
 	})
 	return items, nil
 }
@@ -279,6 +757,19 @@ func (m *Memory) ListDueCards(_ context.Context, userID string, due time.Time, l
 	return items, nil
 }
 
+func (m *Memory) ListCards(_ context.Context, userID string) ([]domain.Card, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	items := make([]domain.Card, 0)
+	for _, card := range m.cards {
+		if card.UserID == userID {
+			items = append(items, card)
+		}
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].CreatedAt.After(items[j].CreatedAt) })
+	return items, nil
+}
+
 func (m *Memory) ApplyReview(_ context.Context, card domain.Card, review domain.Review) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -288,6 +779,19 @@ func (m *Memory) ApplyReview(_ context.Context, card domain.Card, review domain.
 	m.cards[card.ID] = card
 	m.reviews[review.ID] = review
 	return nil
+}
+
+func (m *Memory) ListReviews(_ context.Context, userID string, since time.Time) ([]domain.Review, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	items := make([]domain.Review, 0)
+	for _, review := range m.reviews {
+		if review.UserID == userID && !review.ReviewedAt.Before(since) {
+			items = append(items, review)
+		}
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].ReviewedAt.After(items[j].ReviewedAt) })
+	return items, nil
 }
 
 func (m *Memory) CreateFocusSession(_ context.Context, session domain.FocusSession) error {
@@ -361,16 +865,26 @@ type persistedUser struct {
 }
 
 type snapshot struct {
-	Version  int                   `json:"version"`
-	SavedAt  time.Time             `json:"saved_at"`
-	Users    []persistedUser       `json:"users"`
-	Goals    []domain.Goal         `json:"goals"`
-	Moods    []domain.MoodEntry    `json:"moods"`
-	Tasks    []domain.StudyTask    `json:"tasks"`
-	Decks    []domain.Deck         `json:"decks"`
-	Cards    []domain.Card         `json:"cards"`
-	Reviews  []domain.Review       `json:"reviews"`
-	Sessions []domain.FocusSession `json:"focus_sessions"`
+	Version           int                         `json:"version"`
+	SavedAt           time.Time                   `json:"saved_at"`
+	Users             []persistedUser             `json:"users"`
+	Goals             []domain.Goal               `json:"goals"`
+	Moods             []domain.MoodEntry          `json:"moods"`
+	Tasks             []domain.StudyTask          `json:"tasks"`
+	TodoLists         []domain.TodoList           `json:"todo_lists"`
+	Todos             []domain.TodoItem           `json:"todos"`
+	WordBooks         []domain.WordBook           `json:"word_books"`
+	Words             []domain.VocabularyWord     `json:"vocabulary_words"`
+	WordReviews       []domain.VocabularyReview   `json:"vocabulary_reviews"`
+	PlannerPrefs      []domain.PlannerPreferences `json:"planner_preferences"`
+	PlanBlocks        []domain.StudyPlanBlock     `json:"plan_blocks"`
+	PlannerReports    []domain.PlannerReport      `json:"planner_reports"`
+	WeeklyReflections []domain.WeeklyReflection   `json:"weekly_reflections"`
+	KnowledgeNotes    []domain.KnowledgeNote      `json:"knowledge_notes"`
+	Decks             []domain.Deck               `json:"decks"`
+	Cards             []domain.Card               `json:"cards"`
+	Reviews           []domain.Review             `json:"reviews"`
+	Sessions          []domain.FocusSession       `json:"focus_sessions"`
 }
 
 func (m *Memory) SaveJSON(path string) error {
@@ -387,6 +901,36 @@ func (m *Memory) SaveJSON(path string) error {
 	}
 	for _, item := range m.tasks {
 		s.Tasks = append(s.Tasks, cloneTask(item))
+	}
+	for _, item := range m.todoLists {
+		s.TodoLists = append(s.TodoLists, item)
+	}
+	for _, item := range m.todos {
+		s.Todos = append(s.Todos, cloneTodo(item))
+	}
+	for _, item := range m.wordBooks {
+		s.WordBooks = append(s.WordBooks, item)
+	}
+	for _, item := range m.words {
+		s.Words = append(s.Words, cloneVocabularyWord(item))
+	}
+	for _, item := range m.wordReviews {
+		s.WordReviews = append(s.WordReviews, item)
+	}
+	for _, item := range m.plannerPrefs {
+		s.PlannerPrefs = append(s.PlannerPrefs, clonePlannerPreferences(item))
+	}
+	for _, item := range m.planBlocks {
+		s.PlanBlocks = append(s.PlanBlocks, item)
+	}
+	for _, item := range m.plannerReports {
+		s.PlannerReports = append(s.PlannerReports, clonePlannerReport(item))
+	}
+	for _, item := range m.weeklyReflections {
+		s.WeeklyReflections = append(s.WeeklyReflections, cloneWeeklyReflection(item))
+	}
+	for _, item := range m.knowledgeNotes {
+		s.KnowledgeNotes = append(s.KnowledgeNotes, cloneKnowledgeNote(item))
 	}
 	for _, item := range m.decks {
 		s.Decks = append(s.Decks, item)
@@ -445,6 +989,16 @@ func (m *Memory) LoadJSON(path string) error {
 	m.goals = make(map[string]domain.Goal, len(s.Goals))
 	m.moods = make(map[string]domain.MoodEntry, len(s.Moods))
 	m.tasks = make(map[string]domain.StudyTask, len(s.Tasks))
+	m.todoLists = make(map[string]domain.TodoList, len(s.TodoLists))
+	m.todos = make(map[string]domain.TodoItem, len(s.Todos))
+	m.wordBooks = make(map[string]domain.WordBook, len(s.WordBooks))
+	m.words = make(map[string]domain.VocabularyWord, len(s.Words))
+	m.wordReviews = make(map[string]domain.VocabularyReview, len(s.WordReviews))
+	m.plannerPrefs = make(map[string]domain.PlannerPreferences, len(s.PlannerPrefs))
+	m.planBlocks = make(map[string]domain.StudyPlanBlock, len(s.PlanBlocks))
+	m.plannerReports = make(map[string]domain.PlannerReport, len(s.PlannerReports))
+	m.weeklyReflections = make(map[string]domain.WeeklyReflection, len(s.WeeklyReflections))
+	m.knowledgeNotes = make(map[string]domain.KnowledgeNote, len(s.KnowledgeNotes))
 	m.decks = make(map[string]domain.Deck, len(s.Decks))
 	m.cards = make(map[string]domain.Card, len(s.Cards))
 	m.reviews = make(map[string]domain.Review, len(s.Reviews))
@@ -462,6 +1016,36 @@ func (m *Memory) LoadJSON(path string) error {
 	}
 	for _, item := range s.Tasks {
 		m.tasks[item.ID] = cloneTask(item)
+	}
+	for _, item := range s.TodoLists {
+		m.todoLists[item.ID] = item
+	}
+	for _, item := range s.Todos {
+		m.todos[item.ID] = cloneTodo(item)
+	}
+	for _, item := range s.WordBooks {
+		m.wordBooks[item.ID] = item
+	}
+	for _, item := range s.Words {
+		m.words[item.ID] = cloneVocabularyWord(item)
+	}
+	for _, item := range s.WordReviews {
+		m.wordReviews[item.ID] = item
+	}
+	for _, item := range s.PlannerPrefs {
+		m.plannerPrefs[item.UserID] = clonePlannerPreferences(item)
+	}
+	for _, item := range s.PlanBlocks {
+		m.planBlocks[item.ID] = item
+	}
+	for _, item := range s.PlannerReports {
+		m.plannerReports[plannerReportKey(item.UserID, item.WeekStart)] = clonePlannerReport(item)
+	}
+	for _, item := range s.WeeklyReflections {
+		m.weeklyReflections[weeklyReflectionKey(item.UserID, item.WeekStart)] = cloneWeeklyReflection(item)
+	}
+	for _, item := range s.KnowledgeNotes {
+		m.knowledgeNotes[item.ID] = cloneKnowledgeNote(item)
 	}
 	for _, item := range s.Decks {
 		m.decks[item.ID] = item
@@ -481,6 +1065,45 @@ func (m *Memory) LoadJSON(path string) error {
 func cloneTask(task domain.StudyTask) domain.StudyTask {
 	task.Tags = append([]string(nil), task.Tags...)
 	return task
+}
+
+func cloneTodo(todo domain.TodoItem) domain.TodoItem {
+	todo.Tags = append([]string(nil), todo.Tags...)
+	todo.Steps = append([]domain.TodoStep(nil), todo.Steps...)
+	return todo
+}
+
+func cloneVocabularyWord(word domain.VocabularyWord) domain.VocabularyWord {
+	word.Tags = append([]string(nil), word.Tags...)
+	return word
+}
+
+func clonePlannerPreferences(preferences domain.PlannerPreferences) domain.PlannerPreferences {
+	preferences.Windows = append([]domain.AvailabilityWindow(nil), preferences.Windows...)
+	return preferences
+}
+
+func clonePlannerReport(report domain.PlannerReport) domain.PlannerReport {
+	report.Unscheduled = append([]domain.UnscheduledPlanItem(nil), report.Unscheduled...)
+	return report
+}
+
+func cloneWeeklyReflection(reflection domain.WeeklyReflection) domain.WeeklyReflection {
+	reflection.NextWeekPriorities = append([]string(nil), reflection.NextWeekPriorities...)
+	return reflection
+}
+
+func cloneKnowledgeNote(note domain.KnowledgeNote) domain.KnowledgeNote {
+	note.Tags = append([]string(nil), note.Tags...)
+	return note
+}
+
+func weeklyReflectionKey(userID, weekStart string) string {
+	return userID + "\x00" + weekStart
+}
+
+func plannerReportKey(userID, weekStart string) string {
+	return userID + "\x00" + weekStart
 }
 
 func moodKey(userID, date string) string {

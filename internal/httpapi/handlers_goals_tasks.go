@@ -81,6 +81,14 @@ func (s *Server) changeGoalStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, envelope{"data": goal})
 }
 
+func (s *Server) deleteGoal(w http.ResponseWriter, r *http.Request) {
+	if err := s.service.DeleteGoal(r.Context(), claimsFromContext(r.Context()).Subject, r.PathValue("goal_id")); err != nil {
+		writeError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		GoalID           string              `json:"goal_id"`
@@ -145,4 +153,12 @@ func (s *Server) changeTaskStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, envelope{"data": task})
+}
+
+func (s *Server) deleteTask(w http.ResponseWriter, r *http.Request) {
+	if err := s.service.DeleteTask(r.Context(), claimsFromContext(r.Context()).Subject, r.PathValue("task_id")); err != nil {
+		writeError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

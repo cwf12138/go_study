@@ -10,9 +10,13 @@ tags:
   - name: Goals
   - name: Moods
   - name: Tasks
+  - name: Todos
+  - name: Planner
+  - name: Vocabulary
   - name: Review
   - name: Focus
   - name: Insights
+  - name: Exports
 paths:
   /healthz:
     get:
@@ -247,6 +251,202 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/StudyTask" }
                   meta: { $ref: "#/components/schemas/ListMeta" }
+  /api/v1/todo-lists:
+    get:
+      tags: [Todos]
+      security: [{ bearerAuth: [] }]
+      summary: 列出待办分类；首次访问会自动创建收集箱
+      responses:
+        "200":
+          description: Todo lists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/TodoList" }
+                  meta: { $ref: "#/components/schemas/ListMeta" }
+    post:
+      tags: [Todos]
+      security: [{ bearerAuth: [] }]
+      summary: 创建待办分类
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTodoListRequest" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/TodoList" }
+  /api/v1/todo-lists/{list_id}:
+    delete:
+      tags: [Todos]
+      security: [{ bearerAuth: [] }]
+      summary: 删除自定义分类，并将其中待办移回收集箱
+      parameters:
+        - $ref: "#/components/parameters/TodoListID"
+      responses:
+        "204": { description: Deleted }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/todos:
+    get:
+      tags: [Todos]
+      security: [{ bearerAuth: [] }]
+      summary: 查询待办，支持智能视图、分类、状态、优先级、标签和搜索
+      parameters:
+        - in: query
+          name: view
+          schema: { type: string, enum: [all, inbox, today, upcoming, completed], default: all }
+        - in: query
+          name: list_id
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string, enum: [open, completed] }
+        - in: query
+          name: priority
+          schema: { type: string, enum: [low, medium, high] }
+        - in: query
+          name: tag
+          schema: { type: string }
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: date
+          description: 用于 My Day 视图的日期
+          schema: { type: string, pattern: '^\\d{4}-\\d{2}-\\d{2}$' }
+      responses:
+        "200":
+          description: Todos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/TodoItem" }
+                  meta: { $ref: "#/components/schemas/ListMeta" }
+    post:
+      tags: [Todos]
+      security: [{ bearerAuth: [] }]
+      summary: 创建待办；未提供 list_id 时放入收集箱
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTodoRequest" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/TodoItem" }
+  /api/v1/todos/{todo_id}:
+    delete:
+      tags: [Todos]
+      security: [{ bearerAuth: [] }]
+      summary: 删除待办
+      parameters:
+        - $ref: "#/components/parameters/TodoID"
+      responses:
+        "204": { description: Deleted }
+  /api/v1/todos/{todo_id}/status:
+    patch:
+      tags: [Todos]
+      security: [{ bearerAuth: [] }]
+      summary: 完成或重新打开待办；完成重复待办会创建下一个周期的事项
+      parameters:
+        - $ref: "#/components/parameters/TodoID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [completed]
+              properties:
+                completed: { type: boolean }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/TodoItem" }
+                  next: { $ref: "#/components/schemas/TodoItem" }
+  /api/v1/todos/{todo_id}/my-day:
+    put:
+      tags: [Todos]
+      security: [{ bearerAuth: [] }]
+      summary: 加入指定日期的我的一天
+      parameters:
+        - $ref: "#/components/parameters/TodoID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [date]
+              properties:
+                date: { type: string, pattern: '^\\d{4}-\\d{2}-\\d{2}$' }
+      responses:
+        "200": { description: Updated }
+    delete:
+      tags: [Todos]
+      security: [{ bearerAuth: [] }]
+      summary: 移出我的一天
+      parameters:
+        - $ref: "#/components/parameters/TodoID"
+      responses:
+        "200": { description: Updated }
+  /api/v1/todos/{todo_id}/steps/{step_id}:
+    patch:
+      tags: [Todos]
+      security: [{ bearerAuth: [] }]
+      summary: 标记待办子步骤
+      parameters:
+        - $ref: "#/components/parameters/TodoID"
+        - in: path
+          name: step_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [completed]
+              properties:
+                completed: { type: boolean }
+      responses:
+        "200": { description: Updated }
+  /api/v1/goals/{goal_id}:
+    delete:
+      tags: [Goals]
+      security: [{ bearerAuth: [] }]
+      summary: 删除学习目标（关联任务会保留）
+      parameters:
+        - $ref: "#/components/parameters/GoalID"
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/goals/{goal_id}/status:
     patch:
       tags: [Goals]
@@ -276,6 +476,16 @@ paths:
                 properties:
                   data: { $ref: "#/components/schemas/Goal" }
         "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/tasks/{task_id}:
+    delete:
+      tags: [Tasks]
+      security: [{ bearerAuth: [] }]
+      summary: 删除学习任务
+      parameters:
+        - $ref: "#/components/parameters/TaskID"
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/tasks/{task_id}/status:
     patch:
       tags: [Tasks]
@@ -302,6 +512,355 @@ paths:
                 properties:
                   data: { $ref: "#/components/schemas/StudyTask" }
         "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/planner/preferences:
+    get:
+      tags: [Planner]
+      security: [{ bearerAuth: [] }]
+      summary: 获取智能排程偏好；尚未保存时返回推荐默认值
+      responses:
+        "200":
+          description: Planner preferences
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/PlannerPreferences" }
+    put:
+      tags: [Planner]
+      security: [{ bearerAuth: [] }]
+      summary: 保存时区、专注长度、休息间隔、每日容量与可用时段
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SavePlannerPreferencesRequest" }
+      responses:
+        "200":
+          description: Saved preferences
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/PlannerPreferences" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/v1/planner/week:
+    get:
+      tags: [Planner]
+      security: [{ bearerAuth: [] }]
+      summary: 获取包含时间块、容量与上次排程报告的一周计划
+      parameters:
+        - in: query
+          name: week_start
+          description: 周内任意日期；服务会自动归一化到周一
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: Weekly plan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/PlanWeek" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/v1/planner/generate:
+    post:
+      tags: [Planner]
+      security: [{ bearerAuth: [] }]
+      summary: 根据截止时间、优先级、预计时长、锁定时间和可用容量生成周计划
+      description: 未锁定且未完成的旧自动时间块会被原子替换；手动、锁定和已完成时间块会被保留。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                week_start: { type: string, format: date }
+      responses:
+        "200":
+          description: Generated weekly plan including work that could not fit
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/PlanWeek" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/v1/plan-blocks:
+    post:
+      tags: [Planner]
+      security: [{ bearerAuth: [] }]
+      summary: 手动添加一个时间块
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreatePlanBlockRequest" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/StudyPlanBlock" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/plan-blocks/{block_id}:
+    patch:
+      tags: [Planner]
+      security: [{ bearerAuth: [] }]
+      summary: 修改时间、标题、优先级或锁定状态
+      parameters:
+        - $ref: "#/components/parameters/PlanBlockID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string, maxLength: 200 }
+                notes: { type: string, maxLength: 4000 }
+                start_at: { type: string, format: date-time }
+                end_at: { type: string, format: date-time }
+                priority: { type: string, enum: [low, medium, high] }
+                locked: { type: boolean }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/StudyPlanBlock" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      tags: [Planner]
+      security: [{ bearerAuth: [] }]
+      summary: 删除未在进行中的时间块
+      parameters:
+        - $ref: "#/components/parameters/PlanBlockID"
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/plan-blocks/{block_id}/status:
+    patch:
+      tags: [Planner]
+      security: [{ bearerAuth: [] }]
+      summary: 完成、跳过或重新打开时间块，并可同步完成关联任务或待办
+      parameters:
+        - $ref: "#/components/parameters/PlanBlockID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: "#/components/schemas/PlanBlockStatus" }
+                complete_source: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/StudyPlanBlock" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/word-books:
+    get:
+      tags: [Vocabulary]
+      security: [{ bearerAuth: [] }]
+      summary: 获取词书列表
+      responses:
+        "200":
+          description: Word book list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/WordBook" }
+    post:
+      tags: [Vocabulary]
+      security: [{ bearerAuth: [] }]
+      summary: 创建词书
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateWordBookRequest" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/WordBook" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/word-books/{book_id}/words:
+    post:
+      tags: [Vocabulary]
+      security: [{ bearerAuth: [] }]
+      summary: 向词书添加单词
+      parameters:
+        - in: path
+          name: book_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateVocabularyWordRequest" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/VocabularyWord" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/words:
+    get:
+      tags: [Vocabulary]
+      security: [{ bearerAuth: [] }]
+      summary: 查询词库
+      parameters:
+        - in: query
+          name: book_id
+          schema: { type: string }
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: stage
+          schema: { $ref: "#/components/schemas/VocabularyStage" }
+      responses:
+        "200":
+          description: Word list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/VocabularyWord" }
+  /api/v1/words/queue:
+    get:
+      tags: [Vocabulary]
+      security: [{ bearerAuth: [] }]
+      summary: 获取当前到期的单词学习队列
+      parameters:
+        - in: query
+          name: book_id
+          required: true
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        "200":
+          description: Due vocabulary queue
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/VocabularyWord" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/vocabulary/overview:
+    get:
+      tags: [Vocabulary]
+      security: [{ bearerAuth: [] }]
+      summary: 获取单词学习统计
+      parameters:
+        - in: query
+          name: book_id
+          schema: { type: string }
+      responses:
+        "200":
+          description: Vocabulary statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/VocabularyOverview" }
+  /api/v1/words/{word_id}/reviews:
+    post:
+      tags: [Vocabulary]
+      security: [{ bearerAuth: [] }]
+      summary: 记录一次单词回忆并计算下次复习时间
+      parameters:
+        - in: path
+          name: word_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating]
+              properties:
+                rating: { type: integer, minimum: 1, maximum: 4 }
+                mode: { type: string, enum: [flashcard, spelling], default: flashcard }
+      responses:
+        "200":
+          description: Review recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      word: { $ref: "#/components/schemas/VocabularyWord" }
+                      review: { $ref: "#/components/schemas/VocabularyReview" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/words/{word_id}:
+    delete:
+      tags: [Vocabulary]
+      security: [{ bearerAuth: [] }]
+      summary: 删除单词及其复习记录
+      parameters:
+        - in: path
+          name: word_id
+          required: true
+          schema: { type: string }
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/decks:
     post:
       tags: [Review]
@@ -429,9 +988,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [planned_minutes]
               properties:
                 task_id: { type: string }
+                plan_block_id: { type: string, description: "When set, duration and linked task can be inherited from the plan block." }
                 planned_minutes: { type: integer, minimum: 1, maximum: 240 }
                 break_enabled: { type: boolean, default: false, description: "Split focus time into two segments with a fixed 5-minute break." }
       responses:
@@ -532,6 +1091,135 @@ paths:
                 type: object
                 properties:
                   data: { $ref: "#/components/schemas/FocusSession" }
+  /api/v1/analytics/learning:
+    get:
+      tags: [Insights]
+      security: [{ bearerAuth: [] }]
+      summary: Get cross-module learning insights and recommendations
+      parameters:
+        - in: query
+          name: days
+          schema: { type: integer, minimum: 7, maximum: 90, default: 30 }
+        - in: query
+          name: time_zone
+          schema: { type: string, example: Asia/Shanghai }
+      responses:
+        "200":
+          description: Learning insights
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/LearningInsights" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/v1/reviews/weekly:
+    get:
+      tags: [Insights]
+      security: [{ bearerAuth: [] }]
+      summary: Generate a weekly retrospective with a same-period comparison
+      parameters:
+        - in: query
+          name: week_start
+          schema: { type: string, format: date, description: Monday within the last 12 weeks }
+        - in: query
+          name: time_zone
+          schema: { type: string, example: Asia/Shanghai }
+      responses:
+        "200":
+          description: Weekly review
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/WeeklyReview" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/v1/reviews/weekly/reflection:
+    put:
+      tags: [Insights]
+      security: [{ bearerAuth: [] }]
+      summary: Create or update a weekly reflection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveWeeklyReflectionRequest" }
+      responses:
+        "200":
+          description: Saved reflection
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/WeeklyReflection" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/v1/reviews/weekly/reflections:
+    get:
+      tags: [Insights]
+      security: [{ bearerAuth: [] }]
+      summary: List saved weekly reflections newest first
+      responses:
+        "200":
+          description: Reflection archive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/WeeklyReflection" }
+  /api/v1/exports/data:
+    get:
+      tags: [Exports]
+      security: [{ bearerAuth: [] }]
+      summary: Download a versioned JSON backup of all personal StudyFlow data
+      responses:
+        "200":
+          description: Portable backup; password credentials are never included
+          headers:
+            Content-Disposition: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserDataExport" }
+  /api/v1/exports/learning.csv:
+    get:
+      tags: [Exports]
+      security: [{ bearerAuth: [] }]
+      summary: Download daily learning metrics as UTF-8 CSV
+      parameters:
+        - in: query
+          name: days
+          schema: { type: integer, minimum: 7, maximum: 90, default: 30 }
+        - in: query
+          name: time_zone
+          schema: { type: string, example: Asia/Shanghai }
+      responses:
+        "200":
+          description: CSV with a UTF-8 BOM for spreadsheet compatibility
+          content:
+            text/csv:
+              schema: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/v1/exports/planner.ics:
+    get:
+      tags: [Exports]
+      security: [{ bearerAuth: [] }]
+      summary: Download one planner week as an iCalendar file
+      parameters:
+        - in: query
+          name: week_start
+          schema: { type: string, format: date, description: Any date within the desired week }
+      responses:
+        "200":
+          description: RFC 5545 compatible calendar
+          content:
+            text/calendar:
+              schema: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
   /api/v1/dashboard:
     get:
       tags: [Insights]
@@ -569,9 +1257,29 @@ components:
       name: date
       required: true
       schema: { type: string, pattern: '^\\d{4}-\\d{2}-\\d{2}$', example: '2026-08-29' }
+    GoalID:
+      in: path
+      name: goal_id
+      required: true
+      schema: { type: string }
+    TodoListID:
+      in: path
+      name: list_id
+      required: true
+      schema: { type: string }
+    TodoID:
+      in: path
+      name: todo_id
+      required: true
+      schema: { type: string }
     TaskID:
       in: path
       name: task_id
+      required: true
+      schema: { type: string }
+    PlanBlockID:
+      in: path
+      name: block_id
       required: true
       schema: { type: string }
     FocusSessionID:
@@ -592,6 +1300,11 @@ components:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
     Conflict:
       description: Duplicate resource or invalid state transition
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    NotFound:
+      description: Resource not found
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
@@ -726,6 +1439,227 @@ components:
             created_at: { type: string, format: date-time }
             updated_at: { type: string, format: date-time }
             completed_at: { type: string, format: date-time }
+    CreateTodoListRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 80 }
+        color: { type: string, pattern: '^#[0-9A-Fa-f]{6}$' }
+    TodoList:
+      allOf:
+        - $ref: "#/components/schemas/CreateTodoListRequest"
+        - type: object
+          properties:
+            id: { type: string }
+            user_id: { type: string }
+            kind: { type: string, enum: [inbox, custom] }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+    TodoStep:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string, maxLength: 200 }
+        completed: { type: boolean }
+        created_at: { type: string, format: date-time }
+    CreateTodoRequest:
+      type: object
+      required: [title]
+      properties:
+        list_id: { type: string }
+        title: { type: string, maxLength: 200 }
+        notes: { type: string, maxLength: 6000 }
+        priority: { type: string, enum: [low, medium, high], default: medium }
+        due_at: { type: string, format: date-time }
+        my_day_date: { type: string, pattern: '^\\d{4}-\\d{2}-\\d{2}$' }
+        repeat_rule: { type: string, enum: [none, daily, weekly, monthly], default: none }
+        tags:
+          type: array
+          items: { type: string, maxLength: 48 }
+        steps:
+          type: array
+          maxItems: 30
+          items: { type: string, maxLength: 200 }
+    TodoItem:
+      allOf:
+        - $ref: "#/components/schemas/CreateTodoRequest"
+        - type: object
+          properties:
+            id: { type: string }
+            user_id: { type: string }
+            status: { type: string, enum: [open, completed] }
+            steps:
+              type: array
+              items: { $ref: "#/components/schemas/TodoStep" }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+            completed_at: { type: string, format: date-time }
+    AvailabilityWindow:
+      type: object
+      required: [weekday, start_time, end_time]
+      properties:
+        weekday: { type: integer, minimum: 1, maximum: 7, description: "ISO weekday; Monday is 1." }
+        start_time: { type: string, pattern: '^([01]\\d|2[0-3]):[0-5]\\d$' }
+        end_time: { type: string, pattern: '^([01]\\d|2[0-3]):[0-5]\\d$' }
+    SavePlannerPreferencesRequest:
+      type: object
+      required: [time_zone, session_minutes, break_minutes, daily_max_minutes, windows]
+      properties:
+        time_zone: { type: string, example: Asia/Shanghai }
+        session_minutes: { type: integer, minimum: 15, maximum: 180 }
+        break_minutes: { type: integer, minimum: 0, maximum: 60 }
+        daily_max_minutes: { type: integer, minimum: 30, maximum: 720 }
+        windows:
+          type: array
+          minItems: 1
+          maxItems: 28
+          items: { $ref: "#/components/schemas/AvailabilityWindow" }
+    PlannerPreferences:
+      allOf:
+        - $ref: "#/components/schemas/SavePlannerPreferencesRequest"
+        - type: object
+          properties:
+            user_id: { type: string }
+            updated_at: { type: string, format: date-time }
+    PlanBlockKind:
+      type: string
+      enum: [task, todo, review, vocabulary, custom]
+    PlanBlockStatus:
+      type: string
+      enum: [planned, in_progress, completed, skipped]
+    CreatePlanBlockRequest:
+      type: object
+      required: [kind, title, start_at, end_at]
+      properties:
+        kind: { $ref: "#/components/schemas/PlanBlockKind" }
+        source_id: { type: string, description: "Required for task and todo blocks." }
+        title: { type: string, maxLength: 200 }
+        notes: { type: string, maxLength: 4000 }
+        start_at: { type: string, format: date-time }
+        end_at: { type: string, format: date-time }
+        priority: { type: string, enum: [low, medium, high], default: medium }
+        locked: { type: boolean, default: false }
+    StudyPlanBlock:
+      allOf:
+        - $ref: "#/components/schemas/CreatePlanBlockRequest"
+        - type: object
+          properties:
+            id: { type: string }
+            user_id: { type: string }
+            planned_minutes: { type: integer, minimum: 10, maximum: 480 }
+            status: { $ref: "#/components/schemas/PlanBlockStatus" }
+            auto_generated: { type: boolean }
+            rationale: { type: string }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+            completed_at: { type: string, format: date-time }
+    UnscheduledPlanItem:
+      type: object
+      properties:
+        kind: { $ref: "#/components/schemas/PlanBlockKind" }
+        source_id: { type: string }
+        title: { type: string }
+        remaining_minutes: { type: integer, minimum: 1 }
+        reason: { type: string }
+    PlanWeekSummary:
+      type: object
+      properties:
+        total_blocks: { type: integer, minimum: 0 }
+        completed_blocks: { type: integer, minimum: 0 }
+        planned_minutes: { type: integer, minimum: 0 }
+        completed_minutes: { type: integer, minimum: 0 }
+        capacity_minutes: { type: integer, minimum: 0 }
+        utilization: { type: number, minimum: 0 }
+        overdue_sources: { type: integer, minimum: 0 }
+        unscheduled_items: { type: integer, minimum: 0 }
+        unscheduled_minutes: { type: integer, minimum: 0 }
+    PlanWeek:
+      type: object
+      properties:
+        week_start: { type: string, format: date }
+        week_end: { type: string, format: date }
+        generated_at: { type: string, format: date-time }
+        preferences: { $ref: "#/components/schemas/PlannerPreferences" }
+        blocks:
+          type: array
+          items: { $ref: "#/components/schemas/StudyPlanBlock" }
+        unscheduled:
+          type: array
+          items: { $ref: "#/components/schemas/UnscheduledPlanItem" }
+        summary: { $ref: "#/components/schemas/PlanWeekSummary" }
+    CreateWordBookRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 100 }
+        description: { type: string, maxLength: 1000 }
+        language: { type: string, default: en }
+        daily_new_limit: { type: integer, minimum: 1, maximum: 100, default: 15 }
+    WordBook:
+      allOf:
+        - $ref: "#/components/schemas/CreateWordBookRequest"
+        - type: object
+          properties:
+            id: { type: string }
+            user_id: { type: string }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+    VocabularyStage:
+      type: string
+      enum: [new, learning, reviewing, mastered]
+    CreateVocabularyWordRequest:
+      type: object
+      required: [term, definition]
+      properties:
+        term: { type: string, maxLength: 160 }
+        phonetic: { type: string, maxLength: 200 }
+        definition: { type: string, maxLength: 3000 }
+        example: { type: string, maxLength: 3000 }
+        example_translation: { type: string, maxLength: 3000 }
+        notes: { type: string, maxLength: 4000 }
+        tags:
+          type: array
+          items: { type: string, maxLength: 48 }
+    VocabularyWord:
+      allOf:
+        - $ref: "#/components/schemas/CreateVocabularyWordRequest"
+        - type: object
+          properties:
+            id: { type: string }
+            user_id: { type: string }
+            book_id: { type: string }
+            stage: { $ref: "#/components/schemas/VocabularyStage" }
+            ease_factor: { type: number, minimum: 1.3 }
+            interval_days: { type: integer, minimum: 0 }
+            repetitions: { type: integer, minimum: 0 }
+            lapses: { type: integer, minimum: 0 }
+            due_at: { type: string, format: date-time }
+            last_reviewed_at: { type: string, format: date-time }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+    VocabularyReview:
+      type: object
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        word_id: { type: string }
+        rating: { type: integer, minimum: 1, maximum: 4 }
+        mode: { type: string, enum: [flashcard, spelling] }
+        was_new: { type: boolean }
+        reviewed_at: { type: string, format: date-time }
+        next_due_at: { type: string, format: date-time }
+    VocabularyOverview:
+      type: object
+      properties:
+        total: { type: integer, minimum: 0 }
+        new: { type: integer, minimum: 0 }
+        learning: { type: integer, minimum: 0 }
+        reviewing: { type: integer, minimum: 0 }
+        mastered: { type: integer, minimum: 0 }
+        due_today: { type: integer, minimum: 0 }
+        reviewed_today: { type: integer, minimum: 0 }
+        accuracy_today: { type: number, minimum: 0, maximum: 100 }
+        study_streak: { type: integer, minimum: 0 }
     Deck:
       type: object
       properties:
@@ -752,6 +1686,7 @@ components:
         id: { type: string }
         user_id: { type: string }
         task_id: { type: string }
+        plan_block_id: { type: string }
         planned_minutes: { type: integer }
         actual_minutes: { type: integer }
         focused_seconds: { type: integer }
@@ -764,6 +1699,205 @@ components:
         started_at: { type: string, format: date-time }
         paused_at: { type: string, format: date-time }
         ended_at: { type: string, format: date-time }
+    DailyLearningMetric:
+      type: object
+      properties:
+        date: { type: string, format: date }
+        focus_minutes: { type: integer, minimum: 0 }
+        focus_sessions: { type: integer, minimum: 0 }
+        planned_minutes: { type: integer, minimum: 0 }
+        completed_plan_minutes: { type: integer, minimum: 0 }
+        plan_adherence: { type: number, minimum: 0, maximum: 100 }
+        tasks_completed: { type: integer, minimum: 0 }
+        todos_completed: { type: integer, minimum: 0 }
+        card_reviews: { type: integer, minimum: 0 }
+        card_accuracy: { type: number, minimum: 0, maximum: 100 }
+        vocabulary_reviews: { type: integer, minimum: 0 }
+        vocabulary_accuracy: { type: number, minimum: 0, maximum: 100 }
+        mood_score: { type: integer, minimum: 1, maximum: 5 }
+        stress: { type: integer, minimum: 1, maximum: 5 }
+        energy: { type: integer, minimum: 1, maximum: 5 }
+    FocusHeatmapCell:
+      type: object
+      properties:
+        weekday: { type: integer, minimum: 1, maximum: 7 }
+        hour: { type: integer, minimum: 0, maximum: 23 }
+        minutes: { type: integer, minimum: 0 }
+    GoalLearningInsight:
+      type: object
+      properties:
+        goal_id: { type: string }
+        title: { type: string }
+        total_tasks: { type: integer, minimum: 0 }
+        completed_tasks: { type: integer, minimum: 0 }
+        focus_minutes: { type: integer, minimum: 0 }
+        completion_rate: { type: number, minimum: 0, maximum: 100 }
+    LearningRecommendation:
+      type: object
+      properties:
+        code: { type: string }
+        level: { type: string, enum: [warning, attention, positive, info] }
+        title: { type: string }
+        description: { type: string }
+        evidence: { type: string }
+    LearningInsightSummary:
+      type: object
+      properties:
+        total_focus_minutes: { type: integer, minimum: 0 }
+        average_focus_minutes: { type: number, minimum: 0 }
+        active_days: { type: integer, minimum: 0 }
+        learning_streak: { type: integer, minimum: 0 }
+        plan_adherence: { type: number, minimum: 0, maximum: 100 }
+        tasks_completed: { type: integer, minimum: 0 }
+        todos_completed: { type: integer, minimum: 0 }
+        card_reviews: { type: integer, minimum: 0 }
+        card_accuracy: { type: number, minimum: 0, maximum: 100 }
+        vocabulary_reviews: { type: integer, minimum: 0 }
+        vocabulary_accuracy: { type: number, minimum: 0, maximum: 100 }
+        consistency_score: { type: integer, minimum: 0, maximum: 100 }
+        peak_focus_weekday: { type: integer, minimum: 1, maximum: 7 }
+        peak_focus_hour: { type: integer, minimum: 0, maximum: 23 }
+        mood_focus_correlation: { type: number, minimum: -1, maximum: 1 }
+        stress_focus_correlation: { type: number, minimum: -1, maximum: 1 }
+        due_cards: { type: integer, minimum: 0 }
+        due_vocabulary: { type: integer, minimum: 0 }
+    LearningInsights:
+      type: object
+      properties:
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        time_zone: { type: string }
+        summary: { $ref: "#/components/schemas/LearningInsightSummary" }
+        daily:
+          type: array
+          items: { $ref: "#/components/schemas/DailyLearningMetric" }
+        focus_heatmap:
+          type: array
+          items: { $ref: "#/components/schemas/FocusHeatmapCell" }
+        goals:
+          type: array
+          items: { $ref: "#/components/schemas/GoalLearningInsight" }
+        recommendations:
+          type: array
+          items: { $ref: "#/components/schemas/LearningRecommendation" }
+    SaveWeeklyReflectionRequest:
+      type: object
+      required: [week_start, satisfaction]
+      properties:
+        week_start: { type: string, format: date, description: Must be a Monday }
+        satisfaction: { type: integer, minimum: 1, maximum: 5 }
+        wins: { type: string, maxLength: 4000 }
+        challenges: { type: string, maxLength: 4000 }
+        lessons: { type: string, maxLength: 4000 }
+        next_week_priorities:
+          type: array
+          maxItems: 5
+          items: { type: string, maxLength: 200 }
+    WeeklyReflection:
+      allOf:
+        - $ref: "#/components/schemas/SaveWeeklyReflectionRequest"
+        - type: object
+          properties:
+            id: { type: string }
+            user_id: { type: string }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+    WeeklyReviewSummary:
+      type: object
+      properties:
+        focus_minutes: { type: integer, minimum: 0 }
+        active_days: { type: integer, minimum: 0, maximum: 7 }
+        plan_adherence: { type: number, minimum: 0, maximum: 100 }
+        tasks_completed: { type: integer, minimum: 0 }
+        todos_completed: { type: integer, minimum: 0 }
+        memory_reviews: { type: integer, minimum: 0 }
+        memory_accuracy: { type: number, minimum: 0, maximum: 100 }
+        average_mood: { type: number, minimum: 0, maximum: 5 }
+        average_stress: { type: number, minimum: 0, maximum: 5 }
+        consistency_score: { type: integer, minimum: 0, maximum: 100 }
+        completed_plan_minutes: { type: integer, minimum: 0 }
+        total_planned_minutes: { type: integer, minimum: 0 }
+    WeeklyReviewComparison:
+      type: object
+      properties:
+        focus_minutes_delta: { type: integer }
+        active_days_delta: { type: integer }
+        plan_adherence_delta: { type: number }
+        completed_items_delta: { type: integer }
+        memory_reviews_delta: { type: integer }
+    WeeklyHighlight:
+      type: object
+      properties:
+        kind: { type: string, enum: [win, risk, info] }
+        title: { type: string }
+        description: { type: string }
+        evidence: { type: string }
+    WeeklyReview:
+      type: object
+      properties:
+        week_start: { type: string, format: date }
+        week_end: { type: string, format: date }
+        compared_from: { type: string, format: date }
+        compared_to: { type: string, format: date }
+        summary: { $ref: "#/components/schemas/WeeklyReviewSummary" }
+        previous: { $ref: "#/components/schemas/WeeklyReviewSummary" }
+        comparison: { $ref: "#/components/schemas/WeeklyReviewComparison" }
+        highlights:
+          type: array
+          items: { $ref: "#/components/schemas/WeeklyHighlight" }
+        reflection: { $ref: "#/components/schemas/WeeklyReflection" }
+        reflection_saved: { type: boolean }
+    UserDataExport:
+      type: object
+      required: [schema_version, exported_at, application, user, counts]
+      properties:
+        schema_version: { type: integer, const: 1 }
+        exported_at: { type: string, format: date-time }
+        application: { type: string, const: StudyFlow }
+        user: { $ref: "#/components/schemas/User" }
+        counts:
+          type: object
+          additionalProperties: { type: integer, minimum: 0 }
+        goals:
+          type: array
+          items: { $ref: "#/components/schemas/Goal" }
+        moods:
+          type: array
+          items: { $ref: "#/components/schemas/MoodEntry" }
+        tasks:
+          type: array
+          items: { $ref: "#/components/schemas/StudyTask" }
+        todo_lists:
+          type: array
+          items: { $ref: "#/components/schemas/TodoList" }
+        todos:
+          type: array
+          items: { $ref: "#/components/schemas/TodoItem" }
+        word_books:
+          type: array
+          items: { $ref: "#/components/schemas/WordBook" }
+        vocabulary_words:
+          type: array
+          items: { $ref: "#/components/schemas/VocabularyWord" }
+        vocabulary_reviews:
+          type: array
+          items: { $ref: "#/components/schemas/VocabularyReview" }
+        planner_preferences: { $ref: "#/components/schemas/PlannerPreferences" }
+        plan_blocks:
+          type: array
+          items: { $ref: "#/components/schemas/StudyPlanBlock" }
+        weekly_reflections:
+          type: array
+          items: { $ref: "#/components/schemas/WeeklyReflection" }
+        decks:
+          type: array
+          items: { $ref: "#/components/schemas/Deck" }
+        cards:
+          type: array
+          items: { $ref: "#/components/schemas/Card" }
+        focus_sessions:
+          type: array
+          items: { $ref: "#/components/schemas/FocusSession" }
     Dashboard:
       type: object
       properties:

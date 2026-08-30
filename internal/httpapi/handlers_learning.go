@@ -89,6 +89,7 @@ func (s *Server) reviewCard(w http.ResponseWriter, r *http.Request) {
 func (s *Server) startFocus(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		TaskID         string `json:"task_id"`
+		PlanBlockID    string `json:"plan_block_id"`
 		PlannedMinutes int    `json:"planned_minutes"`
 		BreakEnabled   bool   `json:"break_enabled"`
 	}
@@ -97,7 +98,7 @@ func (s *Server) startFocus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	session, err := s.service.StartFocus(r.Context(), claimsFromContext(r.Context()).Subject, service.StartFocusInput{
-		TaskID: body.TaskID, PlannedMinutes: body.PlannedMinutes, BreakEnabled: body.BreakEnabled,
+		TaskID: body.TaskID, PlanBlockID: body.PlanBlockID, PlannedMinutes: body.PlannedMinutes, BreakEnabled: body.BreakEnabled,
 	})
 	if err != nil {
 		writeError(w, err)

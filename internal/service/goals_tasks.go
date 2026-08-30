@@ -189,6 +189,21 @@ func (s *Service) ChangeGoalStatus(ctx context.Context, userID, goalID string, s
 	return goal, nil
 }
 
+func (s *Service) DeleteGoal(ctx context.Context, userID, goalID string) error {
+	goal, err := s.repo.GoalByID(ctx, goalID)
+	if err != nil {
+		return err
+	}
+	if err := requireOwner(goal.UserID, userID); err != nil {
+		return err
+	}
+	if err := s.repo.DeleteGoal(ctx, goalID); err != nil {
+		return err
+	}
+	s.publish("goal.deleted", userID, goalID, nil)
+	return nil
+}
+
 func allowedGoalTransition(from, to domain.GoalStatus) bool {
 	if from == to {
 		return true
@@ -276,6 +291,21 @@ func (s *Service) ChangeTaskStatus(ctx context.Context, userID, taskID string, s
 	}
 	s.publish("task.status_changed", userID, task.ID, map[string]any{"status": status})
 	return task, nil
+}
+
+func (s *Service) DeleteTask(ctx context.Context, userID, taskID string) error {
+	task, err := s.repo.TaskByID(ctx, taskID)
+	if err != nil {
+		return err
+	}
+	if err := requireOwner(task.UserID, userID); err != nil {
+		return err
+	}
+	if err := s.repo.DeleteTask(ctx, taskID); err != nil {
+		return err
+	}
+	s.publish("task.deleted", userID, taskID, map[string]any{"goal_id": task.GoalID})
+	return nil
 }
 
 func allowedTaskTransition(from, to domain.TaskStatus) bool {

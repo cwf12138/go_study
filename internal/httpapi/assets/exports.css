@@ -1,0 +1,2 @@
+.insights-toolbar{display:grid;justify-items:end;gap:9px}.insights-export-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}.insights-export-actions button{padding:8px 10px;font-size:.7rem}
+@media(max-width:820px){.insights-toolbar{justify-items:stretch}.insights-export-actions{justify-content:flex-start}.insights-export-actions button{flex:1 1 130px}}

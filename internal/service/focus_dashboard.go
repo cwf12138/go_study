@@ -16,18 +16,36 @@ const defaultBreakMinutes = 5
 
 type StartFocusInput struct {
 	TaskID         string
+	PlanBlockID    string
 	PlannedMinutes int
 	BreakEnabled   bool
 }
 
 func (s *Service) StartFocus(ctx context.Context, userID string, input StartFocusInput) (domain.FocusSession, error) {
-	if input.PlannedMinutes < 1 || input.PlannedMinutes > 240 {
-		return domain.FocusSession{}, fmt.Errorf("%w: planned_minutes must be between 1 and 240", domain.ErrInvalidInput)
-	}
 	if _, err := s.repo.ActiveFocusSession(ctx, userID); err == nil {
 		return domain.FocusSession{}, fmt.Errorf("%w: finish or abandon the current focus session first", domain.ErrConflict)
 	} else if !errors.Is(err, domain.ErrNotFound) {
 		return domain.FocusSession{}, err
+	}
+	var planBlock *domain.StudyPlanBlock
+	if input.PlanBlockID != "" {
+		block, err := s.planBlockForUser(ctx, userID, input.PlanBlockID)
+		if err != nil {
+			return domain.FocusSession{}, err
+		}
+		if block.Status == domain.PlanBlockCompleted || block.Status == domain.PlanBlockSkipped {
+			return domain.FocusSession{}, fmt.Errorf("%w: completed or skipped plan blocks cannot start focus", domain.ErrInvalidState)
+		}
+		if input.PlannedMinutes == 0 {
+			input.PlannedMinutes = block.PlannedMinutes
+		}
+		if input.TaskID == "" && block.Kind == domain.PlanBlockTask {
+			input.TaskID = block.SourceID
+		}
+		planBlock = &block
+	}
+	if input.PlannedMinutes < 1 || input.PlannedMinutes > 240 {
+		return domain.FocusSession{}, fmt.Errorf("%w: planned_minutes must be between 1 and 240", domain.ErrInvalidInput)
 	}
 	if input.TaskID != "" {
 		task, err := s.repo.TaskByID(ctx, input.TaskID)
@@ -40,7 +58,7 @@ func (s *Service) StartFocus(ctx context.Context, userID string, input StartFocu
 	}
 	now := s.now().UTC()
 	session := domain.FocusSession{
-		ID: platform.NewID(), UserID: userID, TaskID: input.TaskID,
+		ID: platform.NewID(), UserID: userID, TaskID: input.TaskID, PlanBlockID: input.PlanBlockID,
 		PlannedMinutes: input.PlannedMinutes, BreakEnabled: input.BreakEnabled,
 		Phase: domain.FocusPhaseFocus, Status: domain.FocusRunning,
 		PhaseStartedAt: now, PhaseRemainingSeconds: input.PlannedMinutes * 60, StartedAt: now,
@@ -52,6 +70,13 @@ func (s *Service) StartFocus(ctx context.Context, userID string, input StartFocu
 	}
 	if err := s.repo.CreateFocusSession(ctx, session); err != nil {
 		return domain.FocusSession{}, err
+	}
+	if planBlock != nil {
+		planBlock.Status = domain.PlanBlockDoing
+		planBlock.UpdatedAt = now
+		if err := s.repo.UpdatePlanBlock(ctx, *planBlock); err != nil {
+			return domain.FocusSession{}, err
+		}
 	}
 	s.publish("focus.started", userID, session.ID, map[string]any{"planned_minutes": input.PlannedMinutes, "break_enabled": input.BreakEnabled})
 	return session, nil
@@ -161,6 +186,23 @@ func (s *Service) FinishFocus(ctx context.Context, userID, sessionID string, aba
 	}
 	if err := s.repo.UpdateFocusSession(ctx, session); err != nil {
 		return domain.FocusSession{}, err
+	}
+	if session.PlanBlockID != "" {
+		block, blockErr := s.planBlockForUser(ctx, userID, session.PlanBlockID)
+		if blockErr != nil {
+			return domain.FocusSession{}, blockErr
+		}
+		block.UpdatedAt = now
+		if abandoned {
+			block.Status = domain.PlanBlockPlanned
+			block.CompletedAt = nil
+		} else {
+			block.Status = domain.PlanBlockCompleted
+			block.CompletedAt = &now
+		}
+		if updateErr := s.repo.UpdatePlanBlock(ctx, block); updateErr != nil {
+			return domain.FocusSession{}, updateErr
+		}
 	}
 	s.publish("focus.finished", userID, session.ID, map[string]any{"status": session.Status, "actual_minutes": session.ActualMinutes, "focused_seconds": session.FocusedSeconds})
 	return session, nil
