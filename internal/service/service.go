@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/example/studyflow/internal/domain"
@@ -16,10 +17,13 @@ type Service struct {
 	tokens *security.TokenManager
 	events event.Publisher
 	now    func() time.Time
+
+	historyMu    sync.RWMutex
+	historyCache map[string]historyCacheEntry
 }
 
 func New(repo store.Repository, tokens *security.TokenManager, events event.Publisher) *Service {
-	return &Service{repo: repo, tokens: tokens, events: events, now: time.Now}
+	return &Service{repo: repo, tokens: tokens, events: events, now: time.Now, historyCache: make(map[string]historyCacheEntry)}
 }
 
 func (s *Service) publish(eventType, actorID, aggregateID string, data map[string]any) {

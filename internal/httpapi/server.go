@@ -26,7 +26,8 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 	}
 	s := &Server{service: svc, bus: bus, logger: logger, started: time.Now(), assets: assets}
 	root := http.NewServeMux()
-	root.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(assets))))
+	staticFiles := http.StripPrefix("/static/", http.FileServer(http.FS(assets)))
+	root.Handle("GET /static/", revalidateAssets(staticFiles))
 	root.HandleFunc("/", s.home)
 	root.HandleFunc("GET /healthz", s.health)
 	root.HandleFunc("GET /readyz", s.ready)
@@ -57,6 +58,11 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 	private.HandleFunc("PUT /api/v1/todos/{todo_id}/my-day", s.addTodoToMyDay)
 	private.HandleFunc("DELETE /api/v1/todos/{todo_id}/my-day", s.removeTodoFromMyDay)
 	private.HandleFunc("PATCH /api/v1/todos/{todo_id}/steps/{step_id}", s.toggleTodoStep)
+	private.HandleFunc("GET /api/v1/calendar", s.calendarOverview)
+	private.HandleFunc("GET /api/v1/calendar/days/{date}", s.calendarDay)
+	private.HandleFunc("POST /api/v1/calendar/events", s.createCalendarEvent)
+	private.HandleFunc("PATCH /api/v1/calendar/events/{event_id}", s.updateCalendarEvent)
+	private.HandleFunc("DELETE /api/v1/calendar/events/{event_id}", s.deleteCalendarEvent)
 	private.HandleFunc("POST /api/v1/word-books", s.createWordBook)
 	private.HandleFunc("GET /api/v1/word-books", s.listWordBooks)
 	private.HandleFunc("POST /api/v1/word-books/{book_id}/words", s.createVocabularyWord)

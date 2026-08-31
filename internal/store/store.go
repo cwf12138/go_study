@@ -53,6 +53,12 @@ type Repository interface {
 	DeleteTodo(context.Context, string) error
 	ListTodos(context.Context, string, TodoFilter) ([]domain.TodoItem, error)
 
+	CreateCalendarEvent(context.Context, domain.CalendarEvent) error
+	CalendarEventByID(context.Context, string) (domain.CalendarEvent, error)
+	UpdateCalendarEvent(context.Context, domain.CalendarEvent) error
+	DeleteCalendarEvent(context.Context, string) error
+	ListCalendarEvents(context.Context, string) ([]domain.CalendarEvent, error)
+
 	CreateWordBook(context.Context, domain.WordBook) error
 	WordBookByID(context.Context, string) (domain.WordBook, error)
 	ListWordBooks(context.Context, string) ([]domain.WordBook, error)

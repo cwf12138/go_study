@@ -27,6 +27,7 @@ type UserDataExport struct {
 	Tasks              []domain.StudyTask        `json:"tasks"`
 	TodoLists          []domain.TodoList         `json:"todo_lists"`
 	Todos              []domain.TodoItem         `json:"todos"`
+	CalendarEvents     []domain.CalendarEvent    `json:"calendar_events"`
 	WordBooks          []domain.WordBook         `json:"word_books"`
 	VocabularyWords    []domain.VocabularyWord   `json:"vocabulary_words"`
 	VocabularyReviews  []domain.VocabularyReview `json:"vocabulary_reviews"`
@@ -59,6 +60,9 @@ func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataEx
 		return UserDataExport{}, err
 	}
 	if bundle.Todos, err = s.repo.ListTodos(ctx, userID, store.TodoFilter{}); err != nil {
+		return UserDataExport{}, err
+	}
+	if bundle.CalendarEvents, err = s.repo.ListCalendarEvents(ctx, userID); err != nil {
 		return UserDataExport{}, err
 	}
 	if bundle.WordBooks, err = s.repo.ListWordBooks(ctx, userID); err != nil {
@@ -96,7 +100,7 @@ func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataEx
 	}
 	bundle.Counts = map[string]int{
 		"goals": len(bundle.Goals), "moods": len(bundle.Moods), "tasks": len(bundle.Tasks), "todo_lists": len(bundle.TodoLists),
-		"todos": len(bundle.Todos), "word_books": len(bundle.WordBooks), "vocabulary_words": len(bundle.VocabularyWords),
+		"todos": len(bundle.Todos), "calendar_events": len(bundle.CalendarEvents), "word_books": len(bundle.WordBooks), "vocabulary_words": len(bundle.VocabularyWords),
 		"vocabulary_reviews": len(bundle.VocabularyReviews), "plan_blocks": len(bundle.PlanBlocks), "weekly_reflections": len(bundle.WeeklyReflections),
 		"decks": len(bundle.Decks), "cards": len(bundle.Cards), "reviews": len(bundle.Reviews), "focus_sessions": len(bundle.FocusSessions),
 	}

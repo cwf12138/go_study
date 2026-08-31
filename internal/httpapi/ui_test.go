@@ -23,11 +23,14 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 
 	home := httptest.NewRecorder()
 	handler.ServeHTTP(home, httptest.NewRequest(http.MethodGet, "/", nil))
-	if home.Code != http.StatusOK || !strings.Contains(home.Body.String(), "StudyFlow") || !strings.Contains(home.Body.String(), "mood-trend") || !strings.Contains(home.Body.String(), "theme-toggle") || !strings.Contains(home.Body.String(), "vocab-catalogs") || !strings.Contains(home.Body.String(), "vocab-pagination") {
+	if home.Code != http.StatusOK || !strings.Contains(home.Body.String(), "StudyFlow") || !strings.Contains(home.Body.String(), "mood-trend") || !strings.Contains(home.Body.String(), "theme-toggle") || !strings.Contains(home.Body.String(), "vocab-catalogs") || !strings.Contains(home.Body.String(), "vocab-pagination") || !strings.Contains(home.Body.String(), "panel-calendar") || !strings.Contains(home.Body.String(), "app.js?v=20260901-5") {
 		t.Fatalf("home status = %d, body = %q", home.Code, home.Body.String())
 	}
 	if contentType := home.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "text/html") {
 		t.Fatalf("home content type = %q", contentType)
+	}
+	if cacheControl := home.Header().Get("Cache-Control"); !strings.Contains(cacheControl, "must-revalidate") {
+		t.Fatalf("home cache control = %q", cacheControl)
 	}
 
 	javascript := httptest.NewRecorder()
@@ -35,10 +38,19 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 	if javascript.Code != http.StatusOK || !strings.Contains(javascript.Body.String(), "function bootstrap") {
 		t.Fatalf("asset status = %d", javascript.Code)
 	}
+	if cacheControl := javascript.Header().Get("Cache-Control"); !strings.Contains(cacheControl, "must-revalidate") {
+		t.Fatalf("javascript cache control = %q", cacheControl)
+	}
 
 	catalogStyles := httptest.NewRecorder()
 	handler.ServeHTTP(catalogStyles, httptest.NewRequest(http.MethodGet, "/static/vocabulary-catalogs.css", nil))
 	if catalogStyles.Code != http.StatusOK || !strings.Contains(catalogStyles.Body.String(), ".vocab-catalog") || !strings.HasPrefix(catalogStyles.Header().Get("Content-Type"), "text/css") {
 		t.Fatalf("catalog stylesheet status = %d, content-type = %q", catalogStyles.Code, catalogStyles.Header().Get("Content-Type"))
+	}
+
+	calendarScript := httptest.NewRecorder()
+	handler.ServeHTTP(calendarScript, httptest.NewRequest(http.MethodGet, "/static/calendar.js", nil))
+	if calendarScript.Code != http.StatusOK || !strings.Contains(calendarScript.Body.String(), "function renderYear") {
+		t.Fatalf("calendar script status = %d", calendarScript.Code)
 	}
 }

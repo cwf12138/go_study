@@ -173,6 +173,88 @@ type TodoItem struct {
 	CompletedAt *time.Time     `json:"completed_at,omitempty"`
 }
 
+// CalendarRepeatRule deliberately keeps recurrence compact. It covers the
+// patterns most people use while remaining easy to migrate to RFC 5545 later.
+type CalendarRepeatRule string
+
+const (
+	CalendarRepeatNone    CalendarRepeatRule = "none"
+	CalendarRepeatDaily   CalendarRepeatRule = "daily"
+	CalendarRepeatWeekly  CalendarRepeatRule = "weekly"
+	CalendarRepeatMonthly CalendarRepeatRule = "monthly"
+	CalendarRepeatYearly  CalendarRepeatRule = "yearly"
+)
+
+type CalendarEvent struct {
+	ID              string             `json:"id"`
+	UserID          string             `json:"user_id"`
+	Title           string             `json:"title"`
+	Description     string             `json:"description"`
+	Location        string             `json:"location"`
+	Category        string             `json:"category"`
+	Color           string             `json:"color"`
+	StartAt         time.Time          `json:"start_at"`
+	EndAt           time.Time          `json:"end_at"`
+	AllDay          bool               `json:"all_day"`
+	RepeatRule      CalendarRepeatRule `json:"repeat_rule"`
+	RepeatUntil     *time.Time         `json:"repeat_until,omitempty"`
+	ReminderMinutes int                `json:"reminder_minutes"`
+	CreatedAt       time.Time          `json:"created_at"`
+	UpdatedAt       time.Time          `json:"updated_at"`
+}
+
+type CalendarOccurrence struct {
+	CalendarEvent
+	OccurrenceID    string    `json:"occurrence_id"`
+	OccurrenceStart time.Time `json:"occurrence_start"`
+	OccurrenceEnd   time.Time `json:"occurrence_end"`
+}
+
+type CalendarDaySummary struct {
+	Date        string   `json:"date"`
+	Lunar       string   `json:"lunar"`
+	SolarTerm   string   `json:"solar_term,omitempty"`
+	Festivals   []string `json:"festivals"`
+	HolidayName string   `json:"holiday_name,omitempty"`
+	HolidayType string   `json:"holiday_type,omitempty"`
+}
+
+type HistoricalEvent struct {
+	Year int    `json:"year"`
+	Text string `json:"text"`
+	URL  string `json:"url,omitempty"`
+}
+
+type CalendarDayDetail struct {
+	CalendarDaySummary
+	Weekday       string            `json:"weekday"`
+	LunarFull     string            `json:"lunar_full"`
+	GanZhi        string            `json:"gan_zhi"`
+	Zodiac        string            `json:"zodiac"`
+	Constellation string            `json:"constellation"`
+	Yi            []string          `json:"yi"`
+	Ji            []string          `json:"ji"`
+	Chong         string            `json:"chong"`
+	Sha           string            `json:"sha"`
+	LuckyGod      string            `json:"lucky_god"`
+	WealthGod     string            `json:"wealth_god"`
+	Quote         string            `json:"quote"`
+	QuoteAuthor   string            `json:"quote_author"`
+	History       []HistoricalEvent `json:"history"`
+	HistorySource string            `json:"history_source"`
+}
+
+type CalendarOverview struct {
+	Start       string               `json:"start"`
+	End         string               `json:"end"`
+	Days        []CalendarDaySummary `json:"days"`
+	Events      []CalendarOccurrence `json:"events"`
+	PlanBlocks  []StudyPlanBlock     `json:"plan_blocks"`
+	Tasks       []StudyTask          `json:"tasks"`
+	Todos       []TodoItem           `json:"todos"`
+	MoodEntries []MoodEntry          `json:"mood_entries"`
+}
+
 type VocabularyStage string
 
 const (

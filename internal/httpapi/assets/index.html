@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="StudyFlow 学习成长与间隔复习控制台">
     <title>StudyFlow · 学习控制台</title>
-    <link rel="stylesheet" href="/static/styles.css">
-    <link rel="stylesheet" href="/static/insights.css">
-    <link rel="stylesheet" href="/static/weekly-review.css">
-    <link rel="stylesheet" href="/static/exports.css">
-    <link rel="stylesheet" href="/static/vocabulary-catalogs.css">
+    <link rel="stylesheet" href="/static/styles.css?v=20260901-5">
+    <link rel="stylesheet" href="/static/insights.css?v=20260901-5">
+    <link rel="stylesheet" href="/static/weekly-review.css?v=20260901-5">
+    <link rel="stylesheet" href="/static/exports.css?v=20260901-5">
+    <link rel="stylesheet" href="/static/vocabulary-catalogs.css?v=20260901-5">
+    <link rel="stylesheet" href="/static/calendar.css?v=20260901-5">
   </head>
   <body>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -52,6 +53,7 @@
           <button class="nav-link active" type="button" data-view="dashboard"><span>◫</span>概览</button>
           <button class="nav-link" type="button" data-view="goals"><span>◎</span>学习目标</button>
           <button class="nav-link" type="button" data-view="moods"><span>☺</span>心情日记</button>
+          <button class="nav-link" type="button" data-view="calendar"><span>▦</span>智能日历</button>
           <button class="nav-link" type="button" data-view="tasks"><span>✓</span>学习任务</button>
           <button class="nav-link" type="button" data-view="todo"><span>☑</span>待办清单</button>
           <button class="nav-link" type="button" data-view="planner"><span>▦</span>智能规划</button>
@@ -121,6 +123,43 @@
                 <article class="surface mood-insights-card"><div class="mood-entry-head"><div><p class="eyebrow">MONTHLY INSIGHTS</p><h3>本月回顾</h3></div><span id="mood-logged-days" class="pill">0 天</span></div><div class="mood-metrics"><div><span>平均心情</span><strong id="mood-average">–</strong></div><div><span>连续记录</span><strong id="mood-streak">0</strong></div><div><span>平均压力</span><strong id="mood-stress-average">–</strong></div><div><span>平均精力</span><strong id="mood-energy-average">–</strong></div></div><div id="mood-distribution" class="mood-distribution"></div><div class="mood-activity-summary"><span>常见活动</span><div id="mood-top-activities">本月还没有活动记录</div></div></article>
               </div>
             </div>
+          </section>
+
+          <section id="panel-calendar" class="panel">
+            <div class="calendar-shell">
+              <div class="calendar-toolbar">
+                <div class="calendar-nav-actions"><button id="calendar-today" class="quiet" type="button">今天</button><button id="calendar-prev" class="icon-button" type="button" aria-label="上一段">‹</button><button id="calendar-next" class="icon-button" type="button" aria-label="下一段">›</button><h3 id="calendar-title">日历</h3></div>
+                <div class="calendar-toolbar-actions"><div class="calendar-view-switch" role="tablist" aria-label="日历视图"><button type="button" data-calendar-view="year">年</button><button class="active" type="button" data-calendar-view="month">月</button><button type="button" data-calendar-view="week">周</button><button type="button" data-calendar-view="day">日</button></div><button id="calendar-create" class="primary" type="button">＋ 新建日程</button></div>
+              </div>
+              <div class="calendar-layout">
+                <article class="surface calendar-main-card">
+                  <div id="calendar-weekdays" class="calendar-weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span class="weekend">六</span><span class="weekend">日</span></div>
+                  <div id="calendar-canvas" class="calendar-canvas" aria-live="polite"></div>
+                  <div class="calendar-legend"><span><i class="legend-event"></i>个人日程</span><span><i class="legend-plan"></i>学习计划</span><span><i class="legend-task"></i>任务/待办</span><span><i class="legend-mood"></i>心情记录</span><small>快捷键：T 今天 · M/W/D/Y 切换视图 · ←/→ 翻页 · C 新建</small></div>
+                </article>
+                <aside class="calendar-side">
+                  <article class="surface calendar-day-card"><div class="calendar-day-hero"><div><p id="calendar-detail-weekday" class="eyebrow">TODAY</p><strong id="calendar-detail-number">—</strong></div><div><h3 id="calendar-detail-date">选择一天</h3><p id="calendar-detail-lunar">农历信息</p><span id="calendar-detail-ganzhi"></span></div></div><div id="calendar-day-badges" class="calendar-day-badges"></div><div class="calendar-almanac"><div><b>宜</b><p id="calendar-yi">—</p></div><div><b>忌</b><p id="calendar-ji">—</p></div></div><div id="calendar-almanac-extra" class="calendar-almanac-extra"></div><p class="calendar-disclaimer">黄历内容来自传统民俗，仅供文化了解与日常趣味参考。</p></article>
+                  <article class="surface calendar-agenda-card"><div class="calendar-card-head"><div><p class="eyebrow">DAY AGENDA</p><h3>当日安排</h3></div><button id="calendar-quick-create" class="text-button" type="button">添加</button></div><div id="calendar-day-agenda" class="calendar-day-agenda empty-state">这一天还没有安排。</div></article>
+                  <article class="surface calendar-quote-card"><p class="eyebrow">DAILY NOTE</p><blockquote id="calendar-quote">每天向前一点点。</blockquote><span id="calendar-quote-author">StudyFlow</span></article>
+                  <article class="surface calendar-history-card"><div class="calendar-card-head"><div><p class="eyebrow">ON THIS DAY</p><h3>历史上的今天</h3></div><a href="https://zh.wikipedia.org" target="_blank" rel="noreferrer">来源</a></div><div id="calendar-history" class="calendar-history"><div class="empty-state">选择日期后加载历史事件。</div></div><small id="calendar-history-source"></small></article>
+                </aside>
+              </div>
+            </div>
+
+            <dialog id="calendar-event-dialog" class="calendar-event-dialog">
+              <form id="calendar-event-form" method="dialog">
+                <div class="calendar-dialog-head"><div><p class="eyebrow">CALENDAR EVENT</p><h3 id="calendar-dialog-title">新建日程</h3></div><button id="calendar-dialog-close" class="icon-button" type="button" aria-label="关闭">×</button></div>
+                <input id="calendar-event-id" type="hidden">
+                <label>标题<input id="calendar-event-title" required maxlength="160" placeholder="例如：复习 Go 并发模型"></label>
+                <div class="calendar-form-row"><label>开始<input id="calendar-event-start" type="datetime-local" required></label><label>结束<input id="calendar-event-end" type="datetime-local" required></label></div>
+                <label class="check-label"><input id="calendar-event-all-day" type="checkbox">全天日程</label>
+                <div class="calendar-form-row"><label>分类<select id="calendar-event-category"><option>学习</option><option>工作</option><option>生活</option><option>纪念日</option></select></label><label>颜色<input id="calendar-event-color" type="color" value="#5b81ff"></label></div>
+                <div class="calendar-form-row"><label>重复<select id="calendar-event-repeat"><option value="none">不重复</option><option value="daily">每天</option><option value="weekly">每周</option><option value="monthly">每月</option><option value="yearly">每年</option></select></label><label>重复截止<input id="calendar-event-repeat-until" type="date"></label></div>
+                <div class="calendar-form-row"><label>提醒<select id="calendar-event-reminder"><option value="0">不提醒</option><option value="10">提前 10 分钟</option><option value="30">提前 30 分钟</option><option value="60">提前 1 小时</option><option value="1440">提前 1 天</option></select></label><label>地点<input id="calendar-event-location" maxlength="240" placeholder="可选"></label></div>
+                <label>说明<textarea id="calendar-event-description" rows="3" maxlength="6000" placeholder="补充准备事项或链接"></textarea></label>
+                <div class="calendar-dialog-actions"><button id="calendar-event-delete" class="quiet danger-text hidden" type="button">删除日程</button><span></span><button id="calendar-event-cancel" class="quiet" type="button">取消</button><button class="primary" type="submit">保存日程</button></div>
+              </form>
+            </dialog>
           </section>
 
           <section id="panel-tasks" class="panel">
@@ -240,6 +279,7 @@
         </div>
       </section>
     </div>
-    <script src="/static/app.js" defer></script>
+    <script src="/static/app.js?v=20260901-5" defer></script>
+    <script src="/static/calendar.js?v=20260901-5" defer></script>
   </body>
 </html>

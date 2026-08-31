@@ -282,6 +282,7 @@
       dashboard: ["今天也在前进", "学习概览"],
       goals: ["GOALS", "学习目标"],
       moods: ["MOOD JOURNAL", "心情日记"],
+      calendar: ["SMART CALENDAR", "智能日历"],
       tasks: ["TASKS", "学习任务"],
       todo: ["TODO LIST", "待办清单"],
       planner: ["SMART PLANNER", "智能学习规划"],
@@ -290,9 +291,15 @@
       review: ["SPACED REPETITION", "间隔复习"],
       focus: ["FOCUS", "专注会话"],
     };
+    const targetPanel = $(`#panel-${view}`);
+    if (!targetPanel) {
+      notify("该功能页面尚未加载，请刷新页面后重试。", "error");
+      return;
+    }
+    const label = labels[view] || [String(view).toUpperCase(), "功能页面"];
     state.currentView = view;
-    $("#page-kicker").textContent = labels[view][0];
-    $("#page-title").textContent = labels[view][1];
+    $("#page-kicker").textContent = label[0];
+    $("#page-title").textContent = label[1];
     $$(".panel").forEach((panel) => panel.classList.toggle("active", panel.id === `panel-${view}`));
     $$(".nav-link").forEach((button) => button.classList.toggle("active", button.dataset.view === view));
     $(".sidebar").classList.remove("open");

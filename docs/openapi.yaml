@@ -9,6 +9,7 @@ tags:
   - name: Auth
   - name: Goals
   - name: Moods
+  - name: Calendar
   - name: Tasks
   - name: Todos
   - name: Planner
@@ -437,6 +438,79 @@ paths:
                 completed: { type: boolean }
       responses:
         "200": { description: Updated }
+  /api/v1/calendar:
+    get:
+      tags: [Calendar]
+      security: [{ bearerAuth: [] }]
+      summary: 获取日期范围内的公历/农历信息与聚合日程
+      parameters:
+        - { in: query, name: start, required: true, schema: { type: string, format: date } }
+        - { in: query, name: end, required: true, description: Exclusive end date; a range may contain at most 370 days., schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: Calendar range
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/CalendarOverview" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/v1/calendar/days/{date}:
+    get:
+      tags: [Calendar]
+      security: [{ bearerAuth: [] }]
+      summary: 获取某日农历、节气、黄历、每日一签和历史事件
+      parameters:
+        - { in: path, name: date, required: true, schema: { type: string, format: date } }
+        - { in: query, name: history, schema: { type: boolean, default: false } }
+      responses:
+        "200": { description: Day detail }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/v1/calendar/events:
+    post:
+      tags: [Calendar]
+      security: [{ bearerAuth: [] }]
+      summary: 创建个人日程
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CalendarEventInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/CalendarEvent" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/v1/calendar/events/{event_id}:
+    patch:
+      tags: [Calendar]
+      security: [{ bearerAuth: [] }]
+      summary: 更新个人日程或整个重复系列
+      parameters:
+        - { in: path, name: event_id, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CalendarEventInput" }
+      responses:
+        "200": { description: Updated }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Calendar]
+      security: [{ bearerAuth: [] }]
+      summary: 删除个人日程或整个重复系列
+      parameters:
+        - { in: path, name: event_id, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/goals/{goal_id}:
     delete:
       tags: [Goals]
@@ -1361,6 +1435,51 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
   schemas:
+    CalendarEventInput:
+      type: object
+      required: [title, start_at, end_at]
+      properties:
+        title: { type: string, maxLength: 160 }
+        description: { type: string, maxLength: 6000 }
+        location: { type: string, maxLength: 240 }
+        category: { type: string, maxLength: 60, default: 学习 }
+        color: { type: string, pattern: '^#[0-9A-Fa-f]{6}$', default: '#5b81ff' }
+        start_at: { type: string, format: date-time }
+        end_at: { type: string, format: date-time }
+        all_day: { type: boolean, default: false }
+        repeat_rule: { type: string, enum: [none, daily, weekly, monthly, yearly], default: none }
+        repeat_until: { type: string, format: date-time }
+        reminder_minutes: { type: integer, minimum: 0, maximum: 40320, default: 0 }
+    CalendarEvent:
+      allOf:
+        - $ref: "#/components/schemas/CalendarEventInput"
+        - type: object
+          required: [id, user_id, created_at, updated_at]
+          properties:
+            id: { type: string }
+            user_id: { type: string }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+    CalendarDaySummary:
+      type: object
+      properties:
+        date: { type: string, format: date }
+        lunar: { type: string }
+        solar_term: { type: string }
+        festivals: { type: array, items: { type: string } }
+        holiday_name: { type: string }
+        holiday_type: { type: string, enum: [off, work] }
+    CalendarOverview:
+      type: object
+      properties:
+        start: { type: string, format: date }
+        end: { type: string, format: date }
+        days: { type: array, items: { $ref: "#/components/schemas/CalendarDaySummary" } }
+        events: { type: array, items: { $ref: "#/components/schemas/CalendarEvent" } }
+        plan_blocks: { type: array, items: { $ref: "#/components/schemas/StudyPlanBlock" } }
+        tasks: { type: array, items: { $ref: "#/components/schemas/StudyTask" } }
+        todos: { type: array, items: { $ref: "#/components/schemas/TodoItem" } }
+        mood_entries: { type: array, items: { $ref: "#/components/schemas/MoodEntry" } }
     RegisterRequest:
       type: object
       required: [name, email, password]
@@ -1955,6 +2074,9 @@ components:
         todos:
           type: array
           items: { $ref: "#/components/schemas/TodoItem" }
+        calendar_events:
+          type: array
+          items: { $ref: "#/components/schemas/CalendarEvent" }
         word_books:
           type: array
           items: { $ref: "#/components/schemas/WordBook" }

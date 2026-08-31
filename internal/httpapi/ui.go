@@ -46,6 +46,17 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache, max-age=0, must-revalidate")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(page)
+}
+
+// revalidateAssets prevents a long-running development server from serving a
+// new index.html alongside an old cached app.js. That mismatch can make newly
+// added navigation entries appear present but remain completely unresponsive.
+func revalidateAssets(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache, max-age=0, must-revalidate")
+		next.ServeHTTP(w, r)
+	})
 }

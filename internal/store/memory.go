@@ -23,6 +23,7 @@ type Memory struct {
 	tasks             map[string]domain.StudyTask
 	todoLists         map[string]domain.TodoList
 	todos             map[string]domain.TodoItem
+	calendarEvents    map[string]domain.CalendarEvent
 	wordBooks         map[string]domain.WordBook
 	words             map[string]domain.VocabularyWord
 	wordReviews       map[string]domain.VocabularyReview
@@ -46,6 +47,7 @@ func NewMemory() *Memory {
 		tasks:             make(map[string]domain.StudyTask),
 		todoLists:         make(map[string]domain.TodoList),
 		todos:             make(map[string]domain.TodoItem),
+		calendarEvents:    make(map[string]domain.CalendarEvent),
 		wordBooks:         make(map[string]domain.WordBook),
 		words:             make(map[string]domain.VocabularyWord),
 		wordReviews:       make(map[string]domain.VocabularyReview),
@@ -362,6 +364,56 @@ func (m *Memory) ListTodos(_ context.Context, userID string, filter TodoFilter) 
 		items = append(items, cloneTodo(todo))
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].CreatedAt.After(items[j].CreatedAt) })
+	return items, nil
+}
+
+func (m *Memory) CreateCalendarEvent(_ context.Context, event domain.CalendarEvent) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.calendarEvents[event.ID] = event
+	return nil
+}
+
+func (m *Memory) CalendarEventByID(_ context.Context, id string) (domain.CalendarEvent, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	event, ok := m.calendarEvents[id]
+	if !ok {
+		return domain.CalendarEvent{}, domain.ErrNotFound
+	}
+	return event, nil
+}
+
+func (m *Memory) UpdateCalendarEvent(_ context.Context, event domain.CalendarEvent) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.calendarEvents[event.ID]; !ok {
+		return domain.ErrNotFound
+	}
+	m.calendarEvents[event.ID] = event
+	return nil
+}
+
+func (m *Memory) DeleteCalendarEvent(_ context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.calendarEvents[id]; !ok {
+		return domain.ErrNotFound
+	}
+	delete(m.calendarEvents, id)
+	return nil
+}
+
+func (m *Memory) ListCalendarEvents(_ context.Context, userID string) ([]domain.CalendarEvent, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	items := make([]domain.CalendarEvent, 0)
+	for _, event := range m.calendarEvents {
+		if event.UserID == userID {
+			items = append(items, event)
+		}
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].StartAt.Before(items[j].StartAt) })
 	return items, nil
 }
 
@@ -917,6 +969,7 @@ type snapshot struct {
 	Tasks             []domain.StudyTask          `json:"tasks"`
 	TodoLists         []domain.TodoList           `json:"todo_lists"`
 	Todos             []domain.TodoItem           `json:"todos"`
+	CalendarEvents    []domain.CalendarEvent      `json:"calendar_events"`
 	WordBooks         []domain.WordBook           `json:"word_books"`
 	Words             []domain.VocabularyWord     `json:"vocabulary_words"`
 	WordReviews       []domain.VocabularyReview   `json:"vocabulary_reviews"`
@@ -951,6 +1004,9 @@ func (m *Memory) SaveJSON(path string) error {
 	}
 	for _, item := range m.todos {
 		s.Todos = append(s.Todos, cloneTodo(item))
+	}
+	for _, item := range m.calendarEvents {
+		s.CalendarEvents = append(s.CalendarEvents, item)
 	}
 	for _, item := range m.wordBooks {
 		s.WordBooks = append(s.WordBooks, item)
@@ -1035,6 +1091,7 @@ func (m *Memory) LoadJSON(path string) error {
 	m.tasks = make(map[string]domain.StudyTask, len(s.Tasks))
 	m.todoLists = make(map[string]domain.TodoList, len(s.TodoLists))
 	m.todos = make(map[string]domain.TodoItem, len(s.Todos))
+	m.calendarEvents = make(map[string]domain.CalendarEvent, len(s.CalendarEvents))
 	m.wordBooks = make(map[string]domain.WordBook, len(s.WordBooks))
 	m.words = make(map[string]domain.VocabularyWord, len(s.Words))
 	m.wordReviews = make(map[string]domain.VocabularyReview, len(s.WordReviews))
@@ -1066,6 +1123,9 @@ func (m *Memory) LoadJSON(path string) error {
 	}
 	for _, item := range s.Todos {
 		m.todos[item.ID] = cloneTodo(item)
+	}
+	for _, item := range s.CalendarEvents {
+		m.calendarEvents[item.ID] = item
 	}
 	for _, item := range s.WordBooks {
 		m.wordBooks[item.ID] = item
