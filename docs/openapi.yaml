@@ -17,6 +17,7 @@ tags:
   - name: Review
   - name: Focus
   - name: Insights
+  - name: Knowledge
   - name: Exports
 paths:
   /healthz:
@@ -1298,6 +1299,114 @@ paths:
                   data:
                     type: array
                     items: { $ref: "#/components/schemas/WeeklyReflection" }
+  /api/v1/knowledge/notes:
+    get:
+      tags: [Knowledge]
+      security: [{ bearerAuth: [] }]
+      summary: Search and filter knowledge notes
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: tag
+          schema: { type: string }
+        - in: query
+          name: pinned
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Notes sorted by pin, relevance and update time
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/KnowledgeNoteSummary" }
+    post:
+      tags: [Knowledge]
+      security: [{ bearerAuth: [] }]
+      summary: Create a knowledge note with optional wiki-style links
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveKnowledgeNoteRequest" }
+      responses:
+        "201":
+          description: Created note and its resolved links
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/KnowledgeNoteDetail" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/knowledge/notes/{note_id}:
+    parameters:
+      - in: path
+        name: note_id
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Knowledge]
+      security: [{ bearerAuth: [] }]
+      summary: Get a note with backlinks, outgoing links and unresolved links
+      responses:
+        "200":
+          description: Knowledge note detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/KnowledgeNoteDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Knowledge]
+      security: [{ bearerAuth: [] }]
+      summary: Update note content, tags or pinned state
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveKnowledgeNoteRequest" }
+      responses:
+        "200":
+          description: Updated note detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/KnowledgeNoteDetail" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      tags: [Knowledge]
+      security: [{ bearerAuth: [] }]
+      summary: Delete a note while retaining unresolved references in other notes
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/knowledge/graph:
+    get:
+      tags: [Knowledge]
+      security: [{ bearerAuth: [] }]
+      summary: Build the user's resolved knowledge graph
+      responses:
+        "200":
+          description: Nodes, resolved edges and graph health counts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/KnowledgeGraph" }
   /api/v1/exports/data:
     get:
       tags: [Exports]
@@ -2048,6 +2157,87 @@ components:
           items: { $ref: "#/components/schemas/WeeklyHighlight" }
         reflection: { $ref: "#/components/schemas/WeeklyReflection" }
         reflection_saved: { type: boolean }
+    SaveKnowledgeNoteRequest:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 160 }
+        content: { type: string, maxLength: 100000, description: Supports wiki-style links such as "[[Note title]]" }
+        tags:
+          type: array
+          maxItems: 12
+          items: { type: string, maxLength: 48 }
+        pinned: { type: boolean }
+    KnowledgeNote:
+      type: object
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        title: { type: string }
+        content: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+        pinned: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    KnowledgeNoteSummary:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        snippet: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+        pinned: { type: boolean }
+        backlink_count: { type: integer, minimum: 0 }
+        outgoing_count: { type: integer, minimum: 0 }
+        updated_at: { type: string, format: date-time }
+    KnowledgeLink:
+      type: object
+      properties:
+        source_id: { type: string }
+        source_title: { type: string }
+        target_id: { type: string }
+        target_title: { type: string }
+        resolved: { type: boolean }
+    KnowledgeNoteDetail:
+      type: object
+      properties:
+        note: { $ref: "#/components/schemas/KnowledgeNote" }
+        backlinks:
+          type: array
+          items: { $ref: "#/components/schemas/KnowledgeLink" }
+        outgoing_links:
+          type: array
+          items: { $ref: "#/components/schemas/KnowledgeLink" }
+        unresolved_links:
+          type: array
+          items: { $ref: "#/components/schemas/KnowledgeLink" }
+    KnowledgeGraphNode:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+        pinned: { type: boolean }
+        backlink_count: { type: integer, minimum: 0 }
+        outgoing_count: { type: integer, minimum: 0 }
+        orphan: { type: boolean }
+    KnowledgeGraph:
+      type: object
+      properties:
+        nodes:
+          type: array
+          items: { $ref: "#/components/schemas/KnowledgeGraphNode" }
+        edges:
+          type: array
+          items: { $ref: "#/components/schemas/KnowledgeLink" }
+        unresolved_count: { type: integer, minimum: 0 }
+        orphan_count: { type: integer, minimum: 0 }
     UserDataExport:
       type: object
       required: [schema_version, exported_at, application, user, counts]

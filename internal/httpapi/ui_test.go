@@ -23,7 +23,7 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 
 	home := httptest.NewRecorder()
 	handler.ServeHTTP(home, httptest.NewRequest(http.MethodGet, "/", nil))
-	if home.Code != http.StatusOK || !strings.Contains(home.Body.String(), "StudyFlow") || !strings.Contains(home.Body.String(), "mood-trend") || !strings.Contains(home.Body.String(), "theme-toggle") || !strings.Contains(home.Body.String(), "vocab-catalogs") || !strings.Contains(home.Body.String(), "vocab-pagination") || !strings.Contains(home.Body.String(), "panel-calendar") || !strings.Contains(home.Body.String(), "app.js?v=20260901-5") {
+	if home.Code != http.StatusOK || !strings.Contains(home.Body.String(), "StudyFlow") || !strings.Contains(home.Body.String(), "mood-trend") || !strings.Contains(home.Body.String(), "theme-toggle") || !strings.Contains(home.Body.String(), "vocab-catalogs") || !strings.Contains(home.Body.String(), "vocab-pagination") || !strings.Contains(home.Body.String(), "panel-calendar") || !strings.Contains(home.Body.String(), "panel-knowledge") || !strings.Contains(home.Body.String(), "command-dialog") || !strings.Contains(home.Body.String(), "app.js?v=20260901-6") {
 		t.Fatalf("home status = %d, body = %q", home.Code, home.Body.String())
 	}
 	if contentType := home.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "text/html") {
@@ -52,5 +52,11 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 	handler.ServeHTTP(calendarScript, httptest.NewRequest(http.MethodGet, "/static/calendar.js", nil))
 	if calendarScript.Code != http.StatusOK || !strings.Contains(calendarScript.Body.String(), "function renderYear") {
 		t.Fatalf("calendar script status = %d", calendarScript.Code)
+	}
+
+	knowledgeScript := httptest.NewRecorder()
+	handler.ServeHTTP(knowledgeScript, httptest.NewRequest(http.MethodGet, "/static/knowledge.js", nil))
+	if knowledgeScript.Code != http.StatusOK || !strings.Contains(knowledgeScript.Body.String(), "function renderKnowledgeGraph") {
+		t.Fatalf("knowledge script status = %d", knowledgeScript.Code)
 	}
 }

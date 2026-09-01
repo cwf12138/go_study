@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="StudyFlow 学习成长与间隔复习控制台">
     <title>StudyFlow · 学习控制台</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260901-5">
-    <link rel="stylesheet" href="/static/insights.css?v=20260901-5">
-    <link rel="stylesheet" href="/static/weekly-review.css?v=20260901-5">
-    <link rel="stylesheet" href="/static/exports.css?v=20260901-5">
-    <link rel="stylesheet" href="/static/vocabulary-catalogs.css?v=20260901-5">
-    <link rel="stylesheet" href="/static/calendar.css?v=20260901-5">
+    <link rel="stylesheet" href="/static/styles.css?v=20260901-6">
+    <link rel="stylesheet" href="/static/insights.css?v=20260901-6">
+    <link rel="stylesheet" href="/static/weekly-review.css?v=20260901-6">
+    <link rel="stylesheet" href="/static/exports.css?v=20260901-6">
+    <link rel="stylesheet" href="/static/vocabulary-catalogs.css?v=20260901-6">
+    <link rel="stylesheet" href="/static/calendar.css?v=20260901-6">
+    <link rel="stylesheet" href="/static/knowledge.css?v=20260901-6">
   </head>
   <body>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -54,6 +55,7 @@
           <button class="nav-link" type="button" data-view="goals"><span>◎</span>学习目标</button>
           <button class="nav-link" type="button" data-view="moods"><span>☺</span>心情日记</button>
           <button class="nav-link" type="button" data-view="calendar"><span>▦</span>智能日历</button>
+          <button class="nav-link" type="button" data-view="knowledge"><span>◇</span>知识花园</button>
           <button class="nav-link" type="button" data-view="tasks"><span>✓</span>学习任务</button>
           <button class="nav-link" type="button" data-view="todo"><span>☑</span>待办清单</button>
           <button class="nav-link" type="button" data-view="planner"><span>▦</span>智能规划</button>
@@ -69,7 +71,7 @@
         <header class="topbar">
           <button id="mobile-menu" class="icon-button mobile-only" type="button" aria-label="打开菜单">☰</button>
           <div><p id="page-kicker" class="eyebrow">今天也在前进</p><h2 id="page-title">学习概览</h2></div>
-          <div class="user-actions"><button id="theme-toggle" class="theme-toggle" type="button" aria-label="切换至夜间模式" title="切换主题"><span aria-hidden="true">☾</span><span id="theme-toggle-label">夜间</span></button><span id="user-name"></span><button id="logout" class="quiet" type="button">退出</button></div>
+          <div class="user-actions"><button id="command-trigger" class="command-trigger" type="button" aria-label="打开快捷命令"><span>⌕</span><kbd>Ctrl K</kbd></button><button id="theme-toggle" class="theme-toggle" type="button" aria-label="切换至夜间模式" title="切换主题"><span aria-hidden="true">☾</span><span id="theme-toggle-label">夜间</span></button><span id="user-name"></span><button id="logout" class="quiet" type="button">退出</button></div>
         </header>
 
         <div class="content">
@@ -158,6 +160,54 @@
                 <div class="calendar-form-row"><label>提醒<select id="calendar-event-reminder"><option value="0">不提醒</option><option value="10">提前 10 分钟</option><option value="30">提前 30 分钟</option><option value="60">提前 1 小时</option><option value="1440">提前 1 天</option></select></label><label>地点<input id="calendar-event-location" maxlength="240" placeholder="可选"></label></div>
                 <label>说明<textarea id="calendar-event-description" rows="3" maxlength="6000" placeholder="补充准备事项或链接"></textarea></label>
                 <div class="calendar-dialog-actions"><button id="calendar-event-delete" class="quiet danger-text hidden" type="button">删除日程</button><span></span><button id="calendar-event-cancel" class="quiet" type="button">取消</button><button class="primary" type="submit">保存日程</button></div>
+              </form>
+            </dialog>
+          </section>
+
+          <section id="panel-knowledge" class="panel">
+            <div class="section-intro knowledge-intro">
+              <div><p class="eyebrow">KNOWLEDGE GARDEN</p><h3>知识花园</h3><p>把零散想法写成可连接的长期知识。使用 <code>[[笔记标题]]</code> 建立双向链接，让笔记随着学习持续生长。</p></div>
+              <div class="knowledge-intro-actions"><div class="knowledge-view-switch" role="tablist" aria-label="知识库视图"><button class="active" type="button" data-knowledge-view="notes">笔记</button><button type="button" data-knowledge-view="graph">图谱</button></div><button id="knowledge-new" class="primary" type="button">＋ 新建笔记</button></div>
+            </div>
+            <div class="knowledge-stat-grid">
+              <article><span class="knowledge-stat-icon violet">✦</span><div><small>全部笔记</small><strong id="knowledge-total">0</strong></div></article>
+              <article><span class="knowledge-stat-icon blue">↗</span><div><small>已连接</small><strong id="knowledge-linked">0</strong></div></article>
+              <article><span class="knowledge-stat-icon amber">○</span><div><small>待连接</small><strong id="knowledge-orphans">0</strong></div></article>
+              <article><span class="knowledge-stat-icon green">#</span><div><small>主题标签</small><strong id="knowledge-tag-count">0</strong></div></article>
+            </div>
+            <div id="knowledge-notes-view" class="knowledge-workspace">
+              <aside class="surface knowledge-library-panel">
+                <div class="knowledge-search-wrap"><span>⌕</span><input id="knowledge-search" type="search" placeholder="搜索标题、正文或标签" autocomplete="off"></div>
+                <div class="knowledge-filter-head"><span>笔记库</span><button id="knowledge-clear-filter" class="text-button hidden" type="button">清除筛选</button></div>
+                <div id="knowledge-tags" class="knowledge-tags"></div>
+                <div id="knowledge-note-list" class="knowledge-note-list"><div class="knowledge-list-loading">正在整理知识卡片…</div></div>
+              </aside>
+              <article class="surface knowledge-reader-panel">
+                <div id="knowledge-reader-empty" class="knowledge-reader-empty"><div class="knowledge-empty-orbit"><span>◇</span></div><h3>从一则笔记开始</h3><p>记录概念、读书摘录与自己的思考，再通过双向链接把它们组织起来。</p><button class="quiet" type="button" data-knowledge-create>写下第一则笔记</button></div>
+                <div id="knowledge-reader" class="knowledge-reader hidden">
+                  <header class="knowledge-reader-head"><div><div id="knowledge-reader-tags" class="knowledge-reader-tags"></div><h2 id="knowledge-reader-title"></h2><p id="knowledge-reader-meta"></p></div><div class="knowledge-reader-actions"><button id="knowledge-pin" class="icon-button" type="button" title="置顶笔记" aria-label="置顶笔记">☆</button><button id="knowledge-edit" class="quiet" type="button">编辑</button><button id="knowledge-delete" class="icon-button danger-text" type="button" title="删除笔记" aria-label="删除笔记">⌫</button></div></header>
+                  <div id="knowledge-content" class="knowledge-content"></div>
+                </div>
+              </article>
+              <aside class="surface knowledge-context-panel">
+                <div class="knowledge-context-section"><div class="knowledge-context-title"><span>链接到这里</span><b id="knowledge-backlink-count">0</b></div><div id="knowledge-backlinks" class="knowledge-link-list empty-state">选择笔记后查看反向链接。</div></div>
+                <div class="knowledge-context-section"><div class="knowledge-context-title"><span>本文链接</span><b id="knowledge-outgoing-count">0</b></div><div id="knowledge-outgoing" class="knowledge-link-list empty-state">尚未建立链接。</div></div>
+                <div class="knowledge-context-tip"><span>TIP</span><p>在正文中输入 <code>[[标题]]</code>，即可把两则笔记连接起来。</p></div>
+              </aside>
+            </div>
+            <article id="knowledge-graph-view" class="surface knowledge-graph-panel hidden">
+              <div class="knowledge-graph-head"><div><p class="eyebrow">CONNECTION MAP</p><h3>知识连接图谱</h3><p>节点越大，连接越多。点击节点可以回到对应笔记。</p></div><div class="knowledge-graph-legend"><span><i class="connected"></i>已连接</span><span><i class="pinned"></i>置顶</span><span><i class="orphan"></i>孤立笔记</span></div></div>
+              <div id="knowledge-graph" class="knowledge-graph"><div class="knowledge-graph-empty">创建两则笔记并用 <code>[[标题]]</code> 连接后，关系会出现在这里。</div></div>
+            </article>
+
+            <dialog id="knowledge-editor-dialog" class="knowledge-editor-dialog">
+              <form id="knowledge-editor-form" method="dialog">
+                <div class="knowledge-editor-head"><div><p class="eyebrow">KNOWLEDGE NOTE</p><h3 id="knowledge-editor-heading">新建笔记</h3></div><button id="knowledge-editor-close" class="icon-button" type="button" aria-label="关闭">×</button></div>
+                <input id="knowledge-note-id" type="hidden">
+                <div class="knowledge-editor-meta"><label>标题<input id="knowledge-note-title" required maxlength="160" placeholder="例如：Go channel 的设计原则"></label><label>标签（逗号分隔）<input id="knowledge-note-tags" maxlength="600" placeholder="go, 并发, 读书笔记"></label><label class="check-label"><input id="knowledge-note-pinned" type="checkbox">置顶</label></div>
+                <div class="knowledge-editor-toolbar" aria-label="编辑工具"><button type="button" data-knowledge-insert="## ">H2</button><button type="button" data-knowledge-wrap="**">B</button><button type="button" data-knowledge-wrap="`">Code</button><button type="button" data-knowledge-insert="- ">列表</button><button type="button" data-knowledge-insert="[[笔记标题]]">双向链接</button><span id="knowledge-editor-count">0 字</span></div>
+                <div class="knowledge-editor-body"><textarea id="knowledge-note-content" maxlength="100000" spellcheck="true" placeholder="# 核心概念&#10;&#10;写下自己的理解，而不只是复制资料。&#10;&#10;## 关联思考&#10;&#10;它和 [[另一则笔记]] 有什么关系？"></textarea><div class="knowledge-preview"><div class="knowledge-preview-label">实时预览</div><div id="knowledge-editor-preview" class="knowledge-content"></div></div></div>
+                <div class="knowledge-editor-actions"><span id="knowledge-editor-hint">支持标题、列表、引用、粗体、行内代码和双向链接</span><button id="knowledge-editor-cancel" class="quiet" type="button">取消</button><button class="primary" type="submit">保存笔记</button></div>
               </form>
             </dialog>
           </section>
@@ -279,7 +329,15 @@
         </div>
       </section>
     </div>
-    <script src="/static/app.js?v=20260901-5" defer></script>
-    <script src="/static/calendar.js?v=20260901-5" defer></script>
+    <dialog id="command-dialog" class="command-dialog">
+      <div class="command-shell">
+        <div class="command-search"><span>⌕</span><input id="command-input" type="search" placeholder="跳转页面、创建内容或搜索笔记…" autocomplete="off"><kbd>ESC</kbd></div>
+        <div id="command-results" class="command-results"></div>
+        <div class="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 执行</span><span>全局快捷键 <kbd>Ctrl K</kbd></span></div>
+      </div>
+    </dialog>
+    <script src="/static/app.js?v=20260901-6" defer></script>
+    <script src="/static/calendar.js?v=20260901-6" defer></script>
+    <script src="/static/knowledge.js?v=20260901-6" defer></script>
   </body>
 </html>
