@@ -29,8 +29,13 @@ func main() {
 
 	repository := store.NewMemory()
 	if err := repository.LoadJSON(cfg.DataFile); err != nil {
-		logger.Error("load data snapshot", "error", err)
-		os.Exit(1)
+		var recovery *store.SnapshotRecoveryError
+		if errors.As(err, &recovery) {
+			logger.Warn("data snapshot recovered", "error", err, "quarantined_path", recovery.QuarantinedPath, "backup_path", recovery.BackupPath, "recovered_from_backup", recovery.RecoveredFromBackup)
+		} else {
+			logger.Error("load data snapshot", "error", err)
+			os.Exit(1)
+		}
 	}
 	bus := event.NewBus()
 	tokens := security.NewTokenManager(cfg.JWTSecret, cfg.JWTIssuer, cfg.TokenTTL)

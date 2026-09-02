@@ -35,6 +35,9 @@ type UserDataExport struct {
 	PlanBlocks         []domain.StudyPlanBlock   `json:"plan_blocks"`
 	PlannerReports     []domain.PlannerReport    `json:"planner_reports"`
 	WeeklyReflections  []domain.WeeklyReflection `json:"weekly_reflections"`
+	EnglishReadings    []domain.EnglishReading   `json:"english_readings"`
+	EBookReadings      []domain.EBookReading     `json:"ebook_readings"`
+	ClassicalStudies   []domain.ClassicalStudy   `json:"classical_studies"`
 	Decks              []domain.Deck             `json:"decks"`
 	Cards              []domain.Card             `json:"cards"`
 	Reviews            []domain.Review           `json:"reviews"`
@@ -86,6 +89,15 @@ func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataEx
 	if bundle.WeeklyReflections, err = s.repo.ListWeeklyReflections(ctx, userID); err != nil {
 		return UserDataExport{}, err
 	}
+	if bundle.EnglishReadings, err = s.repo.ListEnglishReadings(ctx, userID); err != nil {
+		return UserDataExport{}, err
+	}
+	if bundle.EBookReadings, err = s.repo.ListEBookReadings(ctx, userID); err != nil {
+		return UserDataExport{}, err
+	}
+	if bundle.ClassicalStudies, err = s.repo.ListClassicalStudies(ctx, userID); err != nil {
+		return UserDataExport{}, err
+	}
 	if bundle.Decks, err = s.repo.ListDecks(ctx, userID); err != nil {
 		return UserDataExport{}, err
 	}
@@ -102,6 +114,8 @@ func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataEx
 		"goals": len(bundle.Goals), "moods": len(bundle.Moods), "tasks": len(bundle.Tasks), "todo_lists": len(bundle.TodoLists),
 		"todos": len(bundle.Todos), "calendar_events": len(bundle.CalendarEvents), "word_books": len(bundle.WordBooks), "vocabulary_words": len(bundle.VocabularyWords),
 		"vocabulary_reviews": len(bundle.VocabularyReviews), "plan_blocks": len(bundle.PlanBlocks), "weekly_reflections": len(bundle.WeeklyReflections),
+		"english_readings": len(bundle.EnglishReadings),
+		"ebook_readings":   len(bundle.EBookReadings), "classical_studies": len(bundle.ClassicalStudies),
 		"decks": len(bundle.Decks), "cards": len(bundle.Cards), "reviews": len(bundle.Reviews), "focus_sessions": len(bundle.FocusSessions),
 	}
 	return bundle, nil

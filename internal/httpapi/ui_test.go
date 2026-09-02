@@ -23,7 +23,7 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 
 	home := httptest.NewRecorder()
 	handler.ServeHTTP(home, httptest.NewRequest(http.MethodGet, "/", nil))
-	if home.Code != http.StatusOK || !strings.Contains(home.Body.String(), "StudyFlow") || !strings.Contains(home.Body.String(), "mood-trend") || !strings.Contains(home.Body.String(), "theme-toggle") || !strings.Contains(home.Body.String(), "vocab-catalogs") || !strings.Contains(home.Body.String(), "vocab-pagination") || !strings.Contains(home.Body.String(), "panel-calendar") || !strings.Contains(home.Body.String(), "panel-knowledge") || !strings.Contains(home.Body.String(), "command-dialog") || !strings.Contains(home.Body.String(), "app.js?v=20260901-6") {
+	if home.Code != http.StatusOK || !strings.Contains(home.Body.String(), "StudyFlow") || !strings.Contains(home.Body.String(), "mood-trend") || !strings.Contains(home.Body.String(), "theme-toggle") || !strings.Contains(home.Body.String(), "vocab-catalogs") || !strings.Contains(home.Body.String(), "vocab-pagination") || !strings.Contains(home.Body.String(), "panel-calendar") || !strings.Contains(home.Body.String(), "panel-knowledge") || !strings.Contains(home.Body.String(), "panel-english") || !strings.Contains(home.Body.String(), "panel-literature") || !strings.Contains(home.Body.String(), "ebook-reader-dialog") || !strings.Contains(home.Body.String(), "classic-reader-dialog") || !strings.Contains(home.Body.String(), "english-reader-dialog") || !strings.Contains(home.Body.String(), "command-dialog") || !strings.Contains(home.Body.String(), "app.js?v=20260902-1") {
 		t.Fatalf("home status = %d, body = %q", home.Code, home.Body.String())
 	}
 	if contentType := home.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "text/html") {
@@ -58,5 +58,26 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 	handler.ServeHTTP(knowledgeScript, httptest.NewRequest(http.MethodGet, "/static/knowledge.js", nil))
 	if knowledgeScript.Code != http.StatusOK || !strings.Contains(knowledgeScript.Body.String(), "function renderKnowledgeGraph") {
 		t.Fatalf("knowledge script status = %d", knowledgeScript.Code)
+	}
+
+	englishScript := httptest.NewRecorder()
+	handler.ServeHTTP(englishScript, httptest.NewRequest(http.MethodGet, "/static/english.js", nil))
+	if englishScript.Code != http.StatusOK || !strings.Contains(englishScript.Body.String(), "function renderFeed") || !strings.Contains(englishScript.Body.String(), "function openReader") {
+		t.Fatalf("english script status = %d", englishScript.Code)
+	}
+	englishStyles := httptest.NewRecorder()
+	handler.ServeHTTP(englishStyles, httptest.NewRequest(http.MethodGet, "/static/english.css", nil))
+	if englishStyles.Code != http.StatusOK || !strings.Contains(englishStyles.Body.String(), ".english-reader-dialog") {
+		t.Fatalf("english stylesheet status = %d", englishStyles.Code)
+	}
+	literatureScript := httptest.NewRecorder()
+	handler.ServeHTTP(literatureScript, httptest.NewRequest(http.MethodGet, "/static/literature.js", nil))
+	if literatureScript.Code != http.StatusOK || !strings.Contains(literatureScript.Body.String(), "function renderCatalog") || !strings.Contains(literatureScript.Body.String(), "function openClassic") {
+		t.Fatalf("literature script status = %d", literatureScript.Code)
+	}
+	literatureStyles := httptest.NewRecorder()
+	handler.ServeHTTP(literatureStyles, httptest.NewRequest(http.MethodGet, "/static/literature.css", nil))
+	if literatureStyles.Code != http.StatusOK || !strings.Contains(literatureStyles.Body.String(), ".ebook-reader-dialog") || !strings.Contains(literatureStyles.Body.String(), ".classic-parallel-text") {
+		t.Fatalf("literature stylesheet status = %d", literatureStyles.Code)
 	}
 }

@@ -18,6 +18,8 @@ tags:
   - name: Focus
   - name: Insights
   - name: Knowledge
+  - name: English
+  - name: Literature
   - name: Exports
 paths:
   /healthz:
@@ -1407,6 +1409,396 @@ paths:
                 type: object
                 properties:
                   data: { $ref: "#/components/schemas/KnowledgeGraph" }
+  /api/v1/english/articles:
+    get:
+      tags: [English]
+      security: [{ bearerAuth: [] }]
+      summary: Aggregate current English RSS summaries with an offline reading-lab fallback
+      parameters:
+        - in: query
+          name: refresh
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Cached feed, source health and content provenance
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EnglishFeed" }
+  /api/v1/english/library:
+    get:
+      tags: [English]
+      security: [{ bearerAuth: [] }]
+      summary: List the user's saved and completed readings
+      responses:
+        "200":
+          description: Reading library
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/EnglishReading" } }
+    post:
+      tags: [English]
+      security: [{ bearerAuth: [] }]
+      summary: Save an article, reading note and collected words
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveEnglishReadingRequest" }
+      responses:
+        "201":
+          description: Saved reading
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EnglishReading" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /api/v1/english/library/{reading_id}:
+    parameters:
+      - in: path
+        name: reading_id
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [English]
+      security: [{ bearerAuth: [] }]
+      summary: Update notes, collected words or completion status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateEnglishReadingRequest" }
+      responses:
+        "200":
+          description: Updated reading
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EnglishReading" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [English]
+      security: [{ bearerAuth: [] }]
+      summary: Remove a personal reading record
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/english/overview:
+    get:
+      tags: [English]
+      security: [{ bearerAuth: [] }]
+      summary: Get reading volume, collected-word count and reading streak
+      responses:
+        "200":
+          description: English reading overview
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EnglishOverview" }
+  /api/v1/literature/catalog:
+    get:
+      tags: [Literature]
+      security: [{ bearerAuth: [] }]
+      summary: Search public-domain world classics by English or Chinese title
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string, maxLength: 120 }
+      responses:
+        "200":
+          description: Project Gutenberg catalog results, with an offline curated fallback
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EBookCatalog" }
+  /api/v1/literature/shelf:
+    get:
+      tags: [Literature]
+      security: [{ bearerAuth: [] }]
+      summary: List the current user's ebook shelf and reading progress
+      responses:
+        "200":
+          description: Personal ebook shelf
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/EBookReading" } }
+    post:
+      tags: [Literature]
+      security: [{ bearerAuth: [] }]
+      summary: Add a catalog book to the personal shelf
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [book]
+              properties:
+                book: { $ref: "#/components/schemas/EBookCatalogItem" }
+      responses:
+        "201":
+          description: Added to shelf
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EBookReading" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/literature/shelf/{reading_id}:
+    parameters:
+      - in: path
+        name: reading_id
+        required: true
+        schema: { type: string }
+    delete:
+      tags: [Literature]
+      security: [{ bearerAuth: [] }]
+      summary: Remove an ebook and its reading data from the shelf
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/literature/shelf/{reading_id}/content:
+    parameters:
+      - in: path
+        name: reading_id
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Literature]
+      security: [{ bearerAuth: [] }]
+      summary: Fetch and paginate the selected public-domain ebook on demand
+      responses:
+        "200":
+          description: Reader pages and source notice
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EBookContent" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/literature/shelf/{reading_id}/progress:
+    parameters:
+      - in: path
+        name: reading_id
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [Literature]
+      security: [{ bearerAuth: [] }]
+      summary: Save the current page, elapsed reading time and completion status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateEBookProgressRequest" }
+      responses:
+        "200":
+          description: Updated progress
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EBookReading" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/literature/shelf/{reading_id}/bookmarks:
+    post:
+      tags: [Literature]
+      security: [{ bearerAuth: [] }]
+      summary: Add a bookmark to an ebook page
+      parameters:
+        - in: path
+          name: reading_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [page_index]
+              properties:
+                page_index: { type: integer, minimum: 0 }
+                label: { type: string, maxLength: 120 }
+                excerpt: { type: string, maxLength: 500 }
+      responses:
+        "201": { description: Bookmark added }
+  /api/v1/literature/shelf/{reading_id}/bookmarks/{bookmark_id}:
+    delete:
+      tags: [Literature]
+      security: [{ bearerAuth: [] }]
+      summary: Delete an ebook bookmark
+      parameters:
+        - in: path
+          name: reading_id
+          required: true
+          schema: { type: string }
+        - in: path
+          name: bookmark_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Bookmark deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/literature/shelf/{reading_id}/notes:
+    post:
+      tags: [Literature]
+      security: [{ bearerAuth: [] }]
+      summary: Add a personal note to an ebook page
+      parameters:
+        - in: path
+          name: reading_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                page_index: { type: integer, minimum: 0 }
+                content: { type: string, minLength: 1, maxLength: 4000 }
+      responses:
+        "201": { description: Note added }
+  /api/v1/literature/shelf/{reading_id}/notes/{note_id}:
+    delete:
+      tags: [Literature]
+      security: [{ bearerAuth: [] }]
+      summary: Delete an ebook note
+      parameters:
+        - in: path
+          name: reading_id
+          required: true
+          schema: { type: string }
+        - in: path
+          name: note_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Note deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/literature/classics:
+    get:
+      tags: [Literature]
+      security: [{ bearerAuth: [] }]
+      summary: Browse ancient poetry and prose with aligned learning translations
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: dynasty
+          schema: { type: string }
+        - in: query
+          name: genre
+          schema: { type: string }
+      responses:
+        "200":
+          description: Filtered classical works
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/ClassicalWork" } }
+  /api/v1/literature/classics/{work_id}:
+    get:
+      tags: [Literature]
+      security: [{ bearerAuth: [] }]
+      summary: Get one classical work and its learning material
+      parameters:
+        - in: path
+          name: work_id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Classical work detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ClassicalWork" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/literature/classic-studies:
+    get:
+      tags: [Literature]
+      security: [{ bearerAuth: [] }]
+      summary: List saved classical-learning states
+      responses:
+        "200":
+          description: Personal learning states
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/ClassicalStudy" } }
+  /api/v1/literature/classic-studies/{work_id}:
+    put:
+      tags: [Literature]
+      security: [{ bearerAuth: [] }]
+      summary: Save favorite, notes, learning status or a recitation attempt
+      parameters:
+        - in: path
+          name: work_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateClassicalStudyRequest" }
+      responses:
+        "200":
+          description: Updated learning state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ClassicalStudy" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/literature/overview:
+    get:
+      tags: [Literature]
+      security: [{ bearerAuth: [] }]
+      summary: Get combined ebook and classical-learning statistics
+      responses:
+        "200":
+          description: Literature studio overview
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/LiteratureOverview" }
   /api/v1/exports/data:
     get:
       tags: [Exports]
@@ -2162,7 +2554,7 @@ components:
       required: [title]
       properties:
         title: { type: string, minLength: 1, maxLength: 160 }
-        content: { type: string, maxLength: 100000, description: Supports wiki-style links such as "[[Note title]]" }
+        content: { type: string, maxLength: 100000, description: 'Supports wiki-style links such as "[[Note title]]"' }
         tags:
           type: array
           maxItems: 12
@@ -2238,6 +2630,200 @@ components:
           items: { $ref: "#/components/schemas/KnowledgeLink" }
         unresolved_count: { type: integer, minimum: 0 }
         orphan_count: { type: integer, minimum: 0 }
+    EnglishArticle:
+      type: object
+      required: [id, title, summary, source, category, difficulty, reading_minutes, word_count]
+      properties:
+        id: { type: string }
+        title: { type: string, maxLength: 240 }
+        summary: { type: string, maxLength: 900, description: Feed-provided summary only; full text remains on the publisher site }
+        url: { type: string, format: uri }
+        source: { type: string }
+        source_url: { type: string, format: uri }
+        category: { type: string, enum: [world, science, technology, learning] }
+        difficulty: { type: string, enum: [B1, B2, C1] }
+        published_at: { type: string, format: date-time }
+        reading_minutes: { type: integer, minimum: 1 }
+        word_count: { type: integer, minimum: 0 }
+        offline: { type: boolean }
+    EnglishSourceStatus:
+      type: object
+      properties:
+        name: { type: string }
+        url: { type: string, format: uri }
+        available: { type: boolean }
+        count: { type: integer, minimum: 0 }
+    EnglishFeed:
+      type: object
+      properties:
+        articles: { type: array, items: { $ref: "#/components/schemas/EnglishArticle" } }
+        sources: { type: array, items: { $ref: "#/components/schemas/EnglishSourceStatus" } }
+        fetched_at: { type: string, format: date-time }
+        degraded: { type: boolean }
+    SaveEnglishReadingRequest:
+      type: object
+      required: [article]
+      properties:
+        article: { $ref: "#/components/schemas/EnglishArticle" }
+        status: { type: string, enum: [saved, completed], default: saved }
+        notes: { type: string, maxLength: 4000 }
+        new_words: { type: array, maxItems: 100, items: { type: string } }
+    UpdateEnglishReadingRequest:
+      type: object
+      properties:
+        status: { type: string, enum: [saved, completed] }
+        notes: { type: string, maxLength: 4000 }
+        new_words: { type: array, maxItems: 100, items: { type: string } }
+    EnglishReading:
+      type: object
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        article: { $ref: "#/components/schemas/EnglishArticle" }
+        status: { type: string, enum: [saved, completed] }
+        notes: { type: string }
+        new_words: { type: array, items: { type: string } }
+        saved_at: { type: string, format: date-time }
+        completed_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    EnglishOverview:
+      type: object
+      properties:
+        saved: { type: integer, minimum: 0 }
+        completed: { type: integer, minimum: 0 }
+        completed_this_week: { type: integer, minimum: 0 }
+        reading_minutes: { type: integer, minimum: 0 }
+        new_words: { type: integer, minimum: 0 }
+        streak_days: { type: integer, minimum: 0 }
+    EBookCatalogItem:
+      type: object
+      required: [id, title, authors, language, source_url]
+      properties:
+        id: { type: string }
+        title: { type: string, maxLength: 240 }
+        chinese_title: { type: string, maxLength: 120 }
+        authors: { type: array, items: { type: string } }
+        summary: { type: string, maxLength: 1200 }
+        language: { type: string }
+        subjects: { type: array, items: { type: string } }
+        cover_url: { type: string, format: uri }
+        content_url: { type: string, format: uri, description: HTTPS Project Gutenberg plain-text resource }
+        source_url: { type: string, format: uri }
+        download_count: { type: integer, minimum: 0 }
+        copyright: { type: boolean }
+        featured: { type: boolean }
+    EBookCatalog:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/EBookCatalogItem" } }
+        query: { type: string }
+        provider: { type: string }
+        degraded: { type: boolean }
+    EBookPage:
+      type: object
+      properties:
+        index: { type: integer, minimum: 0 }
+        chapter: { type: string }
+        content: { type: string }
+    EBookContent:
+      type: object
+      properties:
+        book: { $ref: "#/components/schemas/EBookCatalogItem" }
+        pages: { type: array, items: { $ref: "#/components/schemas/EBookPage" } }
+        total_words: { type: integer, minimum: 0 }
+        license_notice: { type: string }
+        fetched_at: { type: string, format: date-time }
+    EBookBookmark:
+      type: object
+      properties:
+        id: { type: string }
+        page_index: { type: integer, minimum: 0 }
+        label: { type: string }
+        excerpt: { type: string }
+        created_at: { type: string, format: date-time }
+    EBookNote:
+      type: object
+      properties:
+        id: { type: string }
+        page_index: { type: integer, minimum: 0 }
+        content: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    EBookReading:
+      type: object
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        book: { $ref: "#/components/schemas/EBookCatalogItem" }
+        status: { type: string, enum: [unread, reading, completed] }
+        page_index: { type: integer, minimum: 0 }
+        total_pages: { type: integer, minimum: 0 }
+        progress: { type: number, minimum: 0, maximum: 100 }
+        reading_seconds: { type: integer, minimum: 0 }
+        bookmarks: { type: array, items: { $ref: "#/components/schemas/EBookBookmark" } }
+        notes: { type: array, items: { $ref: "#/components/schemas/EBookNote" } }
+        added_at: { type: string, format: date-time }
+        last_read_at: { type: string, format: date-time }
+        completed_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    UpdateEBookProgressRequest:
+      type: object
+      properties:
+        page_index: { type: integer, minimum: 0 }
+        total_pages: { type: integer, minimum: 0 }
+        reading_seconds_delta: { type: integer, minimum: 0, maximum: 3600 }
+        status: { type: string, enum: [unread, reading, completed] }
+    ClassicalAnnotation:
+      type: object
+      properties:
+        term: { type: string }
+        meaning: { type: string }
+    ClassicalWork:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        author: { type: string }
+        dynasty: { type: string }
+        genre: { type: string, enum: [诗, 词, 古文, 语录] }
+        difficulty: { type: string, enum: [入门, 进阶, 挑战] }
+        text: { type: array, items: { type: string } }
+        translation: { type: array, items: { type: string }, description: StudyFlow-written aligned learning translation }
+        annotations: { type: array, items: { $ref: "#/components/schemas/ClassicalAnnotation" } }
+        background: { type: string }
+        appreciation: { type: string }
+        tags: { type: array, items: { type: string } }
+        featured: { type: boolean }
+    ClassicalStudy:
+      type: object
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        work_id: { type: string }
+        favorite: { type: boolean }
+        status: { type: string, enum: [unread, learning, mastered] }
+        notes: { type: string }
+        recitation_count: { type: integer, minimum: 0 }
+        last_studied_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    UpdateClassicalStudyRequest:
+      type: object
+      properties:
+        favorite: { type: boolean }
+        status: { type: string, enum: [unread, learning, mastered] }
+        notes: { type: string, maxLength: 3000 }
+        increment_recitation: { type: boolean }
+    LiteratureOverview:
+      type: object
+      properties:
+        books_in_shelf: { type: integer, minimum: 0 }
+        books_completed: { type: integer, minimum: 0 }
+        reading_minutes: { type: integer, minimum: 0 }
+        bookmarks: { type: integer, minimum: 0 }
+        classics_studied: { type: integer, minimum: 0 }
+        classics_mastered: { type: integer, minimum: 0 }
+        classics_favorites: { type: integer, minimum: 0 }
     UserDataExport:
       type: object
       required: [schema_version, exported_at, application, user, counts]
@@ -2264,6 +2850,15 @@ components:
         todos:
           type: array
           items: { $ref: "#/components/schemas/TodoItem" }
+        english_readings:
+          type: array
+          items: { $ref: "#/components/schemas/EnglishReading" }
+        ebook_readings:
+          type: array
+          items: { $ref: "#/components/schemas/EBookReading" }
+        classical_studies:
+          type: array
+          items: { $ref: "#/components/schemas/ClassicalStudy" }
         calendar_events:
           type: array
           items: { $ref: "#/components/schemas/CalendarEvent" }

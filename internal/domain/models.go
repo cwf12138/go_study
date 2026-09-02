@@ -606,6 +606,170 @@ type KnowledgeGraph struct {
 	OrphanCount     int                  `json:"orphan_count"`
 }
 
+type EnglishArticle struct {
+	ID             string    `json:"id"`
+	Title          string    `json:"title"`
+	Summary        string    `json:"summary"`
+	URL            string    `json:"url"`
+	Source         string    `json:"source"`
+	SourceURL      string    `json:"source_url"`
+	Category       string    `json:"category"`
+	Difficulty     string    `json:"difficulty"`
+	PublishedAt    time.Time `json:"published_at"`
+	ReadingMinutes int       `json:"reading_minutes"`
+	WordCount      int       `json:"word_count"`
+	Offline        bool      `json:"offline,omitempty"`
+}
+
+type EnglishSourceStatus struct {
+	Name      string `json:"name"`
+	URL       string `json:"url"`
+	Available bool   `json:"available"`
+	Count     int    `json:"count"`
+}
+
+type EnglishFeed struct {
+	Articles  []EnglishArticle      `json:"articles"`
+	Sources   []EnglishSourceStatus `json:"sources"`
+	FetchedAt time.Time             `json:"fetched_at"`
+	Degraded  bool                  `json:"degraded"`
+}
+
+type EnglishReading struct {
+	ID          string         `json:"id"`
+	UserID      string         `json:"user_id"`
+	Article     EnglishArticle `json:"article"`
+	Status      string         `json:"status"`
+	Notes       string         `json:"notes"`
+	NewWords    []string       `json:"new_words"`
+	SavedAt     time.Time      `json:"saved_at"`
+	CompletedAt *time.Time     `json:"completed_at,omitempty"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+}
+
+type EnglishOverview struct {
+	Saved             int `json:"saved"`
+	Completed         int `json:"completed"`
+	CompletedThisWeek int `json:"completed_this_week"`
+	ReadingMinutes    int `json:"reading_minutes"`
+	NewWords          int `json:"new_words"`
+	StreakDays        int `json:"streak_days"`
+}
+
+type EBookCatalogItem struct {
+	ID            string   `json:"id"`
+	Title         string   `json:"title"`
+	ChineseTitle  string   `json:"chinese_title,omitempty"`
+	Authors       []string `json:"authors"`
+	Summary       string   `json:"summary"`
+	Language      string   `json:"language"`
+	Subjects      []string `json:"subjects"`
+	CoverURL      string   `json:"cover_url,omitempty"`
+	ContentURL    string   `json:"content_url,omitempty"`
+	SourceURL     string   `json:"source_url"`
+	DownloadCount int      `json:"download_count"`
+	Copyright     bool     `json:"copyright"`
+	Featured      bool     `json:"featured,omitempty"`
+}
+
+type EBookCatalog struct {
+	Items    []EBookCatalogItem `json:"items"`
+	Query    string             `json:"query"`
+	Provider string             `json:"provider"`
+	Degraded bool               `json:"degraded"`
+}
+
+type EBookPage struct {
+	Index   int    `json:"index"`
+	Chapter string `json:"chapter"`
+	Content string `json:"content"`
+}
+
+type EBookContent struct {
+	Book          EBookCatalogItem `json:"book"`
+	Pages         []EBookPage      `json:"pages"`
+	TotalWords    int              `json:"total_words"`
+	LicenseNotice string           `json:"license_notice"`
+	FetchedAt     time.Time        `json:"fetched_at"`
+}
+
+type EBookBookmark struct {
+	ID        string    `json:"id"`
+	PageIndex int       `json:"page_index"`
+	Label     string    `json:"label"`
+	Excerpt   string    `json:"excerpt"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type EBookNote struct {
+	ID        string    `json:"id"`
+	PageIndex int       `json:"page_index"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type EBookReading struct {
+	ID             string           `json:"id"`
+	UserID         string           `json:"user_id"`
+	Book           EBookCatalogItem `json:"book"`
+	Status         string           `json:"status"`
+	PageIndex      int              `json:"page_index"`
+	TotalPages     int              `json:"total_pages"`
+	Progress       float64          `json:"progress"`
+	ReadingSeconds int              `json:"reading_seconds"`
+	Bookmarks      []EBookBookmark  `json:"bookmarks"`
+	Notes          []EBookNote      `json:"notes"`
+	AddedAt        time.Time        `json:"added_at"`
+	LastReadAt     time.Time        `json:"last_read_at"`
+	CompletedAt    *time.Time       `json:"completed_at,omitempty"`
+	UpdatedAt      time.Time        `json:"updated_at"`
+}
+
+type ClassicalAnnotation struct {
+	Term    string `json:"term"`
+	Meaning string `json:"meaning"`
+}
+
+type ClassicalWork struct {
+	ID           string                `json:"id"`
+	Title        string                `json:"title"`
+	Author       string                `json:"author"`
+	Dynasty      string                `json:"dynasty"`
+	Genre        string                `json:"genre"`
+	Difficulty   string                `json:"difficulty"`
+	Text         []string              `json:"text"`
+	Translation  []string              `json:"translation"`
+	Annotations  []ClassicalAnnotation `json:"annotations"`
+	Background   string                `json:"background"`
+	Appreciation string                `json:"appreciation"`
+	Tags         []string              `json:"tags"`
+	Featured     bool                  `json:"featured,omitempty"`
+}
+
+type ClassicalStudy struct {
+	ID              string    `json:"id"`
+	UserID          string    `json:"user_id"`
+	WorkID          string    `json:"work_id"`
+	Favorite        bool      `json:"favorite"`
+	Status          string    `json:"status"`
+	Notes           string    `json:"notes"`
+	RecitationCount int       `json:"recitation_count"`
+	LastStudiedAt   time.Time `json:"last_studied_at"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+type LiteratureOverview struct {
+	BooksInShelf      int `json:"books_in_shelf"`
+	BooksCompleted    int `json:"books_completed"`
+	ReadingMinutes    int `json:"reading_minutes"`
+	Bookmarks         int `json:"bookmarks"`
+	ClassicsStudied   int `json:"classics_studied"`
+	ClassicsMastered  int `json:"classics_mastered"`
+	ClassicsFavorites int `json:"classics_favorites"`
+}
+
 type Deck struct {
 	ID          string    `json:"id"`
 	UserID      string    `json:"user_id"`

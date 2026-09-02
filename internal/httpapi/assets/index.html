@@ -12,6 +12,8 @@
     <link rel="stylesheet" href="/static/vocabulary-catalogs.css?v=20260901-6">
     <link rel="stylesheet" href="/static/calendar.css?v=20260901-6">
     <link rel="stylesheet" href="/static/knowledge.css?v=20260901-6">
+    <link rel="stylesheet" href="/static/english.css?v=20260901-7">
+    <link rel="stylesheet" href="/static/literature.css?v=20260902-1">
   </head>
   <body>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -61,6 +63,8 @@
           <button class="nav-link" type="button" data-view="planner"><span>▦</span>智能规划</button>
           <button class="nav-link" type="button" data-view="insights"><span>⌁</span>学习洞察</button>
           <button class="nav-link" type="button" data-view="vocabulary"><span>Aa</span>单词学习</button>
+          <button class="nav-link" type="button" data-view="english"><span>En</span>英语精读</button>
+          <button class="nav-link" type="button" data-view="literature"><span>阅</span>阅读书房</button>
           <button class="nav-link" type="button" data-view="review"><span>↻</span>间隔复习</button>
           <button class="nav-link" type="button" data-view="focus"><span>◷</span>专注会话</button>
         </nav>
@@ -297,6 +301,51 @@
             </div>
           </section>
 
+          <section id="panel-english" class="panel">
+            <div class="english-intro">
+              <div><p class="eyebrow">DAILY ENGLISH</p><h3>每天读懂一点真实世界</h3><p>用可信资讯练习精读：先理解主旨，再收集生词，最后用一句话留下自己的判断。</p></div>
+              <div class="english-intro-actions"><button id="english-refresh" class="quiet" type="button">↻ 更新内容</button><button id="english-library-toggle" class="primary" type="button">我的阅读</button></div>
+            </div>
+            <div class="english-stat-grid">
+              <article><span class="english-stat-icon blue">R</span><div><small>本周读完</small><strong id="english-week-count">0</strong></div></article>
+              <article><span class="english-stat-icon violet">S</span><div><small>待读清单</small><strong id="english-saved-count">0</strong></div></article>
+              <article><span class="english-stat-icon green">W</span><div><small>累计生词</small><strong id="english-word-count">0</strong></div></article>
+              <article><span class="english-stat-icon amber">↗</span><div><small>连续阅读</small><strong id="english-streak-count">0 天</strong></div></article>
+            </div>
+            <div class="english-layout">
+              <main class="english-feed-column">
+                <article id="english-featured" class="english-featured surface"><div class="english-loading">正在连接英语资讯源…</div></article>
+                <div class="english-toolbar surface">
+                  <div class="english-search"><span>⌕</span><input id="english-search" type="search" placeholder="搜索标题、摘要或来源"></div>
+                  <select id="english-category" aria-label="主题"><option value="">全部主题</option><option value="world">世界</option><option value="science">科学</option><option value="technology">科技</option><option value="learning">学习</option></select>
+                  <select id="english-level" aria-label="难度"><option value="">全部难度</option><option value="B1">B1 进阶基础</option><option value="B2">B2 中高级</option><option value="C1">C1 高级</option></select>
+                </div>
+                <div id="english-feed-status" class="english-feed-status"></div>
+                <div id="english-article-grid" class="english-article-grid"><div class="english-loading">正在准备今日精读…</div></div>
+                <section id="english-library" class="english-library-section hidden"><div class="english-section-head"><div><p class="eyebrow">MY READING</p><h3>阅读清单与学习记录</h3></div><button id="english-library-close" class="quiet" type="button">返回资讯</button></div><div id="english-library-list" class="english-library-list"></div></section>
+              </main>
+              <aside class="english-side-column">
+                <article class="surface english-routine-card"><p class="eyebrow">10-MINUTE ROUTINE</p><h3>一篇文章，三遍读法</h3><ol><li><b>01</b><span><strong>扫读主旨</strong><small>只看标题与摘要，先判断作者在说什么。</small></span></li><li><b>02</b><span><strong>精读语言</strong><small>朗读句子，记录真正影响理解的词。</small></span></li><li><b>03</b><span><strong>主动输出</strong><small>写下一句英文总结或自己的观点。</small></span></li></ol></article>
+                <article class="surface english-source-card"><div><p class="eyebrow">LEARNING SOURCES</p><h3>专项学习入口</h3></div><a href="https://learningenglish.voanews.com/" target="_blank" rel="noreferrer"><span>VOA Learning English<small>慢速音频 · 分级英语</small></span><b>↗</b></a><a href="https://www.bbc.co.uk/learningenglish/" target="_blank" rel="noreferrer"><span>BBC Learning English<small>语法 · 发音 · 新闻英语</small></span><b>↗</b></a><a href="https://www.nasa.gov/rss-feeds/" target="_blank" rel="noreferrer"><span>NASA Science<small>科学与航天原文</small></span><b>↗</b></a></article>
+                <article class="surface english-source-health"><div><p class="eyebrow">SOURCE STATUS</p><h3>资讯源状态</h3></div><div id="english-sources"><span class="english-loading">检测中…</span></div><p>仅展示标题、摘要与原文入口；版权归原发布方所有。</p></article>
+              </aside>
+            </div>
+          </section>
+
+          <section id="panel-literature" class="panel">
+            <div class="literature-intro"><div><p class="eyebrow">LITERATURE STUDIO</p><h3>在经典里，慢慢建立自己的精神书架</h3><p>世界名著按需导入阅读，古诗文逐段理解；进度、书签、笔记与诵读记录都留在同一条学习轨迹中。</p></div><div class="literature-mode-tabs"><button class="active" type="button" data-literature-mode="books">世界名著</button><button type="button" data-literature-mode="classics">古诗文研习</button></div></div>
+            <div class="literature-stats"><article><span>藏</span><div><small>我的书架</small><strong id="lit-books-count">0</strong></div></article><article><span>✓</span><div><small>已读完</small><strong id="lit-completed-count">0</strong></div></article><article><span>时</span><div><small>阅读时长</small><strong id="lit-minutes-count">0 分</strong></div></article><article><span>文</span><div><small>古诗文已学</small><strong id="lit-classics-count">0</strong></div></article></div>
+            <section id="literature-books-view" class="literature-view">
+              <article class="surface literature-search-hero"><div><p class="eyebrow">PUBLIC-DOMAIN LIBRARY</p><h2>下一本想读什么？</h2><p>输入中文或英文书名、作者，从公共领域目录检索并导入纯文本版本。</p></div><form id="ebook-search-form"><span>⌕</span><input id="ebook-search" type="search" maxlength="120" placeholder="傲慢与偏见 / Pride and Prejudice / Jane Austen"><button class="primary" type="submit">搜索名著</button></form><div class="literature-source-note"><span id="ebook-provider">精选书目</span><span>来自 Gutendex / Project Gutenberg 元数据</span><a href="https://www.gutenberg.org/policy/license" target="_blank" rel="noreferrer">版权说明 ↗</a></div></article>
+              <div class="literature-books-layout"><main><div class="literature-section-head"><div><p class="eyebrow">DISCOVER</p><h3 id="ebook-catalog-title">精选世界名著</h3></div><button id="ebook-reset-search" class="text-button" type="button">查看精选</button></div><div id="ebook-catalog" class="ebook-catalog"><div class="literature-loading">正在整理经典书目…</div></div></main><aside class="surface literature-shelf"><div class="literature-section-head"><div><p class="eyebrow">MY SHELF</p><h3>我的书架</h3></div><span id="ebook-shelf-meta" class="pill">0 本</span></div><div id="ebook-shelf" class="ebook-shelf-list"><div class="literature-empty">还没有导入书籍。</div></div></aside></div>
+            </section>
+            <section id="literature-classics-view" class="literature-view hidden">
+              <div class="classics-toolbar surface"><div class="classics-search"><span>⌕</span><input id="classics-search" type="search" placeholder="搜索篇名、作者、名句或主题"></div><select id="classics-dynasty"><option value="">全部朝代</option><option value="先秦">先秦</option><option value="晋">晋</option><option value="唐">唐</option><option value="宋">宋</option></select><select id="classics-genre"><option value="">全部体裁</option><option value="诗">诗</option><option value="词">词</option><option value="古文">古文</option><option value="语录">语录</option></select><button id="classics-random" class="quiet" type="button">换一篇</button></div>
+              <article id="classics-featured" class="surface classics-featured"><div class="literature-loading">正在选取今日篇目…</div></article>
+              <div class="classics-layout"><main><div class="literature-section-head"><div><p class="eyebrow">CHINESE CLASSICS</p><h3>古诗文选读</h3></div><span id="classics-result-count"></span></div><div id="classics-grid" class="classics-grid"></div></main><aside class="surface classics-learning-card"><p class="eyebrow">LEARNING PATH</p><h3>四步研习法</h3><ol><li><b>01</b><span><strong>素读原文</strong><small>先不看译文，捕捉语气与节奏。</small></span></li><li><b>02</b><span><strong>逐段对照</strong><small>借助译文和注释解决理解阻塞。</small></span></li><li><b>03</b><span><strong>理解意脉</strong><small>结合背景与赏析理解表达选择。</small></span></li><li><b>04</b><span><strong>朗读成诵</strong><small>朗读、记录心得并标记掌握。</small></span></li></ol><div id="classics-study-summary" class="classics-study-summary"></div></aside></div>
+            </section>
+          </section>
+
           <section id="panel-review" class="panel">
             <div class="section-intro"><div><p class="eyebrow">SPACED REPETITION</p><h3>间隔复习</h3><p>根据你的回答质量动态安排下一次回顾。</p></div></div>
             <div class="two-column">
@@ -329,6 +378,38 @@
         </div>
       </section>
     </div>
+    <dialog id="ebook-reader-dialog" class="ebook-reader-dialog">
+      <div class="ebook-reader-shell">
+        <header><div><p id="ebook-reader-author" class="eyebrow">EBOOK READER</p><h2 id="ebook-reader-title"></h2></div><div class="ebook-reader-head-actions"><span id="ebook-reader-page">0 / 0</span><button id="ebook-reader-tools-toggle" class="quiet" type="button">工具</button><button id="ebook-reader-close" class="icon-button" type="button" aria-label="关闭阅读器">×</button></div><div class="ebook-reader-progress"><i id="ebook-reader-progress-bar"></i></div></header>
+        <div class="ebook-reader-body">
+          <aside class="ebook-reader-nav"><div><p class="eyebrow">CONTENTS</p><h3>阅读导航</h3></div><label>章节<select id="ebook-chapter-select"></select></label><div id="ebook-chapter-list" class="ebook-chapter-list"></div><a id="ebook-source-link" target="_blank" rel="noreferrer">原书与许可 ↗</a></aside>
+          <main id="ebook-page-stage" class="ebook-page-stage" data-reader-theme="paper"><article><p id="ebook-page-chapter" class="ebook-page-chapter"></p><div id="ebook-page-content" class="ebook-page-content"></div></article><footer><button id="ebook-page-prev" class="quiet" type="button">← 上一页</button><span id="ebook-page-footer">第 1 页</span><button id="ebook-page-next" class="primary" type="button">下一页 →</button></footer></main>
+          <aside class="ebook-reader-tools"><div class="ebook-tool-tabs"><button class="active" type="button" data-ebook-tool="settings">样式</button><button type="button" data-ebook-tool="bookmarks">书签</button><button type="button" data-ebook-tool="notes">笔记</button></div><section id="ebook-tool-settings" class="ebook-tool-panel"><label>字号 <output id="ebook-font-output">19px</output><input id="ebook-font-size" type="range" min="15" max="28" value="19"></label><label>行距 <output id="ebook-line-output">1.85</output><input id="ebook-line-height" type="range" min="150" max="230" value="185"></label><div><span>阅读主题</span><div class="ebook-theme-options"><button class="active" type="button" data-ebook-theme="paper">纸白</button><button type="button" data-ebook-theme="sepia">护眼</button><button type="button" data-ebook-theme="night">深夜</button></div></div><button id="ebook-speak-page" class="quiet full" type="button">🔊 朗读本页</button><button id="ebook-finish-reading" class="quiet full" type="button">✓ 标记全书读完</button><p id="ebook-license-notice" class="ebook-license-notice"></p></section><section id="ebook-tool-bookmarks" class="ebook-tool-panel hidden"><button id="ebook-add-bookmark" class="primary full" type="button">＋ 收藏当前页</button><div id="ebook-bookmarks" class="ebook-tool-list"></div></section><section id="ebook-tool-notes" class="ebook-tool-panel hidden"><textarea id="ebook-note-input" rows="5" maxlength="3000" placeholder="写下这一页的想法、疑问或摘记…"></textarea><button id="ebook-add-note" class="primary full" type="button">保存本页笔记</button><div id="ebook-notes" class="ebook-tool-list"></div></section></aside>
+        </div>
+      </div>
+    </dialog>
+    <dialog id="classic-reader-dialog" class="classic-reader-dialog">
+      <div class="classic-reader-shell"><header><div><p id="classic-reader-meta" class="eyebrow">古诗文研习</p><h2 id="classic-reader-title"></h2><p id="classic-reader-author"></p></div><div><button id="classic-favorite" class="quiet" type="button">☆ 收藏</button><button id="classic-reader-close" class="icon-button" type="button">×</button></div></header><div class="classic-reader-body"><main><div class="classic-reading-actions"><button id="classic-speak" class="quiet" type="button">🔊 朗读原文</button><button id="classic-toggle-translation" class="quiet" type="button">隐藏译文</button><span>译文与赏析由 StudyFlow 编写，仅作学习参考</span></div><div id="classic-parallel-text" class="classic-parallel-text"></div><section><p class="eyebrow">BACKGROUND</p><h3>创作背景</h3><p id="classic-background"></p></section><section><p class="eyebrow">APPRECIATION</p><h3>学习赏析</h3><p id="classic-appreciation"></p></section></main><aside><section><p class="eyebrow">ANNOTATIONS</p><h3>重点注释</h3><div id="classic-annotations" class="classic-annotations"></div></section><section><p class="eyebrow">MY NOTES</p><h3>我的理解</h3><textarea id="classic-notes" rows="6" maxlength="4000" placeholder="用自己的话概括主旨、意象或表达方法…"></textarea><button id="classic-save-notes" class="quiet full" type="button">保存学习笔记</button></section><div class="classic-study-actions"><button id="classic-recite" class="quiet" type="button">完成一次诵读</button><button id="classic-master" class="primary" type="button">标记已掌握</button></div><p id="classic-study-state"></p></aside></div></div>
+    </dialog>
+    <dialog id="english-reader-dialog" class="english-reader-dialog">
+      <div class="english-reader-shell">
+        <header><div><p id="english-reader-source" class="eyebrow">ENGLISH READING</p><h2 id="english-reader-title"></h2><div id="english-reader-meta" class="english-reader-meta"></div></div><button id="english-reader-close" class="icon-button" type="button" aria-label="关闭阅读器">×</button></header>
+        <div class="english-reader-layout">
+          <section class="english-reading-pane">
+            <div class="english-reading-tools"><button id="english-speak" class="quiet" type="button">🔊 朗读摘要</button><button id="english-speak-stop" class="quiet" type="button">停止</button><span>选中英文单词可快速加入生词篮</span></div>
+            <article id="english-reader-summary" class="english-reader-summary" tabindex="0"></article>
+            <div class="english-original-notice"><span>原文内容保留在发布方网站</span><a id="english-original-link" class="primary" target="_blank" rel="noreferrer">阅读全文 ↗</a></div>
+          </section>
+          <aside class="english-notebook-pane">
+            <div><p class="eyebrow">READING NOTES</p><h3>把阅读变成收获</h3></div>
+            <label>一句话总结 / 你的观点<textarea id="english-reading-notes" rows="5" maxlength="4000" placeholder="Try writing one sentence in English…"></textarea></label>
+            <div class="english-word-capture"><label>生词篮<div><input id="english-word-input" maxlength="80" placeholder="例如：resilient"><button id="english-add-word" class="quiet" type="button">添加</button></div></label><div id="english-word-chips" class="english-word-chips"><small>选中或输入生词</small></div></div>
+            <div class="english-wordbook-box"><label>加入词书<select id="english-wordbook"></select></label><label>当前单词<input id="english-wordbook-term" maxlength="160" placeholder="先选择一个生词"></label><label>释义<textarea id="english-wordbook-definition" rows="2" maxlength="3000" placeholder="写下你在语境中理解的含义"></textarea></label><button id="english-save-word" class="quiet" type="button">保存到词书</button></div>
+            <div class="english-reader-actions"><button id="english-save-reading" class="quiet" type="button">保存稍后读</button><button id="english-complete-reading" class="primary" type="button">✓ 标记已精读</button></div>
+          </aside>
+        </div>
+      </div>
+    </dialog>
     <dialog id="command-dialog" class="command-dialog">
       <div class="command-shell">
         <div class="command-search"><span>⌕</span><input id="command-input" type="search" placeholder="跳转页面、创建内容或搜索笔记…" autocomplete="off"><kbd>ESC</kbd></div>
@@ -336,8 +417,10 @@
         <div class="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 执行</span><span>全局快捷键 <kbd>Ctrl K</kbd></span></div>
       </div>
     </dialog>
-    <script src="/static/app.js?v=20260901-6" defer></script>
+    <script src="/static/app.js?v=20260902-1" defer></script>
     <script src="/static/calendar.js?v=20260901-6" defer></script>
-    <script src="/static/knowledge.js?v=20260901-6" defer></script>
+    <script src="/static/knowledge.js?v=20260902-1" defer></script>
+    <script src="/static/english.js?v=20260901-7" defer></script>
+    <script src="/static/literature.js?v=20260902-1" defer></script>
   </body>
 </html>

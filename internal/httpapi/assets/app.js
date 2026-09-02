@@ -284,6 +284,8 @@
       moods: ["MOOD JOURNAL", "心情日记"],
       calendar: ["SMART CALENDAR", "智能日历"],
       knowledge: ["KNOWLEDGE GARDEN", "知识花园"],
+      english: ["DAILY ENGLISH", "英语精读"],
+      literature: ["LITERATURE STUDIO", "阅读书房"],
       tasks: ["TASKS", "学习任务"],
       todo: ["TODO LIST", "待办清单"],
       planner: ["SMART PLANNER", "智能学习规划"],

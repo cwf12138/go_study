@@ -91,6 +91,21 @@ type Repository interface {
 	DeleteKnowledgeNote(context.Context, string) error
 	ListKnowledgeNotes(context.Context, string) ([]domain.KnowledgeNote, error)
 
+	CreateEnglishReading(context.Context, domain.EnglishReading) error
+	EnglishReadingByID(context.Context, string) (domain.EnglishReading, error)
+	UpdateEnglishReading(context.Context, domain.EnglishReading) error
+	DeleteEnglishReading(context.Context, string) error
+	ListEnglishReadings(context.Context, string) ([]domain.EnglishReading, error)
+
+	CreateEBookReading(context.Context, domain.EBookReading) error
+	EBookReadingByID(context.Context, string) (domain.EBookReading, error)
+	UpdateEBookReading(context.Context, domain.EBookReading) error
+	DeleteEBookReading(context.Context, string) error
+	ListEBookReadings(context.Context, string) ([]domain.EBookReading, error)
+	UpsertClassicalStudy(context.Context, domain.ClassicalStudy) error
+	ClassicalStudyByWork(context.Context, string, string) (domain.ClassicalStudy, error)
+	ListClassicalStudies(context.Context, string) ([]domain.ClassicalStudy, error)
+
 	CreateDeck(context.Context, domain.Deck) error
 	DeckByID(context.Context, string) (domain.Deck, error)
 	ListDecks(context.Context, string) ([]domain.Deck, error)

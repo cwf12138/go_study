@@ -18,12 +18,17 @@ type Service struct {
 	events event.Publisher
 	now    func() time.Time
 
-	historyMu    sync.RWMutex
-	historyCache map[string]historyCacheEntry
+	historyMu         sync.RWMutex
+	historyCache      map[string]historyCacheEntry
+	englishMu         sync.RWMutex
+	englishCache      englishCacheEntry
+	literatureMu      sync.RWMutex
+	literatureCatalog map[string]literatureCatalogCacheEntry
+	literatureContent map[string]literatureContentCacheEntry
 }
 
 func New(repo store.Repository, tokens *security.TokenManager, events event.Publisher) *Service {
-	return &Service{repo: repo, tokens: tokens, events: events, now: time.Now, historyCache: make(map[string]historyCacheEntry)}
+	return &Service{repo: repo, tokens: tokens, events: events, now: time.Now, historyCache: make(map[string]historyCacheEntry), literatureCatalog: make(map[string]literatureCatalogCacheEntry), literatureContent: make(map[string]literatureContentCacheEntry)}
 }
 
 func (s *Service) publish(eventType, actorID, aggregateID string, data map[string]any) {

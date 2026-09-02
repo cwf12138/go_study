@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -32,6 +33,9 @@ type Memory struct {
 	plannerReports    map[string]domain.PlannerReport
 	weeklyReflections map[string]domain.WeeklyReflection
 	knowledgeNotes    map[string]domain.KnowledgeNote
+	englishReadings   map[string]domain.EnglishReading
+	ebookReadings     map[string]domain.EBookReading
+	classicalStudies  map[string]domain.ClassicalStudy
 	decks             map[string]domain.Deck
 	cards             map[string]domain.Card
 	reviews           map[string]domain.Review
@@ -56,6 +60,9 @@ func NewMemory() *Memory {
 		plannerReports:    make(map[string]domain.PlannerReport),
 		weeklyReflections: make(map[string]domain.WeeklyReflection),
 		knowledgeNotes:    make(map[string]domain.KnowledgeNote),
+		englishReadings:   make(map[string]domain.EnglishReading),
+		ebookReadings:     make(map[string]domain.EBookReading),
+		classicalStudies:  make(map[string]domain.ClassicalStudy),
 		decks:             make(map[string]domain.Deck),
 		cards:             make(map[string]domain.Card),
 		reviews:           make(map[string]domain.Review),
@@ -780,6 +787,142 @@ func (m *Memory) ListKnowledgeNotes(_ context.Context, userID string) ([]domain.
 	return items, nil
 }
 
+func (m *Memory) CreateEnglishReading(_ context.Context, reading domain.EnglishReading) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, exists := m.englishReadings[reading.ID]; exists {
+		return domain.ErrConflict
+	}
+	m.englishReadings[reading.ID] = cloneEnglishReading(reading)
+	return nil
+}
+
+func (m *Memory) EnglishReadingByID(_ context.Context, id string) (domain.EnglishReading, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	reading, exists := m.englishReadings[id]
+	if !exists {
+		return domain.EnglishReading{}, domain.ErrNotFound
+	}
+	return cloneEnglishReading(reading), nil
+}
+
+func (m *Memory) UpdateEnglishReading(_ context.Context, reading domain.EnglishReading) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, exists := m.englishReadings[reading.ID]; !exists {
+		return domain.ErrNotFound
+	}
+	m.englishReadings[reading.ID] = cloneEnglishReading(reading)
+	return nil
+}
+
+func (m *Memory) DeleteEnglishReading(_ context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, exists := m.englishReadings[id]; !exists {
+		return domain.ErrNotFound
+	}
+	delete(m.englishReadings, id)
+	return nil
+}
+
+func (m *Memory) ListEnglishReadings(_ context.Context, userID string) ([]domain.EnglishReading, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	items := make([]domain.EnglishReading, 0)
+	for _, reading := range m.englishReadings {
+		if reading.UserID == userID {
+			items = append(items, cloneEnglishReading(reading))
+		}
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].UpdatedAt.After(items[j].UpdatedAt) })
+	return items, nil
+}
+
+func (m *Memory) CreateEBookReading(_ context.Context, reading domain.EBookReading) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, exists := m.ebookReadings[reading.ID]; exists {
+		return domain.ErrConflict
+	}
+	m.ebookReadings[reading.ID] = cloneEBookReading(reading)
+	return nil
+}
+
+func (m *Memory) EBookReadingByID(_ context.Context, id string) (domain.EBookReading, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	reading, exists := m.ebookReadings[id]
+	if !exists {
+		return domain.EBookReading{}, domain.ErrNotFound
+	}
+	return cloneEBookReading(reading), nil
+}
+
+func (m *Memory) UpdateEBookReading(_ context.Context, reading domain.EBookReading) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, exists := m.ebookReadings[reading.ID]; !exists {
+		return domain.ErrNotFound
+	}
+	m.ebookReadings[reading.ID] = cloneEBookReading(reading)
+	return nil
+}
+
+func (m *Memory) DeleteEBookReading(_ context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, exists := m.ebookReadings[id]; !exists {
+		return domain.ErrNotFound
+	}
+	delete(m.ebookReadings, id)
+	return nil
+}
+
+func (m *Memory) ListEBookReadings(_ context.Context, userID string) ([]domain.EBookReading, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	items := make([]domain.EBookReading, 0)
+	for _, reading := range m.ebookReadings {
+		if reading.UserID == userID {
+			items = append(items, cloneEBookReading(reading))
+		}
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].UpdatedAt.After(items[j].UpdatedAt) })
+	return items, nil
+}
+
+func (m *Memory) UpsertClassicalStudy(_ context.Context, study domain.ClassicalStudy) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.classicalStudies[classicalStudyKey(study.UserID, study.WorkID)] = study
+	return nil
+}
+
+func (m *Memory) ClassicalStudyByWork(_ context.Context, userID, workID string) (domain.ClassicalStudy, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	study, exists := m.classicalStudies[classicalStudyKey(userID, workID)]
+	if !exists {
+		return domain.ClassicalStudy{}, domain.ErrNotFound
+	}
+	return study, nil
+}
+
+func (m *Memory) ListClassicalStudies(_ context.Context, userID string) ([]domain.ClassicalStudy, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	items := make([]domain.ClassicalStudy, 0)
+	for _, study := range m.classicalStudies {
+		if study.UserID == userID {
+			items = append(items, study)
+		}
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].UpdatedAt.After(items[j].UpdatedAt) })
+	return items, nil
+}
+
 func (m *Memory) CreateDeck(_ context.Context, deck domain.Deck) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -978,11 +1121,33 @@ type snapshot struct {
 	PlannerReports    []domain.PlannerReport      `json:"planner_reports"`
 	WeeklyReflections []domain.WeeklyReflection   `json:"weekly_reflections"`
 	KnowledgeNotes    []domain.KnowledgeNote      `json:"knowledge_notes"`
+	EnglishReadings   []domain.EnglishReading     `json:"english_readings"`
+	EBookReadings     []domain.EBookReading       `json:"ebook_readings"`
+	ClassicalStudies  []domain.ClassicalStudy     `json:"classical_studies"`
 	Decks             []domain.Deck               `json:"decks"`
 	Cards             []domain.Card               `json:"cards"`
 	Reviews           []domain.Review             `json:"reviews"`
 	Sessions          []domain.FocusSession       `json:"focus_sessions"`
 }
+
+// SnapshotRecoveryError reports a recoverable snapshot failure. The caller may
+// continue serving because LoadJSON has either restored the previous valid
+// backup or quarantined the corrupt primary file and kept an empty store.
+type SnapshotRecoveryError struct {
+	Cause               error
+	QuarantinedPath     string
+	BackupPath          string
+	RecoveredFromBackup bool
+}
+
+func (e *SnapshotRecoveryError) Error() string {
+	if e.RecoveredFromBackup {
+		return fmt.Sprintf("invalid data snapshot moved to %q; recovered from %q: %v", e.QuarantinedPath, e.BackupPath, e.Cause)
+	}
+	return fmt.Sprintf("invalid data snapshot moved to %q; no valid backup was available, starting with an empty store: %v", e.QuarantinedPath, e.Cause)
+}
+
+func (e *SnapshotRecoveryError) Unwrap() error { return e.Cause }
 
 func (m *Memory) SaveJSON(path string) error {
 	m.mu.RLock()
@@ -1032,6 +1197,15 @@ func (m *Memory) SaveJSON(path string) error {
 	for _, item := range m.knowledgeNotes {
 		s.KnowledgeNotes = append(s.KnowledgeNotes, cloneKnowledgeNote(item))
 	}
+	for _, item := range m.englishReadings {
+		s.EnglishReadings = append(s.EnglishReadings, cloneEnglishReading(item))
+	}
+	for _, item := range m.ebookReadings {
+		s.EBookReadings = append(s.EBookReadings, cloneEBookReading(item))
+	}
+	for _, item := range m.classicalStudies {
+		s.ClassicalStudies = append(s.ClassicalStudies, item)
+	}
 	for _, item := range m.decks {
 		s.Decks = append(s.Decks, item)
 	}
@@ -1053,17 +1227,16 @@ func (m *Memory) SaveJSON(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return err
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+	if previous, err := os.ReadFile(path); err == nil {
+		if _, validateErr := decodeSnapshot(previous); validateErr == nil {
+			if err := writeSnapshotFile(path+".bak", previous); err != nil {
+				return fmt.Errorf("save previous snapshot backup: %w", err)
+			}
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	if err := os.Rename(tmp, path); err != nil {
-		if removeErr := os.Remove(path); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
-			return removeErr
-		}
-		return os.Rename(tmp, path)
-	}
-	return nil
+	return writeSnapshotFile(path, data)
 }
 
 func (m *Memory) LoadJSON(path string) error {
@@ -1074,12 +1247,28 @@ func (m *Memory) LoadJSON(path string) error {
 	if err != nil {
 		return err
 	}
-	var s snapshot
-	if err := json.Unmarshal(data, &s); err != nil {
-		return err
-	}
-	if s.Version != 1 {
-		return errors.New("unsupported snapshot version")
+	s, primaryErr := decodeSnapshot(data)
+	var recoveryErr *SnapshotRecoveryError
+	if primaryErr != nil {
+		backupPath := path + ".bak"
+		backupData, backupReadErr := os.ReadFile(backupPath)
+		if backupReadErr != nil && !errors.Is(backupReadErr, os.ErrNotExist) {
+			return fmt.Errorf("read snapshot backup: %w", backupReadErr)
+		}
+		if backupReadErr == nil {
+			if backup, backupErr := decodeSnapshot(backupData); backupErr == nil {
+				s = backup
+				recoveryErr = &SnapshotRecoveryError{Cause: primaryErr, BackupPath: backupPath, RecoveredFromBackup: true}
+			}
+		}
+		quarantinedPath, quarantineErr := quarantineSnapshot(path)
+		if quarantineErr != nil {
+			return fmt.Errorf("quarantine invalid data snapshot: %w", quarantineErr)
+		}
+		if recoveryErr == nil {
+			return &SnapshotRecoveryError{Cause: primaryErr, QuarantinedPath: quarantinedPath}
+		}
+		recoveryErr.QuarantinedPath = quarantinedPath
 	}
 
 	m.mu.Lock()
@@ -1100,6 +1289,9 @@ func (m *Memory) LoadJSON(path string) error {
 	m.plannerReports = make(map[string]domain.PlannerReport, len(s.PlannerReports))
 	m.weeklyReflections = make(map[string]domain.WeeklyReflection, len(s.WeeklyReflections))
 	m.knowledgeNotes = make(map[string]domain.KnowledgeNote, len(s.KnowledgeNotes))
+	m.englishReadings = make(map[string]domain.EnglishReading, len(s.EnglishReadings))
+	m.ebookReadings = make(map[string]domain.EBookReading, len(s.EBookReadings))
+	m.classicalStudies = make(map[string]domain.ClassicalStudy, len(s.ClassicalStudies))
 	m.decks = make(map[string]domain.Deck, len(s.Decks))
 	m.cards = make(map[string]domain.Card, len(s.Cards))
 	m.reviews = make(map[string]domain.Review, len(s.Reviews))
@@ -1151,6 +1343,15 @@ func (m *Memory) LoadJSON(path string) error {
 	for _, item := range s.KnowledgeNotes {
 		m.knowledgeNotes[item.ID] = cloneKnowledgeNote(item)
 	}
+	for _, item := range s.EnglishReadings {
+		m.englishReadings[item.ID] = cloneEnglishReading(item)
+	}
+	for _, item := range s.EBookReadings {
+		m.ebookReadings[item.ID] = cloneEBookReading(item)
+	}
+	for _, item := range s.ClassicalStudies {
+		m.classicalStudies[classicalStudyKey(item.UserID, item.WorkID)] = item
+	}
 	for _, item := range s.Decks {
 		m.decks[item.ID] = item
 	}
@@ -1163,6 +1364,69 @@ func (m *Memory) LoadJSON(path string) error {
 	for _, item := range s.Sessions {
 		m.sessions[item.ID] = normalizeFocusSession(item)
 	}
+	if recoveryErr != nil {
+		return recoveryErr
+	}
+	return nil
+}
+
+func decodeSnapshot(data []byte) (snapshot, error) {
+	var value snapshot
+	if err := json.Unmarshal(data, &value); err != nil {
+		return snapshot{}, err
+	}
+	if value.Version != 1 {
+		return snapshot{}, errors.New("unsupported snapshot version")
+	}
+	return value, nil
+}
+
+func quarantineSnapshot(path string) (string, error) {
+	quarantinedPath := path + ".corrupt-" + time.Now().UTC().Format("20060102T150405.000000000Z")
+	if err := os.Rename(path, quarantinedPath); err != nil {
+		return "", err
+	}
+	return quarantinedPath, nil
+}
+
+func writeSnapshotFile(path string, data []byte) error {
+	directory := filepath.Dir(path)
+	temporary, err := os.CreateTemp(directory, "."+filepath.Base(path)+"-*.tmp")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if err := temporary.Chmod(0o600); err != nil {
+		temporary.Close()
+		return err
+	}
+	if _, err := temporary.Write(data); err != nil {
+		temporary.Close()
+		return err
+	}
+	if err := temporary.Sync(); err != nil {
+		temporary.Close()
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		return err
+	}
+	if _, err := decodeSnapshot(data); err != nil {
+		return fmt.Errorf("refuse to write invalid snapshot: %w", err)
+	}
+	if err := os.Rename(temporaryPath, path); err == nil {
+		return nil
+	}
+	displacedPath := path + ".replace-" + time.Now().UTC().Format("20060102T150405.000000000Z")
+	if err := os.Rename(path, displacedPath); err != nil {
+		return err
+	}
+	if err := os.Rename(temporaryPath, path); err != nil {
+		_ = os.Rename(displacedPath, path)
+		return err
+	}
+	_ = os.Remove(displacedPath)
 	return nil
 }
 
@@ -1201,6 +1465,21 @@ func cloneKnowledgeNote(note domain.KnowledgeNote) domain.KnowledgeNote {
 	note.Tags = append([]string(nil), note.Tags...)
 	return note
 }
+
+func cloneEnglishReading(reading domain.EnglishReading) domain.EnglishReading {
+	reading.NewWords = append([]string(nil), reading.NewWords...)
+	return reading
+}
+
+func cloneEBookReading(reading domain.EBookReading) domain.EBookReading {
+	reading.Book.Authors = append([]string(nil), reading.Book.Authors...)
+	reading.Book.Subjects = append([]string(nil), reading.Book.Subjects...)
+	reading.Bookmarks = append([]domain.EBookBookmark(nil), reading.Bookmarks...)
+	reading.Notes = append([]domain.EBookNote(nil), reading.Notes...)
+	return reading
+}
+
+func classicalStudyKey(userID, workID string) string { return userID + "\x00" + workID }
 
 func weeklyReflectionKey(userID, weekStart string) string {
 	return userID + "\x00" + weekStart
