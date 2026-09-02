@@ -258,7 +258,7 @@ func (s *Service) Dashboard(ctx context.Context, userID string) (domain.Dashboar
 	if err != nil {
 		return domain.Dashboard{}, err
 	}
-	dueCards, err := s.repo.ListDueCards(ctx, userID, now.UTC(), 0)
+	words, err := s.repo.ListVocabularyWords(ctx, userID, "")
 	if err != nil {
 		return domain.Dashboard{}, err
 	}
@@ -270,7 +270,12 @@ func (s *Service) Dashboard(ctx context.Context, userID string) (domain.Dashboar
 		return domain.Dashboard{}, err
 	}
 
-	result := domain.Dashboard{DueCards: len(dueCards), TasksByPriority: make(map[string]int)}
+	result := domain.Dashboard{TasksByPriority: make(map[string]int)}
+	for _, word := range words {
+		if !word.DueAt.After(now.UTC()) {
+			result.DueVocabulary++
+		}
+	}
 	for _, goal := range goals {
 		if goal.Status == domain.GoalActive {
 			result.ActiveGoals++

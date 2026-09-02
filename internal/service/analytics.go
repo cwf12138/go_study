@@ -12,7 +12,6 @@ import (
 )
 
 type dailyAccuracyCounter struct {
-	cardCorrect       int
 	vocabularyCorrect int
 }
 
@@ -114,21 +113,6 @@ func (s *Service) LearningInsights(ctx context.Context, userID string, days int,
 		}
 	}
 
-	cardReviews, err := s.repo.ListReviews(ctx, userID, startDay.UTC())
-	if err != nil {
-		return domain.LearningInsights{}, err
-	}
-	for _, review := range cardReviews {
-		if !review.ReviewedAt.Before(endExclusive.UTC()) {
-			continue
-		}
-		if index, ok := dateIndex[review.ReviewedAt.In(location).Format("2006-01-02")]; ok {
-			result.Daily[index].CardReviews++
-			if review.Rating > domain.RatingAgain {
-				accuracy[index].cardCorrect++
-			}
-		}
-	}
 	vocabularyReviews, err := s.repo.ListVocabularyReviews(ctx, userID, startDay.UTC())
 	if err != nil {
 		return domain.LearningInsights{}, err
@@ -159,25 +143,19 @@ func (s *Service) LearningInsights(ctx context.Context, userID string, days int,
 		}
 	}
 
-	cardCorrectTotal := 0
 	vocabularyCorrectTotal := 0
 	for index := range result.Daily {
 		day := &result.Daily[index]
 		if day.PlannedMinutes > 0 {
 			day.PlanAdherence = roundedPercent(day.CompletedPlanMinutes, day.PlannedMinutes)
 		}
-		if day.CardReviews > 0 {
-			day.CardAccuracy = roundedPercent(accuracy[index].cardCorrect, day.CardReviews)
-		}
 		if day.VocabularyReviews > 0 {
 			day.VocabularyAccuracy = roundedPercent(accuracy[index].vocabularyCorrect, day.VocabularyReviews)
 		}
-		cardCorrectTotal += accuracy[index].cardCorrect
 		vocabularyCorrectTotal += accuracy[index].vocabularyCorrect
 		result.Summary.TotalFocusMinutes += day.FocusMinutes
 		result.Summary.TasksCompleted += day.TasksCompleted
 		result.Summary.TodosCompleted += day.TodosCompleted
-		result.Summary.CardReviews += day.CardReviews
 		result.Summary.VocabularyReviews += day.VocabularyReviews
 		if learningDayActive(*day) {
 			result.Summary.ActiveDays++
@@ -192,9 +170,6 @@ func (s *Service) LearningInsights(ctx context.Context, userID string, days int,
 	}
 	if plannedTotal > 0 {
 		result.Summary.PlanAdherence = roundedPercent(completedPlanTotal, plannedTotal)
-	}
-	if result.Summary.CardReviews > 0 {
-		result.Summary.CardAccuracy = roundedPercent(cardCorrectTotal, result.Summary.CardReviews)
 	}
 	if result.Summary.VocabularyReviews > 0 {
 		result.Summary.VocabularyAccuracy = roundedPercent(vocabularyCorrectTotal, result.Summary.VocabularyReviews)
@@ -220,11 +195,6 @@ func (s *Service) LearningInsights(ctx context.Context, userID string, days int,
 		return domain.LearningInsights{}, err
 	}
 	result.Goals = goalLearningInsights(goals, tasks, sessions)
-	dueCards, err := s.repo.ListDueCards(ctx, userID, s.now().UTC(), 0)
-	if err != nil {
-		return domain.LearningInsights{}, err
-	}
-	result.Summary.DueCards = len(dueCards)
 	words, err := s.repo.ListVocabularyWords(ctx, userID, "")
 	if err != nil {
 		return domain.LearningInsights{}, err
@@ -250,7 +220,7 @@ func roundedPercent(numerator, denominator int) float64 {
 }
 
 func learningDayActive(day domain.DailyLearningMetric) bool {
-	return day.FocusMinutes > 0 || day.TasksCompleted > 0 || day.TodosCompleted > 0 || day.CardReviews > 0 || day.VocabularyReviews > 0 || day.CompletedPlanMinutes > 0
+	return day.FocusMinutes > 0 || day.TasksCompleted > 0 || day.TodosCompleted > 0 || day.VocabularyReviews > 0 || day.CompletedPlanMinutes > 0
 }
 
 func learningActivityStreak(daily []domain.DailyLearningMetric) int {
@@ -377,8 +347,8 @@ func learningRecommendations(summary domain.LearningInsightSummary, days, planne
 	} else if plannedTotal > 0 && summary.PlanAdherence >= 85 {
 		items = append(items, domain.LearningRecommendation{Code: "strong_adherence", Level: "positive", Title: "计划与执行非常一致", Description: "保持当前每日容量；新增工作时继续用锁定时间块保护最重要的学习。", Evidence: fmt.Sprintf("时间块执行率达到 %.1f%%", summary.PlanAdherence)})
 	}
-	if summary.DueCards+summary.DueVocabulary >= 20 {
-		items = append(items, domain.LearningRecommendation{Code: "review_backlog", Level: "warning", Title: "记忆复习正在积压", Description: "优先清理到期内容，并暂时减少新卡片或新词摄入，避免复习负债继续增长。", Evidence: fmt.Sprintf("当前有 %d 张知识卡和 %d 个单词到期", summary.DueCards, summary.DueVocabulary)})
+	if summary.DueVocabulary >= 20 {
+		items = append(items, domain.LearningRecommendation{Code: "vocabulary_backlog", Level: "warning", Title: "单词复习正在积压", Description: "优先清理到期单词，并暂时降低每日新词数量，避免复习负担继续增长。", Evidence: fmt.Sprintf("当前有 %d 个单词到期", summary.DueVocabulary)})
 	}
 	if summary.StressFocusCorrelation <= -0.35 {
 		items = append(items, domain.LearningRecommendation{Code: "stress_sensitive", Level: "attention", Title: "高压力日的专注时间明显下降", Description: "在高压力日安排复习、整理等低启动成本工作，把高认知任务放到精力更稳定的时段。", Evidence: fmt.Sprintf("压力与专注相关系数为 %.2f", summary.StressFocusCorrelation)})

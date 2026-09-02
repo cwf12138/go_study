@@ -38,9 +38,6 @@ type UserDataExport struct {
 	EnglishReadings    []domain.EnglishReading   `json:"english_readings"`
 	EBookReadings      []domain.EBookReading     `json:"ebook_readings"`
 	ClassicalStudies   []domain.ClassicalStudy   `json:"classical_studies"`
-	Decks              []domain.Deck             `json:"decks"`
-	Cards              []domain.Card             `json:"cards"`
-	Reviews            []domain.Review           `json:"reviews"`
 	FocusSessions      []domain.FocusSession     `json:"focus_sessions"`
 }
 
@@ -98,15 +95,6 @@ func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataEx
 	if bundle.ClassicalStudies, err = s.repo.ListClassicalStudies(ctx, userID); err != nil {
 		return UserDataExport{}, err
 	}
-	if bundle.Decks, err = s.repo.ListDecks(ctx, userID); err != nil {
-		return UserDataExport{}, err
-	}
-	if bundle.Cards, err = s.repo.ListCards(ctx, userID); err != nil {
-		return UserDataExport{}, err
-	}
-	if bundle.Reviews, err = s.repo.ListReviews(ctx, userID, time.Time{}); err != nil {
-		return UserDataExport{}, err
-	}
 	if bundle.FocusSessions, err = s.repo.ListFocusSessions(ctx, userID, time.Time{}); err != nil {
 		return UserDataExport{}, err
 	}
@@ -115,8 +103,7 @@ func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataEx
 		"todos": len(bundle.Todos), "calendar_events": len(bundle.CalendarEvents), "word_books": len(bundle.WordBooks), "vocabulary_words": len(bundle.VocabularyWords),
 		"vocabulary_reviews": len(bundle.VocabularyReviews), "plan_blocks": len(bundle.PlanBlocks), "weekly_reflections": len(bundle.WeeklyReflections),
 		"english_readings": len(bundle.EnglishReadings),
-		"ebook_readings":   len(bundle.EBookReadings), "classical_studies": len(bundle.ClassicalStudies),
-		"decks": len(bundle.Decks), "cards": len(bundle.Cards), "reviews": len(bundle.Reviews), "focus_sessions": len(bundle.FocusSessions),
+		"ebook_readings":   len(bundle.EBookReadings), "classical_studies": len(bundle.ClassicalStudies), "focus_sessions": len(bundle.FocusSessions),
 	}
 	return bundle, nil
 }
@@ -129,12 +116,12 @@ func (s *Service) ExportLearningCSV(ctx context.Context, userID string, days int
 	var buffer bytes.Buffer
 	buffer.Write([]byte{0xEF, 0xBB, 0xBF}) // UTF-8 BOM keeps Chinese spreadsheet imports readable.
 	writer := csv.NewWriter(&buffer)
-	_ = writer.Write([]string{"date", "focus_minutes", "focus_sessions", "planned_minutes", "completed_plan_minutes", "plan_adherence_percent", "tasks_completed", "todos_completed", "card_reviews", "card_accuracy_percent", "vocabulary_reviews", "vocabulary_accuracy_percent", "mood_score", "stress", "energy"})
+	_ = writer.Write([]string{"date", "focus_minutes", "focus_sessions", "planned_minutes", "completed_plan_minutes", "plan_adherence_percent", "tasks_completed", "todos_completed", "vocabulary_reviews", "vocabulary_accuracy_percent", "mood_score", "stress", "energy"})
 	for _, day := range insights.Daily {
 		_ = writer.Write([]string{
 			day.Date, strconv.Itoa(day.FocusMinutes), strconv.Itoa(day.FocusSessions), strconv.Itoa(day.PlannedMinutes), strconv.Itoa(day.CompletedPlanMinutes),
-			formatDecimal(day.PlanAdherence), strconv.Itoa(day.TasksCompleted), strconv.Itoa(day.TodosCompleted), strconv.Itoa(day.CardReviews), formatDecimal(day.CardAccuracy),
-			strconv.Itoa(day.VocabularyReviews), formatDecimal(day.VocabularyAccuracy), strconv.Itoa(day.MoodScore), strconv.Itoa(day.Stress), strconv.Itoa(day.Energy),
+			formatDecimal(day.PlanAdherence), strconv.Itoa(day.TasksCompleted), strconv.Itoa(day.TodosCompleted), strconv.Itoa(day.VocabularyReviews),
+			formatDecimal(day.VocabularyAccuracy), strconv.Itoa(day.MoodScore), strconv.Itoa(day.Stress), strconv.Itoa(day.Energy),
 		})
 	}
 	writer.Flush()

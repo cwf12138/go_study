@@ -23,7 +23,7 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 
 	home := httptest.NewRecorder()
 	handler.ServeHTTP(home, httptest.NewRequest(http.MethodGet, "/", nil))
-	if home.Code != http.StatusOK || !strings.Contains(home.Body.String(), "StudyFlow") || !strings.Contains(home.Body.String(), "mood-trend") || !strings.Contains(home.Body.String(), "theme-toggle") || !strings.Contains(home.Body.String(), "vocab-catalogs") || !strings.Contains(home.Body.String(), "vocab-pagination") || !strings.Contains(home.Body.String(), "panel-calendar") || !strings.Contains(home.Body.String(), "panel-knowledge") || !strings.Contains(home.Body.String(), "panel-english") || !strings.Contains(home.Body.String(), "panel-literature") || !strings.Contains(home.Body.String(), "ebook-reader-dialog") || !strings.Contains(home.Body.String(), "classic-reader-dialog") || !strings.Contains(home.Body.String(), "english-reader-dialog") || !strings.Contains(home.Body.String(), "command-dialog") || !strings.Contains(home.Body.String(), "app.js?v=20260902-1") {
+	if home.Code != http.StatusOK || !strings.Contains(home.Body.String(), "StudyFlow") || !strings.Contains(home.Body.String(), "mood-trend") || !strings.Contains(home.Body.String(), "theme-toggle") || !strings.Contains(home.Body.String(), "vocab-catalogs") || !strings.Contains(home.Body.String(), "vocab-pagination") || !strings.Contains(home.Body.String(), "panel-calendar") || !strings.Contains(home.Body.String(), "panel-knowledge") || !strings.Contains(home.Body.String(), "panel-english") || !strings.Contains(home.Body.String(), "panel-literature") || !strings.Contains(home.Body.String(), "ebook-reader-dialog") || !strings.Contains(home.Body.String(), "classic-reader-dialog") || !strings.Contains(home.Body.String(), "english-reader-dialog") || !strings.Contains(home.Body.String(), "command-dialog") || !strings.Contains(home.Body.String(), "app.js?v=20260903-1") || strings.Contains(home.Body.String(), "panel-review") || strings.Contains(home.Body.String(), `data-view="review"`) {
 		t.Fatalf("home status = %d, body = %q", home.Code, home.Body.String())
 	}
 	if contentType := home.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "text/html") {
@@ -35,7 +35,7 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 
 	javascript := httptest.NewRecorder()
 	handler.ServeHTTP(javascript, httptest.NewRequest(http.MethodGet, "/static/app.js", nil))
-	if javascript.Code != http.StatusOK || !strings.Contains(javascript.Body.String(), "function bootstrap") {
+	if javascript.Code != http.StatusOK || !strings.Contains(javascript.Body.String(), "function bootstrap") || strings.Contains(javascript.Body.String(), "/api/v1/cards") || strings.Contains(javascript.Body.String(), "/api/v1/decks") {
 		t.Fatalf("asset status = %d", javascript.Code)
 	}
 	if cacheControl := javascript.Header().Get("Cache-Control"); !strings.Contains(cacheControl, "must-revalidate") {

@@ -47,16 +47,6 @@ func TestLearningInsightsAggregatesCrossModuleActivity(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	card := domain.Card{ID: "card-1", UserID: "learner", DeckID: "deck-1", DueAt: now.Add(-time.Hour)}
-	if err := repository.CreateCard(ctx, card); err != nil {
-		t.Fatal(err)
-	}
-	for index, rating := range []domain.ReviewRating{domain.RatingGood, domain.RatingAgain} {
-		reviewed := time.Date(2026, 9, 9+index, 12, 0, 0, 0, time.UTC)
-		if err := repository.ApplyReview(ctx, card, domain.Review{ID: "review-" + string(rune('a'+index)), UserID: "learner", CardID: card.ID, Rating: rating, ReviewedAt: reviewed, NextDueAt: now.AddDate(0, 0, 1)}); err != nil {
-			t.Fatal(err)
-		}
-	}
 	word := domain.VocabularyWord{ID: "word-1", UserID: "learner", BookID: "book-1", Term: "goroutine", Stage: domain.VocabularyLearning, DueAt: now.Add(-time.Hour)}
 	if err := repository.CreateVocabularyWord(ctx, word); err != nil {
 		t.Fatal(err)
@@ -78,13 +68,13 @@ func TestLearningInsightsAggregatesCrossModuleActivity(t *testing.T) {
 	if insights.Summary.PlanAdherence != 66.7 || insights.Summary.TasksCompleted != 1 {
 		t.Fatalf("unexpected execution summary: %+v", insights.Summary)
 	}
-	if insights.Summary.CardReviews != 2 || insights.Summary.CardAccuracy != 50 || insights.Summary.VocabularyReviews != 2 || insights.Summary.VocabularyAccuracy != 100 {
+	if insights.Summary.VocabularyReviews != 2 || insights.Summary.VocabularyAccuracy != 100 {
 		t.Fatalf("unexpected review summary: %+v", insights.Summary)
 	}
 	if len(insights.Goals) != 1 || insights.Goals[0].FocusMinutes != 135 || insights.Goals[0].CompletionRate != 100 {
 		t.Fatalf("unexpected goal insights: %+v", insights.Goals)
 	}
-	if insights.Summary.DueCards != 1 || insights.Summary.DueVocabulary != 1 || len(insights.Recommendations) == 0 {
+	if insights.Summary.DueVocabulary != 1 || len(insights.Recommendations) == 0 {
 		t.Fatalf("backlog or recommendations missing: %+v", insights)
 	}
 }

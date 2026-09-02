@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -126,5 +127,46 @@ func TestSnapshotQuarantinesCorruptFileWithoutBackup(t *testing.T) {
 	}
 	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("corrupt primary should have been moved, stat error=%v", err)
+	}
+}
+
+func TestSnapshotDropsLegacyGenericReviewData(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "snapshot.json")
+	legacy := `{
+  "version": 1,
+  "saved_at": "2026-09-03T00:00:00Z",
+  "plan_blocks": [
+    {"id":"legacy-review","user_id":"u1","kind":"review","title":"Review cards","start_at":"2026-09-03T09:00:00Z","end_at":"2026-09-03T09:30:00Z"},
+    {"id":"kept-task","user_id":"u1","kind":"task","title":"Read Go","start_at":"2026-09-03T10:00:00Z","end_at":"2026-09-03T10:30:00Z"}
+  ],
+  "decks": [{"id":"deck-1","user_id":"u1","name":"Legacy"}],
+  "cards": [{"id":"card-1","user_id":"u1","deck_id":"deck-1","prompt":"Question","answer":"Answer"}],
+  "reviews": [{"id":"review-1","user_id":"u1","card_id":"card-1","rating":3}]
+}`
+	if err := os.WriteFile(path, []byte(legacy), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	memory := NewMemory()
+	if err := memory.LoadJSON(path); err != nil {
+		t.Fatalf("LoadJSON() error = %v", err)
+	}
+	if _, err := memory.PlanBlockByID(context.Background(), "legacy-review"); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("legacy review block should be discarded, error = %v", err)
+	}
+	if _, err := memory.PlanBlockByID(context.Background(), "kept-task"); err != nil {
+		t.Fatalf("non-review plan block should be retained: %v", err)
+	}
+	if err := memory.SaveJSON(path); err != nil {
+		t.Fatalf("SaveJSON() error = %v", err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, removed := range []string{`"decks"`, `"cards"`, `"reviews"`, "legacy-review"} {
+		if strings.Contains(string(data), removed) {
+			t.Fatalf("saved snapshot still contains removed review data %q", removed)
+		}
 	}
 }

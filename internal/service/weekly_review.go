@@ -167,7 +167,7 @@ func reviewMondayOf(value time.Time) time.Time {
 
 func summarizeReviewDays(daily []domain.DailyLearningMetric, start, end time.Time, periodDays int) domain.WeeklyReviewSummary {
 	summary := domain.WeeklyReviewSummary{}
-	cardCorrect, wordCorrect, moodTotal, moodDays, stressTotal, stressDays := 0.0, 0.0, 0, 0, 0, 0
+	wordCorrect, moodTotal, moodDays, stressTotal, stressDays := 0.0, 0, 0, 0, 0
 	for _, day := range daily {
 		date, err := time.ParseInLocation("2006-01-02", day.Date, start.Location())
 		if err != nil || date.Before(start) || date.After(end) {
@@ -178,8 +178,7 @@ func summarizeReviewDays(daily []domain.DailyLearningMetric, start, end time.Tim
 		summary.CompletedPlanMins += day.CompletedPlanMinutes
 		summary.TasksCompleted += day.TasksCompleted
 		summary.TodosCompleted += day.TodosCompleted
-		summary.MemoryReviews += day.CardReviews + day.VocabularyReviews
-		cardCorrect += float64(day.CardReviews) * day.CardAccuracy / 100
+		summary.MemoryReviews += day.VocabularyReviews
 		wordCorrect += float64(day.VocabularyReviews) * day.VocabularyAccuracy / 100
 		if learningDayActive(day) {
 			summary.ActiveDays++
@@ -195,7 +194,7 @@ func summarizeReviewDays(daily []domain.DailyLearningMetric, start, end time.Tim
 		summary.PlanAdherence = roundedPercent(summary.CompletedPlanMins, summary.TotalPlannedMins)
 	}
 	if summary.MemoryReviews > 0 {
-		summary.MemoryAccuracy = roundOne((cardCorrect + wordCorrect) * 100 / float64(summary.MemoryReviews))
+		summary.MemoryAccuracy = roundOne(wordCorrect * 100 / float64(summary.MemoryReviews))
 	}
 	if moodDays > 0 {
 		summary.AverageMood = roundOne(float64(moodTotal) / float64(moodDays))

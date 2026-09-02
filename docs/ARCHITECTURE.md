@@ -19,7 +19,7 @@ HTTP 层只负责协议转换，service 层负责输入规则、所有权检查�
 
 ## 并发模型
 
-`Memory` 用一个 `sync.RWMutex` 保护多个聚合的映射。返回包含 slice 的对象前会复制 slice，避免调用方绕过锁修改共享内存。复习操作通过 `ApplyReview` 在同一个写锁内同时更新卡片和追加历史，保持原子性。
+`Memory` 用一个 `sync.RWMutex` 保护多个聚合的映射。返回包含 slice 的对象前会复制 slice，避免调用方绕过锁修改共享内存。单词学习通过 `ApplyVocabularyReview` 在同一个写锁内更新词条调度状态并追加练习历史，保持原子性。
 
 `Bus` 的订阅表由读写锁保护。发布过程不会等待慢订阅者：每个订阅者有独立有界缓冲区，满时增加原子 dropped 计数。这种选择优先保证 API 延迟，适合实时 UI 等允许重新拉取的投影，不适合付款等不可丢事件。
 
@@ -38,14 +38,14 @@ cancelled --> todo
 
 规则集中在 `allowedTaskTransition`，不会因增加 CLI、gRPC 或消息消费者而重复。
 
-### 间隔复习
+### 单词智能复习
 
-新卡初始 ease factor 为 2.5。第一次答对间隔为 1 天，第二次为 6 天，之后基于旧间隔、ease factor 和回答修正系数增长。Again 会重置学习次数，Hard 降低 ease，Easy 提高 ease 并扩大间隔。算法是无 I/O 的纯函数，可单独实验和替换。
+词书中的新词、学习中词条和已掌握词条使用各自的回顾节奏。用户可选择翻卡回忆或拼写练习，并用四级反馈调整下次出现时间。该能力属于“单词学习”内部流程，不再提供独立的通用卡组与知识卡模块。
 
 ## 一致性边界
 
 - 每次仓储方法是本进程内的原子操作。
-- `ApplyReview` 表达一个跨卡片与复习记录的事务意图。
+- `ApplyVocabularyReview` 表达一个跨词条状态与词汇复习记录的事务意图。
 - JSON 快照包含版本号，写入临时文件后再替换目标文件。
 - 事件目前在写入完成后发布，进程在两者之间崩溃可能漏事件。
 
@@ -55,7 +55,7 @@ cancelled --> todo
 
 1. 在 `internal/store/postgres` 实现 `store.Repository`。
 2. 将 `CreateTask` 等单聚合方法映射为普通事务。
-3. 将 `ApplyReview` 映射为“锁卡片、更新调度字段、插入 review”的单事务。
+3. 将 `ApplyVocabularyReview` 映射为“锁定词条、更新调度字段、插入 vocabulary review”的单事务。
 4. 在 `cmd/api/main.go` 中把 `store.NewMemory()` 替换为 PostgreSQL adapter。
 5. 保留 memory adapter，用于快速测试和本地演示。
 
@@ -70,4 +70,3 @@ cancelled --> todo
 - 为列表增加 cursor 和上限，为 SSE 增加连接配额。
 - 对日志进行敏感字段审查；当前实现不会输出密码或 token。
 - 增加 Prometheus 指标、OpenTelemetry trace、备份恢复演练和 SLO 告警。
-

@@ -33,20 +33,6 @@ $task = Invoke-RestMethod -Method Post -Uri "$baseUrl/api/v1/tasks" -Headers $he
     tags = @("go", "concurrency", "events")
 } | ConvertTo-Json)
 
-$deck = Invoke-RestMethod -Method Post -Uri "$baseUrl/api/v1/decks" -Headers $headers -ContentType "application/json" -Body (@{
-    name = "Go core concepts"
-    description = "Build knowledge through active recall"
-} | ConvertTo-Json)
-
-$card = Invoke-RestMethod -Method Post -Uri "$baseUrl/api/v1/decks/$($deck.data.id)/cards" -Headers $headers -ContentType "application/json" -Body (@{
-    prompt = "When does a send on an unbuffered channel complete?"
-    answer = "When another goroutine has received the value."
-} | ConvertTo-Json)
-
-$review = Invoke-RestMethod -Method Post -Uri "$baseUrl/api/v1/cards/$($card.data.id)/reviews" -Headers $headers -ContentType "application/json" -Body (@{
-    rating = 3
-} | ConvertTo-Json)
-
 $focus = Invoke-RestMethod -Method Post -Uri "$baseUrl/api/v1/focus-sessions" -Headers $headers -ContentType "application/json" -Body (@{
     task_id = $task.data.id
     planned_minutes = 25
@@ -61,7 +47,6 @@ $dashboard = Invoke-RestMethod -Method Get -Uri "$baseUrl/api/v1/dashboard" -Hea
     User = $auth.data.user.email
     Goal = $goal.data.title
     Task = $task.data.title
-    NextReview = $review.data.review.next_due_at
     FocusStatus = $finished.data.status
     Dashboard = $dashboard.data
 } | Format-List

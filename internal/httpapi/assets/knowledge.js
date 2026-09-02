@@ -308,7 +308,7 @@
     ["insights", "学习洞察", "⌁", "统计 周报"], ["vocabulary", "单词学习", "Aa", "英语 词书"],
     ["english", "英语精读", "En", "英语 外刊 新闻 阅读"],
     ["literature", "阅读书房", "阅", "电子书 世界名著 古诗词 古文 阅读"],
-    ["review", "间隔复习", "↻", "卡片 记忆"], ["focus", "专注会话", "◷", "计时 pomodoro"],
+    ["focus", "专注会话", "◷", "计时 pomodoro"],
   ];
 
   function commandCatalog() {

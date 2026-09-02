@@ -320,11 +320,6 @@ func (s *Service) planCandidates(ctx context.Context, userID string, weekStart, 
 		candidate.Score = plannerCandidateScore(candidate, now)
 		candidates = append(candidates, candidate)
 	}
-	dueCards, err := s.repo.ListDueCards(ctx, userID, weekEnd.UTC(), 0)
-	if err != nil {
-		return nil, 0, err
-	}
-	candidates = append(candidates, aggregateReviewCandidates(dueCards, weekStart, weekEnd, location, plannedBySource)...)
 	words, err := s.repo.ListVocabularyWords(ctx, userID, "")
 	if err != nil {
 		return nil, 0, err
@@ -369,7 +364,7 @@ func estimateTodoMinutes(todo domain.TodoItem) int {
 
 func plannerCandidateScore(candidate planCandidate, now time.Time) int {
 	score := map[domain.TaskPriority]int{domain.PriorityHigh: 300, domain.PriorityMedium: 180, domain.PriorityLow: 80}[candidate.Priority]
-	if candidate.Kind == domain.PlanBlockReview || candidate.Kind == domain.PlanBlockVocabulary {
+	if candidate.Kind == domain.PlanBlockVocabulary {
 		score += 220
 	}
 	if !candidate.HasDueAt {
@@ -380,28 +375,6 @@ func plannerCandidateScore(candidate planCandidate, now time.Time) int {
 		return score + 1200 + min(300, -days*30)
 	}
 	return score + max(0, 600-days*60)
-}
-
-func aggregateReviewCandidates(cards []domain.Card, weekStart, weekEnd time.Time, location *time.Location, planned map[string]int) []planCandidate {
-	counts := make(map[string]int)
-	for _, card := range cards {
-		day := plannerDueDay(card.DueAt.In(location), weekStart, weekEnd)
-		if !day.Before(weekEnd) {
-			continue
-		}
-		counts[day.Format("2006-01-02")]++
-	}
-	items := make([]planCandidate, 0, len(counts))
-	for date, count := range counts {
-		day, _ := time.ParseInLocation("2006-01-02", date, location)
-		sourceID := "review:" + date
-		minutes := min(75, max(15, count*3)) - planned[planSourceKey(domain.PlanBlockReview, sourceID)]
-		if minutes <= 0 {
-			continue
-		}
-		items = append(items, planCandidate{Kind: domain.PlanBlockReview, SourceID: sourceID, Title: fmt.Sprintf("间隔复习 · %d 张卡片", count), Minutes: minutes, Priority: domain.PriorityHigh, EarliestAt: day, DueAt: day.Add(23*time.Hour + 59*time.Minute), HasDueAt: true, Rationale: "到期知识卡片应优先在当天完成"})
-	}
-	return items
 }
 
 func aggregateVocabularyCandidates(words []domain.VocabularyWord, books []domain.WordBook, weekStart, weekEnd time.Time, location *time.Location, planned map[string]int) []planCandidate {
@@ -725,7 +698,7 @@ func (s *Service) planBlockForUser(ctx context.Context, userID, blockID string) 
 
 func (s *Service) validatePlanSource(ctx context.Context, userID string, kind domain.PlanBlockKind, sourceID string) error {
 	sourceID = strings.TrimSpace(sourceID)
-	if kind == domain.PlanBlockCustom || kind == domain.PlanBlockReview || kind == domain.PlanBlockVocabulary {
+	if kind == domain.PlanBlockCustom || kind == domain.PlanBlockVocabulary {
 		return nil
 	}
 	if sourceID == "" {
@@ -773,7 +746,7 @@ func validatePlanRange(start, end time.Time) error {
 }
 
 func validPlanBlockKind(kind domain.PlanBlockKind) bool {
-	return kind == domain.PlanBlockTask || kind == domain.PlanBlockTodo || kind == domain.PlanBlockReview || kind == domain.PlanBlockVocabulary || kind == domain.PlanBlockCustom
+	return kind == domain.PlanBlockTask || kind == domain.PlanBlockTodo || kind == domain.PlanBlockVocabulary || kind == domain.PlanBlockCustom
 }
 
 func validPlanBlockStatus(status domain.PlanBlockStatus) bool {

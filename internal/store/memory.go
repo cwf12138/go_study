@@ -36,9 +36,6 @@ type Memory struct {
 	englishReadings   map[string]domain.EnglishReading
 	ebookReadings     map[string]domain.EBookReading
 	classicalStudies  map[string]domain.ClassicalStudy
-	decks             map[string]domain.Deck
-	cards             map[string]domain.Card
-	reviews           map[string]domain.Review
 	sessions          map[string]domain.FocusSession
 }
 
@@ -63,9 +60,6 @@ func NewMemory() *Memory {
 		englishReadings:   make(map[string]domain.EnglishReading),
 		ebookReadings:     make(map[string]domain.EBookReading),
 		classicalStudies:  make(map[string]domain.ClassicalStudy),
-		decks:             make(map[string]domain.Deck),
-		cards:             make(map[string]domain.Card),
-		reviews:           make(map[string]domain.Review),
 		sessions:          make(map[string]domain.FocusSession),
 	}
 }
@@ -923,116 +917,6 @@ func (m *Memory) ListClassicalStudies(_ context.Context, userID string) ([]domai
 	return items, nil
 }
 
-func (m *Memory) CreateDeck(_ context.Context, deck domain.Deck) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.decks[deck.ID] = deck
-	return nil
-}
-
-func (m *Memory) DeckByID(_ context.Context, id string) (domain.Deck, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	deck, ok := m.decks[id]
-	if !ok {
-		return domain.Deck{}, domain.ErrNotFound
-	}
-	return deck, nil
-}
-
-func (m *Memory) ListDecks(_ context.Context, userID string) ([]domain.Deck, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	items := make([]domain.Deck, 0)
-	for _, deck := range m.decks {
-		if deck.UserID == userID {
-			items = append(items, deck)
-		}
-	}
-	sort.Slice(items, func(i, j int) bool { return items[i].CreatedAt.After(items[j].CreatedAt) })
-	return items, nil
-}
-
-func (m *Memory) CreateCard(_ context.Context, card domain.Card) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.cards[card.ID] = card
-	return nil
-}
-
-func (m *Memory) CardByID(_ context.Context, id string) (domain.Card, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	card, ok := m.cards[id]
-	if !ok {
-		return domain.Card{}, domain.ErrNotFound
-	}
-	return card, nil
-}
-
-func (m *Memory) UpdateCard(_ context.Context, card domain.Card) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if _, ok := m.cards[card.ID]; !ok {
-		return domain.ErrNotFound
-	}
-	m.cards[card.ID] = card
-	return nil
-}
-
-func (m *Memory) ListDueCards(_ context.Context, userID string, due time.Time, limit int) ([]domain.Card, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	items := make([]domain.Card, 0)
-	for _, card := range m.cards {
-		if card.UserID == userID && !card.DueAt.After(due) {
-			items = append(items, card)
-		}
-	}
-	sort.Slice(items, func(i, j int) bool { return items[i].DueAt.Before(items[j].DueAt) })
-	if limit > 0 && len(items) > limit {
-		items = items[:limit]
-	}
-	return items, nil
-}
-
-func (m *Memory) ListCards(_ context.Context, userID string) ([]domain.Card, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	items := make([]domain.Card, 0)
-	for _, card := range m.cards {
-		if card.UserID == userID {
-			items = append(items, card)
-		}
-	}
-	sort.Slice(items, func(i, j int) bool { return items[i].CreatedAt.After(items[j].CreatedAt) })
-	return items, nil
-}
-
-func (m *Memory) ApplyReview(_ context.Context, card domain.Card, review domain.Review) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if _, ok := m.cards[card.ID]; !ok {
-		return domain.ErrNotFound
-	}
-	m.cards[card.ID] = card
-	m.reviews[review.ID] = review
-	return nil
-}
-
-func (m *Memory) ListReviews(_ context.Context, userID string, since time.Time) ([]domain.Review, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	items := make([]domain.Review, 0)
-	for _, review := range m.reviews {
-		if review.UserID == userID && !review.ReviewedAt.Before(since) {
-			items = append(items, review)
-		}
-	}
-	sort.Slice(items, func(i, j int) bool { return items[i].ReviewedAt.After(items[j].ReviewedAt) })
-	return items, nil
-}
-
 func (m *Memory) CreateFocusSession(_ context.Context, session domain.FocusSession) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -1124,9 +1008,6 @@ type snapshot struct {
 	EnglishReadings   []domain.EnglishReading     `json:"english_readings"`
 	EBookReadings     []domain.EBookReading       `json:"ebook_readings"`
 	ClassicalStudies  []domain.ClassicalStudy     `json:"classical_studies"`
-	Decks             []domain.Deck               `json:"decks"`
-	Cards             []domain.Card               `json:"cards"`
-	Reviews           []domain.Review             `json:"reviews"`
 	Sessions          []domain.FocusSession       `json:"focus_sessions"`
 }
 
@@ -1206,15 +1087,6 @@ func (m *Memory) SaveJSON(path string) error {
 	for _, item := range m.classicalStudies {
 		s.ClassicalStudies = append(s.ClassicalStudies, item)
 	}
-	for _, item := range m.decks {
-		s.Decks = append(s.Decks, item)
-	}
-	for _, item := range m.cards {
-		s.Cards = append(s.Cards, item)
-	}
-	for _, item := range m.reviews {
-		s.Reviews = append(s.Reviews, item)
-	}
 	for _, item := range m.sessions {
 		s.Sessions = append(s.Sessions, item)
 	}
@@ -1292,9 +1164,6 @@ func (m *Memory) LoadJSON(path string) error {
 	m.englishReadings = make(map[string]domain.EnglishReading, len(s.EnglishReadings))
 	m.ebookReadings = make(map[string]domain.EBookReading, len(s.EBookReadings))
 	m.classicalStudies = make(map[string]domain.ClassicalStudy, len(s.ClassicalStudies))
-	m.decks = make(map[string]domain.Deck, len(s.Decks))
-	m.cards = make(map[string]domain.Card, len(s.Cards))
-	m.reviews = make(map[string]domain.Review, len(s.Reviews))
 	m.sessions = make(map[string]domain.FocusSession, len(s.Sessions))
 	for _, record := range s.Users {
 		record.User.PasswordHash = record.PasswordHash
@@ -1332,6 +1201,9 @@ func (m *Memory) LoadJSON(path string) error {
 		m.plannerPrefs[item.UserID] = clonePlannerPreferences(item)
 	}
 	for _, item := range s.PlanBlocks {
+		if item.Kind == domain.PlanBlockKind("review") {
+			continue
+		}
 		m.planBlocks[item.ID] = item
 	}
 	for _, item := range s.PlannerReports {
@@ -1351,15 +1223,6 @@ func (m *Memory) LoadJSON(path string) error {
 	}
 	for _, item := range s.ClassicalStudies {
 		m.classicalStudies[classicalStudyKey(item.UserID, item.WorkID)] = item
-	}
-	for _, item := range s.Decks {
-		m.decks[item.ID] = item
-	}
-	for _, item := range s.Cards {
-		m.cards[item.ID] = item
-	}
-	for _, item := range s.Reviews {
-		m.reviews[item.ID] = item
 	}
 	for _, item := range s.Sessions {
 		m.sessions[item.ID] = normalizeFocusSession(item)

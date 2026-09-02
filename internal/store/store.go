@@ -106,17 +106,6 @@ type Repository interface {
 	ClassicalStudyByWork(context.Context, string, string) (domain.ClassicalStudy, error)
 	ListClassicalStudies(context.Context, string) ([]domain.ClassicalStudy, error)
 
-	CreateDeck(context.Context, domain.Deck) error
-	DeckByID(context.Context, string) (domain.Deck, error)
-	ListDecks(context.Context, string) ([]domain.Deck, error)
-	CreateCard(context.Context, domain.Card) error
-	CardByID(context.Context, string) (domain.Card, error)
-	UpdateCard(context.Context, domain.Card) error
-	ListDueCards(context.Context, string, time.Time, int) ([]domain.Card, error)
-	ListCards(context.Context, string) ([]domain.Card, error)
-	ApplyReview(context.Context, domain.Card, domain.Review) error
-	ListReviews(context.Context, string, time.Time) ([]domain.Review, error)
-
 	CreateFocusSession(context.Context, domain.FocusSession) error
 	FocusSessionByID(context.Context, string) (domain.FocusSession, error)
 	ActiveFocusSession(context.Context, string) (domain.FocusSession, error)

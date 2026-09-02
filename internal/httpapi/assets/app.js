@@ -40,8 +40,6 @@
     learningInsights: null,
     weeklyReviewWeekStart: mondayKey(new Date()),
     weeklyReview: null,
-    decks: [],
-    dueCards: [],
     currentView: "dashboard",
     focus: loadFocus(),
     dailyFocusGoalMinutes: 60,
@@ -266,8 +264,6 @@
     state.learningInsights = null;
     state.weeklyReviewWeekStart = mondayKey(new Date());
     state.weeklyReview = null;
-    state.decks = [];
-    state.dueCards = [];
     state.focus = null;
     state.dailyFocusGoalMinutes = 60;
     localStorage.removeItem("studyflow.token");
@@ -291,7 +287,6 @@
       planner: ["SMART PLANNER", "智能学习规划"],
       insights: ["LEARNING INSIGHTS", "学习洞察与复盘"],
       vocabulary: ["VOCABULARY", "单词学习"],
-      review: ["SPACED REPETITION", "间隔复习"],
       focus: ["FOCUS", "专注会话"],
     };
     const targetPanel = $(`#panel-${view}`);
@@ -335,7 +330,7 @@
       ]);
       return { books, selectedBookID, words: wordPage.data || [], wordMeta: wordPage.meta || {}, queue, overview };
     });
-    const [dashboard, goalPageResponse, activeGoalsResponse, moods, moodInsights, tasks, todoLists, todos, vocabulary, vocabularyCatalogs, plannerWeek, learningInsights, weeklyReview, dueCards, decks, activeFocus] = await Promise.all([
+    const [dashboard, goalPageResponse, activeGoalsResponse, moods, moodInsights, tasks, todoLists, todos, vocabulary, vocabularyCatalogs, plannerWeek, learningInsights, weeklyReview, activeFocus] = await Promise.all([
       api("/api/v1/dashboard"),
       api(goalListURL(), { returnEnvelope: true }),
       api("/api/v1/goals?status=active&sort=title&order=asc&page=1&page_size=50", { returnEnvelope: true }),
@@ -349,8 +344,6 @@
       api(`/api/v1/planner/week?week_start=${encodeURIComponent(state.plannerWeekStart)}`),
       api(`/api/v1/analytics/learning?days=${state.insightsDays}`),
       api(`/api/v1/reviews/weekly?week_start=${encodeURIComponent(state.weeklyReviewWeekStart)}`),
-      api("/api/v1/cards/due?limit=50"),
-      api("/api/v1/decks"),
       api("/api/v1/focus-sessions/active"),
     ]);
     state.dashboard = dashboard;
@@ -372,8 +365,6 @@
     state.plannerWeek = plannerWeek || null;
     state.learningInsights = learningInsights || null;
     state.weeklyReview = weeklyReview || null;
-    state.dueCards = dueCards;
-    state.decks = decks;
     syncActiveFocus(activeFocus);
     render();
   }
@@ -416,7 +407,6 @@
     renderLearningInsights();
     renderWeeklyReview();
     renderVocabulary();
-    renderReview();
     renderFocus();
     renderSelects();
   }
@@ -427,7 +417,7 @@
     $("#metric-tasks").textContent = data.pending_tasks ?? 0;
     $("#metric-completed").textContent = data.completed_tasks_today ?? 0;
     $("#today-sessions").textContent = `完成 ${data.focus_sessions_today ?? 0} 个专注会话`;
-    $("#metric-cards").textContent = data.due_cards ?? 0;
+    $("#metric-vocabulary").textContent = data.due_vocabulary ?? 0;
     $("#metric-focus").textContent = data.focus_minutes_today ?? 0;
     $("#week-focus").textContent = `本周 ${data.focus_minutes_week ?? 0} 分钟`;
 
@@ -437,10 +427,6 @@
       <div class="list-row"><div class="row-main"><h4>${escapeHTML(task.title)}</h4><p>${priorityLabel(task.priority)}优先级 · ${task.due_at ? `截止 ${formatDate(task.due_at)}` : "未设置截止时间"}</p></div><span class="pill ${task.status}">${taskStatusLabel(task.status)}</span></div>`).join("")
       : "<div class=\"empty-state\">还没有待处理任务。创建一个小而明确的下一步吧。</div>";
 
-    $("#dashboard-cards").className = "stack-list";
-    $("#dashboard-cards").innerHTML = state.dueCards.length ? state.dueCards.slice(0, 4).map((card) => `
-      <div class="list-row"><div class="row-main"><h4>${escapeHTML(card.prompt)}</h4><p>已复习 ${card.repetitions} 次 · 间隔 ${card.interval_days} 天</p></div><button class="text-button" type="button" data-goto="review">复习</button></div>`).join("")
-      : "<div class=\"empty-state\">没有待复习卡片，保持这个节奏。</div>";
   }
 
   function renderGoals() {
@@ -797,7 +783,7 @@
     return `<button class="quiet" type="button" data-task-status="todo" data-id="${task.id}">重新打开</button>`;
   }
 
-  const plannerKindLabel = (kind) => ({ task: "学习任务", todo: "待办事项", review: "知识卡复习", vocabulary: "单词学习", custom: "自定义" }[kind] || kind);
+  const plannerKindLabel = (kind) => ({ task: "学习任务", todo: "待办事项", vocabulary: "单词学习", custom: "自定义" }[kind] || kind);
   const plannerStatusLabel = (status) => ({ planned: "待开始", in_progress: "进行中", completed: "已完成", skipped: "已跳过" }[status] || status);
 
   function plannerTimeZone() {
@@ -1033,11 +1019,9 @@
     $("#insights-adherence").textContent = `${summary.plan_adherence ?? 0}%`;
     $("#insights-active-days").textContent = `${summary.active_days ?? 0} 个活跃日`;
     $("#insights-streak").textContent = summary.learning_streak ?? 0;
-    $("#insights-card-reviews").textContent = summary.card_reviews ?? 0;
-    $("#insights-card-accuracy").textContent = summary.card_reviews ? `正确率 ${summary.card_accuracy}%` : "正确率 —";
     $("#insights-word-reviews").textContent = summary.vocabulary_reviews ?? 0;
-    $("#insights-word-accuracy").textContent = summary.vocabulary_reviews ? `正确率 ${summary.vocabulary_accuracy}%` : "正确率 —";
-    $("#insights-due-memory").textContent = Number(summary.due_cards || 0) + Number(summary.due_vocabulary || 0);
+    $("#insights-word-accuracy").textContent = summary.vocabulary_reviews ? `${summary.vocabulary_accuracy}%` : "—";
+    $("#insights-due-memory").textContent = Number(summary.due_vocabulary || 0);
     const weekdays = ["", "周一", "周二", "周三", "周四", "周五", "周六", "周日"];
     $("#insights-peak-time").textContent = summary.peak_focus_weekday ? `${weekdays[summary.peak_focus_weekday]} ${String(summary.peak_focus_hour).padStart(2, "0")}:00` : "等待数据";
 
@@ -1389,18 +1373,6 @@
     }
   }
 
-  function renderReview() {
-    const container = $("#due-cards-list");
-    $("#due-count").textContent = `${state.dueCards.length} 张`;
-    if (!state.dueCards.length) {
-      container.className = "review-list empty-state";
-      container.textContent = "现在没有待复习卡片。添加卡片后，它会在合适的时间回来找你。";
-      return;
-    }
-    container.className = "review-list";
-    container.innerHTML = state.dueCards.map((card) => `<article class="review-card"><h4>${escapeHTML(card.prompt)}</h4><div class="review-answer">${escapeHTML(card.answer)}</div><p class="hint">已复习 ${card.repetitions} 次 · 当前间隔 ${card.interval_days || 0} 天</p><div class="rating-actions"><button class="rating" type="button" data-rate="1" data-id="${card.id}">忘记了</button><button class="rating" type="button" data-rate="2" data-id="${card.id}">困难</button><button class="rating" type="button" data-rate="3" data-id="${card.id}">良好</button><button class="rating" type="button" data-rate="4" data-id="${card.id}">简单</button></div></article>`).join("");
-  }
-
   function renderFocus() {
     const active = state.focus;
     const form = $("#focus-form");
@@ -1563,13 +1535,6 @@
     focusTask.innerHTML = `<option value="">不关联任务</option>${taskOptions}`;
     focusTask.value = state.tasks.some((task) => task.id === previousTask) ? previousTask : "";
 
-    const deckSelect = $("#card-deck");
-    const previousDeck = deckSelect.value;
-    deckSelect.innerHTML = state.decks.length
-      ? `<option value="">选择卡组</option>${state.decks.map((deck) => `<option value="${deck.id}">${escapeHTML(deck.name)}</option>`).join("")}`
-      : "<option value=\"\">请先创建卡组</option>";
-    deckSelect.value = state.decks.some((deck) => deck.id === previousDeck) ? previousDeck : "";
-
     const todoList = $("#todo-list");
     const previousTodoList = todoList.value;
     todoList.innerHTML = state.todoLists.map((list) => `<option value="${list.id}">${escapeHTML(list.name)}${list.kind === "inbox" ? "（收集箱）" : ""}</option>`).join("");
@@ -1686,8 +1651,6 @@
       if (vocabularyRating) await reviewVocabularyWord(Number(vocabularyRating.dataset.vocabRating));
       const vocabularyDelete = event.target.closest("[data-vocab-delete]");
       if (vocabularyDelete) await deleteVocabularyWord(vocabularyDelete.dataset.vocabDelete);
-      const rating = event.target.closest("[data-rate]");
-      if (rating) await reviewCard(rating.dataset.id, Number(rating.dataset.rate));
       const goalPageButton = event.target.closest("[data-goal-page]");
       if (goalPageButton && !goalPageButton.disabled) await updateGoalQuery({ page: Number(goalPageButton.dataset.goalPage) });
       const focusTaskButton = event.target.closest("[data-focus-task-select]");
@@ -1794,7 +1757,6 @@
     $("#planner-block-kind").addEventListener("change", () => {
       renderPlannerSourceSelect();
       const kind = $("#planner-block-kind").value;
-      if (kind === "review") $("#planner-block-title").value = "知识卡片复习";
       if (kind === "vocabulary") $("#planner-block-title").value = "单词学习";
       if (kind === "task" || kind === "todo") {
         const selected = $("#planner-block-source").selectedOptions[0];
@@ -1991,8 +1953,6 @@
         button.disabled = false;
       }
     });
-    $("#deck-form").addEventListener("submit", (event) => submitForm(event, () => api("/api/v1/decks", { method: "POST", body: JSON.stringify({ name: $("#deck-name").value, description: $("#deck-description").value }) }), "卡组已创建。"));
-    $("#card-form").addEventListener("submit", (event) => submitForm(event, () => api(`/api/v1/decks/${$("#card-deck").value}/cards`, { method: "POST", body: JSON.stringify({ prompt: $("#card-prompt").value, answer: $("#card-answer").value }) }), "复习卡已添加，今天就可以开始复习。"));
     $("#focus-form").addEventListener("submit", startFocus);
     $("#pause-focus").addEventListener("click", pauseFocus);
     $("#resume-focus").addEventListener("click", resumeFocus);
@@ -2093,11 +2053,6 @@
     } catch (error) {
       notify(error.message, "error");
     }
-  }
-
-  async function reviewCard(id, rating) {
-    try { await api(`/api/v1/cards/${id}/reviews`, { method: "POST", body: JSON.stringify({ rating }) }); await refresh(); notify("复习已记录，下次见。"); }
-    catch (error) { notify(error.message, "error"); }
   }
 
   async function startFocus(event) {

@@ -333,7 +333,6 @@ type PlanBlockKind string
 const (
 	PlanBlockTask       PlanBlockKind = "task"
 	PlanBlockTodo       PlanBlockKind = "todo"
-	PlanBlockReview     PlanBlockKind = "review"
 	PlanBlockVocabulary PlanBlockKind = "vocabulary"
 	PlanBlockCustom     PlanBlockKind = "custom"
 )
@@ -432,8 +431,6 @@ type DailyLearningMetric struct {
 	PlanAdherence        float64 `json:"plan_adherence"`
 	TasksCompleted       int     `json:"tasks_completed"`
 	TodosCompleted       int     `json:"todos_completed"`
-	CardReviews          int     `json:"card_reviews"`
-	CardAccuracy         float64 `json:"card_accuracy"`
 	VocabularyReviews    int     `json:"vocabulary_reviews"`
 	VocabularyAccuracy   float64 `json:"vocabulary_accuracy"`
 	MoodScore            int     `json:"mood_score,omitempty"`
@@ -472,8 +469,6 @@ type LearningInsightSummary struct {
 	PlanAdherence          float64 `json:"plan_adherence"`
 	TasksCompleted         int     `json:"tasks_completed"`
 	TodosCompleted         int     `json:"todos_completed"`
-	CardReviews            int     `json:"card_reviews"`
-	CardAccuracy           float64 `json:"card_accuracy"`
 	VocabularyReviews      int     `json:"vocabulary_reviews"`
 	VocabularyAccuracy     float64 `json:"vocabulary_accuracy"`
 	ConsistencyScore       int     `json:"consistency_score"`
@@ -481,7 +476,6 @@ type LearningInsightSummary struct {
 	PeakFocusHour          int     `json:"peak_focus_hour,omitempty"`
 	MoodFocusCorrelation   float64 `json:"mood_focus_correlation"`
 	StressFocusCorrelation float64 `json:"stress_focus_correlation"`
-	DueCards               int     `json:"due_cards"`
 	DueVocabulary          int     `json:"due_vocabulary"`
 }
 
@@ -770,29 +764,7 @@ type LiteratureOverview struct {
 	ClassicsFavorites int `json:"classics_favorites"`
 }
 
-type Deck struct {
-	ID          string    `json:"id"`
-	UserID      string    `json:"user_id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	CreatedAt   time.Time `json:"created_at"`
-}
-
-type Card struct {
-	ID           string    `json:"id"`
-	UserID       string    `json:"user_id"`
-	DeckID       string    `json:"deck_id"`
-	Prompt       string    `json:"prompt"`
-	Answer       string    `json:"answer"`
-	EaseFactor   float64   `json:"ease_factor"`
-	IntervalDays int       `json:"interval_days"`
-	Repetitions  int       `json:"repetitions"`
-	DueAt        time.Time `json:"due_at"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-}
-
-// ReviewRating follows a compact SM-2-style scale.
+// ReviewRating is used by vocabulary recall and spelling practice.
 type ReviewRating int
 
 const (
@@ -801,15 +773,6 @@ const (
 	RatingGood  ReviewRating = 3
 	RatingEasy  ReviewRating = 4
 )
-
-type Review struct {
-	ID         string       `json:"id"`
-	UserID     string       `json:"user_id"`
-	CardID     string       `json:"card_id"`
-	Rating     ReviewRating `json:"rating"`
-	ReviewedAt time.Time    `json:"reviewed_at"`
-	NextDueAt  time.Time    `json:"next_due_at"`
-}
 
 type FocusStatus string
 
@@ -853,7 +816,7 @@ type Dashboard struct {
 	PendingTasks        int            `json:"pending_tasks"`
 	CompletedTasks      int            `json:"completed_tasks"`
 	CompletedTasksToday int            `json:"completed_tasks_today"`
-	DueCards            int            `json:"due_cards"`
+	DueVocabulary       int            `json:"due_vocabulary"`
 	FocusMinutesToday   int            `json:"focus_minutes_today"`
 	FocusMinutesWeek    int            `json:"focus_minutes_week"`
 	FocusSessionsToday  int            `json:"focus_sessions_today"`
