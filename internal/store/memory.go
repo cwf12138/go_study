@@ -33,6 +33,8 @@ type Memory struct {
 	plannerReports    map[string]domain.PlannerReport
 	weeklyReflections map[string]domain.WeeklyReflection
 	knowledgeNotes    map[string]domain.KnowledgeNote
+	memoFolders       map[string]domain.MemoFolder
+	memoNotes         map[string]domain.MemoNote
 	englishReadings   map[string]domain.EnglishReading
 	ebookReadings     map[string]domain.EBookReading
 	classicalStudies  map[string]domain.ClassicalStudy
@@ -57,6 +59,8 @@ func NewMemory() *Memory {
 		plannerReports:    make(map[string]domain.PlannerReport),
 		weeklyReflections: make(map[string]domain.WeeklyReflection),
 		knowledgeNotes:    make(map[string]domain.KnowledgeNote),
+		memoFolders:       make(map[string]domain.MemoFolder),
+		memoNotes:         make(map[string]domain.MemoNote),
 		englishReadings:   make(map[string]domain.EnglishReading),
 		ebookReadings:     make(map[string]domain.EBookReading),
 		classicalStudies:  make(map[string]domain.ClassicalStudy),
@@ -781,6 +785,128 @@ func (m *Memory) ListKnowledgeNotes(_ context.Context, userID string) ([]domain.
 	return items, nil
 }
 
+func (m *Memory) CreateMemoFolder(_ context.Context, folder domain.MemoFolder) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, exists := m.memoFolders[folder.ID]; exists {
+		return domain.ErrConflict
+	}
+	m.memoFolders[folder.ID] = folder
+	return nil
+}
+
+func (m *Memory) MemoFolderByID(_ context.Context, id string) (domain.MemoFolder, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	folder, exists := m.memoFolders[id]
+	if !exists {
+		return domain.MemoFolder{}, domain.ErrNotFound
+	}
+	return folder, nil
+}
+
+func (m *Memory) UpdateMemoFolder(_ context.Context, folder domain.MemoFolder) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, exists := m.memoFolders[folder.ID]; !exists {
+		return domain.ErrNotFound
+	}
+	m.memoFolders[folder.ID] = folder
+	return nil
+}
+
+func (m *Memory) DeleteMemoFolder(_ context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, exists := m.memoFolders[id]; !exists {
+		return domain.ErrNotFound
+	}
+	delete(m.memoFolders, id)
+	for noteID, note := range m.memoNotes {
+		if note.FolderID == id {
+			note.FolderID = ""
+			m.memoNotes[noteID] = cloneMemoNote(note)
+		}
+	}
+	return nil
+}
+
+func (m *Memory) ListMemoFolders(_ context.Context, userID string) ([]domain.MemoFolder, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	items := make([]domain.MemoFolder, 0)
+	for _, folder := range m.memoFolders {
+		if folder.UserID == userID {
+			items = append(items, folder)
+		}
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].SortOrder != items[j].SortOrder {
+			return items[i].SortOrder < items[j].SortOrder
+		}
+		return items[i].Name < items[j].Name
+	})
+	return items, nil
+}
+
+func (m *Memory) CreateMemoNote(_ context.Context, note domain.MemoNote) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, exists := m.memoNotes[note.ID]; exists {
+		return domain.ErrConflict
+	}
+	m.memoNotes[note.ID] = cloneMemoNote(note)
+	return nil
+}
+
+func (m *Memory) MemoNoteByID(_ context.Context, id string) (domain.MemoNote, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	note, exists := m.memoNotes[id]
+	if !exists {
+		return domain.MemoNote{}, domain.ErrNotFound
+	}
+	return cloneMemoNote(note), nil
+}
+
+func (m *Memory) UpdateMemoNote(_ context.Context, note domain.MemoNote) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, exists := m.memoNotes[note.ID]; !exists {
+		return domain.ErrNotFound
+	}
+	m.memoNotes[note.ID] = cloneMemoNote(note)
+	return nil
+}
+
+func (m *Memory) DeleteMemoNote(_ context.Context, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, exists := m.memoNotes[id]; !exists {
+		return domain.ErrNotFound
+	}
+	delete(m.memoNotes, id)
+	return nil
+}
+
+func (m *Memory) ListMemoNotes(_ context.Context, userID string) ([]domain.MemoNote, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	items := make([]domain.MemoNote, 0)
+	for _, note := range m.memoNotes {
+		if note.UserID == userID {
+			items = append(items, cloneMemoNote(note))
+		}
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Pinned != items[j].Pinned {
+			return items[i].Pinned
+		}
+		return items[i].UpdatedAt.After(items[j].UpdatedAt)
+	})
+	return items, nil
+}
+
 func (m *Memory) CreateEnglishReading(_ context.Context, reading domain.EnglishReading) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -1005,6 +1131,8 @@ type snapshot struct {
 	PlannerReports    []domain.PlannerReport      `json:"planner_reports"`
 	WeeklyReflections []domain.WeeklyReflection   `json:"weekly_reflections"`
 	KnowledgeNotes    []domain.KnowledgeNote      `json:"knowledge_notes"`
+	MemoFolders       []domain.MemoFolder         `json:"memo_folders"`
+	MemoNotes         []domain.MemoNote           `json:"memo_notes"`
 	EnglishReadings   []domain.EnglishReading     `json:"english_readings"`
 	EBookReadings     []domain.EBookReading       `json:"ebook_readings"`
 	ClassicalStudies  []domain.ClassicalStudy     `json:"classical_studies"`
@@ -1077,6 +1205,12 @@ func (m *Memory) SaveJSON(path string) error {
 	}
 	for _, item := range m.knowledgeNotes {
 		s.KnowledgeNotes = append(s.KnowledgeNotes, cloneKnowledgeNote(item))
+	}
+	for _, item := range m.memoFolders {
+		s.MemoFolders = append(s.MemoFolders, item)
+	}
+	for _, item := range m.memoNotes {
+		s.MemoNotes = append(s.MemoNotes, cloneMemoNote(item))
 	}
 	for _, item := range m.englishReadings {
 		s.EnglishReadings = append(s.EnglishReadings, cloneEnglishReading(item))
@@ -1161,6 +1295,8 @@ func (m *Memory) LoadJSON(path string) error {
 	m.plannerReports = make(map[string]domain.PlannerReport, len(s.PlannerReports))
 	m.weeklyReflections = make(map[string]domain.WeeklyReflection, len(s.WeeklyReflections))
 	m.knowledgeNotes = make(map[string]domain.KnowledgeNote, len(s.KnowledgeNotes))
+	m.memoFolders = make(map[string]domain.MemoFolder, len(s.MemoFolders))
+	m.memoNotes = make(map[string]domain.MemoNote, len(s.MemoNotes))
 	m.englishReadings = make(map[string]domain.EnglishReading, len(s.EnglishReadings))
 	m.ebookReadings = make(map[string]domain.EBookReading, len(s.EBookReadings))
 	m.classicalStudies = make(map[string]domain.ClassicalStudy, len(s.ClassicalStudies))
@@ -1214,6 +1350,12 @@ func (m *Memory) LoadJSON(path string) error {
 	}
 	for _, item := range s.KnowledgeNotes {
 		m.knowledgeNotes[item.ID] = cloneKnowledgeNote(item)
+	}
+	for _, item := range s.MemoFolders {
+		m.memoFolders[item.ID] = item
+	}
+	for _, item := range s.MemoNotes {
+		m.memoNotes[item.ID] = cloneMemoNote(item)
 	}
 	for _, item := range s.EnglishReadings {
 		m.englishReadings[item.ID] = cloneEnglishReading(item)
@@ -1326,6 +1468,15 @@ func cloneWeeklyReflection(reflection domain.WeeklyReflection) domain.WeeklyRefl
 
 func cloneKnowledgeNote(note domain.KnowledgeNote) domain.KnowledgeNote {
 	note.Tags = append([]string(nil), note.Tags...)
+	return note
+}
+
+func cloneMemoNote(note domain.MemoNote) domain.MemoNote {
+	note.Tags = append([]string(nil), note.Tags...)
+	if note.DeletedAt != nil {
+		deletedAt := *note.DeletedAt
+		note.DeletedAt = &deletedAt
+	}
 	return note
 }
 

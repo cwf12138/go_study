@@ -16,6 +16,7 @@ tags:
   - name: Vocabulary
   - name: Focus
   - name: Insights
+  - name: Memos
   - name: Knowledge
   - name: English
   - name: Literature
@@ -1184,6 +1185,197 @@ paths:
                   data:
                     type: array
                     items: { $ref: "#/components/schemas/WeeklyReflection" }
+  /api/v1/memo-folders:
+    get:
+      tags: [Memos]
+      security: [{ bearerAuth: [] }]
+      summary: List personal memo folders
+      responses:
+        "200":
+          description: Folder list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/MemoFolder" } }
+    post:
+      tags: [Memos]
+      security: [{ bearerAuth: [] }]
+      summary: Create a memo folder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveMemoFolderRequest" }
+      responses:
+        "201":
+          description: Created folder
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MemoFolder" }
+  /api/v1/memo-folders/{folder_id}:
+    parameters:
+      - in: path
+        name: folder_id
+        required: true
+        schema: { type: string }
+    patch:
+      tags: [Memos]
+      security: [{ bearerAuth: [] }]
+      summary: Rename, recolor or reorder a memo folder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveMemoFolderRequest" }
+      responses:
+        "200":
+          description: Updated folder
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MemoFolder" }
+    delete:
+      tags: [Memos]
+      security: [{ bearerAuth: [] }]
+      summary: Delete a folder while retaining its notes
+      responses:
+        "204": { description: Folder deleted }
+  /api/v1/memos:
+    get:
+      tags: [Memos]
+      security: [{ bearerAuth: [] }]
+      summary: Search, filter and sort memo summaries
+      parameters:
+        - in: query
+          name: view
+          schema: { type: string, enum: [all, pinned, checklists, archived, trash], default: all }
+        - in: query
+          name: folder_id
+          schema: { type: string }
+        - in: query
+          name: tag
+          schema: { type: string }
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: sort
+          schema: { type: string, enum: [updated_at, created_at, title], default: updated_at }
+        - in: query
+          name: order
+          schema: { type: string, enum: [asc, desc], default: desc }
+      responses:
+        "200":
+          description: Filtered memo summaries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/MemoNoteSummary" } }
+    post:
+      tags: [Memos]
+      security: [{ bearerAuth: [] }]
+      summary: Create a memo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveMemoNoteRequest" }
+      responses:
+        "201":
+          description: Created memo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MemoNote" }
+  /api/v1/memos/overview:
+    get:
+      tags: [Memos]
+      security: [{ bearerAuth: [] }]
+      summary: Get memo smart-folder counts and tags
+      responses:
+        "200":
+          description: Memo overview
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MemoOverview" }
+  /api/v1/memos/{note_id}:
+    parameters:
+      - in: path
+        name: note_id
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Memos]
+      security: [{ bearerAuth: [] }]
+      summary: Get a memo
+      responses:
+        "200":
+          description: Memo detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MemoNote" }
+    patch:
+      tags: [Memos]
+      security: [{ bearerAuth: [] }]
+      summary: Auto-save memo content and properties
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveMemoNoteRequest" }
+      responses:
+        "200":
+          description: Updated memo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MemoNote" }
+    delete:
+      tags: [Memos]
+      security: [{ bearerAuth: [] }]
+      summary: Move a memo to Recently Deleted
+      responses:
+        "204": { description: Moved to trash }
+  /api/v1/memos/{note_id}/restore:
+    post:
+      tags: [Memos]
+      security: [{ bearerAuth: [] }]
+      summary: Restore a memo from Recently Deleted
+      responses:
+        "200": { description: Restored memo }
+  /api/v1/memos/{note_id}/duplicate:
+    post:
+      tags: [Memos]
+      security: [{ bearerAuth: [] }]
+      summary: Create an editable copy of a memo
+      responses:
+        "201": { description: Created copy }
+  /api/v1/memos/{note_id}/permanent:
+    delete:
+      tags: [Memos]
+      security: [{ bearerAuth: [] }]
+      summary: Permanently delete a memo already in trash
+      responses:
+        "204": { description: Permanently deleted }
   /api/v1/knowledge/notes:
     get:
       tags: [Knowledge]
@@ -2407,6 +2599,77 @@ components:
           items: { $ref: "#/components/schemas/WeeklyHighlight" }
         reflection: { $ref: "#/components/schemas/WeeklyReflection" }
         reflection_saved: { type: boolean }
+    MemoColor:
+      type: string
+      enum: [default, yellow, orange, rose, violet, blue, mint, gray]
+    SaveMemoFolderRequest:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        color: { $ref: "#/components/schemas/MemoColor" }
+        sort_order: { type: integer }
+    MemoFolder:
+      type: object
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        name: { type: string }
+        color: { $ref: "#/components/schemas/MemoColor" }
+        sort_order: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    SaveMemoNoteRequest:
+      type: object
+      properties:
+        folder_id: { type: string }
+        title: { type: string, maxLength: 160 }
+        content: { type: string, maxLength: 100000, description: Markdown with checklist support }
+        tags: { type: array, maxItems: 30, items: { type: string, maxLength: 40 } }
+        color: { $ref: "#/components/schemas/MemoColor" }
+        pinned: { type: boolean }
+        archived: { type: boolean }
+    MemoNote:
+      type: object
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        folder_id: { type: string }
+        title: { type: string }
+        content: { type: string }
+        tags: { type: array, items: { type: string } }
+        color: { $ref: "#/components/schemas/MemoColor" }
+        pinned: { type: boolean }
+        archived: { type: boolean }
+        deleted_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    MemoNoteSummary:
+      type: object
+      properties:
+        id: { type: string }
+        folder_id: { type: string }
+        title: { type: string }
+        snippet: { type: string }
+        tags: { type: array, items: { type: string } }
+        color: { $ref: "#/components/schemas/MemoColor" }
+        pinned: { type: boolean }
+        archived: { type: boolean }
+        deleted_at: { type: string, format: date-time }
+        has_checklist: { type: boolean }
+        checklist_done: { type: integer, minimum: 0 }
+        checklist_total: { type: integer, minimum: 0 }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    MemoOverview:
+      type: object
+      properties:
+        total: { type: integer, minimum: 0 }
+        pinned: { type: integer, minimum: 0 }
+        archived: { type: integer, minimum: 0 }
+        deleted: { type: integer, minimum: 0 }
+        checklist_notes: { type: integer, minimum: 0 }
+        folders: { type: integer, minimum: 0 }
+        tags: { type: array, items: { type: string } }
     SaveKnowledgeNoteRequest:
       type: object
       required: [title]
@@ -2708,6 +2971,12 @@ components:
         todos:
           type: array
           items: { $ref: "#/components/schemas/TodoItem" }
+        memo_folders:
+          type: array
+          items: { $ref: "#/components/schemas/MemoFolder" }
+        memos:
+          type: array
+          items: { $ref: "#/components/schemas/MemoNote" }
         english_readings:
           type: array
           items: { $ref: "#/components/schemas/EnglishReading" }

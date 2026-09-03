@@ -91,6 +91,17 @@ type Repository interface {
 	DeleteKnowledgeNote(context.Context, string) error
 	ListKnowledgeNotes(context.Context, string) ([]domain.KnowledgeNote, error)
 
+	CreateMemoFolder(context.Context, domain.MemoFolder) error
+	MemoFolderByID(context.Context, string) (domain.MemoFolder, error)
+	UpdateMemoFolder(context.Context, domain.MemoFolder) error
+	DeleteMemoFolder(context.Context, string) error
+	ListMemoFolders(context.Context, string) ([]domain.MemoFolder, error)
+	CreateMemoNote(context.Context, domain.MemoNote) error
+	MemoNoteByID(context.Context, string) (domain.MemoNote, error)
+	UpdateMemoNote(context.Context, domain.MemoNote) error
+	DeleteMemoNote(context.Context, string) error
+	ListMemoNotes(context.Context, string) ([]domain.MemoNote, error)
+
 	CreateEnglishReading(context.Context, domain.EnglishReading) error
 	EnglishReadingByID(context.Context, string) (domain.EnglishReading, error)
 	UpdateEnglishReading(context.Context, domain.EnglishReading) error

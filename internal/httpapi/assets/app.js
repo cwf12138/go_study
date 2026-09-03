@@ -279,6 +279,7 @@
       goals: ["GOALS", "学习目标"],
       moods: ["MOOD JOURNAL", "心情日记"],
       calendar: ["SMART CALENDAR", "智能日历"],
+      memos: ["PERSONAL NOTES", "备忘录"],
       knowledge: ["KNOWLEDGE GARDEN", "知识花园"],
       english: ["DAILY ENGLISH", "英语精读"],
       literature: ["LITERATURE STUDIO", "阅读书房"],

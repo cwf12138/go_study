@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="/static/vocabulary-catalogs.css?v=20260901-6">
     <link rel="stylesheet" href="/static/calendar.css?v=20260901-6">
     <link rel="stylesheet" href="/static/knowledge.css?v=20260901-6">
+    <link rel="stylesheet" href="/static/memos.css?v=20260904-1">
     <link rel="stylesheet" href="/static/english.css?v=20260901-7">
     <link rel="stylesheet" href="/static/literature.css?v=20260902-1">
   </head>
@@ -57,6 +58,7 @@
           <button class="nav-link" type="button" data-view="goals"><span>◎</span>学习目标</button>
           <button class="nav-link" type="button" data-view="moods"><span>☺</span>心情日记</button>
           <button class="nav-link" type="button" data-view="calendar"><span>▦</span>智能日历</button>
+          <button class="nav-link" type="button" data-view="memos"><span>▤</span>备忘录</button>
           <button class="nav-link" type="button" data-view="knowledge"><span>◇</span>知识花园</button>
           <button class="nav-link" type="button" data-view="tasks"><span>✓</span>学习任务</button>
           <button class="nav-link" type="button" data-view="todo"><span>☑</span>待办清单</button>
@@ -164,6 +166,53 @@
                 <div class="calendar-dialog-actions"><button id="calendar-event-delete" class="quiet danger-text hidden" type="button">删除日程</button><span></span><button id="calendar-event-cancel" class="quiet" type="button">取消</button><button class="primary" type="submit">保存日程</button></div>
               </form>
             </dialog>
+          </section>
+
+          <section id="panel-memos" class="panel">
+            <div class="memo-heading">
+              <div><p class="eyebrow">PERSONAL NOTES</p><h3>备忘录</h3><p>快速记录此刻，也把重要内容整理成随时找得到的个人资料。</p></div>
+              <div class="memo-heading-actions"><label class="memo-search"><span>⌕</span><input id="memo-search" type="search" placeholder="搜索备忘录、正文或标签" autocomplete="off"></label><button id="memo-new" class="primary" type="button">＋ 新建备忘录</button></div>
+            </div>
+            <div class="memo-workspace">
+              <aside class="memo-sidebar">
+                <div class="memo-sidebar-scroll">
+                  <p class="memo-section-label">智能分类</p>
+                  <nav class="memo-smart-list" aria-label="备忘录分类">
+                    <button class="active" type="button" data-memo-view="all"><span class="memo-nav-icon all">▤</span><b>全部备忘录</b><em id="memo-count-all">0</em></button>
+                    <button type="button" data-memo-view="pinned"><span class="memo-nav-icon pinned">★</span><b>已置顶</b><em id="memo-count-pinned">0</em></button>
+                    <button type="button" data-memo-view="checklists"><span class="memo-nav-icon checklist">✓</span><b>清单</b><em id="memo-count-checklists">0</em></button>
+                    <button type="button" data-memo-view="archived"><span class="memo-nav-icon archived">▣</span><b>归档</b><em id="memo-count-archived">0</em></button>
+                    <button type="button" data-memo-view="trash"><span class="memo-nav-icon trash">⌫</span><b>最近删除</b><em id="memo-count-trash">0</em></button>
+                  </nav>
+                  <div class="memo-sidebar-title"><p class="memo-section-label">文件夹</p><button id="memo-folder-add" type="button" aria-label="新建文件夹">＋</button></div>
+                  <div id="memo-folder-list" class="memo-folder-list"><span class="memo-sidebar-empty">还没有文件夹</span></div>
+                  <div class="memo-sidebar-title memo-tags-title"><p class="memo-section-label">标签</p></div>
+                  <div id="memo-tag-list" class="memo-tag-list"><span class="memo-sidebar-empty">标签会显示在这里</span></div>
+                </div>
+                <div class="memo-sidebar-tip"><span>⌘</span><p><b>快捷记录</b><small>在本页按 Ctrl/⌘ + N 新建，Ctrl/⌘ + S 立即保存。</small></p></div>
+              </aside>
+              <section class="memo-list-pane">
+                <header class="memo-list-head"><div><button id="memo-mobile-folders" type="button" aria-label="显示文件夹">☰</button><h3 id="memo-list-title">全部备忘录</h3><span id="memo-list-count">0 条</span></div><select id="memo-sort" aria-label="备忘录排序"><option value="updated_at:desc">最近编辑</option><option value="created_at:desc">最近创建</option><option value="title:asc">标题 A–Z</option><option value="title:desc">标题 Z–A</option></select></header>
+                <div id="memo-note-list" class="memo-note-list"><div class="memo-list-loading"><i></i><span>正在整理备忘录…</span></div></div>
+              </section>
+              <article class="memo-editor-pane">
+                <div id="memo-editor-empty" class="memo-editor-empty"><div class="memo-empty-paper"><i></i><i></i><i></i></div><h3>留住一个念头</h3><p>选择左侧备忘录，或者新建一则记录。支持标题、列表、待办清单、引用、代码与链接。</p><button class="quiet" type="button" data-memo-create>写一则新备忘录</button></div>
+                <div id="memo-editor" class="memo-editor hidden">
+                  <header class="memo-editor-head"><button id="memo-mobile-list" type="button" aria-label="返回备忘录列表">‹</button><div id="memo-editor-actions" class="memo-editor-actions"><button id="memo-pin" type="button" title="置顶" aria-label="置顶">☆</button><button id="memo-archive" type="button" title="归档" aria-label="归档">▣</button><button id="memo-duplicate" type="button" title="创建副本" aria-label="创建副本">▧</button><button id="memo-download" type="button" title="导出 Markdown" aria-label="导出 Markdown">⇩</button><button id="memo-trash" class="memo-danger" type="button" title="移到最近删除" aria-label="移到最近删除">⌫</button></div><div id="memo-trash-actions" class="memo-trash-actions hidden"><button id="memo-restore" class="quiet" type="button">恢复</button><button id="memo-delete-permanent" class="memo-danger-button" type="button">永久删除</button></div></header>
+                  <div class="memo-editor-scroll">
+                    <input id="memo-title" class="memo-title-input" maxlength="160" placeholder="标题">
+                    <div id="memo-updated" class="memo-updated">尚未保存</div>
+                    <div class="memo-formatbar" role="toolbar" aria-label="文本格式">
+                      <button type="button" data-memo-prefix="# " title="大标题">H1</button><button type="button" data-memo-prefix="## " title="小标题">H2</button><span></span><button type="button" data-memo-wrap="**" title="粗体"><b>B</b></button><button type="button" data-memo-wrap="*" title="斜体"><i>I</i></button><button type="button" data-memo-prefix="- " title="项目列表">•≡</button><button type="button" data-memo-prefix="1. " title="编号列表">1≡</button><button type="button" data-memo-prefix="- [ ] " title="待办清单">☑</button><button type="button" data-memo-prefix="> " title="引用">❝</button><button type="button" data-memo-wrap="`" title="行内代码">&lt;/&gt;</button><button type="button" data-memo-link title="插入链接">↗</button><button id="memo-preview-toggle" type="button" title="切换预览">◫</button>
+                    </div>
+                    <textarea id="memo-content" maxlength="100000" spellcheck="true" placeholder="开始记录…&#10;&#10;输入 - [ ] 可以创建可勾选的清单。"></textarea>
+                    <div id="memo-preview" class="memo-preview hidden"></div>
+                  </div>
+                  <footer class="memo-editor-footer"><div class="memo-properties"><label>文件夹<select id="memo-folder-select"><option value="">备忘录</option></select></label><label>标签<input id="memo-tags" maxlength="1200" placeholder="用逗号分隔"></label><fieldset><legend>颜色</legend><div class="memo-color-picker"><button class="active default" type="button" data-memo-color="default" aria-label="默认"></button><button class="yellow" type="button" data-memo-color="yellow" aria-label="黄色"></button><button class="orange" type="button" data-memo-color="orange" aria-label="橙色"></button><button class="rose" type="button" data-memo-color="rose" aria-label="玫红"></button><button class="violet" type="button" data-memo-color="violet" aria-label="紫色"></button><button class="blue" type="button" data-memo-color="blue" aria-label="蓝色"></button><button class="mint" type="button" data-memo-color="mint" aria-label="薄荷绿"></button></div></fieldset></div><div class="memo-save-meta"><span id="memo-word-count">0 字</span><span id="memo-save-state"><i></i>所有更改已保存</span></div></footer>
+                </div>
+              </article>
+            </div>
+            <dialog id="memo-folder-dialog" class="memo-folder-dialog"><form id="memo-folder-form" method="dialog"><div><p class="eyebrow">NEW FOLDER</p><h3>新建文件夹</h3><p>把同类备忘录放在一起，更容易回到重要内容。</p></div><label>文件夹名称<input id="memo-folder-name" required maxlength="80" placeholder="例如：工作、灵感、旅行"></label><fieldset><legend>标识颜色</legend><div class="memo-folder-colors"><button class="active blue" type="button" data-memo-folder-color="blue"></button><button class="violet" type="button" data-memo-folder-color="violet"></button><button class="yellow" type="button" data-memo-folder-color="yellow"></button><button class="rose" type="button" data-memo-folder-color="rose"></button><button class="mint" type="button" data-memo-folder-color="mint"></button><button class="gray" type="button" data-memo-folder-color="gray"></button></div></fieldset><div class="memo-dialog-actions"><button id="memo-folder-cancel" class="quiet" type="button">取消</button><button class="primary" type="submit">创建文件夹</button></div></form></dialog>
           </section>
 
           <section id="panel-knowledge" class="panel">
@@ -404,9 +453,10 @@
         <div class="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 执行</span><span>全局快捷键 <kbd>Ctrl K</kbd></span></div>
       </div>
     </dialog>
-    <script src="/static/app.js?v=20260903-1" defer></script>
+    <script src="/static/app.js?v=20260904-1" defer></script>
     <script src="/static/calendar.js?v=20260901-6" defer></script>
-    <script src="/static/knowledge.js?v=20260903-1" defer></script>
+    <script src="/static/knowledge.js?v=20260904-1" defer></script>
+    <script src="/static/memos.js?v=20260904-2" defer></script>
     <script src="/static/english.js?v=20260901-7" defer></script>
     <script src="/static/literature.js?v=20260902-1" defer></script>
   </body>

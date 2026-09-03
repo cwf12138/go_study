@@ -34,6 +34,12 @@ func TestSnapshotRoundTripPreservesCredentialsAndData(t *testing.T) {
 	if err := first.UpsertClassicalStudy(ctx, domain.ClassicalStudy{ID: "classic-1", UserID: user.ID, WorkID: "tang-jing-ye-si", Favorite: true, Status: "mastered", Notes: "月光与乡愁。"}); err != nil {
 		t.Fatal(err)
 	}
+	if err := first.CreateMemoFolder(ctx, domain.MemoFolder{ID: "memo-folder-1", UserID: user.ID, Name: "灵感", Color: "violet"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := first.CreateMemoNote(ctx, domain.MemoNote{ID: "memo-1", UserID: user.ID, FolderID: "memo-folder-1", Title: "书单", Content: "- [ ] 局外人", Tags: []string{"阅读"}, Color: "yellow"}); err != nil {
+		t.Fatal(err)
+	}
 	path := filepath.Join(t.TempDir(), "snapshot.json")
 	if err := first.SaveJSON(path); err != nil {
 		t.Fatalf("SaveJSON() error = %v", err)
@@ -69,6 +75,14 @@ func TestSnapshotRoundTripPreservesCredentialsAndData(t *testing.T) {
 	studies, err := second.ListClassicalStudies(ctx, user.ID)
 	if err != nil || len(studies) != 1 || !studies[0].Favorite || studies[0].Status != "mastered" {
 		t.Fatalf("unexpected classical studies: %+v, error: %v", studies, err)
+	}
+	memoFolders, err := second.ListMemoFolders(ctx, user.ID)
+	if err != nil || len(memoFolders) != 1 || memoFolders[0].Name != "灵感" {
+		t.Fatalf("unexpected memo folders: %+v, error: %v", memoFolders, err)
+	}
+	memos, err := second.ListMemoNotes(ctx, user.ID)
+	if err != nil || len(memos) != 1 || memos[0].FolderID != "memo-folder-1" || len(memos[0].Tags) != 1 {
+		t.Fatalf("unexpected memos: %+v, error: %v", memos, err)
 	}
 }
 

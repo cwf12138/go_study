@@ -303,7 +303,7 @@
   const navigationCommands = [
     ["dashboard", "概览", "◫", "首页 今日 数据"], ["goals", "学习目标", "◎", "目标 deadline"],
     ["moods", "心情日记", "☺", "情绪 mood"], ["calendar", "智能日历", "▦", "日程 日期"],
-    ["knowledge", "知识花园", "◇", "笔记 图谱 knowledge"], ["tasks", "学习任务", "✓", "任务 task"],
+    ["memos", "备忘录", "▤", "便签 记录 memo"], ["knowledge", "知识花园", "◇", "笔记 图谱 knowledge"], ["tasks", "学习任务", "✓", "任务 task"],
     ["todo", "待办清单", "☑", "todo 清单"], ["planner", "智能规划", "▤", "计划 排程"],
     ["insights", "学习洞察", "⌁", "统计 周报"], ["vocabulary", "单词学习", "Aa", "英语 词书"],
     ["english", "英语精读", "En", "英语 外刊 新闻 阅读"],
@@ -313,6 +313,7 @@
 
   function commandCatalog() {
     const actions = [
+      { type: "action", id: "new-memo", title: "新建备忘录", subtitle: "快速记录此刻的想法或清单", icon: "▤", keywords: "创建 备忘录 memo 便签" },
       { type: "action", id: "new-note", title: "新建知识笔记", subtitle: "记录想法并建立双向链接", icon: "+", keywords: "创建 笔记 note" },
       { type: "action", id: "new-task", title: "新建学习任务", subtitle: "跳转并填写一项明确行动", icon: "✓", keywords: "创建 任务 task" },
       { type: "action", id: "new-todo", title: "添加待办", subtitle: "快速进入待办收集箱", icon: "☑", keywords: "创建 todo 待办" },
@@ -357,6 +358,7 @@
       await selectKnowledgeNote(item.id);
       return;
     }
+    if (item.id === "new-memo") { navigateTo("memos"); window.setTimeout(() => document.querySelector("#memo-new")?.click(), 80); }
     if (item.id === "new-note") { navigateTo("knowledge"); openKnowledgeEditor(); }
     if (item.id === "new-task") navigateTo("tasks", "#task-title");
     if (item.id === "new-todo") navigateTo("todo", "#todo-title");

@@ -600,6 +600,60 @@ type KnowledgeGraph struct {
 	OrphanCount     int                  `json:"orphan_count"`
 }
 
+type MemoFolder struct {
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	Name      string    `json:"name"`
+	Color     string    `json:"color"`
+	SortOrder int       `json:"sort_order"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// MemoNote is a lightweight personal note. Content uses a small Markdown
+// subset so it remains portable in snapshots and exports.
+type MemoNote struct {
+	ID        string     `json:"id"`
+	UserID    string     `json:"user_id"`
+	FolderID  string     `json:"folder_id,omitempty"`
+	Title     string     `json:"title"`
+	Content   string     `json:"content"`
+	Tags      []string   `json:"tags"`
+	Color     string     `json:"color"`
+	Pinned    bool       `json:"pinned"`
+	Archived  bool       `json:"archived"`
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+}
+
+type MemoNoteSummary struct {
+	ID             string     `json:"id"`
+	FolderID       string     `json:"folder_id,omitempty"`
+	Title          string     `json:"title"`
+	Snippet        string     `json:"snippet"`
+	Tags           []string   `json:"tags"`
+	Color          string     `json:"color"`
+	Pinned         bool       `json:"pinned"`
+	Archived       bool       `json:"archived"`
+	DeletedAt      *time.Time `json:"deleted_at,omitempty"`
+	HasChecklist   bool       `json:"has_checklist"`
+	ChecklistDone  int        `json:"checklist_done"`
+	ChecklistTotal int        `json:"checklist_total"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+type MemoOverview struct {
+	Total          int      `json:"total"`
+	Pinned         int      `json:"pinned"`
+	Archived       int      `json:"archived"`
+	Deleted        int      `json:"deleted"`
+	ChecklistNotes int      `json:"checklist_notes"`
+	Folders        int      `json:"folders"`
+	Tags           []string `json:"tags"`
+}
+
 type EnglishArticle struct {
 	ID             string    `json:"id"`
 	Title          string    `json:"title"`
