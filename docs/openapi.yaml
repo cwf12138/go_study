@@ -22,6 +22,48 @@ tags:
   - name: Literature
   - name: Exports
 paths:
+  /api/v1/weather:
+    get:
+      summary: 当前天气（Open-Meteo，15 分钟服务端缓存）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: latitude
+          in: query
+          required: true
+          schema: { type: number, minimum: -90, maximum: 90 }
+        - name: longitude
+          in: query
+          required: true
+          schema: { type: number, minimum: -180, maximum: 180 }
+      responses:
+        "200":
+          description: data 包含 current（Unix 秒时间、摄氏温度、体感、湿度、WMO 天气代码、昼夜、km/h 风速）、daily（最高最低温度）、timezone
+        "400":
+          description: 经纬度无效
+        "401":
+          description: 需要登录
+        "502":
+          description: 上游网络失败、超时或响应无效
+  /api/v1/weather/locations:
+    get:
+      summary: 按城市名称搜索天气位置（最多 8 个结果）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 2, maxLength: 80 }
+      responses:
+        "200":
+          description: data.results 包含 name、latitude、longitude、admin1、country；无结果时 results 可以省略
+        "400":
+          description: 搜索词无效
+        "401":
+          description: 需要登录
+        "502":
+          description: 城市搜索服务不可用
   /healthz:
     get:
       summary: 进程健康状态

@@ -1,0 +1,13 @@
+.topbar{gap:16px;flex-wrap:wrap;height:auto;min-height:104px}
+.weather-widget{margin-left:auto;display:flex;align-items:center;gap:12px;padding:10px 17px;border:1px solid #d2e4ff;border-radius:20px;background:linear-gradient(120deg,#e5f1ff,#f3f7ff);color:#244673;text-align:left;min-width:205px;box-shadow:0 5px 16px #3366ff0a;transition:transform .2s,box-shadow .2s;cursor:pointer}
+.weather-widget:hover{transform:translateY(-2px);box-shadow:0 7px 20px #3366ff19}
+.weather-widget:focus-visible,.weather-dialog button:focus-visible{outline:3px solid var(--blue);outline-offset:3px}
+.weather-symbol{font-size:32px;line-height:1.2}.weather-copy{display:grid;gap:3px}.weather-copy strong{font-size:14px;font-weight:600}.weather-copy small{font-size:11px;opacity:.8}.weather-temp{font-size:29px;font-weight:600;letter-spacing:-1px;margin-left:auto}
+.weather-widget[data-night="true"]{background:linear-gradient(125deg,#26375b,#425a80);color:#f4f7ff;border-color:#526886}
+.weather-dialog{width:min(440px,calc(100vw - 32px));max-height:85vh;overflow:auto;border:1px solid var(--line);border-radius:24px;padding:26px;background:var(--paper);color:var(--ink);box-shadow:0 25px 100px #0003}
+.weather-dialog::backdrop{background:#10213c60;backdrop-filter:blur(5px)}
+.weather-dialog h3{margin:0}.weather-dialog header{display:flex;align-items:center;justify-content:space-between;gap:16px}.weather-detail{margin:18px 0;padding:20px;border-radius:18px;background:var(--canvas);line-height:1.9;white-space:pre-line}.weather-tools{display:flex;gap:8px;margin:12px 0}.weather-search{display:flex;gap:8px;margin-top:8px}.weather-search input{min-width:0;flex:1}.weather-results{display:grid;gap:8px;margin:12px 0}.weather-results button{text-align:left;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--canvas);color:var(--ink)}.weather-status{min-height:20px;color:var(--muted);font-size:13px}.weather-source{font-size:11px;color:var(--muted);line-height:1.7}.weather-source a{color:inherit}
+:root[data-theme="dark"] .weather-widget{background:linear-gradient(120deg,#233553,#29354b);border-color:#3b506e;color:#d9e8ff}
+@media(max-width:1200px){.weather-widget{min-width:180px;padding:8px 12px}.topbar .user-actions{gap:8px}}
+@media(max-width:760px){.weather-widget{order:4;width:100%;margin-left:0}.topbar .user-actions{margin-left:auto}.weather-copy{flex:1}}
+@media(prefers-reduced-motion:reduce){.weather-widget{transition:none}.weather-widget:hover{transform:none}}

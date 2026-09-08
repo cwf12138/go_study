@@ -35,6 +35,9 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 	root.HandleFunc("POST /api/v1/auth/login", s.login)
 
 	private := http.NewServeMux()
+	weather := newWeatherAPI()
+	private.HandleFunc("GET /api/v1/weather", weather.current)
+	private.HandleFunc("GET /api/v1/weather/locations", weather.locations)
 	private.HandleFunc("GET /api/v1/me", s.me)
 	private.HandleFunc("POST /api/v1/goals", s.createGoal)
 	private.HandleFunc("GET /api/v1/goals", s.listGoals)
