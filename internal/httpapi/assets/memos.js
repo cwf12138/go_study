@@ -10,6 +10,7 @@
 
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
+  let loadVersion = 0, selectionVersion = 0;
   const escapeHTML = (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 
   async function memoAPI(path, options = {}) {
@@ -57,29 +58,37 @@
   }
 
   async function loadMemos({ preserveSelection = true } = {}) {
-    if (!syncAccount() || state.loading) return;
+    if (!syncAccount()) return;
+    const version = ++loadVersion, token = state.token;
+    state.loading = false;
     if (state.dirty && !(await saveCurrent({ quiet: true }))) return;
+    if (version !== loadVersion || token !== state.token) return;
     state.loading = true;
+    const selectedVersion = selectionVersion;
     const previousID = preserveSelection ? state.current?.id : "";
     try {
       const [folders, overview, notes, allNotes] = await Promise.all([
         memoAPI("/api/v1/memo-folders"), memoAPI("/api/v1/memos/overview"), memoAPI(listURL()), memoAPI(listURL("all", false)),
       ]);
+      if (version !== loadVersion || token !== state.token) return;
       state.folders = folders || []; state.overview = overview || {}; state.notes = notes || []; state.allNotes = allNotes || [];
       state.initialized = true;
       renderMemos();
+      // Fetching a list must not replace text typed while the request was running.
+      if (state.dirty || selectedVersion !== selectionVersion) return;
       const keep = previousID && state.notes.some((note) => note.id === previousID);
       if (keep && (!state.current || state.current.id !== previousID)) await selectMemo(previousID, { skipSave: true });
       else if (!keep && state.notes.length) await selectMemo(state.notes[0].id, { skipSave: true });
       else if (!state.notes.length) clearEditor();
     } catch (error) {
+      if (version !== loadVersion || token !== state.token) return;
       notify(error.message, "error");
       $("#memo-note-list").innerHTML = '<div class="memo-list-empty">备忘录加载失败<br><button class="text-button" type="button" data-memo-retry>重新加载</button></div>';
-    } finally { state.loading = false; }
+    } finally { if (version === loadVersion) state.loading = false; }
   }
 
   function renderMemos() {
-    renderSidebar(); renderNoteList(); renderFolderSelect();
+    renderSidebar(); renderNoteList(); if (!state.dirty) renderFolderSelect();
   }
 
   function renderSidebar() {
@@ -126,13 +135,19 @@
   }
 
   async function selectMemo(id, { skipSave = false } = {}) {
+    const version = ++selectionVersion, token = state.token;
     if (!skipSave && state.dirty && !(await saveCurrent({ quiet: true }))) return;
+    if (version !== selectionVersion || token !== state.token) return;
+    const revision = state.revision;
     try {
-      state.current = await memoAPI(`/api/v1/memos/${id}`);
+      const note = await memoAPI(`/api/v1/memos/${id}`);
+      if (version !== selectionVersion || token !== state.token) return;
+      if (revision !== state.revision) { notify("保留了你刚输入的修改，请保存后再切换备忘录。", "error"); return; }
+      state.current = note;
       state.dirty = false; state.preview = false;
       renderNoteList(); renderEditor();
       $(".memo-workspace").classList.add("show-editor");
-    } catch (error) { notify(error.message, "error"); }
+    } catch (error) { if(version === selectionVersion && token === state.token) notify(error.message, "error"); }
   }
 
   function renderEditor() {
@@ -207,7 +222,9 @@
   }
 
   async function refreshLists() {
-    const [overview, notes, allNotes] = await Promise.all([memoAPI("/api/v1/memos/overview"), memoAPI(listURL()), memoAPI(listURL("all", false))]);
+    const query = listURL(), token = state.token;
+    const [overview, notes, allNotes] = await Promise.all([memoAPI("/api/v1/memos/overview"), memoAPI(query), memoAPI(listURL("all", false))]);
+    if (token !== state.token || query !== listURL() || state.loading) return;
     state.overview = overview || {}; state.notes = notes || []; state.allNotes = allNotes || [];
     renderSidebar(); renderNoteList();
   }

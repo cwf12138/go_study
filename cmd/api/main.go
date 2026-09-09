@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -27,10 +28,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Claim the port before loading/recovering data or starting snapshot workers.
+	listener, err := net.Listen("tcp", cfg.HTTPAddr)
+	if err != nil {
+		logger.Error("bind http listener", "error", err)
+		os.Exit(1)
+	}
+	defer listener.Close()
 	repository := store.NewMemory()
 	if err := repository.LoadJSON(cfg.DataFile); err != nil {
 		var recovery *store.SnapshotRecoveryError
-		if errors.As(err, &recovery) {
+		if errors.As(err, &recovery) && recovery.RecoveredFromBackup {
 			logger.Warn("data snapshot recovered", "error", err, "quarantined_path", recovery.QuarantinedPath, "backup_path", recovery.BackupPath, "recovered_from_backup", recovery.RecoveredFromBackup)
 		} else {
 			logger.Error("load data snapshot", "error", err)
@@ -69,7 +77,7 @@ func main() {
 	}()
 	go func() {
 		logger.Info("StudyFlow API started", "address", cfg.HTTPAddr)
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("http server failed", "error", err)
 			stop()
 		}

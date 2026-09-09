@@ -36,6 +36,8 @@
     plannerWeek: null,
     plannerSelectedBlockID: "",
     plannerSettingsOpen: false,
+    plannerDraftRevision: 0,
+    plannerDraftSequence: 0,
     insightsDays: 30,
     learningInsights: null,
     weeklyReviewWeekStart: mondayKey(new Date()),
@@ -67,24 +69,30 @@
   ];
 
   async function api(path, options = {}) {
+    const requestToken = state.token;
     const { returnEnvelope = false, ...requestOptions } = options;
     const headers = new Headers(requestOptions.headers || {});
     if (state.token) headers.set("Authorization", `Bearer ${state.token}`);
     if (requestOptions.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
 
     let response;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 25000);
     try {
-      response = await fetch(path, { ...requestOptions, headers });
-    } catch {
-      throw new Error("无法连接到服务，请确认 Go API 正在运行。");
-    }
-
-    const payload = await response.json().catch(() => ({}));
+      response = await fetch(path, { ...requestOptions, headers, signal: requestOptions.signal || controller.signal });
+      const payload = response.status === 204 ? {} : await response.json();
+      if (state.token !== requestToken) throw new Error("账号已切换，已忽略旧请求结果。");
     if (!response.ok) {
       if (response.status === 401 && state.token) leaveApp();
       throw new Error(payload?.error?.message || `请求失败（${response.status}）`);
     }
     return returnEnvelope ? payload : payload.data;
+    } catch (error) {
+      if (error.name === "AbortError") throw new Error("请求超时，请稍后重试。");
+      if (error instanceof SyntaxError) throw new Error("服务返回了无效数据，请重试或检查服务日志。");
+      if (error instanceof TypeError) throw new Error("无法连接到服务，请确认 Go API 正在运行。");
+      throw error;
+    } finally { window.clearTimeout(timeout); }
   }
 
   async function downloadAuthenticated(path, fallbackFilename) {
@@ -260,6 +268,7 @@
     state.plannerWeek = null;
     state.plannerSelectedBlockID = "";
     state.plannerSettingsOpen = false;
+    state.plannerDraftRevision = 0;
     state.insightsDays = 30;
     state.learningInsights = null;
     state.weeklyReviewWeekStart = mondayKey(new Date());
@@ -315,7 +324,10 @@
     return `/api/v1/goals?${query.toString()}`;
   }
 
+  let refreshVersion = 0;
   async function refresh() {
+    const version = ++refreshVersion, token = state.token;
+    setSyncStatus("正在同步核心模块…", true);
     const todoListsRequest = api("/api/v1/todo-lists");
     const todosRequest = todoListsRequest.then(() => api(`/api/v1/todos?view=all&date=${localDateKey(new Date())}`));
     const vocabularyRequest = api("/api/v1/word-books").then(async (books = []) => {
@@ -331,7 +343,7 @@
       ]);
       return { books, selectedBookID, words: wordPage.data || [], wordMeta: wordPage.meta || {}, queue, overview };
     });
-    const [dashboard, goalPageResponse, activeGoalsResponse, moods, moodInsights, tasks, todoLists, todos, vocabulary, vocabularyCatalogs, plannerWeek, learningInsights, weeklyReview, activeFocus] = await Promise.all([
+    const results = await Promise.allSettled([
       api("/api/v1/dashboard"),
       api(goalListURL(), { returnEnvelope: true }),
       api("/api/v1/goals?status=active&sort=title&order=asc&page=1&page_size=50", { returnEnvelope: true }),
@@ -347,6 +359,9 @@
       api(`/api/v1/reviews/weekly?week_start=${encodeURIComponent(state.weeklyReviewWeekStart)}`),
       api("/api/v1/focus-sessions/active"),
     ]);
+    if (version !== refreshVersion || token !== state.token || !state.user) return;
+    const fallback = [state.dashboard, {data:state.goalPage,meta:state.goalMeta}, {data:state.goals}, state.moodEntries, state.moodInsights, state.tasks, state.todoLists, state.todos, {books:state.wordBooks,selectedBookID:state.vocabularyBookID,words:state.vocabularyWords,wordMeta:state.vocabularyMeta,queue:state.vocabularyQueue,overview:state.vocabularyOverview}, state.vocabularyCatalogs, state.plannerWeek, state.learningInsights, state.weeklyReview, null];
+    const [dashboard, goalPageResponse, activeGoalsResponse, moods, moodInsights, tasks, todoLists, todos, vocabulary, vocabularyCatalogs, plannerWeek, learningInsights, weeklyReview, activeFocus] = results.map((result,index) => result.status === "fulfilled" ? result.value : fallback[index]);
     state.dashboard = dashboard;
     state.goalPage = goalPageResponse.data || [];
     state.goalMeta = goalPageResponse.meta || state.goalMeta;
@@ -366,8 +381,18 @@
     state.plannerWeek = plannerWeek || null;
     state.learningInsights = learningInsights || null;
     state.weeklyReview = weeklyReview || null;
-    syncActiveFocus(activeFocus);
+    if (results[13].status === "fulfilled") syncActiveFocus(activeFocus);
     render();
+    const names = ["概览","目标","目标选项","心情记录","心情统计","任务","待办分类","待办事项","单词学习","词书目录","学习规划","学习分析","周回顾","专注会话"];
+    const failures = results.flatMap((result,index) => result.status === "rejected" ? [names[index]] : []);
+    setSyncStatus(failures.length ? `未更新：${failures.join("、")}。这些模块暂保留上次数据（首次加载可能为空）。` : `已同步 · ${new Date().toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})}`, false, failures.length > 0);
+  }
+
+  function setSyncStatus(message, busy=false, failed=false) {
+    const text = $("#app-sync-status"), button = $("#app-sync-retry");
+    if (!text || !button) return;
+    text.textContent = message; text.parentElement.classList.toggle("sync-warning", failed);
+    button.disabled = busy; button.textContent = busy ? "同步中…" : "刷新数据";
   }
 
   function syncActiveFocus(session) {
@@ -844,7 +869,7 @@
     renderPlannerCalendar();
     renderPlannerDetail();
     renderPlannerUnscheduled();
-    if (state.plannerSettingsOpen) renderPlannerPreferences();
+    if (state.plannerSettingsOpen && !state.plannerDraftRevision) renderPlannerPreferences();
     const blockDate = $("#planner-block-date");
     if (!blockDate.value || blockDate.value < week.week_start || blockDate.value > week.week_end) blockDate.value = week.week_start;
   }
@@ -927,6 +952,7 @@
   }
 
   function renderPlannerPreferences() {
+    updatePlannerDraftStatus();
     const preferences = state.plannerWeek?.preferences;
     if (!preferences) return;
     $("#planner-time-zone").value = preferences.time_zone;
@@ -939,6 +965,16 @@
   function renderPlannerWindowRow(window = { weekday: 1, start_time: "19:00", end_time: "22:00" }) {
     const weekdays = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
     return `<div class="planner-window-row"><select data-planner-window-weekday aria-label="星期">${weekdays.map((label, index) => `<option value="${index + 1}" ${window.weekday === index + 1 ? "selected" : ""}>${label}</option>`).join("")}</select><input data-planner-window-start type="time" value="${window.start_time}" aria-label="开始时间"><span>至</span><input data-planner-window-end type="time" value="${window.end_time}" aria-label="结束时间"><button type="button" data-planner-remove-window aria-label="删除可用时段">×</button></div>`;
+  }
+
+  function markPlannerDraft() {
+    state.plannerDraftRevision = ++state.plannerDraftSequence;
+    updatePlannerDraftStatus();
+  }
+
+  function updatePlannerDraftStatus() {
+    $("#planner-draft-status").textContent = state.plannerDraftRevision ? "有未保存修改 · 自动刷新不会覆盖本次编辑" : "设置已同步 · 修改后需保存";
+    $("#planner-discard-draft").disabled = !state.plannerDraftRevision;
   }
 
   async function refreshPlannerWeek() {
@@ -1587,6 +1623,16 @@
   }
 
   function bindEvents() {
+    $("#planner-preferences-form").addEventListener("input", markPlannerDraft);
+    $("#planner-preferences-form").addEventListener("change", markPlannerDraft);
+    $("#planner-discard-draft").addEventListener("click", () => {
+      if (state.plannerDraftRevision && !window.confirm("放弃尚未保存的规划设置，恢复服务器上的偏好吗？")) return;
+      state.plannerDraftRevision = 0; renderPlannerPreferences(); updatePlannerDraftStatus();
+    });
+    window.addEventListener("beforeunload", event => { if (state.plannerDraftRevision) { event.preventDefault(); event.returnValue = ""; } });
+    $("#app-sync-retry").addEventListener("click", () => refresh().catch(error => setSyncStatus(error.message,false,true)));
+    window.addEventListener("offline", () => { if(state.user) setSyncStatus("网络已断开。页面内容可能不是最新；当前不支持离线保存。",false,true); });
+    window.addEventListener("online", () => { if(state.user) refresh().catch(error => setSyncStatus(error.message,false,true)); });
     $$("[data-auth-tab]").forEach((button) => button.addEventListener("click", () => authTab(button.dataset.authTab)));
     $("#theme-toggle").addEventListener("click", toggleTheme);
     $("#logout").addEventListener("click", () => { leaveApp(); notify("已退出登录"); });
@@ -1636,7 +1682,7 @@
       const plannerAction = event.target.closest("[data-planner-action]");
       if (plannerAction) await plannerBlockAction(plannerAction.dataset.plannerAction, plannerAction.dataset.id);
       const removePlannerWindow = event.target.closest("[data-planner-remove-window]");
-      if (removePlannerWindow) removePlannerWindow.closest(".planner-window-row")?.remove();
+      if (removePlannerWindow) { removePlannerWindow.closest(".planner-window-row")?.remove(); markPlannerDraft(); }
       const vocabularyBook = event.target.closest("[data-vocab-book]");
       if (vocabularyBook) await selectVocabularyBook(vocabularyBook.dataset.vocabBook);
       const vocabularyCatalog = event.target.closest("[data-vocab-catalog]");
@@ -1743,9 +1789,11 @@
       renderPlanner();
     });
     $("#planner-add-window").addEventListener("click", () => {
+      markPlannerDraft();
       $("#planner-window-list").insertAdjacentHTML("beforeend", renderPlannerWindowRow());
     });
     $("#planner-reset-preferences").addEventListener("click", () => {
+      markPlannerDraft();
       const windows = [];
       for (let weekday = 1; weekday <= 5; weekday += 1) windows.push({ weekday, start_time: "19:00", end_time: "22:00" });
       for (let weekday = 6; weekday <= 7; weekday += 1) windows.push({ weekday, start_time: "09:00", end_time: "12:00" }, { weekday, start_time: "14:00", end_time: "18:00" });
@@ -1932,6 +1980,8 @@
       event.preventDefault();
       const form = event.currentTarget;
       const button = form.querySelector("button[type=submit]");
+      if (button.disabled) return;
+      const revision = state.plannerDraftRevision;
       button.disabled = true;
       try {
         const windows = $$(".planner-window-row").map((row) => ({
@@ -1945,9 +1995,10 @@
         }) });
         state.plannerWeek = await api("/api/v1/planner/generate", { method: "POST", body: JSON.stringify({ week_start: state.plannerWeekStart }) });
         state.plannerWeekStart = state.plannerWeek.week_start;
-        state.plannerSettingsOpen = false;
+        if (state.plannerDraftRevision === revision) { state.plannerDraftRevision = 0; state.plannerSettingsOpen = false; }
+        updatePlannerDraftStatus();
         renderPlanner();
-        notify("规划偏好已保存，并已按新规则重新排程。");
+        notify(state.plannerDraftRevision ? "已保存提交的设置；你刚输入的新修改仍保留在表单中。" : "规划偏好已保存，并已按新规则重新排程。");
       } catch (error) {
         notify(error.message, "error");
       } finally {
@@ -2156,7 +2207,7 @@
     bindEvents();
     window.setInterval(updateFocusClock, 250);
     window.setInterval(() => {
-      if (state.user) refresh().catch(() => undefined);
+      if (state.user && !document.hidden) refresh().catch(() => undefined);
     }, 60_000);
     renderReadyCountdown();
     if (!state.token) return;

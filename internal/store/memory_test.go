@@ -125,22 +125,53 @@ func TestSnapshotRecoversPreviousValidBackup(t *testing.T) {
 	}
 }
 
-func TestSnapshotQuarantinesCorruptFileWithoutBackup(t *testing.T) {
+func TestSnapshotPreservesCorruptFileWithoutBackup(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "snapshot.json")
 	if err := os.WriteFile(path, make([]byte, 64), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	memory := NewMemory()
 	err := memory.LoadJSON(path)
-	var recovery *SnapshotRecoveryError
-	if !errors.As(err, &recovery) || recovery.RecoveredFromBackup || recovery.QuarantinedPath == "" {
-		t.Fatalf("LoadJSON() recovery = %#v, error = %v", recovery, err)
+	if err == nil {
+		t.Fatal("corrupt snapshot must stop startup")
 	}
-	if _, err := os.Stat(recovery.QuarantinedPath); err != nil {
-		t.Fatalf("quarantined snapshot: %v", err)
+	data, readErr := os.ReadFile(path)
+	if readErr != nil || len(data) != 64 {
+		t.Fatalf("original snapshot not preserved: %v", readErr)
+	}
+	if err := memory.LoadJSON(path); err == nil {
+		t.Fatal("repeated startup must not silently create an empty database")
+	}
+}
+
+func TestSnapshotMissingPrimaryDoesNotIgnoreBackup(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "snapshot.json")
+	if err := NewMemory().SaveJSON(path + ".bak"); err != nil {
+		t.Fatal(err)
+	}
+	if err := NewMemory().LoadJSON(path); err == nil {
+		t.Fatal("existing backup must not be ignored when primary is missing")
 	}
 	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("corrupt primary should have been moved, stat error=%v", err)
+		t.Fatal("must not create an empty primary")
+	}
+}
+
+func TestSnapshotInvalidBackupPreservesBothFiles(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "snapshot.json")
+	for _, name := range []string{path, path + ".bak"} {
+		if err := os.WriteFile(name, []byte("broken"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := NewMemory().LoadJSON(path); err == nil {
+		t.Fatal("both invalid snapshots must fail")
+	}
+	for _, name := range []string{path, path + ".bak"} {
+		data, err := os.ReadFile(name)
+		if err != nil || string(data) != "broken" {
+			t.Fatalf("modified snapshot: %s %v", name, err)
+		}
 	}
 }
 

@@ -1140,8 +1140,7 @@ type snapshot struct {
 }
 
 // SnapshotRecoveryError reports a recoverable snapshot failure. The caller may
-// continue serving because LoadJSON has either restored the previous valid
-// backup or quarantined the corrupt primary file and kept an empty store.
+// continue serving only when LoadJSON has restored the previous valid backup.
 type SnapshotRecoveryError struct {
 	Cause               error
 	QuarantinedPath     string
@@ -1153,7 +1152,7 @@ func (e *SnapshotRecoveryError) Error() string {
 	if e.RecoveredFromBackup {
 		return fmt.Sprintf("invalid data snapshot moved to %q; recovered from %q: %v", e.QuarantinedPath, e.BackupPath, e.Cause)
 	}
-	return fmt.Sprintf("invalid data snapshot moved to %q; no valid backup was available, starting with an empty store: %v", e.QuarantinedPath, e.Cause)
+	return fmt.Sprintf("snapshot recovery failed; startup must stop: %v", e.Cause)
 }
 
 func (e *SnapshotRecoveryError) Unwrap() error { return e.Cause }
@@ -1248,6 +1247,11 @@ func (m *Memory) SaveJSON(path string) error {
 func (m *Memory) LoadJSON(path string) error {
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
+		if _, backupErr := os.Stat(path + ".bak"); backupErr == nil {
+			return fmt.Errorf("primary snapshot is missing but a backup exists at %q; restore the backup before startup", path+".bak")
+		} else if !errors.Is(backupErr, os.ErrNotExist) {
+			return fmt.Errorf("inspect snapshot backup: %w", backupErr)
+		}
 		return nil
 	}
 	if err != nil {
@@ -1267,12 +1271,12 @@ func (m *Memory) LoadJSON(path string) error {
 				recoveryErr = &SnapshotRecoveryError{Cause: primaryErr, BackupPath: backupPath, RecoveredFromBackup: true}
 			}
 		}
+		if recoveryErr == nil {
+			return fmt.Errorf("snapshot is corrupt and no valid backup is available; original file preserved: %w", primaryErr)
+		}
 		quarantinedPath, quarantineErr := quarantineSnapshot(path)
 		if quarantineErr != nil {
 			return fmt.Errorf("quarantine invalid data snapshot: %w", quarantineErr)
-		}
-		if recoveryErr == nil {
-			return &SnapshotRecoveryError{Cause: primaryErr, QuarantinedPath: quarantinedPath}
 		}
 		recoveryErr.QuarantinedPath = quarantinedPath
 	}

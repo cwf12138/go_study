@@ -41,7 +41,7 @@ const window = { setTimeout() {}, clearTimeout() {}, addEventListener() {}, conf
 class HeadersMock { set() {} }
 class BlobMock {}
 const context = { console, Date, Intl, URL, URLSearchParams, Headers: HeadersMock, Blob: BlobMock, localStorage: { getItem() { return ""; } }, document, window };
-const instrumented = script.replace("\n  bindEvents();\n})();", "\n  window.__memoTest = { renderMarkdown, state, markDirty, saveCurrent, selectMemo };\n  bindEvents();\n})();");
+const instrumented = script.replace("\n  bindEvents();\n})();", "\n  window.__memoTest = { renderMarkdown, state, markDirty, saveCurrent, selectMemo, loadMemos };\n  bindEvents();\n})();");
 if (instrumented === script) throw new Error("memo test instrumentation point was not found");
 vm.runInNewContext(instrumented, context, { filename: scriptPath });
 const rendered = context.window.__memoTest.renderMarkdown("# 清单\n- [x] 完成 <script>alert(1)</script>\n- [ ] 继续 **学习**");
@@ -79,5 +79,23 @@ async function checkSaving() {
     throw new Error('failed save allowed switching away from unsaved content');
   }
   console.log('memo save regression passed: concurrent edits persisted; failed save retains editor');
+  api.state.dirty=false;api.state.token='test';context.localStorage.getItem=()=> 'test';
+  const pending=new Map();
+  context.fetch=url=>new Promise(resolve=>pending.set(url,resolve));
+  const first=api.selectMemo('first');const second=api.selectMemo('second');
+  const response=data=>({status:200,ok:true,json:async()=>({data})});
+  pending.get('/api/v1/memos/second')(response({id:'second',content:'latest selection'}));await second;
+  pending.get('/api/v1/memos/first')(response({id:'first',content:'stale selection'}));await first;
+  if(api.state.current.id!=='second')throw new Error('older note response overwrote latest selection');
+  let releaseOld;
+  context.fetch=async url=>{
+    if(url.includes('q=old'))return new Promise(resolve=>{releaseOld=()=>resolve(response([{id:'second',title:'old'}]))});
+    if(url.includes('q=new'))return response([{id:'second',title:'new'}]);
+    return response(url.includes('overview')?{}:[]);
+  };
+  api.state.query='old';const oldLoad=api.loadMemos();
+  api.state.query='new';await api.loadMemos();releaseOld();await oldLoad;
+  if(api.state.notes[0]?.title!=='new')throw new Error('new search was ignored or overwritten by old results');
+  console.log('memo request regression passed: latest note selection and search win');
 }
 checkSaving().catch(error => { console.error(error); process.exitCode = 1; });
