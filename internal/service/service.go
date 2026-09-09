@@ -25,6 +25,9 @@ type Service struct {
 	literatureMu      sync.RWMutex
 	literatureCatalog map[string]literatureCatalogCacheEntry
 	literatureContent map[string]literatureContentCacheEntry
+	// Bounded lock striping serializes a user's literature read-modify-write operations.
+	// Separate from external-content caches; no network calls are made under these locks.
+	literatureWrites [64]sync.Mutex
 }
 
 func New(repo store.Repository, tokens *security.TokenManager, events event.Publisher) *Service {

@@ -17,7 +17,7 @@ const selectors = [...script.matchAll(/\$\("#([^"]+)"\)/g)].map((match) => match
 const missing = [...new Set(selectors.filter((id) => !ids.has(id)))];
 if (missing.length) throw new Error(`memos.js references missing HTML ids: ${missing.join(", ")}`);
 
-for (const marker of ['data-view="memos"', 'id="panel-memos"', 'id="memo-editor"', '/static/memos.js?v=20260904-2', '/static/memos.css?v=20260904-1']) {
+for (const marker of ['data-view="memos"', 'id="panel-memos"', 'id="memo-editor"', '/static/memos.js?v=20260909-1', '/static/memos-refresh.css?v=20260909-1']) {
   if (!html.includes(marker)) throw new Error(`missing HTML marker: ${marker}`);
 }
 for (const marker of ["/api/v1/memo-folders", "/api/v1/memos/overview", "/restore", "/duplicate", "/permanent", "saveCurrent", "renderMarkdown"]) {
@@ -41,7 +41,7 @@ const window = { setTimeout() {}, clearTimeout() {}, addEventListener() {}, conf
 class HeadersMock { set() {} }
 class BlobMock {}
 const context = { console, Date, Intl, URL, URLSearchParams, Headers: HeadersMock, Blob: BlobMock, localStorage: { getItem() { return ""; } }, document, window };
-const instrumented = script.replace("\n  bindEvents();\n})();", "\n  window.__memoTest = { renderMarkdown };\n  bindEvents();\n})();");
+const instrumented = script.replace("\n  bindEvents();\n})();", "\n  window.__memoTest = { renderMarkdown, state, markDirty, saveCurrent, selectMemo };\n  bindEvents();\n})();");
 if (instrumented === script) throw new Error("memo test instrumentation point was not found");
 vm.runInNewContext(instrumented, context, { filename: scriptPath });
 const rendered = context.window.__memoTest.renderMarkdown("# 清单\n- [x] 完成 <script>alert(1)</script>\n- [ ] 继续 **学习**");
@@ -49,3 +49,35 @@ if (!rendered.includes("&lt;script&gt;") || rendered.includes("<script>") || !re
   throw new Error(`unsafe or incomplete memo rendering: ${rendered}`);
 }
 console.log(`memo UI smoke passed: ${selectors.length} selectors, ${ids.size} document ids`);
+
+async function checkSaving() {
+  const api = context.window.__memoTest;
+  api.state.current = { id: 'test-note', title: 'test' };
+  getElement('#memo-title').value = 'test';
+  getElement('#memo-content').value = 'first edit';
+  api.markDirty();
+  let release;
+  const writes = [];
+  context.fetch = async (url, options = {}) => {
+    if (options.method === 'PATCH') {
+      const payload = JSON.parse(options.body); writes.push(payload);
+      if (writes.length === 1) await new Promise(resolve => { release = resolve; });
+      return { status:200, ok:true, json:async () => ({ data:{ id:'test-note', ...payload } }) };
+    }
+    return { status:200, ok:true, json:async () => ({ data:url.includes('overview') ? {} : [] }) };
+  };
+  const saving = api.saveCurrent({ quiet:true });
+  getElement('#memo-content').value = 'second edit while saving'; api.markDirty();
+  release();
+  if (!(await saving) || writes.length !== 2 || writes[1].content !== 'second edit while saving' || api.state.dirty) {
+    throw new Error('edits made during save were lost or not saved');
+  }
+  context.fetch = async () => { throw new Error('offline'); };
+  getElement('#memo-content').value = 'unsaved offline edit'; api.markDirty();
+  await api.selectMemo('another-note');
+  if (api.state.current.id !== 'test-note' || !api.state.dirty || getElement('#memo-content').value !== 'unsaved offline edit') {
+    throw new Error('failed save allowed switching away from unsaved content');
+  }
+  console.log('memo save regression passed: concurrent edits persisted; failed save retains editor');
+}
+checkSaving().catch(error => { console.error(error); process.exitCode = 1; });

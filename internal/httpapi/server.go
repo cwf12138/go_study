@@ -128,6 +128,7 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 	private.HandleFunc("POST /api/v1/literature/shelf/{reading_id}/bookmarks", s.addEBookBookmark)
 	private.HandleFunc("DELETE /api/v1/literature/shelf/{reading_id}/bookmarks/{bookmark_id}", s.deleteEBookBookmark)
 	private.HandleFunc("POST /api/v1/literature/shelf/{reading_id}/notes", s.addEBookNote)
+	private.HandleFunc("PATCH /api/v1/literature/shelf/{reading_id}/notes/{note_id}", s.updateEBookNote)
 	private.HandleFunc("DELETE /api/v1/literature/shelf/{reading_id}/notes/{note_id}", s.deleteEBookNote)
 	private.HandleFunc("DELETE /api/v1/literature/shelf/{reading_id}", s.deleteEBookFromShelf)
 	private.HandleFunc("GET /api/v1/literature/classics", s.listClassicalWorks)

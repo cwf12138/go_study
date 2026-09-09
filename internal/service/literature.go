@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"net/http"
 	"net/url"
@@ -17,6 +18,14 @@ import (
 	"github.com/example/studyflow/internal/domain"
 	"github.com/example/studyflow/internal/platform"
 )
+
+func (s *Service) lockLiteratureUser(userID string) func() {
+	hash := fnv.New32a()
+	_, _ = hash.Write([]byte(userID))
+	lock := &s.literatureWrites[hash.Sum32()%uint32(len(s.literatureWrites))]
+	lock.Lock()
+	return lock.Unlock
+}
 
 type literatureCatalogCacheEntry struct {
 	catalog   domain.EBookCatalog
@@ -180,6 +189,7 @@ func allowedEBookContentURL(value string) bool {
 }
 
 func (s *Service) AddEBook(ctx context.Context, userID string, book domain.EBookCatalogItem) (domain.EBookReading, error) {
+	defer s.lockLiteratureUser(userID)()
 	book, err := validateEBook(book)
 	if err != nil {
 		return domain.EBookReading{}, err
@@ -249,6 +259,7 @@ func (s *Service) EBookReading(ctx context.Context, userID, id string) (domain.E
 	return reading, nil
 }
 func (s *Service) DeleteEBookReading(ctx context.Context, userID, id string) error {
+	defer s.lockLiteratureUser(userID)()
 	reading, err := s.EBookReading(ctx, userID, id)
 	if err != nil {
 		return err
@@ -384,6 +395,7 @@ type UpdateEBookProgressInput struct {
 }
 
 func (s *Service) UpdateEBookProgress(ctx context.Context, userID, id string, input UpdateEBookProgressInput) (domain.EBookReading, error) {
+	defer s.lockLiteratureUser(userID)()
 	reading, err := s.EBookReading(ctx, userID, id)
 	if err != nil {
 		return domain.EBookReading{}, err
@@ -426,12 +438,19 @@ func (s *Service) UpdateEBookProgress(ctx context.Context, userID, id string, in
 }
 
 func (s *Service) AddEBookBookmark(ctx context.Context, userID, id string, pageIndex int, label, excerpt string) (domain.EBookReading, error) {
+	defer s.lockLiteratureUser(userID)()
 	reading, err := s.EBookReading(ctx, userID, id)
 	if err != nil {
 		return domain.EBookReading{}, err
 	}
 	if pageIndex < 0 {
 		return domain.EBookReading{}, fmt.Errorf("%w: invalid page index", domain.ErrInvalidInput)
+	}
+	// A page is bookmarked once, including after a double click or a retry.
+	for _, bookmark := range reading.Bookmarks {
+		if bookmark.PageIndex == pageIndex {
+			return reading, nil
+		}
 	}
 	label = cleanEnglishText(label, 120)
 	excerpt = cleanEnglishText(excerpt, 300)
@@ -444,6 +463,7 @@ func (s *Service) AddEBookBookmark(ctx context.Context, userID, id string, pageI
 	return reading, nil
 }
 func (s *Service) DeleteEBookBookmark(ctx context.Context, userID, id, bookmarkID string) (domain.EBookReading, error) {
+	defer s.lockLiteratureUser(userID)()
 	reading, err := s.EBookReading(ctx, userID, id)
 	if err != nil {
 		return domain.EBookReading{}, err
@@ -469,6 +489,7 @@ func (s *Service) DeleteEBookBookmark(ctx context.Context, userID, id, bookmarkI
 }
 
 func (s *Service) AddEBookNote(ctx context.Context, userID, id string, pageIndex int, content string) (domain.EBookReading, error) {
+	defer s.lockLiteratureUser(userID)()
 	reading, err := s.EBookReading(ctx, userID, id)
 	if err != nil {
 		return domain.EBookReading{}, err
@@ -486,6 +507,7 @@ func (s *Service) AddEBookNote(ctx context.Context, userID, id string, pageIndex
 	return reading, nil
 }
 func (s *Service) DeleteEBookNote(ctx context.Context, userID, id, noteID string) (domain.EBookReading, error) {
+	defer s.lockLiteratureUser(userID)()
 	reading, err := s.EBookReading(ctx, userID, id)
 	if err != nil {
 		return domain.EBookReading{}, err

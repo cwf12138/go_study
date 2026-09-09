@@ -113,6 +113,22 @@ func (s *Server) deleteEBookNote(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, envelope{"data": reading})
 }
+
+func (s *Server) updateEBookNote(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Content string `json:"content"`
+	}
+	if err := decodeJSON(w, r, &body); err != nil {
+		writeError(w, invalidJSON(err))
+		return
+	}
+	reading, err := s.service.UpdateEBookNote(r.Context(), claimsFromContext(r.Context()).Subject, r.PathValue("reading_id"), r.PathValue("note_id"), body.Content)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{"data": reading})
+}
 func (s *Server) deleteEBookFromShelf(w http.ResponseWriter, r *http.Request) {
 	if err := s.service.DeleteEBookReading(r.Context(), claimsFromContext(r.Context()).Subject, r.PathValue("reading_id")); err != nil {
 		writeError(w, err)

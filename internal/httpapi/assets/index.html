@@ -14,8 +14,10 @@
     <link rel="stylesheet" href="/static/calendar.css?v=20260901-6">
     <link rel="stylesheet" href="/static/knowledge.css?v=20260901-6">
     <link rel="stylesheet" href="/static/memos.css?v=20260904-1">
+    <link rel="stylesheet" href="/static/memos-refresh.css?v=20260909-1">
     <link rel="stylesheet" href="/static/english.css?v=20260901-7">
     <link rel="stylesheet" href="/static/literature.css?v=20260902-1">
+    <link rel="stylesheet" href="/static/literature-product.css?v=20260909-1">
   </head>
   <body>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -173,6 +175,10 @@
             <div class="memo-heading">
               <div><p class="eyebrow">PERSONAL NOTES</p><h3>备忘录</h3><p>快速记录此刻，也把重要内容整理成随时找得到的个人资料。</p></div>
               <div class="memo-heading-actions"><label class="memo-search"><span>⌕</span><input id="memo-search" type="search" placeholder="搜索备忘录、正文或标签" autocomplete="off"></label><button id="memo-new" class="primary" type="button">＋ 新建备忘录</button></div>
+            </div>
+            <div class="memo-utility-bar">
+              <span>记录 · 整理 · 沉淀</span>
+              <div><select id="memo-template" aria-label="从模板新建备忘录"><option value="">从模板新建…</option><option value="study">学习笔记</option><option value="meeting">讨论记录</option><option value="daily">每日回顾</option></select><button id="memo-save" class="quiet" type="button" title="立即保存（Ctrl / ⌘ + S）">保存</button><button id="memo-focus" class="quiet" type="button" aria-pressed="false">专心写作</button></div>
             </div>
             <div class="memo-workspace">
               <aside class="memo-sidebar">
@@ -384,6 +390,8 @@
             <div class="literature-intro"><div><p class="eyebrow">LITERATURE STUDIO</p><h3>在经典里，慢慢建立自己的精神书架</h3><p>世界名著按需导入阅读，古诗文逐段理解；进度、书签、笔记与诵读记录都留在同一条学习轨迹中。</p></div><div class="literature-mode-tabs"><button class="active" type="button" data-literature-mode="books">世界名著</button><button type="button" data-literature-mode="classics">古诗文研习</button></div></div>
             <div class="literature-stats"><article><span>藏</span><div><small>我的书架</small><strong id="lit-books-count">0</strong></div></article><article><span>✓</span><div><small>已读完</small><strong id="lit-completed-count">0</strong></div></article><article><span>时</span><div><small>阅读时长</small><strong id="lit-minutes-count">0 分</strong></div></article><article><span>文</span><div><small>古诗文已学</small><strong id="lit-classics-count">0</strong></div></article></div>
             <section id="literature-books-view" class="literature-view">
+              <article id="reading-resume" class="reading-resume"><div><p class="eyebrow">YOUR QUIET CORNER</p><h3>让阅读成为日常</h3><p>正在整理你的书架…</p></div></article>
+              <div class="library-controls"><label>书架搜索<input id="shelf-query" type="search" placeholder="书名或作者"></label><label>阅读状态<select id="shelf-status"><option value="">全部</option><option value="reading">阅读中</option><option value="completed">已读完</option></select></label><button class="quiet" type="button" data-literature-retry>重新同步</button><span id="literature-health" role="status">等待同步</span></div>
               <article class="surface literature-search-hero"><div><p class="eyebrow">PUBLIC-DOMAIN LIBRARY</p><h2>下一本想读什么？</h2><p>输入中文或英文书名、作者，从公共领域目录检索并导入纯文本版本。</p></div><form id="ebook-search-form"><span>⌕</span><input id="ebook-search" type="search" maxlength="120" placeholder="傲慢与偏见 / Pride and Prejudice / Jane Austen"><button class="primary" type="submit">搜索名著</button></form><div class="literature-source-note"><span id="ebook-provider">精选书目</span><span>来自 Gutendex / Project Gutenberg 元数据</span><a href="https://www.gutenberg.org/policy/license" target="_blank" rel="noreferrer">版权说明 ↗</a></div></article>
               <div class="literature-books-layout"><main><div class="literature-section-head"><div><p class="eyebrow">DISCOVER</p><h3 id="ebook-catalog-title">精选世界名著</h3></div><button id="ebook-reset-search" class="text-button" type="button">查看精选</button></div><div id="ebook-catalog" class="ebook-catalog"><div class="literature-loading">正在整理经典书目…</div></div></main><aside class="surface literature-shelf"><div class="literature-section-head"><div><p class="eyebrow">MY SHELF</p><h3>我的书架</h3></div><span id="ebook-shelf-meta" class="pill">0 本</span></div><div id="ebook-shelf" class="ebook-shelf-list"><div class="literature-empty">还没有导入书籍。</div></div></aside></div>
             </section>
@@ -415,10 +423,15 @@
         </div>
       </section>
     </div>
+    <dialog id="reading-note-edit-dialog" class="reading-note-edit-dialog" aria-labelledby="reading-note-edit-title">
+      <form id="reading-note-edit-form"><p class="eyebrow">READING NOTES</p><h2 id="reading-note-edit-title">编辑阅读笔记</h2><label for="reading-note-edit-content">笔记内容</label><textarea id="reading-note-edit-content" rows="9" maxlength="3000" required></textarea><p id="reading-note-edit-status" role="status" aria-live="polite"></p><footer><button id="reading-note-edit-cancel" class="quiet" type="button">取消</button><button id="reading-note-edit-save" class="primary" type="submit">保存修改</button></footer></form>
+    </dialog>
     <dialog id="ebook-reader-dialog" class="ebook-reader-dialog">
       <div class="ebook-reader-shell">
         <header><div><p id="ebook-reader-author" class="eyebrow">EBOOK READER</p><h2 id="ebook-reader-title"></h2></div><div class="ebook-reader-head-actions"><span id="ebook-reader-page">0 / 0</span><button id="ebook-reader-tools-toggle" class="quiet" type="button">工具</button><button id="ebook-reader-close" class="icon-button" type="button" aria-label="关闭阅读器">×</button></div><div class="ebook-reader-progress"><i id="ebook-reader-progress-bar"></i></div></header>
         <div class="ebook-reader-body">
+          <details class="reader-search-box"><summary>全文查找与笔记导出</summary><form id="reader-search-form"><input id="reader-text-query" type="search" minlength="2" maxlength="100" placeholder="输入原文中的词句" aria-label="全文搜索词" required><button class="quiet" type="submit">查找</button><button id="reader-export" class="quiet" type="button">导出笔记</button><button id="reader-stop-speech" class="quiet" type="button">停止朗读</button></form><div id="reader-search-results" aria-live="polite"></div></details>
+          <div class="reader-product-tools"><form id="reader-jump-form"><label for="reader-page-number">页码</label><input id="reader-page-number" type="number" min="1" value="1" required><button class="quiet" type="submit">跳转</button></form><button id="reader-nav-toggle" class="quiet" type="button" aria-expanded="false">目录</button><button id="reader-focus" class="quiet" type="button" aria-pressed="false">沉浸阅读</button><button id="reader-retry" class="quiet" type="button">重试下载</button><button id="reader-save" class="quiet" type="button">重试保存</button><span id="reader-save-status" role="status">尚未打开书籍</span></div>
           <aside class="ebook-reader-nav"><div><p class="eyebrow">CONTENTS</p><h3>阅读导航</h3></div><label>章节<select id="ebook-chapter-select"></select></label><div id="ebook-chapter-list" class="ebook-chapter-list"></div><a id="ebook-source-link" target="_blank" rel="noreferrer">原书与许可 ↗</a></aside>
           <main id="ebook-page-stage" class="ebook-page-stage" data-reader-theme="paper"><article><p id="ebook-page-chapter" class="ebook-page-chapter"></p><div id="ebook-page-content" class="ebook-page-content"></div></article><footer><button id="ebook-page-prev" class="quiet" type="button">← 上一页</button><span id="ebook-page-footer">第 1 页</span><button id="ebook-page-next" class="primary" type="button">下一页 →</button></footer></main>
           <aside class="ebook-reader-tools"><div class="ebook-tool-tabs"><button class="active" type="button" data-ebook-tool="settings">样式</button><button type="button" data-ebook-tool="bookmarks">书签</button><button type="button" data-ebook-tool="notes">笔记</button></div><section id="ebook-tool-settings" class="ebook-tool-panel"><label>字号 <output id="ebook-font-output">19px</output><input id="ebook-font-size" type="range" min="15" max="28" value="19"></label><label>行距 <output id="ebook-line-output">1.85</output><input id="ebook-line-height" type="range" min="150" max="230" value="185"></label><div><span>阅读主题</span><div class="ebook-theme-options"><button class="active" type="button" data-ebook-theme="paper">纸白</button><button type="button" data-ebook-theme="sepia">护眼</button><button type="button" data-ebook-theme="night">深夜</button></div></div><button id="ebook-speak-page" class="quiet full" type="button">🔊 朗读本页</button><button id="ebook-finish-reading" class="quiet full" type="button">✓ 标记全书读完</button><p id="ebook-license-notice" class="ebook-license-notice"></p></section><section id="ebook-tool-bookmarks" class="ebook-tool-panel hidden"><button id="ebook-add-bookmark" class="primary full" type="button">＋ 收藏当前页</button><div id="ebook-bookmarks" class="ebook-tool-list"></div></section><section id="ebook-tool-notes" class="ebook-tool-panel hidden"><textarea id="ebook-note-input" rows="5" maxlength="3000" placeholder="写下这一页的想法、疑问或摘记…"></textarea><button id="ebook-add-note" class="primary full" type="button">保存本页笔记</button><div id="ebook-notes" class="ebook-tool-list"></div></section></aside>
@@ -458,8 +471,8 @@
     <script src="/static/weather.js?v=20260909-1" defer></script>
     <script src="/static/calendar.js?v=20260901-6" defer></script>
     <script src="/static/knowledge.js?v=20260904-1" defer></script>
-    <script src="/static/memos.js?v=20260904-2" defer></script>
+    <script src="/static/memos.js?v=20260909-1" defer></script>
     <script src="/static/english.js?v=20260901-7" defer></script>
-    <script src="/static/literature.js?v=20260902-1" defer></script>
+    <script src="/static/literature.js?v=20260909-1" defer></script>
   </body>
 </html>

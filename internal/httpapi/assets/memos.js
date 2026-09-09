@@ -5,7 +5,7 @@
     folders: [], notes: [], allNotes: [], overview: {}, current: null,
     view: "all", folderID: "", tag: "", query: "", sort: "updated_at:desc",
     initialized: false, loading: false, dirty: false, saving: false, preview: false,
-    searchTimer: null, saveTimer: null, token: "", folderColor: "blue",
+    searchTimer: null, saveTimer: null, token: "", folderColor: "blue", revision: 0, savePromise: null,
   };
 
   const $ = (selector) => document.querySelector(selector);
@@ -58,6 +58,7 @@
 
   async function loadMemos({ preserveSelection = true } = {}) {
     if (!syncAccount() || state.loading) return;
+    if (state.dirty && !(await saveCurrent({ quiet: true }))) return;
     state.loading = true;
     const previousID = preserveSelection ? state.current?.id : "";
     try {
@@ -125,7 +126,7 @@
   }
 
   async function selectMemo(id, { skipSave = false } = {}) {
-    if (!skipSave && state.dirty) await saveCurrent({ quiet: true });
+    if (!skipSave && state.dirty && !(await saveCurrent({ quiet: true }))) return;
     try {
       state.current = await memoAPI(`/api/v1/memos/${id}`);
       state.dirty = false; state.preview = false;
@@ -157,11 +158,11 @@
     $(".memo-workspace").classList.remove("show-editor"); renderNoteList();
   }
 
-  async function createMemo() {
-    if (state.dirty) await saveCurrent({ quiet: true });
+  async function createMemo(template = {}) {
+    if (state.dirty && !(await saveCurrent({ quiet: true }))) return;
     try {
-      const note = await memoAPI("/api/v1/memos", { method: "POST", body: JSON.stringify({ folder_id: state.folderID || "", title: "新备忘录", content: "", color: "default", tags: [] }) });
-      state.view = "all"; state.tag = "";
+      const note = await memoAPI("/api/v1/memos", { method: "POST", body: JSON.stringify({ folder_id: state.folderID || "", title: template.title || "新备忘录", content: template.content || "", color: "default", tags: [] }) });
+      state.view = "all"; state.tag = ""; state.query = ""; $("#memo-search").value = "";
       await loadMemos({ preserveSelection: false }); await selectMemo(note.id, { skipSave: true });
       $("#memo-title").select();
     } catch (error) { notify(error.message, "error"); }
@@ -169,24 +170,40 @@
 
   function markDirty() {
     if (!state.current || state.current.deleted_at) return;
-    state.dirty = true; updateEditorMeta(); setSaveState("saving", "等待自动保存…");
+    state.revision++; state.dirty = true; updateEditorMeta(); setSaveState("saving", "等待自动保存…");
     window.clearTimeout(state.saveTimer); state.saveTimer = window.setTimeout(() => saveCurrent({ quiet: true }), 700);
   }
 
   async function saveCurrent({ quiet = false } = {}) {
-    if (!state.current || !state.dirty || state.saving || state.current.deleted_at) return;
+    if (state.savePromise) {
+      if (!(await state.savePromise)) return false;
+      return saveCurrent({ quiet });
+    }
+    if (!state.current || !state.dirty || state.current.deleted_at) return true;
     state.saving = true; window.clearTimeout(state.saveTimer); setSaveState("saving", "正在保存…");
+    const id = state.current.id, revision = state.revision, token = state.token;
     const payload = {
       title: $("#memo-title").value, content: $("#memo-content").value,
       folder_id: $("#memo-folder-select").value, tags: splitTags($("#memo-tags").value), color: state.current.color || "default",
     };
-    try {
-      const updated = await memoAPI(`/api/v1/memos/${state.current.id}`, { method: "PATCH", body: JSON.stringify(payload) });
-      state.current = updated; state.dirty = false; setSaveState("saved");
-      await refreshLists();
-      if (!quiet) notify("备忘录已保存。");
-    } catch (error) { setSaveState("error", "保存失败"); if (!quiet) notify(error.message, "error"); }
-    finally { state.saving = false; }
+    state.savePromise = (async () => {
+      try {
+        const updated = await memoAPI(`/api/v1/memos/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+        if (state.token !== token || state.current?.id !== id) return false;
+        if (state.revision === revision) { state.current = updated; state.dirty = false; setSaveState("saved"); }
+        else setSaveState("saving", "仍有新修改待保存…");
+        // A failed list refresh must not misreport a successful save as a failed write.
+        try { await refreshLists(); } catch (_) { /* Retry when reopening the list. */ }
+        if (!quiet && !state.dirty) notify("备忘录已保存。");
+        return true;
+      } catch (error) {
+        setSaveState("error", "保存失败 · 点击保存重试"); notify(error.message, "error"); return false;
+      }
+    })();
+    const saved = await state.savePromise;
+    state.savePromise = null; state.saving = false;
+    if (saved && state.dirty && state.token === token) return saveCurrent({ quiet });
+    return saved;
   }
 
   async function refreshLists() {
@@ -245,7 +262,7 @@
 
   async function patchAction(payload, successMessage) {
     if (!state.current) return;
-    if (state.dirty) await saveCurrent({ quiet: true });
+    if (state.dirty && !(await saveCurrent({ quiet: true }))) return;
     try {
       state.current = await memoAPI(`/api/v1/memos/${state.current.id}`, { method: "PATCH", body: JSON.stringify(payload) });
       renderEditor(); await refreshLists(); if (successMessage) notify(successMessage);
@@ -254,6 +271,7 @@
 
   async function trashCurrent() {
     if (!state.current || !window.confirm(`将“${state.current.title}”移到最近删除？`)) return;
+    if (state.dirty && !(await saveCurrent({ quiet: true }))) return;
     try { await memoAPI(`/api/v1/memos/${state.current.id}`, { method: "DELETE" }); state.current = null; await loadMemos({ preserveSelection: false }); notify("已移到最近删除，可随时恢复。"); }
     catch (error) { notify(error.message, "error"); }
   }
@@ -272,6 +290,7 @@
 
   async function duplicateCurrent() {
     if (!state.current) return;
+    if (state.dirty && !(await saveCurrent({ quiet: true }))) return;
     try { const copy = await memoAPI(`/api/v1/memos/${state.current.id}/duplicate`, { method: "POST" }); await loadMemos({ preserveSelection: false }); await selectMemo(copy.id, { skipSave: true }); notify("已创建备忘录副本。"); }
     catch (error) { notify(error.message, "error"); }
   }
@@ -305,9 +324,9 @@
     } catch (error) { notify(error.message, "error"); }
   }
 
-  function selectView(view) { state.view = view; state.folderID = ""; state.tag = ""; loadMemos({ preserveSelection: false }); }
+  function selectView(view) { state.view = view; state.folderID = ""; state.tag = ""; $(".memo-workspace").classList.remove("show-folders"); loadMemos({ preserveSelection: false }); }
   function selectFolder(id) { state.folderID = id; state.view = "all"; state.tag = ""; $(".memo-workspace").classList.remove("show-folders"); loadMemos({ preserveSelection: false }); }
-  function selectTag(tag) { state.tag = state.tag === tag ? "" : tag; state.folderID = ""; state.view = "all"; loadMemos({ preserveSelection: false }); }
+  function selectTag(tag) { state.tag = state.tag === tag ? "" : tag; state.folderID = ""; state.view = "all"; $(".memo-workspace").classList.remove("show-folders"); loadMemos({ preserveSelection: false }); }
 
   function splitTags(value) { return [...new Set(String(value || "").split(/[,，]/).map((tag) => tag.trim().toLowerCase()).filter(Boolean))]; }
   function relativeDate(value) { const date = new Date(value), diff = Date.now() - date.getTime(); if (!Number.isFinite(diff)) return ""; if (diff < 60_000) return "刚刚"; if (diff < 3_600_000) return `${Math.max(1, Math.floor(diff / 60_000))} 分钟前`; if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`; return new Intl.DateTimeFormat("zh-CN", { month: "short", day: "numeric" }).format(date); }
@@ -315,6 +334,21 @@
   function folderColorValue(color) { return { yellow: "#e8b846", orange: "#e7924c", rose: "#de758c", violet: "#8d78d4", blue: "#6595df", mint: "#54b991", gray: "#929cab" }[color] || "#6595df"; }
 
   function bindEvents() {
+    $("#memo-save").addEventListener("click", () => saveCurrent());
+    $("#memo-focus").addEventListener("click", () => {
+      const focused = $(".memo-workspace").classList.toggle("memo-focused");
+      $("#memo-focus").textContent = focused ? "退出专心写作" : "专心写作";
+      $("#memo-focus").setAttribute("aria-pressed", String(focused));
+    });
+    $("#memo-template").addEventListener("change", async event => {
+      const templates = {
+        study: { title: "学习笔记", content: "## 学习主题\n\n## 核心概念\n- \n\n## 我的理解\n\n## 待解决的问题\n- [ ] \n\n## 下一步实践\n- [ ] " },
+        meeting: { title: "讨论记录", content: "## 讨论主题\n\n## 参与者与时间\n\n## 关键结论\n- \n\n## 后续行动\n- [ ] 负责人 / 事项 / 截止时间" },
+        daily: { title: `每日回顾 ${new Date().toLocaleDateString("zh-CN")}`, content: "## 今天完成了什么\n- [ ] \n\n## 值得记住的收获\n\n## 遇到的困难\n\n## 明天的一小步\n- [ ] " },
+      };
+      const template = templates[event.target.value]; event.target.value = "";
+      if (template) await createMemo(template);
+    });
     document.querySelector('[data-view="memos"]')?.addEventListener("click", () => loadMemos());
     $("#memo-new").addEventListener("click", createMemo); $("#memo-folder-add").addEventListener("click", () => { $("#memo-folder-dialog").showModal(); $("#memo-folder-name").focus(); });
     $("#memo-folder-cancel").addEventListener("click", () => $("#memo-folder-dialog").close()); $("#memo-folder-form").addEventListener("submit", createFolder);
@@ -351,7 +385,7 @@
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "n") { event.preventDefault(); createMemo(); }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); saveCurrent(); }
     });
-    window.addEventListener("beforeunload", () => { if (state.dirty) saveCurrent({ quiet: true }); });
+    window.addEventListener("beforeunload", (event) => { if (state.dirty || state.saving) { event.preventDefault(); event.returnValue = ""; } });
   }
 
   bindEvents();

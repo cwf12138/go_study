@@ -56,6 +56,7 @@ type UpdateClassicalStudyInput struct {
 }
 
 func (s *Service) UpdateClassicalStudy(ctx context.Context, userID, workID string, input UpdateClassicalStudyInput) (domain.ClassicalStudy, error) {
+	defer s.lockLiteratureUser(userID)()
 	if _, err := s.ClassicalWork(workID); err != nil {
 		return domain.ClassicalStudy{}, err
 	}

@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -48,6 +49,31 @@ func TestLiteratureAPIWorkflow(t *testing.T) {
 	bookmark := performJSON(t, handler, http.MethodPost, "/api/v1/literature/shelf/"+saved.Data.ID+"/bookmarks", auth.Data.Token, map[string]any{"page_index": 2, "label": "Chapter I", "excerpt": "It is a truth..."})
 	if bookmark.Code != http.StatusCreated {
 		t.Fatalf("bookmark status=%d body=%s", bookmark.Code, bookmark.Body.String())
+	}
+	notePath := "/api/v1/literature/shelf/" + saved.Data.ID + "/notes"
+	note := performJSON(t, handler, http.MethodPost, notePath, auth.Data.Token, map[string]any{"page_index": 2, "content": "First thought"})
+	var noteResponse struct {
+		Data struct {
+			Notes []struct {
+				ID string `json:"id"`
+			} `json:"notes"`
+		} `json:"data"`
+	}
+	if note.Code != http.StatusCreated || json.Unmarshal(note.Body.Bytes(), &noteResponse) != nil || len(noteResponse.Data.Notes) != 1 {
+		t.Fatalf("create note: %d %s", note.Code, note.Body.String())
+	}
+	editPath := notePath + "/" + noteResponse.Data.Notes[0].ID
+	edited := performJSON(t, handler, http.MethodPatch, editPath, auth.Data.Token, map[string]any{"content": "Revised thought"})
+	if edited.Code != http.StatusOK || !strings.Contains(edited.Body.String(), "Revised thought") {
+		t.Fatalf("edit note: %d %s", edited.Code, edited.Body.String())
+	}
+	invalid := performJSON(t, handler, http.MethodPatch, editPath, auth.Data.Token, map[string]any{"content": " "})
+	if invalid.Code != http.StatusBadRequest {
+		t.Fatalf("empty note: %d", invalid.Code)
+	}
+	unauthorized := performJSON(t, handler, http.MethodPatch, editPath, "", map[string]any{"content": "No token"})
+	if unauthorized.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthorized note: %d", unauthorized.Code)
 	}
 	classics := performJSON(t, handler, http.MethodGet, "/api/v1/literature/classics?q=静夜思", auth.Data.Token, nil)
 	if classics.Code != http.StatusOK {

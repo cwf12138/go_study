@@ -1802,6 +1802,40 @@ paths:
       responses:
         "201": { description: Note added }
   /api/v1/literature/shelf/{reading_id}/notes/{note_id}:
+    patch:
+      tags: [Literature]
+      summary: 编辑阅读笔记，保留原页码与创建时间
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: reading_id
+          required: true
+          schema: { type: string }
+        - in: path
+          name: note_id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              additionalProperties: false
+              properties:
+                content: { type: string, minLength: 1, maxLength: 3000 }
+      responses:
+        "200":
+          description: 更新后的阅读记录（data 为 EBookReading）
+        "400":
+          description: 内容为空或超过长度限制
+        "401":
+          description: 未登录
+        "403":
+          description: 无权操作其他用户的书籍
+        "404":
+          description: 书籍或笔记不存在
     delete:
       tags: [Literature]
       security: [{ bearerAuth: [] }]
