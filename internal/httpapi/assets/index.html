@@ -6,6 +6,7 @@
     <meta name="description" content="StudyFlow 学习成长与专注管理控制台">
     <title>StudyFlow · 学习控制台</title>
     <link rel="stylesheet" href="/static/styles.css?v=20260901-6">
+    <link rel="stylesheet" href="/static/timeline.css?v=20260910-1">
     <link rel="stylesheet" href="/static/sync-status.css?v=20260909-1">
     <link rel="stylesheet" href="/static/weather.css?v=20260909-1">
     <link rel="stylesheet" href="/static/insights.css?v=20260901-6">
@@ -59,6 +60,7 @@
         <a class="brand" href="#dashboard" aria-label="StudyFlow 首页"><span class="brand-mark">S</span><span>StudyFlow</span></a>
         <nav class="nav" aria-label="主导航">
           <button class="nav-link active" type="button" data-view="dashboard"><span>◫</span>概览</button>
+          <button class="nav-link" type="button" data-view="timeline"><span>↟</span>成长足迹</button>
           <button class="nav-link" type="button" data-view="goals"><span>◎</span>学习目标</button>
           <button class="nav-link" type="button" data-view="moods"><span>☺</span>心情日记</button>
           <button class="nav-link" type="button" data-view="calendar"><span>▦</span>智能日历</button>
@@ -96,6 +98,15 @@
             <div class="dashboard-main" style="margin-top:20px">
               <article class="surface"><div class="surface-head"><div><p class="eyebrow">TASKS</p><h3>下一步行动</h3></div><button class="text-button" type="button" data-goto="tasks">管理任务</button></div><div id="dashboard-tasks" class="stack-list empty-state">还没有任务。创建一个小而明确的下一步吧。</div></article>
             </div>
+          </section>
+
+          <section id="panel-timeline" class="panel">
+            <header class="trail-hero"><div><p class="eyebrow">YOUR LEARNING STORY</p><h3>每一步，都值得被看见</h3><p>回望完成的小事，发现持续积累的力量。</p></div><span aria-hidden="true">↟</span></header>
+            <form id="trail-filter" class="trail-controls"><label>月份<input id="trail-month" type="month" required></label><label>记录类型<select id="trail-kind"><option value="">全部足迹</option><option value="task">完成任务</option><option value="todo">完成待办</option><option value="focus">专注完成</option><option value="book">读完书籍</option><option value="memo">新建备忘录</option></select></label><button class="primary" type="submit">查看足迹</button><button id="trail-today" class="quiet" type="button">回到本月</button></form>
+            <div class="trail-stats"><article><span>筛选内的记录</span><strong id="trail-total">—</strong></article><article><span>有记录的天数</span><strong id="trail-days">—</strong></article><article><span>已完成专注 / 分钟</span><strong id="trail-minutes">—</strong></article></div>
+            <p id="trail-status" role="status" aria-live="polite"></p><div id="trail-list" class="trail-list"></div>
+            <nav class="trail-pagination" aria-label="成长足迹分页"><button id="trail-prev" class="quiet" type="button" disabled>上一页</button><span id="trail-page">第 1 页</span><button id="trail-next" class="quiet" type="button" disabled>下一页</button></nav>
+            <p class="trail-note">根据现存记录生成，并非永久操作日志。删除记录或撤销完成后，相应足迹也会变化。使用当前设备的 UTC 偏移归属日期，统计随月份与类型筛选变化。</p>
           </section>
 
           <section id="panel-goals" class="panel">
@@ -470,6 +481,7 @@
       </div>
     </dialog>
     <script src="/static/app.js?v=20260904-1" defer></script>
+    <script src="/static/timeline.js?v=20260910-1" defer></script>
     <script src="/static/weather.js?v=20260909-1" defer></script>
     <script src="/static/calendar.js?v=20260901-6" defer></script>
     <script src="/static/knowledge.js?v=20260904-1" defer></script>

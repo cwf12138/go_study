@@ -285,6 +285,7 @@
   function showView(view) {
     const labels = {
       dashboard: ["今天也在前进", "学习概览"],
+      timeline: ["LEARNING TIMELINE", "成长足迹"],
       goals: ["GOALS", "学习目标"],
       moods: ["MOOD JOURNAL", "心情日记"],
       calendar: ["SMART CALENDAR", "智能日历"],

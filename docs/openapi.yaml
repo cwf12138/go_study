@@ -22,6 +22,32 @@ tags:
   - name: Literature
   - name: Exports
 paths:
+  /api/v1/timeline:
+    get:
+      summary: 按月汇总现有学习记录的成长足迹
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: month
+          required: true
+          schema: { type: string, pattern: '^\d{4}-\d{2}$' }
+        - in: query
+          name: kind
+          schema: { type: string, enum: ['', task, todo, focus, book, memo] }
+        - in: query
+          name: offset
+          description: UTC 偏移分钟数，例如中国标准时间为 480；默认为 UTC。
+          schema: { type: integer, minimum: -840, maximum: 840, default: 0 }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, maximum: 100000, default: 1 }
+      responses:
+        '200':
+          description: data 包含 items（id、kind、title、at、minutes）、total、page、pages、active_days、focus_minutes。每页 20 条，统计覆盖当前月份与类型的全部结果。
+        '400':
+          description: 筛选参数无效
+        '401':
+          description: 未登录
   /api/v1/weather:
     get:
       summary: 当前天气（Open-Meteo，15 分钟服务端缓存）
