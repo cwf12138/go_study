@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -23,7 +24,7 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 
 	home := httptest.NewRecorder()
 	handler.ServeHTTP(home, httptest.NewRequest(http.MethodGet, "/", nil))
-if home.Code != http.StatusOK || !strings.Contains(home.Body.String(), "StudyFlow") || !strings.Contains(home.Body.String(), "mood-trend") || !strings.Contains(home.Body.String(), "theme-toggle") || !strings.Contains(home.Body.String(), "vocab-catalogs") || !strings.Contains(home.Body.String(), "vocab-pagination") || !strings.Contains(home.Body.String(), "panel-calendar") || !strings.Contains(home.Body.String(), "panel-memos") || !strings.Contains(home.Body.String(), "memo-editor") || !strings.Contains(home.Body.String(), "panel-knowledge") || !strings.Contains(home.Body.String(), "panel-english") || !strings.Contains(home.Body.String(), "panel-literature") || !strings.Contains(home.Body.String(), "ebook-reader-dialog") || !strings.Contains(home.Body.String(), "classic-reader-dialog") || !strings.Contains(home.Body.String(), "english-reader-dialog") || !strings.Contains(home.Body.String(), "command-dialog") || !strings.Contains(home.Body.String(), "memos.js?v=20260909-1") || !strings.Contains(home.Body.String(), "app.js?v=20260904-1") || strings.Contains(home.Body.String(), "panel-review") || strings.Contains(home.Body.String(), `data-view="review"`) {
+	if home.Code != http.StatusOK || !strings.Contains(home.Body.String(), "StudyFlow") || !strings.Contains(home.Body.String(), "mood-trend") || !strings.Contains(home.Body.String(), "theme-toggle") || !strings.Contains(home.Body.String(), "vocab-catalogs") || !strings.Contains(home.Body.String(), "vocab-pagination") || !strings.Contains(home.Body.String(), "panel-calendar") || !strings.Contains(home.Body.String(), "panel-memos") || !strings.Contains(home.Body.String(), "memo-editor") || !strings.Contains(home.Body.String(), "panel-knowledge") || !strings.Contains(home.Body.String(), "panel-english") || !strings.Contains(home.Body.String(), "panel-literature") || !strings.Contains(home.Body.String(), "ebook-reader-dialog") || !strings.Contains(home.Body.String(), "classic-reader-dialog") || !strings.Contains(home.Body.String(), "english-reader-dialog") || !strings.Contains(home.Body.String(), "command-dialog") || !strings.Contains(home.Body.String(), "memos.js?v=20260909-1") || !regexp.MustCompile(`src="/static/app.js\?v=[^"]+"`).MatchString(home.Body.String()) || strings.Contains(home.Body.String(), "panel-review") || strings.Contains(home.Body.String(), `data-view="review"`) {
 		t.Fatalf("home status = %d, body = %q", home.Code, home.Body.String())
 	}
 	if contentType := home.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "text/html") {
@@ -40,6 +41,32 @@ if home.Code != http.StatusOK || !strings.Contains(home.Body.String(), "StudyFlo
 	}
 	if cacheControl := javascript.Header().Get("Cache-Control"); !strings.Contains(cacheControl, "must-revalidate") {
 		t.Fatalf("javascript cache control = %q", cacheControl)
+	}
+
+	if !strings.Contains(home.Body.String(), `/static/focus-studio.css?v=`) || !strings.Contains(home.Body.String(), `id="focus-phase-track"`) || !strings.Contains(home.Body.String(), `form="focus-form"`) {
+		t.Fatal("focus studio stylesheet, phase track or form submission control is missing")
+	}
+	focusStyles := httptest.NewRecorder()
+	handler.ServeHTTP(focusStyles, httptest.NewRequest(http.MethodGet, "/static/focus-studio.css?v=test", nil))
+	if focusStyles.Code != http.StatusOK || !strings.HasPrefix(focusStyles.Header().Get("Content-Type"), "text/css") || !strings.Contains(focusStyles.Body.String(), "#panel-focus") {
+		t.Fatalf("focus stylesheet status = %d, content-type = %q", focusStyles.Code, focusStyles.Header().Get("Content-Type"))
+	}
+	if !strings.Contains(focusStyles.Header().Get("Cache-Control"), "must-revalidate") {
+		t.Fatal("focus stylesheet must revalidate with the server")
+	}
+
+	for _, marker := range []string{`/static/task-studio.css?v=`, `id="task-search"`, `id="tasks-pagination"`, `id="task-create-shortcut"`} {
+		if !strings.Contains(home.Body.String(), marker) {
+			t.Fatalf("task studio marker is missing: %s", marker)
+		}
+	}
+	taskStyles := httptest.NewRecorder()
+	handler.ServeHTTP(taskStyles, httptest.NewRequest(http.MethodGet, "/static/task-studio.css?v=test", nil))
+	if taskStyles.Code != http.StatusOK || !strings.HasPrefix(taskStyles.Header().Get("Content-Type"), "text/css") || !strings.Contains(taskStyles.Body.String(), "#panel-tasks") {
+		t.Fatalf("task stylesheet status = %d, content-type = %q", taskStyles.Code, taskStyles.Header().Get("Content-Type"))
+	}
+	if !strings.Contains(taskStyles.Header().Get("Cache-Control"), "must-revalidate") {
+		t.Fatal("task stylesheet must revalidate with the server")
 	}
 
 	catalogStyles := httptest.NewRecorder()

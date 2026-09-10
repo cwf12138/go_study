@@ -18,6 +18,8 @@
     moodSaving: false,
     theme: loadTheme(),
     tasks: [],
+    taskQuery: { text: "", status: "", priority: "", deadline: "", sort: "smart", page: 1, pageSize: 8 },
+    taskSearchComposing: false,
     todoLists: [],
     todos: [],
     todoView: "today",
@@ -50,6 +52,7 @@
     dailyFocusGoalMinutes: 60,
     isFinishingFocus: false,
     isUpdatingFocus: false,
+    isStartingFocus: false,
     toastTimer: null,
     vocabularySearchTimer: null,
   };
@@ -252,6 +255,8 @@
     state.moodSelectedDate = localDateKey(new Date());
     state.moodDraftRevision = 0;
     state.tasks = [];
+    state.taskQuery = { text: "", status: "", priority: "", deadline: "", sort: "smart", page: 1, pageSize: 8 };
+    state.taskSearchComposing = false;
     state.todoLists = [];
     state.todos = [];
     state.todoView = "today";
@@ -311,6 +316,7 @@
     }
     const label = labels[view] || [String(view).toUpperCase(), "功能页面"];
     state.currentView = view;
+    if (view !== "focus") setFocusQuiet(false);
     $("#page-kicker").textContent = label[0];
     $("#page-title").textContent = label[1];
     $$(".panel").forEach((panel) => panel.classList.toggle("active", panel.id === `panel-${view}`));
@@ -811,17 +817,183 @@
     return `<article class="todo-item ${completed ? "completed" : ""}"><button class="todo-complete" type="button" data-todo-completed="${!completed}" data-id="${todo.id}" aria-label="${completed ? "重新打开" : "完成"}待办 ${escapeHTML(todo.title)}">${completed ? "✓" : ""}</button><div class="todo-item-body"><div class="todo-item-title"><h4>${escapeHTML(todo.title)}</h4><span class="priority-${todo.priority}">● ${priorityLabel(todo.priority)}</span></div>${todo.notes ? `<p>${escapeHTML(todo.notes)}</p>` : ""}${meta ? `<div class="todo-meta">${meta}</div>` : ""}${(todo.tags || []).map((tag) => `<span class="tag">#${escapeHTML(tag)}</span>`).join("")}${steps.length ? `<div class="todo-steps"><span>${completedSteps}/${steps.length} 个步骤</span>${steps.map((step) => `<button class="todo-step ${step.completed ? "done" : ""}" type="button" data-todo-step="${todo.id}" data-step-id="${step.id}" data-step-completed="${!step.completed}"><i>${step.completed ? "✓" : ""}</i>${escapeHTML(step.title)}</button>`).join("")}</div>` : ""}</div><div class="todo-item-actions">${!completed ? `<button class="text-button" type="button" data-todo-my-day="${todo.my_day_date === localDateKey(new Date()) ? "remove" : "add"}" data-id="${todo.id}">${todo.my_day_date === localDateKey(new Date()) ? "移出今天" : "加入今天"}</button>` : ""}<button class="todo-delete" type="button" data-todo-delete="${todo.id}" aria-label="删除待办 ${escapeHTML(todo.title)}" title="删除待办">×</button></div></article>`;
   }
 
+  function taskIsOpen(task) {
+    return task.status === "todo" || task.status === "in_progress";
+  }
+
+  function taskTimestamp(value) {
+    const timestamp = value ? new Date(value).getTime() : NaN;
+    return Number.isFinite(timestamp) ? timestamp : null;
+  }
+
+  function taskIsOverdue(task, now = Date.now()) {
+    const due = taskTimestamp(task.due_at);
+    return taskIsOpen(task) && due !== null && due < now;
+  }
+
+  function queryTaskPage(items, query, now = Date.now()) {
+    const tokens = String(query.text || "").trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+    const today = localDateKey(new Date(now));
+    const filtered = items.filter((task) => {
+      if (query.status && task.status !== query.status) return false;
+      if (query.priority && task.priority !== query.priority) return false;
+      const haystack = [task.title, task.description, ...(task.tags || [])].join(" ").toLocaleLowerCase();
+      if (!tokens.every((token) => haystack.includes(token))) return false;
+      if (!query.deadline) return true;
+      if (!taskIsOpen(task)) return false;
+      const due = taskTimestamp(task.due_at);
+      if (query.deadline === "overdue") return due !== null && due < now;
+      if (query.deadline === "today") return due !== null && localDateKey(new Date(due)) === today;
+      if (query.deadline === "week") return due !== null && due >= now && due < now + 7 * 86400000;
+      if (query.deadline === "undated") return due === null;
+      return true;
+    });
+    const priority = { high: 0, medium: 1, low: 2 };
+    const dueOrder = (a, b) => (taskTimestamp(a.due_at) ?? Infinity) - (taskTimestamp(b.due_at) ?? Infinity);
+    const createdOrder = (a, b, descending = true) => {
+      const left = taskTimestamp(a.created_at), right = taskTimestamp(b.created_at);
+      if (left === null || right === null) return left === right ? 0 : left === null ? 1 : -1;
+      return descending ? right - left : left - right;
+    };
+    filtered.sort((a, b) => {
+      let order = 0;
+      if (query.sort === "title") order = String(a.title || "").localeCompare(String(b.title || ""), "zh-CN");
+      else if (query.sort === "newest" || query.sort === "oldest") order = createdOrder(a, b, query.sort === "newest");
+      else if (query.sort === "due") order = dueOrder(a, b);
+      else order = Number(taskIsOpen(b)) - Number(taskIsOpen(a))
+        || Number(taskIsOverdue(b, now)) - Number(taskIsOverdue(a, now))
+        || (priority[a.priority] ?? 3) - (priority[b.priority] ?? 3)
+        || dueOrder(a, b) || createdOrder(a, b);
+      return order || String(a.id).localeCompare(String(b.id));
+    });
+    const pageSize = Math.min(50, Math.max(1, Math.floor(Number(query.pageSize) || 8)));
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    const page = Math.min(totalPages, Math.max(1, Math.floor(Number(query.page) || 1)));
+    return { items: filtered.slice((page - 1) * pageSize, page * pageSize), total: filtered.length, page, pageSize, totalPages };
+  }
+
+  function taskDeadlineBadge(task, now = Date.now()) {
+    const due = taskTimestamp(task.due_at);
+    if (due === null) return { label: "未设截止日期", tone: "undated" };
+    const date = formatDate(task.due_at, true);
+    if (!taskIsOpen(task)) return { label: `截止 ${date}`, tone: "closed" };
+    if (due < now) return { label: `已逾期 · ${date}`, tone: "overdue" };
+    if (localDateKey(new Date(due)) === localDateKey(new Date(now))) return { label: `今天截止 · ${date}`, tone: "today" };
+    return { label: `截止 ${date}`, tone: "upcoming" };
+  }
+
   function renderTasks() {
-    const filter = $("#task-filter").value;
-    const tasks = filter ? state.tasks.filter((task) => task.status === filter) : state.tasks;
+    const query = state.taskQuery;
+    const result = queryTaskPage(state.tasks, query);
+    query.page = result.page;
+    [["#task-filter", "status"], ["#task-priority-filter", "priority"], ["#task-deadline-filter", "deadline"], ["#task-sort", "sort"], ["#task-search", "text"]].forEach(([selector, key]) => {
+      if (selector === "#task-search" && state.taskSearchComposing) return;
+      if ($(selector).value !== query[key]) $(selector).value = query[key];
+    });
+    $("#task-stat-todo").textContent = state.tasks.filter((task) => task.status === "todo").length;
+    $("#task-stat-active").textContent = state.tasks.filter((task) => task.status === "in_progress").length;
+    $("#task-stat-overdue").textContent = state.tasks.filter((task) => taskIsOverdue(task)).length;
+    $("#task-stat-done").textContent = state.tasks.filter((task) => task.status === "done").length;
+    const hasFilter = Boolean(query.text || query.status || query.priority || query.deadline || query.sort !== "smart");
+    $("#task-clear-filters").classList.toggle("hidden", !hasFilter);
+    $("#task-sort-hint").textContent = ({
+      smart: "优先处理：未完成 → 逾期 → 优先级 → 截止时间",
+      due: "按截止时间升序；未设截止日期的任务排在最后",
+      newest: "最近创建的任务优先", oldest: "最早创建的任务优先", title: "按任务名称排序",
+    })[query.sort] || "";
+    $("#tasks-summary").textContent = result.total ? `${result.total} 项匹配 · 第 ${result.page} / ${result.totalPages} 页` : "0 项匹配";
     const container = $("#tasks-list");
-    if (!tasks.length) {
+    if (!result.items.length) {
       container.className = "task-list empty-state";
-      container.textContent = filter ? "这个状态下还没有任务。" : "还没有任务。用一个 30 分钟的小任务开始吧。";
+      container.innerHTML = `<div class="task-empty"><span aria-hidden="true">${state.tasks.length ? "⌕" : "↗"}</span><h4>${state.tasks.length ? "没有找到匹配的任务" : "从一件小事开始"}</h4><p>${state.tasks.length ? "试试其他关键词，或放宽筛选条件。" : "写下一个明确的下一步，不必一次安排好所有事。"}</p><button class="quiet" type="button" ${state.tasks.length ? "data-task-reset" : "data-task-create"}>${state.tasks.length ? "重置筛选" : "创建第一项任务"}</button></div>`;
+    } else {
+      container.className = "task-list";
+      container.innerHTML = result.items.map(taskStudioCard).join("");
+    }
+    const pagination = $("#tasks-pagination");
+    pagination.classList.toggle("hidden", result.totalPages <= 1);
+    pagination.innerHTML = result.totalPages <= 1 ? "" : `<button class="quiet" type="button" data-task-page="${result.page - 1}" ${result.page === 1 ? "disabled" : ""}>上一页</button><span>第 ${result.page} / ${result.totalPages} 页 · 每页 ${result.pageSize} 项</span><button class="quiet" type="button" data-task-page="${result.page + 1}" ${result.page === result.totalPages ? "disabled" : ""}>下一页</button>`;
+  }
+
+  function taskStudioCard(task) {
+    const due = taskDeadlineBadge(task);
+    const goal = state.goals.find((item) => item.id === task.goal_id);
+    const open = taskIsOpen(task);
+    return `<div class="task-swipe" data-task-swipe><button class="task-swipe-delete" type="button" data-task-delete="${escapeHTML(task.id)}" aria-label="删除任务 ${escapeHTML(task.title)}">删除</button><article class="list-row task-swipe-card ${open ? "" : "task-is-closed"}" data-task-swipe-card role="group" tabindex="0" aria-label="任务：${escapeHTML(task.title)}；按回车展开删除操作"><div class="task-card-heading"><span class="pill ${escapeHTML(task.status)}">${escapeHTML(taskStatusLabel(task.status))}</span><span class="task-priority priority-${escapeHTML(task.priority)}">● ${escapeHTML(priorityLabel(task.priority))}优先级</span><button class="task-more" type="button" data-task-menu aria-expanded="false" aria-label="展开删除操作：${escapeHTML(task.title)}">···</button></div><div class="row-main"><h4>${escapeHTML(task.title)}</h4>${task.description ? `<p class="task-card-description">${escapeHTML(task.description)}</p>` : ""}<div class="task-card-meta"><span class="task-deadline is-${due.tone}">${escapeHTML(due.label)}</span>${Number(task.estimated_minutes) > 0 ? `<span>预计 ${Number(task.estimated_minutes)} 分钟</span>` : ""}${goal ? `<span>目标 · ${escapeHTML(goal.title)}</span>` : ""}</div>${task.tags?.length ? `<div class="task-card-tags">${task.tags.map((tag) => `<span class="tag">#${escapeHTML(tag)}</span>`).join("")}</div>` : ""}</div><div class="task-card-footer"><span>创建于 ${formatDate(task.created_at)}</span><div class="row-actions">${open ? `<button class="text-button task-focus-link" type="button" data-task-focus="${escapeHTML(task.id)}">去专注 ↗</button>` : ""}${taskActions(task)}</div></div></article></div>`;
+  }
+
+  function updateTaskQuery(patch) {
+    state.taskQuery = { ...state.taskQuery, ...patch, page: patch.page ?? 1 };
+    renderTasks();
+  }
+
+  function resetTaskQuery() {
+    updateTaskQuery({ text: "", status: "", priority: "", deadline: "", sort: "smart", page: 1 });
+  }
+
+  function focusTaskComposer() {
+    $("#task-title").focus({ preventScroll: true });
+    $("#task-title").scrollIntoView({ block: "center", behavior: "auto" });
+  }
+
+  function bindTaskStudioEvents() {
+    [["#task-filter", "status"], ["#task-priority-filter", "priority"], ["#task-deadline-filter", "deadline"], ["#task-sort", "sort"]].forEach(([selector, field]) => {
+      $(selector).addEventListener("change", () => updateTaskQuery({ [field]: $(selector).value }));
+    });
+    $("#task-search").addEventListener("input", (event) => { if (!event.isComposing) updateTaskQuery({ text: event.target.value }); });
+    $("#task-search").addEventListener("compositionstart", () => { state.taskSearchComposing = true; });
+    $("#task-search").addEventListener("compositionend", (event) => { state.taskSearchComposing = false; updateTaskQuery({ text: event.target.value }); });
+    $("#task-clear-filters").addEventListener("click", resetTaskQuery);
+    $("#task-create-shortcut").addEventListener("click", focusTaskComposer);
+  }
+
+  async function createTask(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = form.querySelector("button[type=submit]");
+    if (button.disabled || !form.reportValidity()) return;
+    const payload = {
+      goal_id: $("#task-goal").value, title: $("#task-title").value, description: $("#task-description").value,
+      estimated_minutes: Number($("#task-minutes").value || 0), priority: $("#task-priority").value,
+      due_at: toISO($("#task-due").value), tags: $("#task-tags").value.split(",").map((tag) => tag.trim()).filter(Boolean),
+    };
+    const fields = [...form.querySelectorAll("input,select,textarea,button")].map((field) => ({ field, disabled: field.disabled }));
+    const label = button.textContent;
+    fields.forEach(({ field }) => { field.disabled = true; });
+    button.textContent = "正在创建…";
+    try {
+      await api("/api/v1/tasks", { method: "POST", body: JSON.stringify(payload) });
+      form.reset();
+      // A newly created task should not disappear behind a previous search or status filter.
+      updateTaskQuery({ text: "", status: "", priority: "", deadline: "", sort: "newest", page: 1 });
+      await refresh();
+      notify("任务已创建，已切换到最新任务。");
+    } catch (error) {
+      notify(error.message, "error");
+    } finally {
+      fields.forEach(({ field, disabled }) => { field.disabled = disabled; });
+      button.textContent = label;
+    }
+  }
+
+  function prepareTaskFocus(id) {
+    const task = state.tasks.find((item) => item.id === id);
+    if (!task || !taskIsOpen(task)) return;
+    if (state.isStartingFocus || state.isUpdatingFocus || state.isFinishingFocus) {
+      notify("专注会话正在同步，请稍后再试。", "error");
       return;
     }
-    container.className = "task-list";
-    container.innerHTML = tasks.map((task) => `<div class="task-swipe" data-task-swipe><button class="task-swipe-delete" type="button" data-task-delete="${task.id}" aria-label="删除任务 ${escapeHTML(task.title)}">删除</button><article class="list-row task-swipe-card" data-task-swipe-card role="button" tabindex="0" aria-expanded="false" aria-label="显示任务删除操作：${escapeHTML(task.title)}"><div class="row-main"><div class="row-actions"><h4>${escapeHTML(task.title)}</h4><span class="pill ${task.status}">${taskStatusLabel(task.status)}</span><span class="priority-${task.priority}">● ${priorityLabel(task.priority)}</span></div><p>${escapeHTML(task.description || "尚未添加完成说明")} · 预计 ${task.estimated_minutes} 分钟${task.due_at ? ` · 截止 ${formatDate(task.due_at, true)}` : ""}</p>${(task.tags || []).map((tag) => `<span class="tag">${escapeHTML(tag)}</span>`).join("")}</div><div class="row-actions">${taskActions(task)}</div></article></div>`).join("");
+    if (state.focus) {
+      showView("focus");
+      notify("当前已有专注会话，已为你打开；不会更改本次关联任务。");
+      return;
+    }
+    $("#focus-task").value = task.id;
+    $("#focus-minutes").value = Number(task.estimated_minutes) > 0 ? clampPlannedMinutes(task.estimated_minutes) : 25;
+    renderFocus();
+    showView("focus");
+    $("#start-focus").focus();
+    notify("已关联任务，请确认专注时长后开始。");
   }
 
   function toggleTaskActions(card) {
@@ -832,9 +1004,11 @@
       if (item === wrapper) return;
       item.classList.remove("revealed");
       item.querySelector("[data-task-swipe-card]")?.setAttribute("aria-expanded", "false");
+      item.querySelector("[data-task-menu]")?.setAttribute("aria-expanded", "false");
     });
     wrapper.classList.toggle("revealed", opening);
     card.setAttribute("aria-expanded", String(opening));
+    wrapper.querySelector("[data-task-menu]")?.setAttribute("aria-expanded", String(opening));
   }
 
   function toggleGoalActions(card) {
@@ -1461,7 +1635,7 @@
     const active = state.focus;
     const form = $("#focus-form");
     const paused = active?.status === "paused";
-    const updating = state.isFinishingFocus || state.isUpdatingFocus;
+    const updating = state.isFinishingFocus || state.isUpdatingFocus || state.isStartingFocus;
     const stateLabel = $("#focus-state");
     $("#pause-focus").classList.toggle("hidden", !active || paused);
     $("#resume-focus").classList.toggle("hidden", !active || !paused);
@@ -1472,8 +1646,23 @@
     $("#finish-focus").disabled = updating;
     $("#abandon-focus").disabled = updating;
     $("#start-focus").disabled = Boolean(active) || updating;
-    form.querySelectorAll("input,select").forEach((field) => { field.disabled = Boolean(active); });
-    $$("[data-focus-duration]").forEach((button) => { button.disabled = Boolean(active); });
+    $("#start-focus").classList.toggle("hidden", Boolean(active));
+    $("#start-focus").textContent = state.isStartingFocus ? "正在开启…" : "▶ 开始专注";
+    form.querySelectorAll("input,select").forEach((field) => { field.disabled = Boolean(active) || updating; });
+    $$("[data-focus-duration]").forEach((button) => { button.disabled = Boolean(active) || updating; });
+    $("#focus-quiet-toggle").disabled = !active;
+    $("#focus-quiet-toggle").title = active ? "收起设置与统计，按 Esc 返回完整布局" : "开始专注后可进入简洁模式";
+    $("#panel-focus").dataset.focusState = paused ? "paused" : active?.phase === "break" ? "break" : active ? "running" : "idle";
+    if (active) {
+      $("#focus-minutes").value = active.plannedMinutes;
+      $("#focus-break-enabled").checked = active.breakEnabled;
+      $("#focus-complete-task").checked = active.completeTask;
+      $("#focus-task").value = active.taskID || "";
+    } else {
+      setFocusQuiet(false);
+    }
+    renderFocusPlan();
+    renderFocusTransitionNotice();
     renderFocusProgress();
     renderFocusTaskPreview();
     if (!active) {
@@ -1481,7 +1670,8 @@
       $("#focus-session-step").textContent = "准备开始";
       stateLabel.textContent = "尚未开始专注";
       stateLabel.className = "focus-state is-idle";
-      $("#focus-description").textContent = "选择一个任务和时长，开始第一段深度工作。";
+      const selectedTask = state.tasks.find((item) => item.id === $("#focus-task").value);
+      $("#focus-description").textContent = selectedTask ? `即将专注：${selectedTask.title}` : "选择一个任务，或给自己一段自由专注的时间。";
       return;
     }
     const task = state.tasks.find((item) => item.id === active.taskID);
@@ -1498,6 +1688,76 @@
     $("#focus-clock").textContent = formatDuration(plannedMinutes * 60);
     $("#focus-timer").style.setProperty("--progress", "0%");
     renderFocusTicks(0);
+  }
+
+  function focusPlanSegments(minutes, breakEnabled, breakMinutes = 5) {
+    const seconds = clampPlannedMinutes(minutes) * 60;
+    return breakEnabled ? [
+      { phase: "focus_first", label: "第一段专注", seconds: Math.ceil(seconds / 2) },
+      { phase: "break", label: "中途休息", seconds: breakMinutes * 60 },
+      { phase: "focus_second", label: "第二段专注", seconds: Math.floor(seconds / 2) },
+    ] : [{ phase: "focus", label: "完整专注", seconds }];
+  }
+
+  function renderFocusPlan() {
+    const active = state.focus;
+    const minutes = active ? active.plannedMinutes : clampPlannedMinutes($("#focus-minutes").value);
+    const breakEnabled = active ? active.breakEnabled : $("#focus-break-enabled").checked;
+    const segments = focusPlanSegments(minutes, breakEnabled, active?.breakMinutes ?? 5);
+    const current = active ? segments.findIndex((segment) => segment.phase === active.phase) : -1;
+    const duration = (seconds) => `${Math.floor(seconds / 60)} 分${seconds % 60 ? ` ${seconds % 60} 秒` : "钟"}`;
+    $("#focus-phase-track").innerHTML = segments.map((segment, index) => `<li class="${index === current ? "is-current" : current > index ? "is-done" : ""}" ${index === current ? 'aria-current="step"' : ""}><strong>${segment.label}</strong><span>${duration(segment.seconds)}${index === current && active?.status === "paused" ? " · 已暂停" : ""}</span></li>`).join("");
+    $("#focus-plan-summary").textContent = `${minutes} 分钟专注${breakEnabled ? ` + ${segments[1].seconds / 60} 分钟休息` : " · 不间断时段"}`;
+    $("#focus-setup-hint").textContent = active ? "本次设置已锁定，结束后可安排下一次专注。" : "调整好节奏，在时钟下点击开始。";
+    $$("[data-focus-duration]").forEach((button) => button.setAttribute("aria-pressed", String(Number(button.dataset.focusDuration) === minutes)));
+  }
+
+  function setFocusQuiet(enabled) {
+    const quiet = Boolean(enabled && state.focus);
+    const panel = $("#panel-focus");
+    const wasQuiet = panel.classList.contains("is-quiet");
+    panel.classList.toggle("is-quiet", quiet);
+    const button = $("#focus-quiet-toggle");
+    button.setAttribute("aria-pressed", String(quiet));
+    button.textContent = quiet ? "退出简洁 · Esc" : "简洁模式";
+    if (wasQuiet && !quiet && state.currentView === "focus") {
+      (state.focus ? button : $("#start-focus")).focus();
+    }
+  }
+
+  function renderFocusTransitionNotice() {
+    const message = state.focus?.transitionError || "";
+    $("#focus-transition-notice").classList.toggle("hidden", !message);
+    $("#focus-transition-message").textContent = message ? `阶段已到时，尚未成功同步：${message}` : "";
+    $("#focus-retry-transition").disabled = state.isUpdatingFocus || state.isFinishingFocus;
+  }
+
+  async function retryFocusTransition() {
+    if (!state.focus?.transitionError || state.isUpdatingFocus || state.isFinishingFocus) return;
+    const previous = state.focus;
+    let retry = false;
+    state.isUpdatingFocus = true;
+    renderFocus();
+    try {
+      // The server may have applied the previous request even if its response was lost.
+      // Reconcile before replaying so retry never skips a phase or re-finishes a session.
+      const session = await api("/api/v1/focus-sessions/active");
+      if (state.focus?.id !== previous.id) return;
+      syncActiveFocus(session);
+      retry = state.focus?.id === previous.id && state.focus.phase === previous.phase
+        && state.focus.status === "running" && phaseRemainingSeconds(state.focus) === 0;
+      if (retry) state.focus.autoFinishAttempted = true;
+      if (!session) await refresh();
+    } catch (error) {
+      if (state.focus?.id === previous.id) state.focus.transitionError = error.message;
+      notify(error.message, "error");
+    } finally {
+      state.isUpdatingFocus = false;
+      renderFocus();
+    }
+    if (!retry || state.focus?.id !== previous.id) return;
+    if (state.focus.phase === "focus_first" || state.focus.phase === "break") await advanceFocus(true);
+    else await finishFocus(false, true);
   }
 
   function updateFocusClock() {
@@ -1542,7 +1802,7 @@
 
   function focusSessionStep(focus) {
     if (!focus.breakEnabled) return "完整专注时段";
-    return ({ focus_first: "第 1 段 / 共 3 段", break: "休息 / 共 3 段", focus_second: "第 3 段 / 共 3 段" }[focus.phase] || "专注时段");
+    return ({ focus_first: "专注 1 / 2", break: "中场休息", focus_second: "专注 2 / 2" }[focus.phase] || "专注时段");
   }
 
   function renderFocusTicks(progress) {
@@ -1580,15 +1840,18 @@
   function renderFocusTaskPreview() {
     const container = $("#focus-task-preview");
     if (!container) return;
-    const tasks = state.tasks.filter((task) => task.status !== "done" && task.status !== "cancelled").slice(0, 5);
     const selectedTaskID = state.focus?.taskID || $("#focus-task")?.value;
+    const available = state.tasks.filter((task) => task.status !== "done" && task.status !== "cancelled");
+    // Keep a task chosen from the full select visible even when it is outside the first five.
+    const selected = available.find((task) => task.id === selectedTaskID);
+    const tasks = (selected ? [selected, ...available.filter((task) => task.id !== selected.id)] : available).slice(0, 5);
     if (!tasks.length) {
       container.className = "focus-task-preview empty-state";
       container.textContent = "还没有待办任务。先创建一项足够小、可以立刻开始的任务。";
       return;
     }
     container.className = "focus-task-preview";
-    container.innerHTML = tasks.map((task) => `<button class="focus-task-item ${task.id === selectedTaskID ? "selected" : ""}" type="button" data-focus-task-select="${task.id}" ${state.focus ? "disabled" : ""}><span class="focus-task-check" aria-hidden="true"></span><span class="focus-task-content"><strong>${escapeHTML(task.title)}</strong><small>${task.estimated_minutes ? `预计 ${task.estimated_minutes} 分钟` : "未设置预计时长"}</small></span><span class="priority-${task.priority}">●</span></button>`).join("");
+    container.innerHTML = tasks.map((task) => `<button class="focus-task-item ${task.id === selectedTaskID ? "selected" : ""}" type="button" data-focus-task-select="${task.id}" aria-pressed="${task.id === selectedTaskID}" ${state.focus || state.isStartingFocus ? "disabled" : ""}><span class="focus-task-check" aria-hidden="true"></span><span class="focus-task-content"><strong>${escapeHTML(task.title)}</strong><small>${task.estimated_minutes ? `预计 ${task.estimated_minutes} 分钟` : "未设置预计时长"}</small></span><span class="priority-${task.priority}" aria-hidden="true">●</span></button>`).join("");
   }
 
   function clampDailyFocusGoal(value) {
@@ -1615,7 +1878,7 @@
 
     const taskOptions = state.tasks.filter((task) => task.status !== "done" && task.status !== "cancelled").map((task) => `<option value="${task.id}">${escapeHTML(task.title)}</option>`).join("");
     const focusTask = $("#focus-task");
-    const previousTask = focusTask.value;
+    const previousTask = state.focus?.taskID || focusTask.value;
     focusTask.innerHTML = `<option value="">不关联任务</option>${taskOptions}`;
     focusTask.value = state.tasks.some((task) => task.id === previousTask) ? previousTask : "";
 
@@ -1700,6 +1963,19 @@
       if (deleteTaskButton) await deleteTask(deleteTaskButton.dataset.taskDelete);
       const taskCard = event.target.closest("[data-task-swipe-card]");
       if (taskCard && !event.target.closest("button")) toggleTaskActions(taskCard);
+      const taskMenu = event.target.closest("[data-task-menu]");
+      if (taskMenu && taskCard) toggleTaskActions(taskCard);
+      const taskFocus = event.target.closest("[data-task-focus]");
+      if (taskFocus) prepareTaskFocus(taskFocus.dataset.taskFocus);
+      const taskPage = event.target.closest("[data-task-page]");
+      if (taskPage && !taskPage.disabled) {
+        updateTaskQuery({ page: Number(taskPage.dataset.taskPage) });
+        $("#tasks-summary").setAttribute("tabindex", "-1");
+        $("#tasks-summary").focus({ preventScroll: true });
+        $("#tasks-list").scrollIntoView({ block: "start", behavior: "auto" });
+      }
+      if (event.target.closest("[data-task-reset]")) resetTaskQuery();
+      if (event.target.closest("[data-task-create]")) focusTaskComposer();
       const todoView = event.target.closest("[data-todo-view]");
       if (todoView) {
         state.todoView = todoView.dataset.todoView;
@@ -1748,9 +2024,9 @@
       const goalPageButton = event.target.closest("[data-goal-page]");
       if (goalPageButton && !goalPageButton.disabled) await updateGoalQuery({ page: Number(goalPageButton.dataset.goalPage) });
       const focusTaskButton = event.target.closest("[data-focus-task-select]");
-      if (focusTaskButton && !state.focus) {
+      if (focusTaskButton && !state.focus && !state.isStartingFocus) {
         $("#focus-task").value = focusTaskButton.dataset.focusTaskSelect;
-        renderFocusTaskPreview();
+        renderFocus();
         notify("已关联该任务，设置时长后即可开始专注。");
       }
       const moodDay = event.target.closest("[data-mood-date]");
@@ -1775,12 +2051,12 @@
     });
     document.addEventListener("keydown", (event) => {
       const taskCard = event.target.closest?.("[data-task-swipe-card]");
-      if (taskCard && (event.key === "Enter" || event.key === " ")) {
+      if (taskCard && event.target === taskCard && (event.key === "Enter" || event.key === " ")) {
         event.preventDefault();
         toggleTaskActions(taskCard);
       }
       const goalCard = event.target.closest?.("[data-goal-swipe-card]");
-      if (goalCard && (event.key === "Enter" || event.key === " ")) {
+      if (goalCard && event.target === goalCard && (event.key === "Enter" || event.key === " ")) {
         event.preventDefault();
         toggleGoalActions(goalCard);
       }
@@ -1795,7 +2071,7 @@
         reviewVocabularyWord(Number(event.key));
       }
     });
-    $("#task-filter").addEventListener("change", renderTasks);
+    bindTaskStudioEvents();
     $("#todo-search").addEventListener("input", () => {
       state.todoFilters.query = $("#todo-search").value.trim();
       renderTodos();
@@ -1912,13 +2188,21 @@
     $("#goal-sort").addEventListener("change", () => updateGoalQuery({ sort: $("#goal-sort").value, page: 1 }));
     $("#goal-order").addEventListener("change", () => updateGoalQuery({ order: $("#goal-order").value, page: 1 }));
     $$("[data-focus-duration]").forEach((button) => button.addEventListener("click", () => {
+      if (state.focus || state.isStartingFocus) return;
       $("#focus-minutes").value = button.dataset.focusDuration;
       renderReadyCountdown();
+      renderFocusPlan();
     }));
     $("#focus-minutes").addEventListener("input", () => {
-      if (!state.focus) renderReadyCountdown();
+      if (!state.focus && !state.isStartingFocus) { renderReadyCountdown(); renderFocusPlan(); }
     });
-    $("#focus-task").addEventListener("change", renderFocusTaskPreview);
+    $("#focus-break-enabled").addEventListener("change", renderFocusPlan);
+    $("#focus-quiet-toggle").addEventListener("click", () => setFocusQuiet(!$("#panel-focus").classList.contains("is-quiet")));
+    $("#focus-retry-transition").addEventListener("click", retryFocusTransition);
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && state.currentView === "focus" && $("#panel-focus").classList.contains("is-quiet")) setFocusQuiet(false);
+    });
+    $("#focus-task").addEventListener("change", renderFocus);
     $("#mood-prev-month").addEventListener("click", () => shiftMoodMonth(-1));
     $("#mood-form").addEventListener("input", markMoodDraft);
     $("#mood-today").addEventListener("click", async () => {
@@ -1981,7 +2265,7 @@
       state.goalQuery.page = 1;
       return submitForm(event, () => api("/api/v1/goals", { method: "POST", body: JSON.stringify({ title: $("#goal-title").value, description: $("#goal-description").value, deadline: toISO($("#goal-deadline").value) }) }), "目标已创建。");
     });
-    $("#task-form").addEventListener("submit", (event) => submitForm(event, () => api("/api/v1/tasks", { method: "POST", body: JSON.stringify({ goal_id: $("#task-goal").value, title: $("#task-title").value, description: $("#task-description").value, estimated_minutes: Number($("#task-minutes").value || 0), priority: $("#task-priority").value, due_at: toISO($("#task-due").value), tags: $("#task-tags").value.split(",").map((tag) => tag.trim()).filter(Boolean) }) }), "任务已创建。"));
+    $("#task-form").addEventListener("submit", createTask);
     $("#todo-list-form").addEventListener("submit", (event) => submitForm(event, () => api("/api/v1/todo-lists", { method: "POST", body: JSON.stringify({ name: $("#todo-list-name").value, color: $("#todo-list-color").value }) }), "分类已创建。"));
     $("#todo-form").addEventListener("submit", (event) => submitForm(event, () => api("/api/v1/todos", { method: "POST", body: JSON.stringify({ list_id: $("#todo-list").value, title: $("#todo-title").value, notes: $("#todo-notes").value, priority: $("#todo-priority").value, due_at: toISO($("#todo-due").value), my_day_date: $("#todo-my-day").checked ? localDateKey(new Date()) : "", repeat_rule: $("#todo-repeat").value, tags: $("#todo-tags").value.split(",").map((tag) => tag.trim()).filter(Boolean), steps: $("#todo-steps").value.split("\n").map((step) => step.trim()).filter(Boolean) }) }), "待办已加入清单。"));
     $("#vocab-book-form").addEventListener("submit", (event) => submitForm(event, () => api("/api/v1/word-books", { method: "POST", body: JSON.stringify({ name: $("#vocab-book-name").value, description: $("#vocab-book-description").value, language: "en", daily_new_limit: Number($("#vocab-book-limit").value || 15) }) }), "词书已创建。"));
@@ -2072,7 +2356,9 @@
     $("#pause-focus").addEventListener("click", pauseFocus);
     $("#resume-focus").addEventListener("click", resumeFocus);
     $("#finish-focus").addEventListener("click", () => finishFocus(false));
-    $("#abandon-focus").addEventListener("click", () => finishFocus(true));
+    $("#abandon-focus").addEventListener("click", () => {
+      if (state.focus && !state.isUpdatingFocus && !state.isFinishingFocus && window.confirm("确定放弃本次专注？本次不会计入已完成专注。若想保留投入时间，请选择「完成并记录」。")) finishFocus(true);
+    });
   }
 
   async function updateGoalQuery(nextQuery) {
@@ -2172,20 +2458,25 @@
 
   async function startFocus(event) {
     event.preventDefault();
-    if (state.focus) return;
-    const button = $("#start-focus");
-    button.disabled = true;
+    if (state.focus || state.isStartingFocus || state.isFinishingFocus || state.isUpdatingFocus) return;
+    if (!$("#focus-form").reportValidity()) return;
+    const plannedMinutes = clampPlannedMinutes($("#focus-minutes").value);
+    const breakEnabled = $("#focus-break-enabled").checked;
+    const taskID = $("#focus-task").value;
+    const completeTask = $("#focus-complete-task").checked;
+    state.isStartingFocus = true;
+    renderFocus();
     try {
-      const plannedMinutes = clampPlannedMinutes($("#focus-minutes").value);
-      const breakEnabled = $("#focus-break-enabled").checked;
-      const session = await api("/api/v1/focus-sessions", { method: "POST", body: JSON.stringify({ task_id: $("#focus-task").value, planned_minutes: plannedMinutes, break_enabled: breakEnabled }) });
-      state.focus = { id: session.id, completeTask: $("#focus-complete-task").checked };
+      const session = await api("/api/v1/focus-sessions", { method: "POST", body: JSON.stringify({ task_id: taskID, planned_minutes: plannedMinutes, break_enabled: breakEnabled }) });
+      state.focus = { id: session.id, completeTask };
       syncActiveFocus(session);
       renderFocus();
       notify(breakEnabled ? "倒计时已开始：前半段专注后将自动休息 5 分钟。" : `${session.planned_minutes} 分钟倒计时已开始，享受这一段不被打扰的时间。`);
     } catch (error) {
       notify(error.message, "error");
-      button.disabled = false;
+    } finally {
+      state.isStartingFocus = false;
+      renderFocus();
     }
   }
 
@@ -2198,7 +2489,8 @@
   }
 
   async function advanceFocus(automatic = false) {
-    if (!state.focus || state.isUpdatingFocus) return;
+    if (!state.focus || state.isUpdatingFocus || state.isFinishingFocus) return;
+    const focusID = state.focus.id;
     state.isUpdatingFocus = true;
     renderFocus();
     try {
@@ -2207,6 +2499,7 @@
       renderFocus();
       notify(session.phase === "break" ? "第一段专注完成，开始休息 5 分钟。" : automatic ? "休息结束，开始第二段专注。" : "已进入下一阶段。");
     } catch (error) {
+      if (automatic && state.focus?.id === focusID) state.focus.transitionError = error.message;
       notify(error.message, "error");
     } finally {
       state.isUpdatingFocus = false;
@@ -2215,7 +2508,7 @@
   }
 
   async function updateFocusSession(action, message) {
-    if (!state.focus || state.isUpdatingFocus) return;
+    if (!state.focus || state.isUpdatingFocus || state.isFinishingFocus) return;
     state.isUpdatingFocus = true;
     renderFocus();
     try {
@@ -2232,7 +2525,7 @@
   }
 
   async function finishFocus(abandoned, automatic = false) {
-    if (!state.focus || state.isFinishingFocus) return;
+    if (!state.focus || state.isFinishingFocus || state.isUpdatingFocus) return;
     const completedFocus = state.focus;
     state.isFinishingFocus = true;
     renderFocus();
@@ -2257,8 +2550,8 @@
       }
       notify(abandoned ? "已放弃本次专注会话。" : automatic ? "倒计时结束，专注会话已自动完成。" : "专注会话已完成，做得好。");
     } catch (error) {
+      if (automatic && state.focus?.id === completedFocus.id) state.focus.transitionError = error.message;
       notify(error.message, "error");
-      if (automatic) refresh().catch(() => undefined);
     } finally {
       state.isFinishingFocus = false;
       renderFocus();
@@ -2273,6 +2566,7 @@
       if (state.user && !document.hidden) refresh().catch(() => undefined);
     }, 60_000);
     renderReadyCountdown();
+    renderFocusPlan();
     if (!state.token) return;
     try {
       const user = await api("/api/v1/me");
