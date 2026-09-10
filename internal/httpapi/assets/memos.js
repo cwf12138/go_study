@@ -18,16 +18,27 @@
     const token = localStorage.getItem("studyflow.token") || "";
     if (token) headers.set("Authorization", `Bearer ${token}`);
     if (options.body) headers.set("Content-Type", "application/json");
-    let response;
-    try { response = await fetch(path, { ...options, headers }); }
-    catch { throw new Error("无法连接到备忘录服务。"); }
-    if (response.status === 204) return null;
-    const payload = await response.json().catch(() => ({}));
-    if (response.status === 404 && (path.startsWith("/api/v1/memos") || path.startsWith("/api/v1/memo-folders"))) {
-      throw new Error("当前 Go 服务尚未加载备忘录接口，请停止旧进程并重新运行 go run ./cmd/api。");
-    }
-    if (!response.ok) throw new Error(payload?.error?.message || `请求失败（${response.status}）`);
-    return payload.data;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 25000);
+    try {
+      const response = await fetch(path, { ...options, headers, signal: controller.signal });
+      if (token !== (localStorage.getItem("studyflow.token") || "")) throw new Error("账号已切换，请重新打开备忘录。");
+      if (response.status === 204) return null;
+      const payload = await response.json().catch(() => null);
+      if (token !== (localStorage.getItem("studyflow.token") || "")) throw new Error("账号已切换，已忽略旧响应。");
+      if (response.status === 404) {
+        if (payload?.error?.code === "not_found") throw new Error("这条备忘录或文件夹已不存在，请刷新列表后重试。");
+        throw new Error("备忘录接口不可用，请确认访问地址正确并重启 Go 服务。");
+      }
+      if (response.status === 401) throw new Error("登录已过期，请重新登录。");
+      if (!response.ok) throw new Error(payload?.error?.message || `请求失败（${response.status}）`);
+      if (!payload || !("data" in payload)) throw new Error("备忘录服务返回了无效数据，请重试。");
+      return payload.data;
+    } catch (error) {
+      if (error.name === "AbortError") throw new Error("备忘录请求超时，请重试；未提交的文字仍保留在编辑区。");
+      if (error instanceof TypeError) throw new Error("无法连接到备忘录服务。");
+      throw error;
+    } finally { window.clearTimeout(timeout); }
   }
 
   function notify(message, type = "success") {

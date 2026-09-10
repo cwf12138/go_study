@@ -40,8 +40,8 @@ const document = { querySelector: getElement, querySelectorAll() { return []; },
 const window = { setTimeout() {}, clearTimeout() {}, addEventListener() {}, confirm() { return false; }, prompt() { return null; } };
 class HeadersMock { set() {} }
 class BlobMock {}
-const context = { console, Date, Intl, URL, URLSearchParams, Headers: HeadersMock, Blob: BlobMock, localStorage: { getItem() { return ""; } }, document, window };
-const instrumented = script.replace("\n  bindEvents();\n})();", "\n  window.__memoTest = { renderMarkdown, state, markDirty, saveCurrent, selectMemo, loadMemos };\n  bindEvents();\n})();");
+const context = { console, Date, Intl, URL, URLSearchParams, AbortController, Headers: HeadersMock, Blob: BlobMock, localStorage: { getItem() { return ""; } }, document, window };
+const instrumented = script.replace("\n  bindEvents();\n})();", "\n  window.__memoTest = { renderMarkdown, state, markDirty, saveCurrent, selectMemo, loadMemos, memoAPI };\n  bindEvents();\n})();");
 if (instrumented === script) throw new Error("memo test instrumentation point was not found");
 vm.runInNewContext(instrumented, context, { filename: scriptPath });
 const rendered = context.window.__memoTest.renderMarkdown("# 清单\n- [x] 完成 <script>alert(1)</script>\n- [ ] 继续 **学习**");
@@ -97,5 +97,20 @@ async function checkSaving() {
   api.state.query='new';await api.loadMemos();releaseOld();await oldLoad;
   if(api.state.notes[0]?.title!=='new')throw new Error('new search was ignored or overwritten by old results');
   console.log('memo request regression passed: latest note selection and search win');
+  const assert = require('node:assert/strict');
+  context.fetch=async()=>({ok:false,status:404,json:async()=>({error:{code:'not_found'}})});
+  await assert.rejects(api.memoAPI('/api/v1/memos/missing'),/已不存在/);
+  context.fetch=async()=>({ok:false,status:404,json:async()=>{throw new Error('not JSON')}});
+  await assert.rejects(api.memoAPI('/api/v1/memos'),/接口不可用/);
+  context.fetch=async()=>({ok:true,status:200,json:async()=>({})});
+  await assert.rejects(api.memoAPI('/api/v1/memos'),/无效数据/);
+  context.fetch=async()=>({ok:true,status:200,json:async()=>{context.localStorage.getItem=()=> 'changed';return {data:[]}}});
+  await assert.rejects(api.memoAPI('/api/v1/memos'),/账号已切换/);
+  let abortRequest;
+  context.window.setTimeout=callback=>{abortRequest=callback;return 1};
+  context.fetch=(_url,options)=>new Promise((_resolve,reject)=>options.signal.addEventListener('abort',()=>reject(Object.assign(new Error('aborted'),{name:'AbortError'}))));
+  const request=api.memoAPI('/api/v1/memos');abortRequest();
+  await assert.rejects(request,/请求超时/);
+  console.log('memo API regression passed: distinct 404 errors, malformed data, account switching and timeout');
 }
 checkSaving().catch(error => { console.error(error); process.exitCode = 1; });

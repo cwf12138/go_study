@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -123,6 +124,14 @@ func TestSnapshotRecoversPreviousValidBackup(t *testing.T) {
 	if err != nil || len(tasks) != 0 {
 		t.Fatalf("backup should contain the previous generation, tasks=%+v error=%v", tasks, err)
 	}
+	// Simulate an immediate restart before the periodic snapshot worker runs.
+	restarted := NewMemory()
+	if err := restarted.LoadJSON(path); err != nil {
+		t.Fatalf("recovery was not durable across immediate restart: %v", err)
+	}
+	if _, err := restarted.UserByEmail(ctx, user.Email); err != nil {
+		t.Fatalf("restarted user: %v", err)
+	}
 }
 
 func TestSnapshotPreservesCorruptFileWithoutBackup(t *testing.T) {
@@ -141,6 +150,38 @@ func TestSnapshotPreservesCorruptFileWithoutBackup(t *testing.T) {
 	}
 	if err := memory.LoadJSON(path); err == nil {
 		t.Fatal("repeated startup must not silently create an empty database")
+	}
+}
+
+func TestConcurrentSnapshotSavesKeepPrimaryAndBackupReadable(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "snapshot.json")
+	memory := NewMemory()
+	if err := memory.CreateUser(context.Background(), domain.User{ID: "snapshot-user", Email: "snapshot@example.com"}); err != nil {
+		t.Fatal(err)
+	}
+	var group sync.WaitGroup
+	for i := 0; i < 16; i++ {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			if err := memory.SaveJSON(path); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	group.Wait()
+	for _, name := range []string{path, path + ".bak"} {
+		data, err := os.ReadFile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		value, err := decodeSnapshot(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(value.Users) != 1 || value.Users[0].ID != "snapshot-user" {
+			t.Fatalf("invalid persisted user in %s", name)
+		}
 	}
 }
 

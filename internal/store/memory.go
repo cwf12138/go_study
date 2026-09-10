@@ -16,6 +16,9 @@ import (
 )
 
 type Memory struct {
+	// Lock order: snapshotMu, then mu. Disk I/O never holds mu.
+	// This serializes one repository's snapshots, not multiple processes.
+	snapshotMu        sync.Mutex
 	mu                sync.RWMutex
 	users             map[string]domain.User
 	emails            map[string]string
@@ -1158,6 +1161,8 @@ func (e *SnapshotRecoveryError) Error() string {
 func (e *SnapshotRecoveryError) Unwrap() error { return e.Cause }
 
 func (m *Memory) SaveJSON(path string) error {
+	m.snapshotMu.Lock()
+	defer m.snapshotMu.Unlock()
 	m.mu.RLock()
 	s := snapshot{Version: 1, SavedAt: time.Now().UTC()}
 	for _, item := range m.users {
@@ -1245,6 +1250,8 @@ func (m *Memory) SaveJSON(path string) error {
 }
 
 func (m *Memory) LoadJSON(path string) error {
+	m.snapshotMu.Lock()
+	defer m.snapshotMu.Unlock()
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		if _, backupErr := os.Stat(path + ".bak"); backupErr == nil {
@@ -1279,6 +1286,11 @@ func (m *Memory) LoadJSON(path string) error {
 			return fmt.Errorf("quarantine invalid data snapshot: %w", quarantineErr)
 		}
 		recoveryErr.QuarantinedPath = quarantinedPath
+		// Rebuild the primary before reporting successful recovery. Otherwise a
+		// crash before the next periodic save leaves only the backup on disk.
+		if err := writeSnapshotFile(path, backupData); err != nil {
+			return fmt.Errorf("restore primary snapshot (original preserved at %q, backup at %q): %w", quarantinedPath, backupPath, err)
+		}
 	}
 
 	m.mu.Lock()
