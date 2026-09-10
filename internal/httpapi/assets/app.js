@@ -13,6 +13,9 @@
     moodInsights: null,
     moodMonth: monthKey(new Date()),
     moodSelectedDate: localDateKey(new Date()),
+    moodDraftRevision: 0,
+    moodDraftSequence: 0,
+    moodSaving: false,
     theme: loadTheme(),
     tasks: [],
     todoLists: [],
@@ -247,6 +250,7 @@
     state.moodInsights = null;
     state.moodMonth = monthKey(new Date());
     state.moodSelectedDate = localDateKey(new Date());
+    state.moodDraftRevision = 0;
     state.tasks = [];
     state.todoLists = [];
     state.todos = [];
@@ -328,6 +332,7 @@
   let refreshVersion = 0;
   async function refresh() {
     const version = ++refreshVersion, token = state.token;
+    const moodMonth = state.moodMonth, moodVersion = moodLoadVersion;
     setSyncStatus("正在同步核心模块…", true);
     const todoListsRequest = api("/api/v1/todo-lists");
     const todosRequest = todoListsRequest.then(() => api(`/api/v1/todos?view=all&date=${localDateKey(new Date())}`));
@@ -367,8 +372,10 @@
     state.goalPage = goalPageResponse.data || [];
     state.goalMeta = goalPageResponse.meta || state.goalMeta;
     state.goals = activeGoalsResponse.data || [];
-    state.moodEntries = moods || [];
-    state.moodInsights = moodInsights || null;
+    if (moodMonth === state.moodMonth && moodVersion === moodLoadVersion) {
+      state.moodEntries = moods || [];
+      state.moodInsights = moodInsights || null;
+    }
     state.tasks = tasks;
     state.todoLists = todoLists || [];
     state.todos = todos || [];
@@ -529,11 +536,11 @@
       if (entry) classes.push("has-entry");
       if (date === state.moodSelectedDate) classes.push("selected");
       if (date === localDateKey(new Date())) classes.push("today");
-      cells.push(`<button class="${classes.join(" ")}" type="button" data-mood-date="${date}" aria-label="${date}${option ? `，${option.label}` : "，尚未记录"}"><span class="mood-date">${day}</span><span class="mood-face">${option?.emoji || ""}</span></button>`);
+      cells.push(`<button class="${classes.join(" ")}" type="button" data-mood-date="${date}" data-emotion="${entry?.mood || 'none'}" aria-pressed="${date === state.moodSelectedDate}" ${date === localDateKey(new Date()) ? 'aria-current="date"' : ''} aria-label="${date}${option ? `，${option.label}` : "，尚未记录"}${entry?.note ? '，有日记' : ''}"><span class="mood-date">${day}</span><span class="mood-face">${option?.emoji || '·'}</span>${entry?.note ? '<i class="mood-diary-dot" aria-hidden="true"></i>' : ''}</button>`);
     }
     calendar.innerHTML = cells.join("");
     $("#mood-month-title").textContent = new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long" }).format(firstDay);
-    renderMoodForm(entryByDate.get(state.moodSelectedDate));
+    if (!state.moodDraftRevision && !state.moodSaving) renderMoodForm(entryByDate.get(state.moodSelectedDate));
     renderMoodInsights();
     renderMoodTrend();
   }
@@ -546,6 +553,7 @@
       const selected = button.dataset.moodChoice === mood;
       button.classList.toggle("selected", selected);
       button.setAttribute("aria-checked", String(selected));
+      button.setAttribute("role", "radio"); button.tabIndex = selected ? 0 : -1;
     });
     $("#mood-note").value = entry?.note || "";
     $("#mood-tags").value = (entry?.tags || []).join(", ");
@@ -554,8 +562,9 @@
     $("#mood-stress-value").textContent = $("#mood-stress").value;
     $("#mood-energy-value").textContent = $("#mood-energy").value;
     const activities = new Set(entry?.activities || []);
-    $$('[data-mood-activity]').forEach((button) => button.classList.toggle("selected", activities.has(button.dataset.moodActivity)));
+    $$('[data-mood-activity]').forEach((button) => { button.classList.toggle("selected", activities.has(button.dataset.moodActivity)); button.setAttribute("aria-pressed", String(activities.has(button.dataset.moodActivity))); });
     $("#delete-mood-entry").disabled = !entry;
+    updateMoodDraftStatus(entry ? "这一天的记录已保存" : "还没有记录，慢慢写就好");
   }
 
   function renderMoodInsights() {
@@ -582,11 +591,12 @@
   function renderMoodTrend() {
     const container = $("#mood-trend");
     const caption = $("#mood-trend-caption");
-    const entries = state.moodEntries.map((entry) => ({ ...entry, score: moodOptions.findIndex((option) => option.value === entry.mood) + 1 })).filter((entry) => entry.score > 0);
+    const entries = state.moodEntries.map((entry) => ({ ...entry, score: moodOptions.findIndex((option) => option.value === entry.mood) + 1 })).filter((entry) => entry.score > 0 && entry.date.startsWith(state.moodMonth)).sort((a,b) => a.date.localeCompare(b.date));
     if (!entries.length) {
       caption.textContent = "等待记录";
       container.className = "mood-trend empty-state";
       container.textContent = "记录几天心情后，这里会呈现你的变化轨迹。";
+      container.setAttribute("aria-label", "本月没有心情记录");
       return;
     }
     const [year, month] = state.moodMonth.split("-").map(Number);
@@ -603,31 +613,40 @@
     const average = Number(state.moodInsights?.average_mood || 0).toFixed(1);
     caption.textContent = `已记录 ${entries.length} 天 · 平均 ${average}`;
     const grid = moodOptions.map((option, index) => `<line x1="${left}" y1="${y(index + 1)}" x2="${width - right}" y2="${y(index + 1)}" class="mood-trend-grid"/><text x="3" y="${y(index + 1) + 4}" class="mood-trend-label">${option.emoji}</text>`).join("");
-    const polyline = points.map((point) => `${point.x},${point.y}`).join(" ");
+    const segments = []; let segment = [];
+    for (const point of points) { if (segment.length && point.day !== segment[segment.length-1].day + 1) { segments.push(segment); segment=[]; } segment.push(point); }
+    if (segment.length) segments.push(segment);
+    const polylines = segments.filter(group=>group.length>1).map(group=>`<polyline points="${group.map(point=>`${point.x},${point.y}`).join(' ')}" class="mood-trend-line"/>`).join('');
     const dots = points.map((point) => {
       const option = moodOptions[point.score - 1];
       return `<circle cx="${point.x}" cy="${point.y}" r="5" class="mood-trend-dot"><title>${point.date} · ${option.label}</title></circle>`;
     }).join("");
     const labels = [1, Math.ceil(daysInMonth / 2), daysInMonth].map((day) => `<text x="${x(day)}" y="${height - 8}" text-anchor="middle" class="mood-trend-axis">${day}日</text>`).join("");
     container.className = "mood-trend";
-    container.innerHTML = `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true">${grid}<polyline points="${polyline}" class="mood-trend-line"/>${dots}${labels}</svg>`;
+    container.setAttribute("aria-label", `本月心情记录，未记录日期不连线。${entries.map(entry=>`${entry.date} ${moodOptions[entry.score-1].label}`).join('；')}`);
+    container.innerHTML = `<svg viewBox="0 0 ${width} ${height}" aria-hidden="true">${grid}${polylines}${dots}${labels}</svg><p class="mood-chart-note">每个圆点代表一次记录，空白日期不推测。心情没有标准答案。</p>`;
   }
 
+  let moodLoadVersion = 0;
   async function refreshMoods() {
+    const version = ++moodLoadVersion, month = state.moodMonth, token = state.token;
     const [entries, insights] = await Promise.all([
       api(`/api/v1/moods?month=${state.moodMonth}`),
       api(`/api/v1/moods/insights?month=${state.moodMonth}`),
     ]);
+    if (version !== moodLoadVersion || month !== state.moodMonth || token !== state.token) return;
     state.moodEntries = entries || [];
     state.moodInsights = insights || null;
     renderMoods();
   }
 
   async function shiftMoodMonth(offset) {
+    if (!canLeaveMoodDraft()) return;
     const [year, month] = state.moodMonth.split("-").map(Number);
     const next = new Date(year, month - 1 + offset, 1);
     state.moodMonth = monthKey(next);
     if (!state.moodSelectedDate.startsWith(state.moodMonth)) state.moodSelectedDate = `${state.moodMonth}-01`;
+    state.moodEntries = []; state.moodInsights = null; renderMoods();
     try {
       await refreshMoods();
     } catch (error) {
@@ -637,34 +656,61 @@
 
   async function saveMoodEntry(event) {
     event.preventDefault();
+    if (state.moodSaving) return;
+    const revision = state.moodDraftRevision, date = state.moodSelectedDate;
+    state.moodSaving = true; updateMoodDraftStatus("正在保存…");
     const button = event.currentTarget.querySelector('button[type="submit"]');
     button.disabled = true;
     try {
       const activities = $$('[data-mood-activity].selected').map((item) => item.dataset.moodActivity);
-      const tags = $("#mood-tags").value.split(",").map((tag) => tag.trim()).filter(Boolean);
-      await api(`/api/v1/moods/${state.moodSelectedDate}`, { method: "PUT", body: JSON.stringify({ mood: $("#mood-value").value, note: $("#mood-note").value, activities, tags, stress: Number($("#mood-stress").value), energy: Number($("#mood-energy").value) }) });
-      await refreshMoods();
-      notify("心情日记已保存。");
+      const tags = $("#mood-tags").value.split(/[,，]/).map((tag) => tag.trim()).filter(Boolean);
+      const saved = await api(`/api/v1/moods/${date}`, { method: "PUT", body: JSON.stringify({ mood: $("#mood-value").value, note: $("#mood-note").value, activities, tags, stress: Number($("#mood-stress").value), energy: Number($("#mood-energy").value) }) });
+      if (date === state.moodSelectedDate && revision === state.moodDraftRevision) state.moodDraftRevision = 0;
+      state.moodEntries = state.moodEntries.filter(entry=>entry.date!==date); if(saved) state.moodEntries.push(saved);
+      try { await refreshMoods(); } catch (_) { notify("日记已保存，但月度统计暂未更新。", "error"); }
+      updateMoodDraftStatus(state.moodDraftRevision ? "已保存提交内容，仍有新修改未保存" : "这一天的记录已保存");
     } catch (error) {
+      updateMoodDraftStatus("保存失败，输入内容仍在，请重试");
       notify(error.message, "error");
     } finally {
+      state.moodSaving = false;
       button.disabled = false;
+      $("#delete-mood-entry").disabled = !state.moodEntries.some(entry=>entry.date===state.moodSelectedDate);
     }
+  }
+
+  function updateMoodDraftStatus(message) {
+    $("#mood-draft-status").textContent = message || "有未保存修改 · 请点击保存这一天";
+    $("#mood-note-count").textContent = `${$("#mood-note").value.length} / 6000`;
+  }
+  function markMoodDraft() { state.moodDraftRevision = ++state.moodDraftSequence; updateMoodDraftStatus(); }
+  function canLeaveMoodDraft() {
+    if (state.moodSaving) { notify("正在保存，请稍等片刻再切换日期。", "error"); return false; }
+    if (state.moodDraftRevision && !window.confirm("这一天的日记尚未保存，放弃修改并切换日期吗？")) return false;
+    state.moodDraftRevision = 0; return true;
   }
 
   async function deleteMoodEntry() {
     const exists = state.moodEntries.some((entry) => entry.date === state.moodSelectedDate);
     if (!exists) return;
+    if (state.moodSaving || !window.confirm("删除这一天的心情记录和日记？尚未保存的修改也会丢弃，此操作无法撤销。")) return;
+    state.moodSaving = true;
+    $("#mood-form").inert = true;
     const button = $("#delete-mood-entry");
     button.disabled = true;
     try {
       await api(`/api/v1/moods/${state.moodSelectedDate}`, { method: "DELETE" });
-      await refreshMoods();
+      state.moodDraftRevision = 0;
+      state.moodEntries = state.moodEntries.filter(entry=>entry.date!==state.moodSelectedDate);
+      renderMoodForm();
+      try { await refreshMoods(); } catch (_) { notify("记录已删除，但统计暂未更新。", "error"); }
       notify("当天的心情记录已删除。");
     } catch (error) {
       notify(error.message, "error");
     } finally {
-      button.disabled = false;
+      state.moodSaving = false;
+      $("#mood-form").inert = false;
+      button.disabled = !state.moodEntries.some(entry=>entry.date===state.moodSelectedDate);
     }
   }
 
@@ -1709,20 +1755,23 @@
       }
       const moodDay = event.target.closest("[data-mood-date]");
       if (moodDay) {
+        if (moodDay.dataset.moodDate !== state.moodSelectedDate && !canLeaveMoodDraft()) return;
         state.moodSelectedDate = moodDay.dataset.moodDate;
         renderMoods();
       }
       const moodChoice = event.target.closest("[data-mood-choice]");
       if (moodChoice) {
+        markMoodDraft();
         $("#mood-value").value = moodChoice.dataset.moodChoice;
         $$('[data-mood-choice]').forEach((button) => {
           const selected = button === moodChoice;
           button.classList.toggle("selected", selected);
           button.setAttribute("aria-checked", String(selected));
+          button.setAttribute("role", "radio"); button.tabIndex = selected ? 0 : -1;
         });
       }
       const moodActivity = event.target.closest("[data-mood-activity]");
-      if (moodActivity) moodActivity.classList.toggle("selected");
+      if (moodActivity) { moodActivity.classList.toggle("selected"); moodActivity.setAttribute("aria-pressed", String(moodActivity.classList.contains("selected"))); markMoodDraft(); }
     });
     document.addEventListener("keydown", (event) => {
       const taskCard = event.target.closest?.("[data-task-swipe-card]");
@@ -1871,6 +1920,19 @@
     });
     $("#focus-task").addEventListener("change", renderFocusTaskPreview);
     $("#mood-prev-month").addEventListener("click", () => shiftMoodMonth(-1));
+    $("#mood-form").addEventListener("input", markMoodDraft);
+    $("#mood-today").addEventListener("click", async () => {
+      if (!canLeaveMoodDraft()) return;
+      state.moodMonth = monthKey(new Date()); state.moodSelectedDate = localDateKey(new Date());
+      state.moodEntries=[];state.moodInsights=null;renderMoods();
+      try { await refreshMoods(); } catch (error) { notify(error.message,"error"); }
+    });
+    $(".mood-picker").addEventListener("keydown", event => {
+      const buttons=$$('[data-mood-choice]'), index=buttons.indexOf(event.target);
+      if(index<0 || !["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(event.key))return;
+      event.preventDefault();const next=(index+(["ArrowLeft","ArrowUp"].includes(event.key)?-1:1)+buttons.length)%buttons.length;buttons[next].click();buttons[next].focus();
+    });
+    window.addEventListener("beforeunload", event => { if(state.moodDraftRevision || state.moodSaving) { event.preventDefault(); event.returnValue=""; } });
     $("#mood-next-month").addEventListener("click", () => shiftMoodMonth(1));
     $("#mood-stress").addEventListener("input", () => { $("#mood-stress-value").textContent = $("#mood-stress").value; });
     $("#mood-energy").addEventListener("input", () => { $("#mood-energy-value").textContent = $("#mood-energy").value; });

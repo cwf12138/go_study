@@ -6,6 +6,7 @@
     <meta name="description" content="StudyFlow 学习成长与专注管理控制台">
     <title>StudyFlow · 学习控制台</title>
     <link rel="stylesheet" href="/static/styles.css?v=20260901-6">
+    <link rel="stylesheet" href="/static/mood-journal.css?v=20260910-1">
     <link rel="stylesheet" href="/static/timeline.css?v=20260910-1">
     <link rel="stylesheet" href="/static/sync-status.css?v=20260909-1">
     <link rel="stylesheet" href="/static/weather.css?v=20260909-1">
@@ -118,7 +119,7 @@
           </section>
 
           <section id="panel-moods" class="panel">
-            <div class="section-intro"><div><p class="eyebrow">MOOD JOURNAL</p><h3>心情日记</h3><p>用一个表情记录一天，也给情绪留下一段只属于自己的文字。</p></div></div>
+            <div class="mood-journal-hero"><div><p class="eyebrow">A LITTLE SPACE FOR YOURSELF</p><h3>给每一种心情，留一个位置。</h3><p>不必每天都很好。记下一点感受，也是一种照顾自己的方式。</p><button id="mood-today" class="quiet" type="button">回到今天 ↗</button></div><div class="mood-hero-art" aria-hidden="true"><span>☁</span><b>☺</b><i>✦</i></div></div>
             <div class="mood-workspace">
               <div class="mood-main-column">
                 <article class="surface mood-calendar-card">
@@ -139,10 +140,10 @@
                     <div><span class="mood-field-label">今天发生了什么？</span><div id="mood-activities" class="mood-activities"><button type="button" data-mood-activity="学习">学习</button><button type="button" data-mood-activity="工作">工作</button><button type="button" data-mood-activity="运动">运动</button><button type="button" data-mood-activity="社交">社交</button><button type="button" data-mood-activity="休息">休息</button><button type="button" data-mood-activity="睡眠不足">睡眠不足</button></div></div>
                     <label>日记<textarea id="mood-note" rows="5" maxlength="6000" placeholder="写下今天值得记住的片段、感受或念头…"></textarea></label>
                     <label>关键词（逗号分隔）<input id="mood-tags" maxlength="600" placeholder="例如：考试、朋友、成就感"></label>
-                    <button class="primary" type="submit">保存这一天</button>
+                    <div class="mood-writing-meta"><span id="mood-draft-status" role="status" aria-live="polite">选择一天开始记录</span><span id="mood-note-count">0 / 6000</span></div><button class="primary" type="submit">保存这一天</button>
                   </form>
                 </article>
-                <article class="surface mood-insights-card"><div class="mood-entry-head"><div><p class="eyebrow">MONTHLY INSIGHTS</p><h3>本月回顾</h3></div><span id="mood-logged-days" class="pill">0 天</span></div><div class="mood-metrics"><div><span>平均心情</span><strong id="mood-average">–</strong></div><div><span>连续记录</span><strong id="mood-streak">0</strong></div><div><span>平均压力</span><strong id="mood-stress-average">–</strong></div><div><span>平均精力</span><strong id="mood-energy-average">–</strong></div></div><div id="mood-distribution" class="mood-distribution"></div><div class="mood-activity-summary"><span>常见活动</span><div id="mood-top-activities">本月还没有活动记录</div></div></article>
+<article class="surface mood-insights-card"><div class="mood-entry-head"><div><p class="eyebrow">MONTHLY INSIGHTS</p><h3>本月回顾</h3></div><span id="mood-logged-days" class="pill">0 天</span></div><div class="mood-metrics"><div><span>平均心情</span><strong id="mood-average">–</strong></div><div><span>最长连续记录</span><strong id="mood-streak">0</strong></div><div><span>平均压力</span><strong id="mood-stress-average">–</strong></div><div><span>平均精力</span><strong id="mood-energy-average">–</strong></div></div><div id="mood-distribution" class="mood-distribution"></div><div class="mood-activity-summary"><span>常见活动</span><div id="mood-top-activities">本月还没有活动记录</div></div></article>
               </div>
             </div>
           </section>
