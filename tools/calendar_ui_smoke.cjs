@@ -39,7 +39,7 @@ const scriptPath = path.join(__dirname, "..", "internal", "httpapi", "assets", "
 let source = fs.readFileSync(scriptPath, "utf8");
 const instrumented = source.replace(
   /\n  bind\(\);\r?\n\}\)\(\);\s*$/,
-  "\n  window.__calendarTest = { parseWikipediaHistory };\n  bind();\n})();\n",
+  "\n  window.__calendarTest = { parseWikipediaHistory, state, renderCalendar };\n  bind();\n})();\n",
 );
 if (instrumented === source) throw new Error("calendar test instrumentation point was not found");
 vm.runInNewContext(instrumented, context, { filename: scriptPath });
@@ -67,3 +67,9 @@ if (history.length !== 3 || history[0].year !== 2004 || history[2].year !== -550
 }
 
 console.log(`calendar UI smoke ok: ${cells} day cells, title=${getElement("#calendar-title").textContent}, history=${history.length}`);
+for (const view of ['year', 'month', 'week', 'day']) {
+  context.window.__calendarTest.state.view = view;
+  context.window.__calendarTest.renderCalendar();
+  if (getElement('#panel-calendar').dataset.calendarMode !== view) throw new Error(`calendar mode missing: ${view}`);
+}
+console.log('calendar responsive view hooks passed: year, month, week, day');

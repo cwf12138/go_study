@@ -43,6 +43,18 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 		t.Fatalf("javascript cache control = %q", cacheControl)
 	}
 
+	if !strings.Contains(home.Body.String(), `/static/organizer-studio.css?v=`) {
+		t.Fatal("calendar and memos shared presentation stylesheet is missing")
+	}
+	organizerStyles := httptest.NewRecorder()
+	handler.ServeHTTP(organizerStyles, httptest.NewRequest(http.MethodGet, "/static/organizer-studio.css?v=test", nil))
+	if organizerStyles.Code != http.StatusOK || !strings.HasPrefix(organizerStyles.Header().Get("Content-Type"), "text/css") || !strings.Contains(organizerStyles.Body.String(), "#panel-memos") || !strings.Contains(organizerStyles.Body.String(), "#panel-calendar") {
+		t.Fatalf("organizer stylesheet status = %d", organizerStyles.Code)
+	}
+	if !strings.Contains(organizerStyles.Header().Get("Cache-Control"), "must-revalidate") {
+		t.Fatal("organizer styles must be revalidated")
+	}
+
 	if !strings.Contains(home.Body.String(), `/static/focus-studio.css?v=`) || !strings.Contains(home.Body.String(), `id="focus-phase-track"`) || !strings.Contains(home.Body.String(), `form="focus-form"`) {
 		t.Fatal("focus studio stylesheet, phase track or form submission control is missing")
 	}

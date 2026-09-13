@@ -95,6 +95,7 @@
       day: new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long", day: "numeric", weekday: "long" }).format(anchor),
     };
     $("#calendar-title").textContent = titles[state.view];
+    $("#panel-calendar").dataset.calendarMode = state.view;
     document.querySelectorAll("[data-calendar-view]").forEach((button) => button.classList.toggle("active", button.dataset.calendarView === state.view));
     $("#calendar-weekdays").classList.toggle("hidden", state.view !== "month");
     if (state.view === "year") renderYear(); else if (state.view === "month") renderMonth(); else renderTimeView();

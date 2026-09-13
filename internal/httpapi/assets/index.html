@@ -23,6 +23,7 @@
     <link rel="stylesheet" href="/static/english.css?v=20260901-7">
     <link rel="stylesheet" href="/static/literature.css?v=20260902-1">
     <link rel="stylesheet" href="/static/literature-product.css?v=20260909-1">
+    <link rel="stylesheet" href="/static/organizer-studio.css?v=20260914-1">
   </head>
   <body>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -151,6 +152,7 @@
           </section>
 
           <section id="panel-calendar" class="panel">
+            <header class="organizer-heading"><div><p class="eyebrow">THE ART OF EVERYDAY · 四时有序</p><h3>把日子，过成喜欢的节奏。</h3><p>安排重要的事，也为生活留一点空白。</p></div><div class="organizer-emblem" aria-hidden="true"><i></i><span>日有小暖<br>岁有从容</span></div></header>
             <div class="calendar-shell">
               <div class="calendar-toolbar">
                 <div class="calendar-nav-actions"><button id="calendar-today" class="quiet" type="button">今天</button><button id="calendar-prev" class="icon-button" type="button" aria-label="上一段">‹</button><button id="calendar-next" class="icon-button" type="button" aria-label="下一段">›</button><h3 id="calendar-title">日历</h3></div>
@@ -158,6 +160,7 @@
               </div>
               <div class="calendar-layout">
                 <article class="surface calendar-main-card">
+                  <div class="calendar-sheet-caption"><span>日程手账</span><small>选择日期，查看当天的安排与农历</small></div>
                   <div id="calendar-weekdays" class="calendar-weekdays"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span class="weekend">六</span><span class="weekend">日</span></div>
                   <div id="calendar-canvas" class="calendar-canvas" aria-live="polite"></div>
                   <div class="calendar-legend"><span><i class="legend-event"></i>个人日程</span><span><i class="legend-plan"></i>学习计划</span><span><i class="legend-task"></i>任务/待办</span><span><i class="legend-mood"></i>心情记录</span><small>快捷键：T 今天 · M/W/D/Y 切换视图 · ←/→ 翻页 · C 新建</small></div>
@@ -189,11 +192,11 @@
 
           <section id="panel-memos" class="panel">
             <div class="memo-heading">
-              <div><p class="eyebrow">PERSONAL NOTES</p><h3>备忘录</h3><p>快速记录此刻，也把重要内容整理成随时找得到的个人资料。</p></div>
+              <div><p class="eyebrow">A PLACE FOR YOUR THOUGHTS · 随记</p><h3>让每一个念头，有处安放。</h3><p>捕捉灵感，整理思绪，慢慢写下属于你的积累。</p></div>
               <div class="memo-heading-actions"><label class="memo-search"><span>⌕</span><input id="memo-search" type="search" placeholder="搜索备忘录、正文或标签" autocomplete="off"></label><button id="memo-new" class="primary" type="button">＋ 新建备忘录</button></div>
             </div>
             <div class="memo-utility-bar">
-              <span>记录 · 整理 · 沉淀</span>
+              <span>随手记下 · 有序收藏 · 安静写作</span>
               <div><select id="memo-template" aria-label="从模板新建备忘录"><option value="">从模板新建…</option><option value="study">学习笔记</option><option value="meeting">讨论记录</option><option value="daily">每日回顾</option></select><button id="memo-save" class="quiet" type="button" title="立即保存（Ctrl / ⌘ + S）">保存</button><button id="memo-focus" class="quiet" type="button" aria-pressed="false">专心写作</button></div>
             </div>
             <div class="memo-workspace">
@@ -223,12 +226,12 @@
                 <div id="memo-editor" class="memo-editor hidden">
                   <header class="memo-editor-head"><button id="memo-mobile-list" type="button" aria-label="返回备忘录列表">‹</button><div id="memo-editor-actions" class="memo-editor-actions"><button id="memo-pin" type="button" title="置顶" aria-label="置顶">☆</button><button id="memo-archive" type="button" title="归档" aria-label="归档">▣</button><button id="memo-duplicate" type="button" title="创建副本" aria-label="创建副本">▧</button><button id="memo-download" type="button" title="导出 Markdown" aria-label="导出 Markdown">⇩</button><button id="memo-trash" class="memo-danger" type="button" title="移到最近删除" aria-label="移到最近删除">⌫</button></div><div id="memo-trash-actions" class="memo-trash-actions hidden"><button id="memo-restore" class="quiet" type="button">恢复</button><button id="memo-delete-permanent" class="memo-danger-button" type="button">永久删除</button></div></header>
                   <div class="memo-editor-scroll">
-                    <input id="memo-title" class="memo-title-input" maxlength="160" placeholder="标题">
+                    <input id="memo-title" class="memo-title-input" maxlength="160" placeholder="给这个念头起个名字" aria-label="备忘录标题">
                     <div id="memo-updated" class="memo-updated">尚未保存</div>
                     <div class="memo-formatbar" role="toolbar" aria-label="文本格式">
                       <button type="button" data-memo-prefix="# " title="大标题">H1</button><button type="button" data-memo-prefix="## " title="小标题">H2</button><span></span><button type="button" data-memo-wrap="**" title="粗体"><b>B</b></button><button type="button" data-memo-wrap="*" title="斜体"><i>I</i></button><button type="button" data-memo-prefix="- " title="项目列表">•≡</button><button type="button" data-memo-prefix="1. " title="编号列表">1≡</button><button type="button" data-memo-prefix="- [ ] " title="待办清单">☑</button><button type="button" data-memo-prefix="> " title="引用">❝</button><button type="button" data-memo-wrap="`" title="行内代码">&lt;/&gt;</button><button type="button" data-memo-link title="插入链接">↗</button><button id="memo-preview-toggle" type="button" title="切换预览">◫</button>
                     </div>
-                    <textarea id="memo-content" maxlength="100000" spellcheck="true" placeholder="开始记录…&#10;&#10;输入 - [ ] 可以创建可勾选的清单。"></textarea>
+                    <textarea id="memo-content" maxlength="100000" spellcheck="true" aria-label="备忘录正文" placeholder="从一句话开始，不必急着写完整…&#10;&#10;输入 - [ ] 可以创建可勾选的清单。"></textarea>
                     <div id="memo-preview" class="memo-preview hidden"></div>
                   </div>
                   <footer class="memo-editor-footer"><div class="memo-properties"><label>文件夹<select id="memo-folder-select"><option value="">备忘录</option></select></label><label>标签<input id="memo-tags" maxlength="1200" placeholder="用逗号分隔"></label><fieldset><legend>颜色</legend><div class="memo-color-picker"><button class="active default" type="button" data-memo-color="default" aria-label="默认"></button><button class="yellow" type="button" data-memo-color="yellow" aria-label="黄色"></button><button class="orange" type="button" data-memo-color="orange" aria-label="橙色"></button><button class="rose" type="button" data-memo-color="rose" aria-label="玫红"></button><button class="violet" type="button" data-memo-color="violet" aria-label="紫色"></button><button class="blue" type="button" data-memo-color="blue" aria-label="蓝色"></button><button class="mint" type="button" data-memo-color="mint" aria-label="薄荷绿"></button></div></fieldset></div><div class="memo-save-meta"><span id="memo-word-count">0 字</span><span id="memo-save-state"><i></i>所有更改已保存</span></div></footer>
@@ -551,7 +554,7 @@
     <script src="/static/app.js?v=20260911-tasks" defer></script>
     <script src="/static/timeline.js?v=20260910-1" defer></script>
     <script src="/static/weather.js?v=20260909-1" defer></script>
-    <script src="/static/calendar.js?v=20260901-6" defer></script>
+    <script src="/static/calendar.js?v=20260914-1" defer></script>
     <script src="/static/knowledge.js?v=20260904-1" defer></script>
     <script src="/static/memos.js?v=20260909-1" defer></script>
     <script src="/static/english.js?v=20260901-7" defer></script>
