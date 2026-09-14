@@ -26,6 +26,7 @@
     <link rel="stylesheet" href="/static/literature-product.css?v=20260909-1">
     <link rel="stylesheet" href="/static/organizer-studio.css?v=20260914-1">
     <link rel="stylesheet" href="/static/growth-studio.css?v=20260915-1">
+    <link rel="stylesheet" href="/static/action-studio.css?v=20260915-1">
   </head>
   <body>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -342,7 +343,7 @@
           </section>
 
           <section id="panel-todo" class="panel">
-            <div class="section-intro"><div><p class="eyebrow">TODO LIST</p><h3>待办清单</h3><p>先收集，再把真正重要的事放进“我的一天”。学习任务负责学习计划，待办清单负责生活与工作中的下一步。</p></div></div>
+            <header class="action-heading"><div><p class="eyebrow">EVERYDAY LIST · 日常有序</p><h3>把琐事放下，把今天过好。</h3><p>先收集，再选择。让真正重要的事，留在“我的一天”。</p></div><div class="action-heading-mark" aria-hidden="true"><span>✓</span><i></i><i></i></div></header>
             <div class="todo-workspace">
               <aside class="surface todo-nav-card">
                 <div class="todo-nav-head"><div><p class="eyebrow">SMART LISTS</p><h3>我的清单</h3></div></div>
@@ -355,11 +356,11 @@
                 </div>
                 <div class="todo-list-divider"><span>我的分类</span></div>
                 <div id="todo-custom-lists" class="todo-custom-lists"></div>
-                <form id="todo-list-form" class="todo-new-list-form"><input id="todo-list-name" maxlength="80" required placeholder="新建分类，例如：生活"><input id="todo-list-color" type="color" value="#7c4dff" aria-label="分类颜色"><button class="quiet" type="submit">添加</button></form>
+                <form id="todo-list-form" class="todo-new-list-form"><input id="todo-list-name" maxlength="80" required aria-label="新分类名称" placeholder="新建分类，例如：生活"><input id="todo-list-color" type="color" value="#7c4dff" aria-label="分类颜色"><button class="quiet" type="submit">添加</button></form>
               </aside>
               <article class="surface todo-main-card">
                 <div class="todo-main-head"><div><p id="todo-view-kicker" class="eyebrow">MY DAY</p><h3 id="todo-view-title">我的一天</h3><p id="todo-view-description">从收集箱中挑选今天真正要完成的事。</p></div><span id="todo-view-count" class="pill">0 项</span></div>
-                <div class="todo-toolbar"><label class="todo-search"><span aria-hidden="true">⌕</span><input id="todo-search" type="search" placeholder="搜索标题、备注或标签"></label><select id="todo-priority-filter" aria-label="按优先级筛选"><option value="">全部优先级</option><option value="high">高优先级</option><option value="medium">中优先级</option><option value="low">低优先级</option></select><select id="todo-tag-filter" aria-label="按标签筛选"><option value="">全部标签</option></select></div>
+                <div class="todo-toolbar"><label class="todo-search"><span aria-hidden="true">⌕</span><input id="todo-search" type="search" aria-label="搜索待办标题、备注或标签" placeholder="搜索标题、备注或标签"></label><select id="todo-priority-filter" aria-label="按优先级筛选"><option value="">全部优先级</option><option value="high">高优先级</option><option value="medium">中优先级</option><option value="low">低优先级</option></select><select id="todo-tag-filter" aria-label="按标签筛选"><option value="">全部标签</option></select></div>
                 <div id="todo-items" class="todo-items empty-state">正在加载待办…</div>
                 <section id="todo-suggestions" class="todo-suggestions hidden"><div class="todo-suggestions-head"><div><p class="eyebrow">SUGGESTIONS</p><h4>可加入今天</h4></div><span>从未完成事项中挑选</span></div><div id="todo-suggestion-items" class="todo-suggestion-items"></div></section>
               </article>
@@ -368,11 +369,11 @@
           </section>
 
           <section id="panel-planner" class="panel">
-            <div class="section-intro planner-intro"><div><p class="eyebrow">SMART PLANNER</p><h3>智能学习规划</h3><p>把任务、待办和单词学习放进真实可执行的时间表；优先级变化或计划落后时，可以随时重新排程。</p></div><div class="planner-week-actions"><button id="planner-prev-week" class="quiet" type="button" aria-label="上一周">←</button><button id="planner-current-week" class="quiet" type="button">本周</button><button id="planner-next-week" class="quiet" type="button" aria-label="下一周">→</button><button id="planner-generate" class="primary" type="button">智能排程</button></div></div>
+            <header class="section-intro planner-intro action-heading"><div><p class="eyebrow">WEEKLY STUDIO · 时间有度</p><h3>为重要的事，留一段好时光。</h3><p>把学习安排进真实的生活。按可用时间规划，也给变化留出余地。</p></div><div class="planner-week-actions"><button id="planner-prev-week" class="quiet" type="button" aria-label="上一周">←</button><button id="planner-current-week" class="quiet" type="button">本周</button><button id="planner-next-week" class="quiet" type="button" aria-label="下一周">→</button><button id="planner-generate" class="primary" type="button">✦ 智能排程</button></div></header>
             <div class="planner-stat-grid"><article><span>本周计划</span><strong id="planner-planned-minutes">0</strong><small>分钟</small></article><article><span>已完成</span><strong id="planner-completed-minutes">0</strong><small>分钟</small></article><article><span>容量利用率</span><strong id="planner-utilization">0%</strong><small id="planner-capacity">容量 0 分钟</small></article><article><span>未排程</span><strong id="planner-unscheduled-count">0</strong><small id="planner-unscheduled-minutes">0 分钟待安排</small></article></div>
             <article class="surface planner-calendar-card">
               <div class="planner-calendar-head"><div><p class="eyebrow">WEEKLY TIMEBOX</p><h3 id="planner-week-title">本周计划</h3></div><div class="planner-legend"><span><i class="task"></i>任务</span><span><i class="todo"></i>待办</span><span><i class="vocabulary"></i>单词</span><span><i class="custom"></i>自定义</span><button id="planner-settings-toggle" class="quiet" type="button">规划设置</button></div></div>
-              <div id="planner-calendar" class="planner-calendar" aria-label="一周学习时间表"></div>
+              <p class="action-calendar-hint">点击时间块查看详情或调整安排；窄屏下可横向滚动查看完整一周。</p><div class="action-calendar-viewport" role="region" aria-label="一周学习时间表，可横向滚动" tabindex="0"><div id="planner-calendar" class="planner-calendar" aria-label="一周学习时间表"></div></div>
             </article>
             <div class="planner-lower-grid">
               <article class="surface planner-agenda-card"><div class="planner-card-head"><div><p class="eyebrow">AGENDA</p><h3>时间块详情</h3></div></div><div id="planner-block-detail" class="planner-block-detail empty-state">点击日历中的时间块查看详情，或从右侧手动添加一个安排。</div></article>
