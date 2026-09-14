@@ -25,6 +25,7 @@
     <link rel="stylesheet" href="/static/literature.css?v=20260902-1">
     <link rel="stylesheet" href="/static/literature-product.css?v=20260909-1">
     <link rel="stylesheet" href="/static/organizer-studio.css?v=20260914-1">
+    <link rel="stylesheet" href="/static/growth-studio.css?v=20260915-1">
   </head>
   <body>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -123,10 +124,10 @@
             <article class="surface habit-calendar-card"><p class="eyebrow">YOUR CONSISTENCY</p><h3 id="habit-detail-title">选择一个习惯</h3><p id="habit-detail-meta" class="habit-footnote">在月历中查看、补记或撤销打卡。</p><div class="habit-month-nav"><button id="habit-prev" class="quiet" type="button" aria-label="上个月">‹</button><strong id="habit-month-label"></strong><button id="habit-next" class="quiet" type="button" aria-label="下个月">›</button></div><div class="habit-weekdays" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div><div id="habit-calendar" class="habit-calendar"></div><div id="habit-detail-stats" class="habit-detail-stats"></div><button id="habit-current-month" class="text-button" type="button">回到当前月</button><p class="habit-footnote">点击日期即可打卡，再次点击可撤销。仅可记录创建日起至今天；归档后只读。今天尚未打卡时，连续天数暂保留到昨天。</p></article></div>
           </section>
           <section id="panel-goals" class="panel">
-            <div class="section-intro"><div><p class="eyebrow">GOALS</p><h3>学习目标</h3><p>为重要的学习方向设定边界、截止日期与清晰状态。</p></div></div>
+            <header class="growth-heading"><div><p class="eyebrow">GOAL ATELIER · 心有所向</p><h3>让想抵达的远方，慢慢清晰。</h3><p>留住重要的方向，给每一个愿望一个开始。</p></div><div class="growth-orbit" aria-hidden="true"><span>↗</span><i></i></div></header>
             <div class="two-column wide-left">
               <article class="surface goals-surface"><div class="goals-toolbar"><label>状态<select id="goal-status-filter"><option value="">全部状态</option><option value="active">进行中</option><option value="completed">已完成</option><option value="archived">已归档</option></select></label><label>排序<select id="goal-sort"><option value="created_at">创建时间</option><option value="updated_at">更新时间</option><option value="deadline">截止日期</option><option value="title">目标名称</option></select></label><label>顺序<select id="goal-order"><option value="desc">从新到旧</option><option value="asc">从旧到新</option></select></label><span id="goals-summary" class="goals-summary">正在加载…</span></div><div id="goals-list" class="goal-list empty-state">正在加载目标…</div><nav id="goals-pagination" class="pagination hidden" aria-label="目标列表分页"></nav></article>
-              <article class="surface form-surface"><h3>新建目标</h3><form id="goal-form" class="form-grid"><label>目标名称<input id="goal-title" required maxlength="160" placeholder="例如：掌握 Go 并发"></label><label>目标说明<textarea id="goal-description" rows="3" placeholder="为什么它重要？"></textarea></label><label>截止日期（可选）<input id="goal-deadline" type="datetime-local"></label><button class="primary" type="submit">创建目标</button></form></article>
+              <article class="surface form-surface"><div class="growth-form-heading"><span aria-hidden="true">＋</span><p class="eyebrow">A NEW DIRECTION</p><h3>写下一个新目标</h3><p>不必面面俱到，先明确一件重要的事。</p></div><form id="goal-form" class="form-grid"><label>目标名称<input id="goal-title" required maxlength="160" placeholder="例如：掌握 Go 并发"></label><label>目标说明<textarea id="goal-description" rows="4" placeholder="为什么想做这件事？你期待怎样的改变？"></textarea></label><label>截止日期（可选）<input id="goal-deadline" type="datetime-local"></label><button class="primary" type="submit">＋ 创建目标</button></form><p class="growth-form-tip">方向可以坚定，节奏可以从容。<br>没有明确时间，也可以先留空截止日期。</p></article>
             </div>
           </section>
 
@@ -252,7 +253,7 @@
 
           <section id="panel-knowledge" class="panel">
             <div class="section-intro knowledge-intro">
-              <div><p class="eyebrow">KNOWLEDGE GARDEN</p><h3>知识花园</h3><p>把零散想法写成可连接的长期知识。使用 <code>[[笔记标题]]</code> 建立双向链接，让笔记随着学习持续生长。</p></div>
+              <div><p class="eyebrow">KNOWLEDGE GARDEN · 思有所生</p><h3>让零散的灵感，在这里生长。</h3><p>记录自己的理解，用 <code>[[笔记标题]]</code> 连接想法，慢慢长成一片知识花园。</p></div>
               <div class="knowledge-intro-actions"><div class="knowledge-view-switch" role="tablist" aria-label="知识库视图"><button class="active" type="button" data-knowledge-view="notes">笔记</button><button type="button" data-knowledge-view="graph">图谱</button></div><button id="knowledge-new" class="primary" type="button">＋ 新建笔记</button></div>
             </div>
             <div class="knowledge-stat-grid">
@@ -263,7 +264,7 @@
             </div>
             <div id="knowledge-notes-view" class="knowledge-workspace">
               <aside class="surface knowledge-library-panel">
-                <div class="knowledge-search-wrap"><span>⌕</span><input id="knowledge-search" type="search" placeholder="搜索标题、正文或标签" autocomplete="off"></div>
+                <div class="growth-library-heading"><p class="eyebrow">YOUR COLLECTION</p><h3>我的笔记</h3></div><div class="knowledge-search-wrap"><span aria-hidden="true">⌕</span><input id="knowledge-search" type="search" aria-label="搜索知识笔记的标题、正文或标签" placeholder="搜索标题、正文或标签" autocomplete="off"></div>
                 <div class="knowledge-filter-head"><span>笔记库</span><button id="knowledge-clear-filter" class="text-button hidden" type="button">清除筛选</button></div>
                 <div id="knowledge-tags" class="knowledge-tags"></div>
                 <div id="knowledge-note-list" class="knowledge-note-list"><div class="knowledge-list-loading">正在整理知识卡片…</div></div>
@@ -292,7 +293,7 @@
                 <input id="knowledge-note-id" type="hidden">
                 <div class="knowledge-editor-meta"><label>标题<input id="knowledge-note-title" required maxlength="160" placeholder="例如：Go channel 的设计原则"></label><label>标签（逗号分隔）<input id="knowledge-note-tags" maxlength="600" placeholder="go, 并发, 读书笔记"></label><label class="check-label"><input id="knowledge-note-pinned" type="checkbox">置顶</label></div>
                 <div class="knowledge-editor-toolbar" aria-label="编辑工具"><button type="button" data-knowledge-insert="## ">H2</button><button type="button" data-knowledge-wrap="**">B</button><button type="button" data-knowledge-wrap="`">Code</button><button type="button" data-knowledge-insert="- ">列表</button><button type="button" data-knowledge-insert="[[笔记标题]]">双向链接</button><span id="knowledge-editor-count">0 字</span></div>
-                <div class="knowledge-editor-body"><textarea id="knowledge-note-content" maxlength="100000" spellcheck="true" placeholder="# 核心概念&#10;&#10;写下自己的理解，而不只是复制资料。&#10;&#10;## 关联思考&#10;&#10;它和 [[另一则笔记]] 有什么关系？"></textarea><div class="knowledge-preview"><div class="knowledge-preview-label">实时预览</div><div id="knowledge-editor-preview" class="knowledge-content"></div></div></div>
+                <div class="knowledge-editor-body"><textarea id="knowledge-note-content" aria-label="笔记正文，支持 Markdown 和双向链接" maxlength="100000" spellcheck="true" placeholder="# 核心概念&#10;&#10;写下自己的理解，而不只是复制资料。&#10;&#10;## 关联思考&#10;&#10;它和 [[另一则笔记]] 有什么关系？"></textarea><div class="knowledge-preview"><div class="knowledge-preview-label">实时预览</div><div id="knowledge-editor-preview" class="knowledge-content"></div></div></div>
                 <div class="knowledge-editor-actions"><span id="knowledge-editor-hint">支持标题、列表、引用、粗体、行内代码和双向链接</span><button id="knowledge-editor-cancel" class="quiet" type="button">取消</button><button class="primary" type="submit">保存笔记</button></div>
               </form>
             </dialog>
