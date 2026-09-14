@@ -20,6 +20,7 @@ type Memory struct {
 	// This serializes one repository's snapshots, not multiple processes.
 	snapshotMu        sync.Mutex
 	mu                sync.RWMutex
+	habits            map[string]domain.Habit
 	users             map[string]domain.User
 	emails            map[string]string
 	goals             map[string]domain.Goal
@@ -46,6 +47,7 @@ type Memory struct {
 
 func NewMemory() *Memory {
 	return &Memory{
+		habits:            make(map[string]domain.Habit),
 		users:             make(map[string]domain.User),
 		emails:            make(map[string]string),
 		goals:             make(map[string]domain.Goal),
@@ -1117,6 +1119,7 @@ type persistedUser struct {
 }
 
 type snapshot struct {
+	Habits            []domain.Habit              `json:"habits"`
 	Version           int                         `json:"version"`
 	SavedAt           time.Time                   `json:"saved_at"`
 	Users             []persistedUser             `json:"users"`
@@ -1165,6 +1168,9 @@ func (m *Memory) SaveJSON(path string) error {
 	defer m.snapshotMu.Unlock()
 	m.mu.RLock()
 	s := snapshot{Version: 1, SavedAt: time.Now().UTC()}
+	for _, item := range m.habits {
+		s.Habits = append(s.Habits, cloneHabit(item))
+	}
 	for _, item := range m.users {
 		s.Users = append(s.Users, persistedUser{User: item, PasswordHash: item.PasswordHash})
 	}
@@ -1296,6 +1302,10 @@ func (m *Memory) LoadJSON(path string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.users = make(map[string]domain.User, len(s.Users))
+	m.habits = make(map[string]domain.Habit, len(s.Habits))
+	for _, item := range s.Habits {
+		m.habits[item.ID] = cloneHabit(item)
+	}
 	m.emails = make(map[string]string, len(s.Users))
 	m.goals = make(map[string]domain.Goal, len(s.Goals))
 	m.moods = make(map[string]domain.MoodEntry, len(s.Moods))

@@ -22,6 +22,71 @@ tags:
   - name: Literature
   - name: Exports
 paths:
+  /api/v1/habits:
+    get:
+      summary: 列出当前账号的习惯及连续天数统计（包含归档）
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 'data 为习惯数组，含 today、current_streak、longest_streak、total 与 checkins 日期列表' }
+        '401': { description: 未登录 }
+    post:
+      summary: 创建每日习惯（每账号最多 200 个，包含归档）
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, minLength: 1, maxLength: 80 }
+                description: { type: string, maxLength: 300 }
+                icon: { type: string, enum: [read, listen, write, move, water], default: read }
+                time_zone: { type: string, default: Asia/Shanghai, description: 固定 IANA 时区，不允许 Local }
+      responses:
+        '201': { description: data 为新习惯与统计 }
+        '400': { description: 输入无效或超过数量上限 }
+  /api/v1/habits/{habit_id}/checkins/{date}:
+    parameters:
+      - { in: path, name: habit_id, required: true, schema: { type: string } }
+      - { in: path, name: date, required: true, schema: { type: string, format: date } }
+    put:
+      summary: 幂等打卡或撤销，仅允许创建日起至习惯时区的今天
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [checked]
+              properties:
+                checked: { type: boolean }
+      responses:
+        '200': { description: data 为更新后的习惯与统计 }
+        '400': { description: 无效日期或缺少布尔值 }
+        '409': { description: 习惯已归档，请先恢复 }
+        '404': { description: 习惯不存在或不属于当前账号 }
+  /api/v1/habits/{habit_id}/archive:
+    parameters:
+      - { in: path, name: habit_id, required: true, schema: { type: string } }
+    patch:
+      summary: 归档或恢复习惯，保留全部历史记录
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [archived]
+              properties:
+                archived: { type: boolean }
+      responses:
+        '200': { description: data 为更新后的习惯与统计 }
+        '400': { description: 缺少有效布尔值 }
+        '404': { description: 习惯不存在或不属于当前账号 }
   /api/v1/timeline:
     get:
       summary: 按月汇总现有学习记录的成长足迹

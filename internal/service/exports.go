@@ -23,6 +23,7 @@ type UserDataExport struct {
 	User               domain.User               `json:"user"`
 	Counts             map[string]int            `json:"counts"`
 	Goals              []domain.Goal             `json:"goals"`
+	Habits             []domain.Habit            `json:"habits"`
 	Moods              []domain.MoodEntry        `json:"moods"`
 	Tasks              []domain.StudyTask        `json:"tasks"`
 	TodoLists          []domain.TodoList         `json:"todo_lists"`
@@ -53,6 +54,9 @@ func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataEx
 		return UserDataExport{}, err
 	}
 	if bundle.Moods, err = s.repo.ListAllMoodEntries(ctx, userID); err != nil {
+		return UserDataExport{}, err
+	}
+	if bundle.Habits, err = s.repo.ListHabits(ctx, userID); err != nil {
 		return UserDataExport{}, err
 	}
 	if bundle.Tasks, err = s.repo.ListTasks(ctx, userID, store.TaskFilter{}); err != nil {
@@ -107,7 +111,8 @@ func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataEx
 		return UserDataExport{}, err
 	}
 	bundle.Counts = map[string]int{
-		"goals": len(bundle.Goals), "moods": len(bundle.Moods), "tasks": len(bundle.Tasks), "todo_lists": len(bundle.TodoLists),
+		"habits": len(bundle.Habits),
+		"goals":  len(bundle.Goals), "moods": len(bundle.Moods), "tasks": len(bundle.Tasks), "todo_lists": len(bundle.TodoLists),
 		"todos": len(bundle.Todos), "calendar_events": len(bundle.CalendarEvents), "word_books": len(bundle.WordBooks), "vocabulary_words": len(bundle.VocabularyWords),
 		"vocabulary_reviews": len(bundle.VocabularyReviews), "plan_blocks": len(bundle.PlanBlocks), "weekly_reflections": len(bundle.WeeklyReflections),
 		"memo_folders": len(bundle.MemoFolders), "memos": len(bundle.Memos),
