@@ -27,6 +27,7 @@
     <link rel="stylesheet" href="/static/organizer-studio.css?v=20260914-1">
     <link rel="stylesheet" href="/static/growth-studio.css?v=20260915-1">
     <link rel="stylesheet" href="/static/action-studio.css?v=20260915-1">
+    <link rel="stylesheet" href="/static/english-reading.css?v=20260915-1">
   </head>
   <body>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -421,7 +422,7 @@
 
           <section id="panel-english" class="panel">
             <div class="english-intro">
-              <div><p class="eyebrow">DAILY ENGLISH</p><h3>每天读懂一点真实世界</h3><p>用可信资讯练习精读：先理解主旨，再收集生词，最后用一句话留下自己的判断。</p></div>
+              <div><p class="eyebrow">THE READING ROOM · 每日英文</p><h3>慢慢读，读懂更大的世界。</h3><p>从一段英文开始：理解主旨，发现新词，再写下自己的思考。</p></div>
               <div class="english-intro-actions"><button id="english-refresh" class="quiet" type="button">↻ 更新内容</button><button id="english-library-toggle" class="primary" type="button">我的阅读</button></div>
             </div>
             <div class="english-stat-grid">
@@ -434,11 +435,11 @@
               <main class="english-feed-column">
                 <article id="english-featured" class="english-featured surface"><div class="english-loading">正在连接英语资讯源…</div></article>
                 <div class="english-toolbar surface">
-                  <div class="english-search"><span>⌕</span><input id="english-search" type="search" placeholder="搜索标题、摘要或来源"></div>
+                  <div class="english-search"><span aria-hidden="true">⌕</span><input id="english-search" type="search" aria-label="搜索英文文章标题、摘要或来源" placeholder="搜索标题、摘要或来源"></div>
                   <select id="english-category" aria-label="主题"><option value="">全部主题</option><option value="world">世界</option><option value="science">科学</option><option value="technology">科技</option><option value="learning">学习</option></select>
                   <select id="english-level" aria-label="难度"><option value="">全部难度</option><option value="B1">B1 进阶基础</option><option value="B2">B2 中高级</option><option value="C1">C1 高级</option></select>
                 </div>
-                <div id="english-feed-status" class="english-feed-status"></div>
+                <div id="english-feed-status" class="english-feed-status" role="status" aria-live="polite"></div>
                 <div id="english-article-grid" class="english-article-grid"><div class="english-loading">正在准备今日精读…</div></div>
                 <section id="english-library" class="english-library-section hidden"><div class="english-section-head"><div><p class="eyebrow">MY READING</p><h3>阅读清单与学习记录</h3></div><button id="english-library-close" class="quiet" type="button">返回资讯</button></div><div id="english-library-list" class="english-library-list"></div></section>
               </main>
@@ -536,13 +537,14 @@
     <dialog id="classic-reader-dialog" class="classic-reader-dialog">
       <div class="classic-reader-shell"><header><div><p id="classic-reader-meta" class="eyebrow">古诗文研习</p><h2 id="classic-reader-title"></h2><p id="classic-reader-author"></p></div><div><button id="classic-favorite" class="quiet" type="button">☆ 收藏</button><button id="classic-reader-close" class="icon-button" type="button">×</button></div></header><div class="classic-reader-body"><main><div class="classic-reading-actions"><button id="classic-speak" class="quiet" type="button">🔊 朗读原文</button><button id="classic-toggle-translation" class="quiet" type="button">隐藏译文</button><span>译文与赏析由 StudyFlow 编写，仅作学习参考</span></div><div id="classic-parallel-text" class="classic-parallel-text"></div><section><p class="eyebrow">BACKGROUND</p><h3>创作背景</h3><p id="classic-background"></p></section><section><p class="eyebrow">APPRECIATION</p><h3>学习赏析</h3><p id="classic-appreciation"></p></section></main><aside><section><p class="eyebrow">ANNOTATIONS</p><h3>重点注释</h3><div id="classic-annotations" class="classic-annotations"></div></section><section><p class="eyebrow">MY NOTES</p><h3>我的理解</h3><textarea id="classic-notes" rows="6" maxlength="4000" placeholder="用自己的话概括主旨、意象或表达方法…"></textarea><button id="classic-save-notes" class="quiet full" type="button">保存学习笔记</button></section><div class="classic-study-actions"><button id="classic-recite" class="quiet" type="button">完成一次诵读</button><button id="classic-master" class="primary" type="button">标记已掌握</button></div><p id="classic-study-state"></p></aside></div></div>
     </dialog>
-    <dialog id="english-reader-dialog" class="english-reader-dialog">
+    <dialog id="english-reader-dialog" class="english-reader-dialog" aria-labelledby="english-reader-title">
       <div class="english-reader-shell">
         <header><div><p id="english-reader-source" class="eyebrow">ENGLISH READING</p><h2 id="english-reader-title"></h2><div id="english-reader-meta" class="english-reader-meta"></div></div><button id="english-reader-close" class="icon-button" type="button" aria-label="关闭阅读器">×</button></header>
         <div class="english-reader-layout">
           <section class="english-reading-pane">
             <div class="english-reading-tools"><button id="english-speak" class="quiet" type="button">🔊 朗读摘要</button><button id="english-speak-stop" class="quiet" type="button">停止</button><span>选中英文单词可快速加入生词篮</span></div>
-            <article id="english-reader-summary" class="english-reader-summary" tabindex="0"></article>
+            <div class="english-type-tools"><label for="english-reading-size">正文字号</label><select id="english-reading-size"><option value="18">标准 · 18px</option><option value="22" selected>舒适 · 22px</option><option value="26">大字 · 26px</option></select><span id="english-type-status" role="status" aria-live="polite">舒适阅读</span></div>
+            <article id="english-reader-summary" class="english-reader-summary" lang="en" aria-label="英文精读内容" tabindex="0"></article>
             <div class="english-original-notice"><span>原文内容保留在发布方网站</span><a id="english-original-link" class="primary" target="_blank" rel="noreferrer">阅读全文 ↗</a></div>
           </section>
           <aside class="english-notebook-pane">
@@ -570,6 +572,7 @@
     <script src="/static/knowledge.js?v=20260904-1" defer></script>
     <script src="/static/memos.js?v=20260909-1" defer></script>
     <script src="/static/english.js?v=20260901-7" defer></script>
+    <script src="/static/english-reading.js?v=20260915-1" defer></script>
     <script src="/static/literature.js?v=20260909-1" defer></script>
   </body>
 </html>
