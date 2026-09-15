@@ -28,6 +28,9 @@
     <link rel="stylesheet" href="/static/growth-studio.css?v=20260915-1">
     <link rel="stylesheet" href="/static/action-studio.css?v=20260915-1">
     <link rel="stylesheet" href="/static/english-reading.css?v=20260915-1">
+    <link rel="stylesheet" href="/static/idea-lab.css?v=20260915-1">
+    <link rel="stylesheet" href="/static/explore.css?v=20260916-1">
+    <link rel="stylesheet" href="/static/daily-card.css?v=20260916-draw">
   </head>
   <body>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -75,6 +78,9 @@
           <button class="nav-link" type="button" data-view="calendar"><span>▦</span>智能日历</button>
           <button class="nav-link" type="button" data-view="memos"><span>▤</span>备忘录</button>
           <button class="nav-link" type="button" data-view="knowledge"><span>◇</span>知识花园</button>
+          <button class="nav-link" type="button" data-view="lab"><span>✧</span>灵感实验室</button>
+          <button class="nav-link" type="button" data-view="explore"><span>✉</span>探索生活</button>
+          <button class="nav-link" type="button" data-view="daily"><span>☀</span>每日一签</button>
           <button class="nav-link" type="button" data-view="tasks"><span>✓</span>学习任务</button>
           <button class="nav-link" type="button" data-view="todo"><span>☑</span>待办清单</button>
           <button class="nav-link" type="button" data-view="planner"><span>▦</span>智能规划</button>
@@ -299,6 +305,31 @@
                 <div class="knowledge-editor-actions"><span id="knowledge-editor-hint">支持标题、列表、引用、粗体、行内代码和双向链接</span><button id="knowledge-editor-cancel" class="quiet" type="button">取消</button><button class="primary" type="submit">保存笔记</button></div>
               </form>
             </dialog>
+          </section>
+
+          <section id="panel-lab" class="panel">
+            <header class="lab-heading"><div><p class="eyebrow">IDEA LAB · 思考不设限</p><h3>让学过的知识，发生新的反应。</h3><p>不急着找答案。试着讲清楚、连起来，再问一次“为什么”。</p></div><span aria-hidden="true">✧</span></header>
+            <div class="lab-modes" role="group" aria-label="选择思考练习"><button type="button" data-lab-mode="explain" aria-pressed="true"><b>01 · 费曼讲解</b><span>把一个概念，讲给初学者听。</span></button><button type="button" data-lab-mode="connect" aria-pressed="false"><b>02 · 知识碰撞</b><span>让两则笔记，长出一个新想法。</span></button><button type="button" data-lab-mode="challenge" aria-pressed="false"><b>03 · 反向思考</b><span>寻找反例，看见观点的边界。</span></button></div>
+            <div class="lab-layout"><aside class="surface lab-source"><p class="eyebrow">START WITH A SPARK</p><h3>今天研究什么？</h3><label>自选主题<input id="lab-topic" maxlength="120" placeholder="例如：为什么需要 Go channel？"></label><button id="lab-start" type="button" class="primary">用这个主题开始</button><div class="lab-divider">或从知识花园寻找灵感</div><button id="lab-draw" class="quiet" type="button">✧ 随机抽取笔记</button><p id="lab-source-hint">费曼讲解与反向思考抽取一则，知识碰撞抽取两则不同笔记。</p><div id="lab-sources"></div><p class="lab-privacy">只读取当前账号的知识笔记。没有 AI 自动评分，也不会向第三方发送内容。</p></aside>
+            <article class="surface lab-writing"><div class="lab-writing-head"><div><p class="eyebrow">THINK ON PAPER</p><h3 id="lab-heading">费曼讲解</h3></div><span id="lab-count">0 字</span></div><p id="lab-context">输入主题或抽取笔记，开始一次思考实验。</p><form id="lab-form"><label><span id="lab-label-one">用初学者听得懂的话解释</span><textarea id="lab-one" rows="5" maxlength="6000" required placeholder="不照抄定义，从自己的理解开始…"></textarea></label><label><span id="lab-label-two">给出一个具体例子或生活类比</span><textarea id="lab-two" rows="4" maxlength="6000" required placeholder="把抽象的想法，放进一个具体场景…"></textarea></label><label><span id="lab-label-three">哪里还讲不清？下一步如何验证？</span><textarea id="lab-three" rows="3" maxlength="6000" required placeholder="诚实地留下疑问，也是一种收获。"></textarea></label><div class="lab-save-row"><button id="lab-save" class="primary" type="submit" disabled>保存到知识花园</button><span id="lab-status" role="status" aria-live="polite">未保存的内容仅在当前页面保留。</span></div></form><p class="lab-footnote">这是开放式练习，没有标准答案。保存后可在知识花园搜索“灵感实验”，再次保存会更新同一则练习笔记。</p></article></div>
+          </section>
+
+          <section id="panel-explore" class="panel">
+            <header class="explore-heading"><div><p class="eyebrow">LITTLE ADVENTURES · 日常之外</p><h3>生活不止待办，还有值得期待的小事。</h3><p>给未来寄一封信，为今天拆一份惊喜。不打分，也不必追求效率。</p></div><span aria-hidden="true">✺</span></header>
+            <div class="explore-tabs" role="group" aria-label="探索栏目"><button data-explore-tab="letter" type="button" aria-pressed="true">✉ 时光邮局</button><button data-explore-tab="challenge" type="button" aria-pressed="false">✦ 生活盲盒</button><button id="explore-refresh" class="quiet" type="button">刷新记录</button></div>
+            <p id="explore-status" role="status" aria-live="polite">进入后加载当前账号的记录。</p>
+            <div class="explore-layout"><article class="surface explore-compose">
+              <form id="explore-letter-form"><p class="eyebrow">TO MY FUTURE SELF</p><h3>写给未来的自己</h3><label>信封标题<input id="explore-title" required maxlength="120" placeholder="致一年后的我"></label><label>此刻心情<select id="explore-mood"><option>平静</option><option>期待</option><option>开心</option><option>迷茫</option><option>疲惫</option></select></label><label>解锁时间（当前设备时区）<input id="explore-unlock" type="datetime-local" required></label><label>信的内容<textarea id="explore-body" required rows="8" maxlength="12000" placeholder="最近在意什么？希望未来的自己还记得什么？"></textarea></label><button class="primary" type="submit">封存这封信</button><p class="explore-note">封存后不能修改；到期后在这里打开，不会发送邮件。标题和心情始终可见，正文到期前由服务端隐藏。此功能不是加密保险箱，本地数据快照仍包含正文。</p></form>
+              <form id="explore-challenge-form" class="hidden"><p class="eyebrow">MAKE ROOM FOR SURPRISE</p><h3>给今天一点新鲜感</h3><label>我有多少时间<select id="explore-minutes"><option value="5">5 分钟</option><option value="15" selected>15 分钟</option><option value="30">30 分钟</option><option value="60">1 小时</option></select></label><label>预算上限<select id="explore-budget"><option value="0">不花钱</option><option value="20">20 元以内</option></select></label><label>想待在哪里<select id="explore-place"><option value="any">都可以</option><option value="indoor">室内</option><option value="outdoor">户外</option></select></label><div class="explore-box" aria-hidden="true">✦</div><button class="primary" type="submit">拆开生活盲盒</button><p class="explore-note">从 12 个原创小挑战中抽取，优先选择没遇到过的内容。预算和时间为参考；不需要购买任何东西，也可以不完成。</p></form>
+            </article><section class="surface explore-records"><div class="explore-record-head"><div><p class="eyebrow">YOUR LITTLE COLLECTION</p><h3 id="explore-list-title">我的时光信件</h3></div><select id="explore-filter" aria-label="按记录状态筛选"><option value="all">全部记录</option><option value="waiting">等待中</option><option value="done">已解锁 / 已完成</option></select></div><div id="explore-list"></div><nav class="explore-pages" aria-label="探索记录分页"><button id="explore-prev" class="quiet" type="button">上一页</button><span id="explore-page"></span><button id="explore-next" class="quiet" type="button">下一页</button></nav></section></div>
+          </section>
+
+          <section id="panel-daily" class="panel">
+            <header class="daily-heading"><div><p class="eyebrow">FORTUNE STICKS · 今日抽签</p><h3>静一静，为今天摇一支签。</h3><p>心里留一个念头，轻点签筒。签有偶然，生活由你决定。</p></div><button id="daily-today" class="quiet" type="button">今日签筒</button></header>
+            <div class="daily-controls"><label>回看日期<input id="daily-date" type="date" min="2026-01-01"></label><label>卡片纸色<select id="daily-theme"><option value="warm">暖纸</option><option value="green">青苔</option><option value="blue">夜海</option></select></label><button id="daily-refresh" class="quiet" type="button">刷新</button><span id="daily-status" role="status" aria-live="polite">正在准备日签…</span></div>
+            <section id="daily-draw-stage" class="daily-draw-stage" data-phase="idle" aria-label="抽签区"><div class="daily-ritual-head"><span>一日一签 · 随机相逢</span><h3 id="daily-ritual-title">此刻，你在想什么？</h3><p id="daily-ritual-hint">轻点下方签筒，摇出属于今天的一支签。</p></div><button id="daily-draw" type="button" class="daily-draw-button" aria-label="摇动签筒抽取今日签"><span class="fortune-sticks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="fortune-cylinder" aria-hidden="true"><b>签</b><small>静候一念</small></span><span class="fortune-shadow" aria-hidden="true"></span></button><button id="daily-reveal" class="primary hidden" type="button">签已出 · 点击揭签</button><p class="daily-draw-caption">点击摇签 · 无需摇晃设备</p></section>
+            <div id="daily-result" class="daily-layout hidden"><article id="daily-poster" class="daily-poster" data-paper="warm" aria-label="抽签结果"><div class="daily-poster-top"><span>STUDYFLOW / 签笺</span><span id="daily-weekday"></span></div><div class="daily-date-art"><strong id="daily-day">—</strong><div><span id="daily-month"></span><b id="daily-topic">今日</b></div><i aria-hidden="true">✺</i></div><blockquote id="daily-quote">等待揭签。</blockquote><div class="daily-action"><span>签意 · 可以尝试</span><p id="daily-action-text">揭签后查看。</p></div><div class="daily-poster-foot"><span>StudyFlow 原创生活签 · 仅供娱乐与自省</span><span id="daily-full-date"></span></div></article>
+            <aside class="daily-side"><article class="surface daily-reflection"><p class="eyebrow">READ BETWEEN THE LINES</p><h3>读签，也读一读自己</h3><p id="daily-prompt">今天有什么值得记住？</p><form id="daily-form"><label>我的感受<textarea id="daily-reflection" rows="6" maxlength="3000" placeholder="这支签让你想到了什么？"></textarea></label><button id="daily-save" class="primary" type="submit" disabled>保存感受</button></form><div class="daily-actions"><button id="daily-favorite" class="quiet" type="button" aria-pressed="false" disabled>♡ 收藏日签</button><button id="daily-download" class="quiet" type="button" disabled>↓ 保存图片</button></div><p class="daily-note">分享图不包含私人感受。收藏和已保存感受随账号保存；纸色只保留在当前页面。</p></article><article class="surface daily-collection"><div><p class="eyebrow">KEEP WHAT RESONATES</p><h3>收藏的签</h3></div><div id="daily-favorites">暂无收藏</div></article></aside></div><p class="daily-note">31 支原创生活签随机抽取，仅供娱乐与自省。按中国标准时间每天保留首次结果，自动保存，刷新不会换签；不同日期可能抽到同一签。往日未抽不可补抽，旧版已保存记录继续保留。未保存感受只保留在当前页面。</p>
           </section>
 
           <section id="panel-tasks" class="panel">
@@ -564,7 +595,7 @@
         <div class="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 执行</span><span>全局快捷键 <kbd>Ctrl K</kbd></span></div>
       </div>
     </dialog>
-    <script src="/static/app.js?v=20260914-habits" defer></script>
+    <script src="/static/app.js?v=20260916-daily" defer></script>
     <script src="/static/habits.js?v=20260914-1" defer></script>
     <script src="/static/timeline.js?v=20260910-1" defer></script>
     <script src="/static/weather.js?v=20260909-1" defer></script>
@@ -573,6 +604,9 @@
     <script src="/static/memos.js?v=20260909-1" defer></script>
     <script src="/static/english.js?v=20260901-7" defer></script>
     <script src="/static/english-reading.js?v=20260915-1" defer></script>
+    <script src="/static/idea-lab.js?v=20260915-1" defer></script>
+    <script src="/static/explore.js?v=20260916-1" defer></script>
+    <script src="/static/daily-card.js?v=20260916-draw" defer></script>
     <script src="/static/literature.js?v=20260909-1" defer></script>
   </body>
 </html>

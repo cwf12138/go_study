@@ -22,6 +22,104 @@ tags:
   - name: Literature
   - name: Exports
 paths:
+  /api/v1/daily-card:
+    get:
+      summary: 查询已抽签结果及收藏感受；未抽签返回元数据，body 为空，不触发抽签
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: date
+          schema: { type: string, format: date }
+          description: 默认为中国标准时间的今天，可回看 2026-01-01 至今天
+      responses:
+        '200': { description: data 含 date、title、body、action、prompt、favorite、reflection }
+        '400': { description: 无效或未来日期 }
+        '401': { description: 未登录 }
+  /api/v1/daily-card/draw:
+    post:
+      summary: 随机抽取今日签并自动保存；同账号当天并发与重试返回首次结果
+      description: 使用中国标准时间，31 支原创生活签等概率抽取，不同日期可能重复。旧版当天已保存日签继续保留。无需请求体。
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: data 为已保存结果，新增签含 sign_number }
+        '400': { description: 超过探索记录上限 }
+        '401': { description: 未登录 }
+  /api/v1/daily-card/{date}:
+    parameters:
+      - { in: path, name: date, required: true, schema: { type: string, format: date } }
+    put:
+      summary: 保存已抽签的收藏或感受，省略字段保持原值，未抽不可保存
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                favorite: { type: boolean }
+                reflection: { type: string, maxLength: 3000 }
+              description: 至少提供一个非 null 字段，空字符串可清空感受
+      responses:
+        '200': { description: data 为保存后的日签 }
+        '400': { description: 日期或内容无效，或超过探索记录 500 条上限 }
+        '409': { description: 此日期尚未抽签 }
+  /api/v1/explore:
+    get:
+      summary: 当前账号的探索记录，未解锁信件正文为空
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 'data 为记录数组，含 kind、locked、completed_at、reflection 等字段' }
+        '401': { description: 未登录 }
+  /api/v1/explore/{kind}:
+    parameters:
+      - in: path
+        name: kind
+        required: true
+        schema: { type: string, enum: [letter, challenge] }
+    post:
+      summary: 封存时光信或抽取生活挑战，相同账号和 ID 的重试返回原记录
+      description: 每账号最多 500 条。letter 需要 title、body、unlock_at；challenge 需要 minutes、budget、place。解锁时间必须在未来十年内，预算按人民币估算。
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id: { type: string, minLength: 16, maxLength: 80, description: 建议 UUID，失败重试必须保留原值 }
+                title: { type: string, maxLength: 120 }
+                body: { type: string, maxLength: 12000 }
+                mood: { type: string, maxLength: 40 }
+                unlock_at: { type: string, format: date-time }
+                minutes: { type: integer, minimum: 5, maximum: 120 }
+                budget: { type: integer, minimum: 0, maximum: 100 }
+                place: { type: string, enum: [any, indoor, outdoor] }
+      responses:
+        '201': { description: data 为记录，信件到期前不返回正文 }
+        '400': { description: 参数无效、超过上限或没有符合条件的挑战 }
+        '409': { description: ID 已用于另一类记录 }
+  /api/v1/explore/{id}/completion:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string } }
+    put:
+      summary: 完成生活挑战或更新感受，重复提交保留首次完成时间
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reflection: { type: string, maxLength: 3000 }
+      responses:
+        '200': { description: data 为更新后的挑战 }
+        '400': { description: 感受内容过长 }
+        '404': { description: 记录不存在或属于其他账号 }
+        '409': { description: 信件不支持完成操作 }
   /api/v1/habits:
     get:
       summary: 列出当前账号的习惯及连续天数统计（包含归档）

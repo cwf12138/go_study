@@ -21,6 +21,7 @@ type Memory struct {
 	snapshotMu        sync.Mutex
 	mu                sync.RWMutex
 	habits            map[string]domain.Habit
+	explorations      map[string]domain.Exploration
 	users             map[string]domain.User
 	emails            map[string]string
 	goals             map[string]domain.Goal
@@ -48,6 +49,7 @@ type Memory struct {
 func NewMemory() *Memory {
 	return &Memory{
 		habits:            make(map[string]domain.Habit),
+		explorations:      make(map[string]domain.Exploration),
 		users:             make(map[string]domain.User),
 		emails:            make(map[string]string),
 		goals:             make(map[string]domain.Goal),
@@ -1120,6 +1122,7 @@ type persistedUser struct {
 
 type snapshot struct {
 	Habits            []domain.Habit              `json:"habits"`
+	Explorations      []domain.Exploration        `json:"explorations"`
 	Version           int                         `json:"version"`
 	SavedAt           time.Time                   `json:"saved_at"`
 	Users             []persistedUser             `json:"users"`
@@ -1170,6 +1173,9 @@ func (m *Memory) SaveJSON(path string) error {
 	s := snapshot{Version: 1, SavedAt: time.Now().UTC()}
 	for _, item := range m.habits {
 		s.Habits = append(s.Habits, cloneHabit(item))
+	}
+	for _, item := range m.explorations {
+		s.Explorations = append(s.Explorations, cloneExploration(item))
 	}
 	for _, item := range m.users {
 		s.Users = append(s.Users, persistedUser{User: item, PasswordHash: item.PasswordHash})
@@ -1303,6 +1309,10 @@ func (m *Memory) LoadJSON(path string) error {
 	defer m.mu.Unlock()
 	m.users = make(map[string]domain.User, len(s.Users))
 	m.habits = make(map[string]domain.Habit, len(s.Habits))
+	m.explorations = make(map[string]domain.Exploration, len(s.Explorations))
+	for _, item := range s.Explorations {
+		m.explorations[item.ID] = cloneExploration(item)
+	}
 	for _, item := range s.Habits {
 		m.habits[item.ID] = cloneHabit(item)
 	}

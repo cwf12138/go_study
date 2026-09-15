@@ -24,6 +24,10 @@ type Repository interface {
 	CreateHabit(context.Context, domain.Habit) error
 	HabitByID(context.Context, string) (domain.Habit, error)
 	ListHabits(context.Context, string) ([]domain.Habit, error)
+	CreateExploration(context.Context, domain.Exploration) error
+	SaveDailyCard(context.Context, domain.Exploration, *bool, *string) (domain.Exploration, error)
+	ListExplorations(context.Context, string) ([]domain.Exploration, error)
+	CompleteExploration(context.Context, string, string, string, time.Time) (domain.Exploration, error)
 	SetHabitArchived(context.Context, string, string, bool, time.Time) (domain.Habit, error)
 	SetHabitCheck(context.Context, string, string, string, bool, time.Time) (domain.Habit, error)
 	CreateUser(context.Context, domain.User) error
