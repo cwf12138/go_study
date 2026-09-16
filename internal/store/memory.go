@@ -22,6 +22,7 @@ type Memory struct {
 	mu                sync.RWMutex
 	habits            map[string]domain.Habit
 	explorations      map[string]domain.Exploration
+	keepsakes         map[string]domain.Keepsake
 	users             map[string]domain.User
 	emails            map[string]string
 	goals             map[string]domain.Goal
@@ -50,6 +51,7 @@ func NewMemory() *Memory {
 	return &Memory{
 		habits:            make(map[string]domain.Habit),
 		explorations:      make(map[string]domain.Exploration),
+		keepsakes:         make(map[string]domain.Keepsake),
 		users:             make(map[string]domain.User),
 		emails:            make(map[string]string),
 		goals:             make(map[string]domain.Goal),
@@ -1123,6 +1125,7 @@ type persistedUser struct {
 type snapshot struct {
 	Habits            []domain.Habit              `json:"habits"`
 	Explorations      []domain.Exploration        `json:"explorations"`
+	Keepsakes         []domain.Keepsake           `json:"keepsakes"`
 	Version           int                         `json:"version"`
 	SavedAt           time.Time                   `json:"saved_at"`
 	Users             []persistedUser             `json:"users"`
@@ -1176,6 +1179,9 @@ func (m *Memory) SaveJSON(path string) error {
 	}
 	for _, item := range m.explorations {
 		s.Explorations = append(s.Explorations, cloneExploration(item))
+	}
+	for _, item := range m.keepsakes {
+		s.Keepsakes = append(s.Keepsakes, cloneKeepsake(item))
 	}
 	for _, item := range m.users {
 		s.Users = append(s.Users, persistedUser{User: item, PasswordHash: item.PasswordHash})
@@ -1310,6 +1316,10 @@ func (m *Memory) LoadJSON(path string) error {
 	m.users = make(map[string]domain.User, len(s.Users))
 	m.habits = make(map[string]domain.Habit, len(s.Habits))
 	m.explorations = make(map[string]domain.Exploration, len(s.Explorations))
+	m.keepsakes = make(map[string]domain.Keepsake, len(s.Keepsakes))
+	for _, item := range s.Keepsakes {
+		m.keepsakes[item.ID] = cloneKeepsake(item)
+	}
 	for _, item := range s.Explorations {
 		m.explorations[item.ID] = cloneExploration(item)
 	}

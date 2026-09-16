@@ -22,6 +22,46 @@ tags:
   - name: Literature
   - name: Exports
 paths:
+  /api/v1/keepsakes:
+    get:
+      summary: 当前账号的人生地图与博物馆记录（含照片与归档）
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: data 为记录数组，前端筛选并按 8 条分页 }
+        '401': { description: 未登录 }
+  /api/v1/keepsakes/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, minLength: 16, maxLength: 80 } }
+    put:
+      summary: 完整保存地点或展品；首次 revision 为 0，编辑传上次版本
+      description: ID 建议客户端 UUID；同一版本及相同内容的请求重试幂等。归档和恢复也通过完整保存执行，不能切换 kind。每账号合计最多 200 条（含归档）。
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, title, revision]
+              properties:
+                kind: { type: string, enum: [place, exhibit] }
+                title: { type: string, minLength: 1, maxLength: 120 }
+                story: { type: string, maxLength: 6000 }
+                collection: { type: string, maxLength: 60 }
+                category: { type: string, description: 'exhibit 必填：film、music、game、object、moment' }
+                status: { type: string, description: 'place 必填：wish 或 visited' }
+                date: { type: string, description: 可为空，否则为 YYYY-MM-DD }
+                latitude: { type: [number, 'null'], minimum: -90, maximum: 90, description: 地点必填，WGS84 }
+                longitude: { type: [number, 'null'], minimum: -180, maximum: 180, description: 地点必填，WGS84 }
+                photo: { type: string, description: 可为空；JPEG/PNG base64 data URL，解码后最多 280000 字节、最大 1600×1600 }
+                favorite: { type: boolean }
+                archived: { type: boolean }
+                revision: { type: integer, minimum: 0 }
+      responses:
+        '200': { description: data 为保存后记录，含新 revision、created_at 与 updated_at }
+        '400': { description: 字段或图片无效，或数量超限 }
+        '404': { description: 记录不存在或属于其他账号 }
+        '409': { description: 版本冲突，请保留草稿并刷新核对 }
   /api/v1/daily-card:
     get:
       summary: 查询已抽签结果及收藏感受；未抽签返回元数据，body 为空，不触发抽签

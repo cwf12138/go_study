@@ -1,6 +1,6 @@
 const fs=require('fs'),vm=require('vm'),path=require('path'),assert=require('assert');
 const root=path.join(__dirname,'../internal/httpapi/assets');const source=fs.readFileSync(path.join(root,'explore.js'),'utf8');
-const nodes=new Map();function node(id){if(!nodes.has(id))nodes.set(id,{value:id==='#explore-filter'?'all':'',textContent:'',innerHTML:'',disabled:false,handlers:{},classList:{contains:()=>false,toggle(){}},querySelectorAll:()=>[],querySelector:()=>({}),setAttribute(){},addEventListener(n,f){this.handlers[n]=f;},reset(){},reportValidity:()=>true});return nodes.get(id);}
+const nodes=new Map();function node(id){if(!nodes.has(id))nodes.set(id,{value:id==='#explore-filter'?'all':'',textContent:'',innerHTML:'',disabled:false,handlers:{},classList:{contains:()=>false,toggle(){}},querySelectorAll:()=>[],querySelector:()=>({classList:{toggle(){}}}),setAttribute(){},addEventListener(n,f){this.handlers[n]=f;},reset(){},reportValidity:()=>true});return nodes.get(id);}
 let token='alice',response=async()=>({ok:true,json:async()=>({data:[]})});
 const ctx={document:{querySelector:node},localStorage:{getItem:()=>token},MutationObserver:class{observe(){}},window:{addEventListener(){},setInterval(){},confirm:()=>true},crypto:{randomUUID:()=> 'new-challenge-00000001'},AbortController,setTimeout,clearTimeout,fetch:(...a)=>response(...a)};vm.createContext(ctx);
 vm.runInContext(source.replace(' sync();render();if(panel.classList.contains',' window.test={state,render,request,load,create,sync};sync();render();if(panel.classList.contains'),ctx);
