@@ -17,8 +17,10 @@
  function upsert(item){state.items=[item,...state.items.filter(v=>v.id!==item.id)];}
  function render(){
   panel.querySelectorAll('[data-explore-tab]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.exploreTab===state.tab)));
-  const keepsake=state.tab==='place'||state.tab==='exhibit';
-  $('#keepsake-workspace').classList.toggle('hidden',!keepsake);panel.querySelector('.explore-layout').classList.toggle('hidden',keepsake);$('#explore-status').classList.toggle('hidden',keepsake);$('#explore-refresh').classList.toggle('hidden',keepsake);
+  const keepsake=state.tab==='place'||state.tab==='exhibit',play=state.tab==='sound'||state.tab==='choice';
+  $('#sound-room').classList.toggle('hidden',state.tab!=='sound');$('#choice-room').classList.toggle('hidden',state.tab!=='choice');
+  $('#keepsake-workspace').classList.toggle('hidden',!keepsake);panel.querySelector('.explore-layout').classList.toggle('hidden',keepsake||play);$('#explore-status').classList.toggle('hidden',keepsake||play);$('#explore-refresh').classList.toggle('hidden',keepsake||play);
+  if(play){document.dispatchEvent(new CustomEvent('studyflow:playrooms'));return;}
   if(keepsake){document.dispatchEvent(new CustomEvent('studyflow:keepsakes',{detail:state.tab}));return;}
   ['letter','challenge'].forEach(kind=>{const form=$('#explore-'+kind+'-form');form.classList.toggle('hidden',state.tab!==kind);form.querySelectorAll('input,textarea,select').forEach(f=>f.disabled=state.busy||!!state.pending[kind]);form.querySelector('button[type=submit]').disabled=state.busy;form.querySelector('button[type=submit]').textContent=state.pending[kind]?'重试上次提交':kind==='letter'?'封存这封信':'拆开生活盲盒';});
   $('#explore-refresh').disabled=state.busy;$('#explore-list-title').textContent=state.tab==='letter'?'我的时光信件':'我的生活小冒险';
