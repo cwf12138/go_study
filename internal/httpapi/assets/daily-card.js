@@ -1,45 +1,55 @@
 (() => {
  'use strict';
  const $=s=>document.querySelector(s),panel=$('#panel-daily');
- const state={card:null,token:'',epoch:0,busy:false,dirty:false,favorites:[],phase:'idle',date:''},controllers=new Set();
- const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
  const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
- const status=v=>{$('#daily-status').textContent=v;};
- function sync(){const token=localStorage.getItem('studyflow.token')||'';if(token===state.token)return;state.epoch++;controllers.forEach(c=>c.abort());Object.assign(state,{card:null,token,busy:false,dirty:false,favorites:[],phase:'idle',date:today()});$('#daily-form').reset();$('#daily-quote').textContent='等待揭签。';$('#daily-day').textContent='—';$('#daily-month').textContent='';$('#daily-weekday').textContent='';$('#daily-full-date').textContent='';$('#daily-topic').textContent='今日';$('#daily-action-text').textContent='揭签后查看。';$('#daily-prompt').textContent='今天有什么值得记住？';$('#daily-date').value=today();status('等待加载当前账号日签。');render();}
- async function request(path,options={}){const token=state.token,epoch=state.epoch;if(!token)throw Error('请先登录');if(token!==localStorage.getItem('studyflow.token')){sync();throw Error('账号已切换');}const c=new AbortController();controllers.add(c);const timer=setTimeout(()=>c.abort(),20000);try{const r=await fetch('/api/v1/'+path,{...options,signal:c.signal,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'}});const p=await r.json();if(epoch!==state.epoch||token!==localStorage.getItem('studyflow.token')){sync();throw Error('账号已切换');}if(!r.ok)throw Error(r.status===404?'请重启更新后的 Go 服务，日签接口尚未就绪。':p.error?.message||'请求失败');return p.data;}finally{clearTimeout(timer);controllers.delete(c);}}
- function render(){const c=state.card;$('#daily-date').max=today();['save','favorite','download'].forEach(id=>$('#daily-'+id).disabled=state.busy||!c);['today','refresh','date'].forEach(id=>$('#daily-'+id).disabled=state.busy);$('#daily-reflection').disabled=state.busy||!c;
-  if(!c&&state.phase==='revealed')state.phase='idle';
-  $('#daily-result').classList.toggle('hidden',!c||state.phase!=='revealed');$('#daily-draw-stage').classList.toggle('hidden',!!c&&state.phase==='revealed');$('#daily-draw-stage').dataset.phase=state.phase;
-  $('#daily-draw').disabled=state.busy||!!c||(state.date&&state.date!==today());$('#daily-reveal').classList.toggle('hidden',state.phase!=='ready');$('#daily-reveal').disabled=state.busy;
-  $('#daily-ritual-title').textContent=state.phase==='shaking'?'签筒轻摇，静候一签…':state.phase==='ready'?'一支签，已来到你面前。':state.date&&state.date!==today()?'这一天没有抽签记录。':'此刻，你在想什么？';
-  $('#daily-ritual-hint').textContent=state.phase==='ready'?'点击揭签，看看它想提醒你什么。':state.date&&state.date!==today()?'往日不可补抽，点击“今日签筒”开始。':'点击签筒抽签。每天首次随机抽取，结果自动保存。';
-  if(c){$('#daily-date').value=c.date;$('#daily-day').textContent=c.date.slice(-2);$('#daily-month').textContent=c.date.slice(0,7).replace('-',' / ');$('#daily-full-date').textContent=c.date;$('#daily-weekday').textContent=new Intl.DateTimeFormat('zh-CN',{weekday:'long',timeZone:'Asia/Shanghai'}).format(new Date(c.date+'T12:00:00+08:00'));$('#daily-topic').textContent=c.title;$('#daily-quote').textContent=c.body;$('#daily-action-text').textContent=c.action;$('#daily-prompt').textContent=c.prompt;$('#daily-favorite').textContent=c.favorite?'♥ 已收藏':'♡ 收藏日签';$('#daily-favorite').setAttribute('aria-pressed',String(c.favorite));}
-  $('#daily-favorites').innerHTML=state.favorites.length?state.favorites.map(c=>`<button type="button" data-daily-date="${esc(c.date)}" ${state.busy?'disabled':''}><span>${esc(c.date)}</span><strong>${esc(c.title)}</strong></button>`).join(''):'<p class="daily-note">收藏一句触动你的话，以后再来读。</p>';
-  if(c){$('#daily-day').textContent=c.sign_number?String(c.sign_number).padStart(2,'0'):'旧签';$('#daily-month').textContent=c.sign_number?'第 '+c.sign_number+' 签':'保留的旧版日签';}
+ const state={token:'',epoch:0,card:null,busy:false,loaded:false,date:today()},controllers=new Set();
+ const status=t=>$('#daily-status').textContent=t;
+ function render(){
+  $('#daily-date-label').textContent=state.date.replaceAll('-',' / ');
+  $('#daily-luck').textContent=state.card?.title||'签';
+  $('#daily-message').textContent=state.card?.body||'轻点下方，为今天抽一支签。';
+  $('#daily-slip').dataset.drawn=String(!!state.card);
+  $('#daily-draw').disabled=state.busy||!state.loaded||!!state.card;
+  $('#daily-draw').textContent=state.busy?'请稍候…':state.card?'今日已抽 · 明天再来':'抽取今日签';
+  $('#daily-retry').classList.toggle('hidden',state.loaded||state.busy);
  }
- async function run(action){sync();if(state.busy)return;const epoch=state.epoch;state.busy=true;render();try{await action();}catch(e){if(epoch===state.epoch)status('未完成：'+(e.name==='AbortError'?'请求超时，请刷新核对。':e.message)+' 感受草稿仍保留。');}finally{if(epoch===state.epoch){state.busy=false;render();}}}
- function allowLeave(){return !state.dirty||window.confirm('当前感受尚未保存，继续会丢弃这些修改。是否继续？');}
- function load(date=today()){sync();if(state.busy)return;if(!allowLeave()){render();return;}return run(async()=>{status('正在查看抽签记录…');const c=await request('daily-card?date='+encodeURIComponent(date));if(!c||c.kind!=='daily')throw Error('日签数据格式无效');state.date=c.date;state.card=c.body?c:null;state.phase=c.body?'revealed':'idle';$('#daily-date').value=c.date;$('#daily-reflection').value=c.reflection||'';state.dirty=false;status(c.body?'已恢复这一天的签，不会重复抽取。':'尚未抽签，今天的签正在签筒里等你。');try{const items=await request('explore');if(!Array.isArray(items))throw Error('收藏数据格式无效');state.favorites=items.filter(c=>c.kind==='daily'&&c.favorite).sort((a,b)=>b.date.localeCompare(a.date));}catch(e){status('抽签记录已加载，收藏夹同步失败：'+e.message);}});}
- function draw(){sync();if(state.busy||state.card||(state.date&&state.date!==today()))return;return run(async()=>{const epoch=state.epoch;state.phase='shaking';render();status('正在摇签…');try{const [c]=await Promise.all([request('daily-card/draw',{method:'POST'}),new Promise(resolve=>setTimeout(resolve,window.matchMedia?.('(prefers-reduced-motion: reduce)').matches?0:1100))]);if(epoch!==state.epoch)return;if(!c?.body)throw Error('出签结果无效，请刷新核对');state.card=c;state.date=c.date;state.phase='ready';$('#daily-reflection').value=c.reflection||'';status('签已出，结果已保存。请点击揭签。');}catch(error){if(epoch===state.epoch)state.phase='idle';throw error;}});}
- $('#daily-draw').addEventListener('click',draw);
- $('#daily-reveal').addEventListener('click',()=>{if(!state.card||state.busy)return;state.phase='revealed';render();$('#daily-poster').setAttribute('tabindex','-1');$('#daily-poster').focus();status('今日签已揭晓。签意仅供娱乐与自省，不替你作决定。');});
- function updateFavorite(c){state.favorites=state.favorites.filter(v=>v.date!==c.date);if(c.favorite)state.favorites.push(c);state.favorites.sort((a,b)=>b.date.localeCompare(a.date));}
- $('#daily-date').addEventListener('change',()=>load($('#daily-date').value));$('#daily-today').addEventListener('click',()=>load());$('#daily-refresh').addEventListener('click',()=>load(state.card?.date||today()));
- $('#daily-reflection').addEventListener('input',()=>{state.dirty=true;status('感受尚未保存。');});
- $('#daily-form').addEventListener('submit',e=>{e.preventDefault();if(state.busy||!state.card)return;run(async()=>{const reflection=$('#daily-reflection').value;const c=await request('daily-card/'+state.card.date,{method:'PUT',body:JSON.stringify({reflection})});state.card=c;state.dirty=false;updateFavorite(c);status('这一天的感受已保存。');});});
- $('#daily-favorite').addEventListener('click',()=>{if(state.busy||!state.card)return;run(async()=>{const c=await request('daily-card/'+state.card.date,{method:'PUT',body:JSON.stringify({favorite:!state.card.favorite})});state.card=c;updateFavorite(c);status(c.favorite?'已收藏；未保存的感受仍需点击保存。':'已取消收藏；未保存的感受仍需点击保存。');});});
- $('#daily-favorites').addEventListener('click',e=>{const b=e.target.closest('[data-daily-date]');if(b)load(b.dataset.dailyDate);});
- $('#daily-theme').addEventListener('change',()=>$('#daily-poster').dataset.paper=$('#daily-theme').value);
- function wrap(ctx,text,x,y,width,lineHeight){let line='';for(const ch of Array.from(text)){if(ctx.measureText(line+ch).width>width&&line){ctx.fillText(line,x,y);y+=lineHeight;line=ch;}else line+=ch;}if(line)ctx.fillText(line,x,y);return y+lineHeight;}
- async function download(){const c=state.card;if(!c)return;const palettes={warm:['#f8efdf','#493c31','#a45c49'],green:['#e8efe3','#304437','#4d7358'],blue:['#1b3040','#edf2f2','#a4ced6']};const [paper,ink,accent]=palettes[$('#daily-theme').value]||palettes.warm;
-  try{const canvas=document.createElement('canvas');canvas.width=1080;canvas.height=1440;const ctx=canvas.getContext('2d');if(!ctx)throw Error('浏览器不支持图片绘制');ctx.fillStyle=paper;ctx.fillRect(0,0,1080,1440);ctx.fillStyle=accent;ctx.font='24px sans-serif';ctx.fillText('STUDYFLOW / DAILY',85,95);ctx.font='200px Georgia';ctx.fillText(c.date.slice(-2),75,330);ctx.font='28px sans-serif';ctx.fillText(c.date,360,220);ctx.font='46px serif';ctx.fillText(c.title,360,300);ctx.fillStyle=ink;ctx.font='56px serif';wrap(ctx,c.body,85,510,910,90);ctx.fillStyle=accent;ctx.font='28px sans-serif';ctx.fillText('今日小行动',85,1000);ctx.fillStyle=ink;ctx.font='32px sans-serif';wrap(ctx,c.action,85,1070,910,58);ctx.fillStyle=accent;ctx.font='24px sans-serif';ctx.fillText('StudyFlow 原创 · 不作运势预测',85,1350);
-   const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)throw Error('图片生成失败');const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='StudyFlow-日签-'+c.date+'.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);status('分享图已生成，不包含私人感受。');
-  }catch(e){status('图片导出失败：'+e.message);}
+ function sync(){
+  const token=localStorage.getItem('studyflow.token')||'';
+  if(token===state.token)return;
+  controllers.forEach(c=>c.abort());state.epoch++;
+  Object.assign(state,{token,card:null,busy:false,loaded:false,date:today()});
+  status('正在查看今日签…');render();
  }
- $('#daily-download').addEventListener('click',download);
- new MutationObserver(()=>{sync();if(panel.classList.contains('active')&&state.token&&!state.card)load();}).observe(panel,{attributes:true,attributeFilter:['class']});new MutationObserver(sync).observe($('#app-view'),{attributes:true,attributeFilter:['class']});
- window.addEventListener('storage',e=>{if(e.key==='studyflow.token')sync();});window.addEventListener('beforeunload',e=>{if(state.dirty){e.preventDefault();e.returnValue='';}});
- let observedToday=today();
- window.setInterval(()=>{if(document.hidden||!panel.classList.contains('active'))return;const next=today();$('#daily-date').max=next;if(next!==observedToday){if(state.card?.date===observedToday){if(state.dirty){status('新的一天到了。请先保存感受，再点击“回到今日”。');return;}if(state.busy)return;load(next);}observedToday=next;}},60000);
- sync();render();if(panel.classList.contains('active')&&state.token)load();
+ async function request(draw){
+  const epoch=state.epoch,token=state.token,c=new AbortController();controllers.add(c);
+  const timeout=setTimeout(()=>c.abort(),20000);
+  try{
+   if(!token)throw Error('请先登录');
+   const r=await fetch('/api/v1/daily-card'+(draw?'/draw':''),{method:draw?'POST':'GET',headers:{Authorization:'Bearer '+token},signal:c.signal});
+   const data=await r.json();
+   if(epoch!==state.epoch||token!==localStorage.getItem('studyflow.token')){sync();throw Error('账号已切换');}
+   if(!r.ok)throw Error(data.error?.message||'请求失败');
+   if(data.data?.kind!=='daily'||!/^\d{4}-\d{2}-\d{2}$/.test(data.data.date)||draw&&!data.data.body)throw Error('签文数据不完整，请重试');
+   return data.data;
+  }finally{clearTimeout(timeout);controllers.delete(c);}
+ }
+ async function run(draw=false){
+  sync();if(state.busy)return;
+  // Recheck at midnight before allowing a new draw.
+  if(draw&&state.date!==today()){state.card=null;state.loaded=false;draw=false;}
+  if(draw&&(!state.loaded||state.card))return;
+  const epoch=state.epoch;state.busy=true;status(draw?'正在抽取今日签…':'正在查看今日签…');render();
+  try{const card=await request(draw);if(epoch!==state.epoch)return;state.card=card.body?card:null;state.date=card.date;state.loaded=true;status(card.body?'今日签已保存，刷新不会重新抽取。':'每天只抽一次，点一下就好。');}
+  catch(e){if(epoch===state.epoch){state.loaded=false;status(e.name==='AbortError'?'请求超时，请重新加载核对结果。':'未完成：'+e.message+'。请重新加载。');}}
+  finally{if(epoch===state.epoch){state.busy=false;render();}}
+ }
+ $('#daily-draw').addEventListener('click',()=>run(true));
+ $('#daily-retry').addEventListener('click',()=>run());
+ function enter(){sync();if(panel.classList.contains('active')&&state.token&&(!state.loaded||state.date!==today()))run();}
+ new MutationObserver(enter).observe(panel,{attributes:true,attributeFilter:['class']});
+ new MutationObserver(sync).observe($('#app-view'),{attributes:true,attributeFilter:['class']});
+ window.addEventListener('storage',e=>{if(e.key==='studyflow.token')enter();});
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)enter();});
+ window.setInterval(()=>{if(!document.hidden)enter();},60000);
+ sync();render();enter();
 })();

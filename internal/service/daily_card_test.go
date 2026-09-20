@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/example/studyflow/internal/domain"
 	"github.com/example/studyflow/internal/store"
 	"path/filepath"
@@ -29,8 +30,11 @@ func TestDailyCardDateAndPersistence(t *testing.T) {
 		t.Fatal("GET must not draw")
 	}
 	c, err = s.DrawDailyCard(ctx, "alice")
-	if err != nil || c.Body == "" || c.SignNumber < 1 || c.SignNumber > 31 {
+	if err != nil || c.Body == "" || c.SignNumber < 1 || c.SignNumber > len(dailyCardTexts) {
 		t.Fatal(c, err)
+	}
+	if c.Title != "大吉" && c.Title != "中吉" && c.Title != "小吉" && c.Title != "吉" && c.Title != "末吉" {
+		t.Fatalf("unexpected fortune: %s", c.Title)
 	}
 	repeated, err := s.DrawDailyCard(ctx, "alice")
 	if err != nil || repeated.Body != c.Body {
@@ -76,6 +80,44 @@ func TestDailyCardDateAndPersistence(t *testing.T) {
 	again, err := s.DailyCard(ctx, "alice", c.Date)
 	if err != nil || again.Reflection != reflection || again.Body != c.Body {
 		t.Fatal(again, err)
+	}
+}
+
+func TestLegacyDailyDrawUsesNewPresentationWithoutReroll(t *testing.T) {
+	ctx := context.Background()
+	repo := store.NewMemory()
+	s := New(repo, nil, nil)
+	s.now = func() time.Time { return time.Date(2026, 9, 21, 4, 0, 0, 0, time.UTC) }
+	for _, number := range []int{0, 7, 31} {
+		legacy, err := s.dailyBase("legacy", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		legacy.UserID = fmt.Sprintf("legacy-%d", number)
+		legacy.ID = legacy.UserID + ":daily:" + legacy.Date
+		legacy.Title, legacy.Body, legacy.SignNumber = "留白", "旧版签文", number
+		legacy.Reflection, legacy.Favorite = "保留我的感受", true
+		if _, err = repo.SaveDailyCard(ctx, legacy, nil, nil); err != nil {
+			t.Fatal(err)
+		}
+		got, err := s.DailyCard(ctx, legacy.UserID, "")
+		if err != nil || got.Title == legacy.Title || got.Body == legacy.Body {
+			t.Fatal(got, err)
+		}
+		repeat, err := s.DrawDailyCard(ctx, legacy.UserID)
+		if err != nil || repeat.Title != got.Title || repeat.Body != got.Body {
+			t.Fatal("legacy result rerolled", err)
+		}
+		items, _ := repo.ListExplorations(ctx, legacy.UserID)
+		if len(items) != 1 || items[0].Body != legacy.Body || items[0].Reflection != legacy.Reflection || !items[0].Favorite {
+			t.Fatal("original record changed")
+		}
+		s.now = func() time.Time { return time.Date(2026, 9, 22, 4, 0, 0, 0, time.UTC) }
+		past, err := s.DailyCard(ctx, legacy.UserID, legacy.Date)
+		if err != nil || past.Body != legacy.Body {
+			t.Fatal("historical record changed", err)
+		}
+		s.now = func() time.Time { return time.Date(2026, 9, 21, 4, 0, 0, 0, time.UTC) }
 	}
 }
 
