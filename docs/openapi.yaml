@@ -22,6 +22,43 @@ tags:
   - name: Literature
   - name: Exports
 paths:
+  /api/v1/ledger:
+    get:
+      summary: 当前账号的全部收支与月度预算（含回收站）
+      description: 前端按月份、收支、分类、账户、备注及回收站状态筛选，每页 10 笔。金额单位为人民币分；此接口不提供银行余额或转账。
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: 'data 为账目数组，每条含 id、user_id、kind、amount、date、category、account、note、archived、revision、created_at、updated_at' }
+        '401': { description: 未登录 }
+  /api/v1/ledger/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,80}$' } }
+    put:
+      summary: 保存收支或预算，包括编辑、移入回收站和恢复
+      description: 'ID 按账号隔离。首次 revision 为 0，更新携带上次版本；同一内容及版本的重试幂等。预算 ID 必须为 budget-YYYY-MM，日期为当月 01 日。普通账目 ID 建议 UUID，不能使用 budget- 前缀。每账号合计最多 10000 条（含回收站），不存在永久删除入口。'
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, amount, date, revision]
+              properties:
+                kind: { type: string, enum: [expense, income, budget] }
+                amount: { type: integer, minimum: 1, maximum: 10000000000, description: 人民币分，不接受小数 }
+                date: { type: string, format: date, description: '2000-01-01 至 2100-12-31' }
+                category: { type: string, maxLength: 24, description: 收支必填，预算忽略 }
+                account: { type: string, maxLength: 24, description: 手动账户标签；收支必填，预算忽略 }
+                note: { type: string, maxLength: 500 }
+                archived: { type: boolean, default: false }
+                revision: { type: integer, minimum: 0, maximum: 1000000 }
+      responses:
+        '200': { description: data 为保存后的完整记录和递增 revision }
+        '400': { description: 输入无效或超过记录上限 }
+        '401': { description: 未登录 }
+        '404': { description: 更新目标不存在 }
+        '409': { description: 版本冲突，保留草稿并重新读取记录后编辑 }
   /api/v1/keepsakes:
     get:
       summary: 当前账号的人生地图与博物馆记录（含照片与归档）

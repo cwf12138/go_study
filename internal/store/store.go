@@ -22,6 +22,8 @@ type TodoFilter struct {
 // implementation can replace Memory without changing the service layer.
 type Repository interface {
 	ListKeepsakes(context.Context, string) ([]domain.Keepsake, error)
+	ListLedger(context.Context, string) ([]domain.LedgerEntry, error)
+	SaveLedger(context.Context, domain.LedgerEntry, int) (domain.LedgerEntry, error)
 	SaveKeepsake(context.Context, domain.Keepsake, int) (domain.Keepsake, error)
 	CreateHabit(context.Context, domain.Habit) error
 	HabitByID(context.Context, string) (domain.Habit, error)

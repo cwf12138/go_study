@@ -33,6 +33,7 @@
     <link rel="stylesheet" href="/static/keepsakes.css?v=20260916-1">
     <link rel="stylesheet" href="/static/playrooms.css?v=20260920-1">
     <link rel="stylesheet" href="/static/daily-card.css?v=20260921-simple">
+    <link rel="stylesheet" href="/static/ledger.css?v=20260922-1">
     <link rel="stylesheet" href="/static/layout.css?v=20260922-1">
   </head>
   <body>
@@ -84,6 +85,7 @@
           <button class="nav-link" type="button" data-view="lab"><span>✧</span>灵感实验室</button>
           <button class="nav-link" type="button" data-view="explore"><span>✉</span>探索生活</button>
           <button class="nav-link" type="button" data-view="daily"><span>☀</span>每日一签</button>
+          <button class="nav-link" type="button" data-view="ledger"><span>¥</span>生活账本</button>
           <button class="nav-link" type="button" data-view="tasks"><span>✓</span>学习任务</button>
           <button class="nav-link" type="button" data-view="todo"><span>☑</span>待办清单</button>
           <button class="nav-link" type="button" data-view="planner"><span>▦</span>智能规划</button>
@@ -350,6 +352,18 @@
             </div>
           </section>
 
+          <section id="panel-ledger" class="panel">
+            <header class="ledger-heading"><div><p class="eyebrow">LIFE LEDGER / 每一笔，都是生活</p><h3>把日子，记得清楚一点。</h3><p>看见钱花在哪里，也为喜欢的生活留一点余地。</p></div><button id="ledger-new" class="primary" type="button">＋ 记一笔</button></header>
+            <div class="ledger-toolbar"><div class="ledger-month-nav"><button id="ledger-prev" class="quiet" type="button" aria-label="上个月">←</button><label>账本月份<input id="ledger-month" type="month" min="2000-01" max="2100-12"></label><button id="ledger-next" class="quiet" type="button" aria-label="下个月">→</button><button id="ledger-now" class="quiet" type="button">本月</button></div><button id="ledger-refresh" class="quiet" type="button">刷新账本</button></div>
+            <p id="ledger-status" role="status" aria-live="polite"></p>
+            <div class="ledger-metrics"><article><span>本月支出</span><strong id="ledger-expense">¥0.00</strong><small>仅统计未移入回收站的账目</small></article><article><span>本月收入</span><strong id="ledger-income">¥0.00</strong><small>手动记录的收入</small></article><article><span>本月收支结余</span><strong id="ledger-net">¥0.00</strong><small>收入 − 支出，并非账户余额</small></article></div>
+            <div class="ledger-insights"><article class="surface ledger-budget"><div class="ledger-card-head"><h3>给支出一个边界</h3><button id="ledger-budget-edit" class="quiet" type="button">设置预算</button></div><p id="ledger-budget-label">尚未设置月度预算</p><div class="ledger-meter" role="progressbar" aria-label="月度预算使用比例" aria-valuemin="0" aria-valuemax="100" id="ledger-meter"><i id="ledger-meter-fill"></i></div><p id="ledger-budget-hint"></p><small>预算为当月总支出上限；所有统计不受下方流水筛选影响。</small></article><article class="surface"><div class="ledger-card-head"><h3>钱都花在哪里</h3><span>点击分类查看流水</span></div><div id="ledger-categories"></div></article></div>
+            <article class="surface ledger-trend-card"><div class="ledger-card-head"><h3>每日支出节奏</h3><span>点击柱形筛选某一天</span></div><div id="ledger-trend" class="ledger-trend" aria-label="当月每日支出"></div></article>
+            <article class="surface ledger-records"><div class="ledger-card-head"><div><p class="eyebrow">TRANSACTIONS</p><h3>生活流水</h3></div><button id="ledger-export" class="quiet" type="button">导出筛选结果 CSV</button></div><div class="ledger-filters"><label>搜索<input id="ledger-search" type="search" maxlength="100" placeholder="分类、账户或备注"></label><label>收支<select id="ledger-kind"><option value="">全部收支</option><option value="expense">支出</option><option value="income">收入</option></select></label><label>分类<select id="ledger-category"><option value="">全部分类</option></select></label><label>账户<select id="ledger-account"><option value="">全部账户</option></select></label><label>记录状态<select id="ledger-archive"><option value="active">正常记录</option><option value="archived">回收站</option></select></label><label>排序<select id="ledger-sort"><option value="newest">日期从新到旧</option><option value="oldest">日期从旧到新</option><option value="amount">金额从大到小</option></select></label></div><div class="ledger-list-meta"><span id="ledger-summary"></span><button id="ledger-clear" class="text-button" type="button">清除筛选</button></div><div id="ledger-list"></div><nav class="ledger-pagination" aria-label="流水分页"><button id="ledger-page-prev" class="quiet" type="button">上一页</button><span id="ledger-page"></span><button id="ledger-page-next" class="quiet" type="button">下一页</button></nav></article>
+            <p class="ledger-footnote">人民币手动账本 · 不连接银行 · 不支持转账与多币种换算。记录随账号保存并纳入个人数据导出；回收站记录仍保留在备份中。</p>
+          </section>
+          <dialog id="ledger-dialog"><form id="ledger-form"><header><div><p class="eyebrow">A LITTLE RECORD</p><h3 id="ledger-editor-title">记一笔</h3></div><button id="ledger-close" class="quiet" type="button" aria-label="关闭账目编辑">×</button></header><fieldset id="ledger-fields"><div class="ledger-form-row"><label>类型<select id="ledger-entry-kind"><option value="expense">支出</option><option value="income">收入</option><option value="budget">月度预算</option></select></label><label>金额（元）<input id="ledger-amount" inputmode="decimal" required maxlength="12" placeholder="0.00" autocomplete="off"></label></div><label>日期<input id="ledger-date" type="date" min="2000-01-01" max="2100-12-31" required></label><div id="ledger-entry-details"><div class="ledger-form-row"><label>分类<input id="ledger-entry-category" maxlength="24" list="ledger-category-suggestions" placeholder="例如：餐饮"></label><label>账户标签<input id="ledger-entry-account" maxlength="24" list="ledger-account-suggestions" placeholder="例如：微信"></label></div><label>备注<textarea id="ledger-note" rows="3" maxlength="500" placeholder="这笔钱用在了哪里？"></textarea></label></div></fieldset><p id="ledger-editor-status" role="status" aria-live="polite"></p><footer><button id="ledger-save" class="primary" type="submit">保存账目</button></footer></form></dialog>
+          <datalist id="ledger-category-suggestions"><option value="餐饮"></option><option value="交通"></option><option value="购物"></option><option value="居住"></option><option value="学习"></option><option value="娱乐"></option><option value="医疗"></option><option value="工资"></option><option value="其他"></option></datalist><datalist id="ledger-account-suggestions"><option value="微信"></option><option value="支付宝"></option><option value="银行卡"></option><option value="现金"></option></datalist>
           <section id="panel-tasks" class="panel">
             <header class="task-studio-header"><div><p class="eyebrow">TASK STUDIO · 行动空间</p><h3>把下一步，变得清晰一点。</h3><p>从一个小任务开始，让想做的事真正向前。</p></div><button id="task-create-shortcut" class="primary" type="button">＋ 新建任务</button></header>
             <div class="task-overview" aria-label="全部任务概况">
@@ -613,7 +627,8 @@
         <div class="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 执行</span><span>全局快捷键 <kbd>Ctrl K</kbd></span></div>
       </div>
     </dialog>
-    <script src="/static/app.js?v=20260916-daily" defer></script>
+    <script src="/static/app.js?v=20260922-ledger" defer></script>
+    <script src="/static/ledger.js?v=20260922-1" defer></script>
     <script src="/static/habits.js?v=20260914-1" defer></script>
     <script src="/static/timeline.js?v=20260910-1" defer></script>
     <script src="/static/weather.js?v=20260909-1" defer></script>
