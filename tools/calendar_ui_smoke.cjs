@@ -9,7 +9,7 @@ function element() {
     innerHTML: "", textContent: "", value: "", checked: false, open: false, dataset: {},
     style: { setProperty() {} },
     classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-    addEventListener() {}, insertAdjacentHTML(_position, html) { this.innerHTML = html + this.innerHTML; },
+    addEventListener() {}, setAttribute() {}, insertAdjacentHTML(_position, html) { this.innerHTML = html + this.innerHTML; },
     querySelector() { return element(); }, focus() {}, close() {}, showModal() {},
   };
 }

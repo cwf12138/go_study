@@ -34,6 +34,7 @@
     <link rel="stylesheet" href="/static/playrooms.css?v=20260920-1">
     <link rel="stylesheet" href="/static/daily-card.css?v=20260921-simple">
     <link rel="stylesheet" href="/static/ledger.css?v=20260922-1">
+    <link rel="stylesheet" href="/static/calendar-experience.css?v=20260922-2">
     <link rel="stylesheet" href="/static/layout.css?v=20260922-1">
   </head>
   <body>
@@ -179,8 +180,10 @@
             <div class="calendar-shell">
               <div class="calendar-toolbar">
                 <div class="calendar-nav-actions"><button id="calendar-today" class="quiet" type="button">今天</button><button id="calendar-prev" class="icon-button" type="button" aria-label="上一段">‹</button><button id="calendar-next" class="icon-button" type="button" aria-label="下一段">›</button><h3 id="calendar-title">日历</h3></div>
-                <div class="calendar-toolbar-actions"><div class="calendar-view-switch" role="tablist" aria-label="日历视图"><button type="button" data-calendar-view="year">年</button><button class="active" type="button" data-calendar-view="month">月</button><button type="button" data-calendar-view="week">周</button><button type="button" data-calendar-view="day">日</button></div><button id="calendar-create" class="primary" type="button">＋ 新建日程</button></div>
+                <div class="calendar-toolbar-actions"><div class="calendar-tool-icons"><button id="calendar-search-open" type="button" class="icon-button" aria-label="搜索日程" title="搜索日程" aria-haspopup="dialog" aria-controls="calendar-tools-dialog"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg></button><button id="calendar-filter-open" type="button" class="icon-button" aria-label="筛选与日期跳转" title="筛选与日期跳转" aria-haspopup="dialog" aria-controls="calendar-tools-dialog"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="currentColor"/><circle cx="15" cy="12" r="2" fill="currentColor"/><circle cx="8" cy="18" r="2" fill="currentColor"/></svg></button></div><div class="calendar-view-switch" role="tablist" aria-label="日历视图"><button type="button" data-calendar-view="year">年</button><button class="active" type="button" data-calendar-view="month">月</button><button type="button" data-calendar-view="week">周</button><button type="button" data-calendar-view="day">日</button></div><button id="calendar-create" class="primary" type="button">＋ 新建日程</button></div>
               </div>
+              <dialog id="calendar-tools-dialog" class="calendar-tools-dialog" aria-labelledby="calendar-tools-title"><header><h3 id="calendar-tools-title">搜索日程</h3><button id="calendar-tools-close" type="button" class="icon-button" aria-label="关闭搜索与筛选">×</button></header><div id="calendar-search-fields"><label>查找当前日期范围<input id="calendar-search" type="search" maxlength="100" placeholder="输入日程、计划或任务标题" autocomplete="off"></label><p>按标题即时查找，搜索条件在关闭后仍保留。</p></div><div id="calendar-filter-fields" class="hidden"><label>直达日期<input id="calendar-jump" type="date"></label><label>显示内容<select id="calendar-source"><option value="all">全部内容</option><option value="event">个人日程</option><option value="plan">学习计划</option><option value="tasks">任务与待办</option><option value="mood">心情记录</option></select></label><p>选择后立即生效。图标上的圆点表示正在使用搜索或来源筛选。</p></div><footer><button id="calendar-reset-filters" class="quiet" type="button">清除全部条件</button><button id="calendar-tools-done" class="primary" type="button">查看日历</button></footer></dialog>
+              <p id="calendar-view-status" class="calendar-view-status" role="status" aria-live="polite"></p>
               <div class="calendar-layout">
                 <article class="surface calendar-main-card">
                   <div class="calendar-sheet-caption"><span>日程手账</span><small>选择日期，查看当天的安排与农历</small></div>
@@ -632,7 +635,7 @@
     <script src="/static/habits.js?v=20260914-1" defer></script>
     <script src="/static/timeline.js?v=20260910-1" defer></script>
     <script src="/static/weather.js?v=20260909-1" defer></script>
-    <script src="/static/calendar.js?v=20260914-1" defer></script>
+    <script src="/static/calendar.js?v=20260922-tools" defer></script>
     <script src="/static/knowledge.js?v=20260904-1" defer></script>
     <script src="/static/memos.js?v=20260909-1" defer></script>
     <script src="/static/english.js?v=20260901-7" defer></script>

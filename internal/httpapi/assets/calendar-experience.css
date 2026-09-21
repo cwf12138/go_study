@@ -1,0 +1,106 @@
+/* A compact working calendar, with supporting information below the agenda. */
+#panel-calendar .organizer-heading{margin:4px 0 20px}
+#panel-calendar .calendar-toolbar{padding:14px 18px;border-radius:16px;gap:16px;margin-bottom:0}
+#panel-calendar .calendar-nav-actions h3{font-size:22px}
+#panel-calendar .calendar-view-switch{padding:4px;border-radius:12px}
+#panel-calendar .calendar-view-switch button{min-width:44px;min-height:36px;border-radius:8px;font-size:13px}
+#panel-calendar .calendar-view-switch button.active{background:var(--studio-accent);color:#fff}
+.calendar-browse-bar{display:flex;align-items:end;gap:14px;flex-wrap:wrap;padding:16px 2px 0}
+.calendar-browse-bar label{display:grid;gap:6px;font-size:11px;color:var(--muted);min-width:0}
+.calendar-browse-bar .calendar-search-label{flex:1;min-width:180px}
+#panel-calendar .calendar-browse-bar :is(input,select){background:var(--paper);color:var(--ink);border-color:var(--studio-rule);font-size:13px;min-height:40px}
+.calendar-browse-bar>button{min-height:40px;font-size:12px}
+.calendar-view-status{font-size:12px;line-height:1.8;color:var(--muted);margin:12px 0 16px;min-height:22px}
+#panel-calendar .calendar-layout{align-items:start;grid-template-columns:minmax(0,1fr) 310px;gap:20px}
+#panel-calendar .calendar-main-card{border-radius:16px;overflow:hidden;padding:0;min-height:0}
+#panel-calendar .calendar-canvas{min-height:0}
+#panel-calendar .calendar-month-grid{grid-template-rows:repeat(6,minmax(110px,auto));min-height:0}
+#panel-calendar .calendar-day-cell{min-height:110px;padding:11px 9px;transition:background .16s,box-shadow .16s;position:relative}
+#panel-calendar .calendar-day-cell:hover{background:var(--studio-wash);box-shadow:inset 0 0 0 1px var(--studio-rule)}
+#panel-calendar .calendar-day-cell.selected{background:var(--studio-soft);box-shadow:inset 0 0 0 2px var(--studio-accent)}
+#panel-calendar .calendar-day-cell.today .calendar-solar-day{background:var(--studio-accent);color:#fff;border-radius:50%;width:27px;height:27px;display:inline-grid;place-items:center}
+#panel-calendar .calendar-solar-day{font-size:16px;font-weight:600}
+#panel-calendar .calendar-lunar-day{font-size:11px}
+#panel-calendar .calendar-cell-items{gap:4px;margin-top:8px}
+#panel-calendar .calendar-cell-item{font-size:11px;padding:3px 5px;border-radius:4px;line-height:1.5}
+#panel-calendar .calendar-cell-more{font-size:10px;color:var(--studio-accent)}
+#panel-calendar .calendar-weekdays{padding-block:12px;background:var(--studio-wash);font-size:12px}
+#panel-calendar .calendar-side{display:flex;flex-direction:column;gap:16px;min-width:0}
+#panel-calendar .calendar-side>.surface{width:100%;padding:20px;border-radius:16px}
+#panel-calendar .calendar-agenda-card{order:-1;border-top:3px solid var(--studio-accent)}
+#panel-calendar .calendar-day-agenda{max-height:350px;overflow:auto;scrollbar-width:thin}
+#panel-calendar .calendar-agenda-item{padding:13px 4px;gap:9px;border-bottom:1px solid var(--studio-rule);border-radius:6px}
+#panel-calendar .calendar-agenda-item[data-calendar-event]{cursor:pointer}
+#panel-calendar .calendar-agenda-item[data-calendar-event]:hover{background:var(--studio-soft)}
+#panel-calendar .calendar-agenda-item b{font-size:14px;line-height:1.6;overflow-wrap:anywhere}
+#panel-calendar .calendar-agenda-item small{font-size:11px;line-height:1.8}
+#panel-calendar .calendar-agenda-time{font-size:12px;font-variant-numeric:tabular-nums}
+#panel-calendar .calendar-history{max-height:220px;overflow:auto;scrollbar-width:thin}
+#panel-calendar .calendar-day-hero strong{font-size:48px}
+#panel-calendar .calendar-mini-month h4>button{border:0;background:transparent;color:var(--studio-accent);font:inherit;padding:5px 10px;border-radius:8px;cursor:pointer}
+#panel-calendar .calendar-mini-month h4>button:hover{background:var(--studio-soft)}
+#panel-calendar .calendar-load-error{margin:12px;border-radius:10px}
+#panel-calendar .calendar-legend{line-height:1.8;padding:12px 16px}
+#panel-calendar .calendar-event-dialog{border-radius:18px}
+#panel-calendar .calendar-event-dialog :is(input,select,textarea){font-size:15px}
+#panel-calendar .calendar-event-dialog label{line-height:1.7}
+@media(max-width:1200px){#panel-calendar .calendar-layout{grid-template-columns:minmax(0,1fr)}#panel-calendar .calendar-side{display:grid;grid-template-columns:1fr 1fr;align-items:start}#panel-calendar .calendar-month-grid{grid-template-rows:repeat(6,minmax(100px,auto))}#panel-calendar .calendar-day-cell{min-height:100px}}
+@media(max-width:650px){#panel-calendar .organizer-emblem{display:none}#panel-calendar .calendar-toolbar{padding:12px;gap:14px}#panel-calendar .calendar-toolbar-actions{width:100%;justify-content:space-between}#panel-calendar .calendar-nav-actions h3{font-size:20px;width:auto;margin:0 0 0 6px}#panel-calendar .calendar-side{grid-template-columns:1fr}.calendar-browse-bar{gap:10px}.calendar-browse-bar label{flex:1;min-width:130px}.calendar-browse-bar .calendar-search-label{flex-basis:100%;order:3}#panel-calendar .calendar-month-grid{grid-template-rows:repeat(6,minmax(76px,auto))}#panel-calendar .calendar-day-cell{min-height:76px;padding:8px 4px}#panel-calendar .calendar-solar-day{font-size:14px}#panel-calendar .calendar-lunar-day{font-size:9px}#panel-calendar .calendar-cell-item{flex:0 0 5px;width:5px;height:5px;padding:0;border:0;border-radius:50%;font-size:0;background:var(--item-color)}#panel-calendar .calendar-cell-items{display:flex;flex-wrap:wrap;flex-direction:row;align-items:center;gap:4px}#panel-calendar .calendar-cell-more{font-size:9px}#panel-calendar .calendar-legend small{display:none}}
+@media(prefers-reduced-motion:reduce){#panel-calendar *{animation:none!important;transition:none!important}}
+
+/* On-demand tools: native modal focus handling, with a mobile bottom-sheet layout. */
+#panel-calendar .calendar-tool-icons{display:flex;gap:8px}
+#panel-calendar .calendar-tool-icons button{position:relative;display:grid;place-items:center;width:44px;height:44px;padding:10px;border:1px solid var(--studio-rule);border-radius:12px;background:var(--paper);color:var(--ink)}
+#panel-calendar .calendar-tool-icons button[data-filtered=true]{color:var(--studio-accent);background:var(--studio-soft)}
+#panel-calendar .calendar-tool-icons button[data-filtered=true]::after{content:'';position:absolute;right:5px;top:5px;width:6px;height:6px;background:var(--studio-accent);border-radius:50%}
+#panel-calendar .calendar-tools-dialog{width:min(440px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;padding:26px;border:1px solid var(--studio-rule);border-radius:20px;background:var(--paper);color:var(--ink);box-shadow:0 24px 70px #18261c30}
+.calendar-tools-dialog::backdrop{background:#17251d60;backdrop-filter:blur(3px)}
+.calendar-tools-dialog header{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:24px}
+#panel-calendar .calendar-tools-dialog h3{font-size:22px;margin:0}
+.calendar-tools-dialog label{display:grid;gap:10px;margin-bottom:20px;font-size:15px}
+#panel-calendar .calendar-tools-dialog input,#panel-calendar .calendar-tools-dialog select{font-size:16px;min-height:46px;background:var(--paper);color:var(--ink);border-color:var(--studio-rule)}
+.calendar-tools-dialog p{font-size:14px;line-height:1.8;color:var(--muted)}
+.calendar-tools-dialog footer{display:flex;gap:12px;justify-content:space-between;margin-top:24px}
+#panel-calendar .calendar-tools-dialog button{min-height:44px;font-size:14px}
+#panel-calendar .calendar-toolbar-actions{flex-wrap:wrap;gap:12px}
+
+/* Readability: primary information is no longer rendered at 9–11px. */
+#panel-calendar .calendar-solar-day{font-size:19px}
+#panel-calendar .calendar-lunar-day{font-size:13px;line-height:1.6}
+#panel-calendar .calendar-cell-item{font-size:13px;line-height:1.65}
+#panel-calendar .calendar-cell-more,#panel-calendar .calendar-holiday-tag{font-size:12px}
+#panel-calendar .calendar-weekdays{font-size:14px}
+#panel-calendar .calendar-view-switch button,#panel-calendar .calendar-nav-actions button,#panel-calendar #calendar-create{font-size:14px;min-height:42px}
+#panel-calendar .calendar-view-status{font-size:14px;margin:14px 0}
+#panel-calendar .calendar-sheet-caption span,#panel-calendar .calendar-sheet-caption small,#panel-calendar .calendar-legend,#panel-calendar .calendar-legend small{font-size:13px}
+#panel-calendar .calendar-card-head h3{font-size:20px}
+#panel-calendar .calendar-agenda-item b{font-size:16px}
+#panel-calendar .calendar-agenda-item small,#panel-calendar .calendar-agenda-time{font-size:14px}
+#panel-calendar .calendar-day-hero h3{font-size:16px;line-height:1.6}
+#panel-calendar .calendar-day-hero p,#panel-calendar .calendar-day-hero span,#panel-calendar .calendar-day-badges span{font-size:14px;line-height:1.8}
+#panel-calendar .calendar-almanac p{font-size:15px;line-height:1.9}
+#panel-calendar .calendar-almanac b{font-size:14px;width:28px;height:28px}
+#panel-calendar .calendar-almanac-extra,#panel-calendar .calendar-disclaimer,#panel-calendar .calendar-history-card>small{font-size:13px;line-height:1.9}
+#panel-calendar .calendar-quote-card blockquote{font-size:18px}
+#panel-calendar .calendar-quote-card>span{font-size:13px}
+#panel-calendar .calendar-history-item span{font-size:15px;line-height:1.9}
+#panel-calendar .calendar-history-item strong{font-size:16px}
+#panel-calendar .calendar-mini-day{font-size:14px;padding:8px 0}
+#panel-calendar .calendar-mini-week,#panel-calendar .calendar-mini-month small{font-size:12px}
+#panel-calendar .calendar-timed-event{font-size:13px}
+#panel-calendar .calendar-time-head{font-size:14px}
+#panel-calendar .calendar-hour-labels{font-size:12px}
+@media(max-width:650px){
+ #panel-calendar .calendar-toolbar-actions{justify-content:flex-start;gap:10px}
+ #panel-calendar .calendar-view-switch{order:3;width:100%;display:flex}
+ #panel-calendar .calendar-view-switch button{flex:1}
+ #panel-calendar #calendar-create{margin-left:auto}
+ #panel-calendar .calendar-month-grid{grid-template-rows:repeat(6,minmax(90px,auto))}
+ #panel-calendar .calendar-day-cell{min-height:90px}
+ #panel-calendar .calendar-cell-head{flex-wrap:wrap;gap:2px}
+ #panel-calendar .calendar-solar-day{font-size:17px}
+ #panel-calendar .calendar-lunar-day{font-size:12px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ #panel-calendar .calendar-cell-item{font-size:0;line-height:0}
+ #panel-calendar .calendar-cell-more{font-size:11px}
+ #panel-calendar .calendar-tools-dialog{width:100%;max-width:none;margin:auto 0 0;border-radius:22px 22px 0 0;max-height:85dvh;padding:24px 20px max(24px,env(safe-area-inset-bottom))}
+}
