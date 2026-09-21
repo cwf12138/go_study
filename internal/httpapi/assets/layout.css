@@ -1,0 +1,51 @@
+/* Shared page frame. Keep this sheet after feature styles. Width includes gutters. */
+.workspace {
+  --page-width: 1440px;
+  --page-gutter: clamp(24px, 2vw, 32px);
+  --page-block-space: 24px;
+}
+
+/* Wider working surfaces; reading columns retain their own readable line lengths. */
+.workspace:has(> .content > :is(#panel-calendar, #panel-memos, #panel-planner).active) {
+  --page-width: 1680px;
+}
+
+.workspace > .content {
+  width: 100%;
+  max-width: var(--page-width);
+  margin-inline: auto;
+  padding: var(--page-block-space) var(--page-gutter) 32px;
+}
+
+/* Same inner edges as the centered content, while the header background stays full width. */
+.workspace > .topbar {
+  padding-block: 20px;
+  padding-inline: max(var(--page-gutter), calc((100% - var(--page-width)) / 2 + var(--page-gutter)));
+}
+
+.workspace > .content > .app-sync-bar {
+  margin-bottom: 16px;
+}
+
+/* A small centered experience needs no second large top margin. */
+#panel-daily .daily-simple {
+  margin: 8px auto 24px;
+  padding-top: 12px;
+}
+
+@media (max-width: 900px) {
+  .workspace {
+    --page-gutter: 22px;
+    --page-block-space: 24px;
+  }
+  .workspace > .topbar { padding-block: 18px; }
+}
+
+@media (max-width: 560px) {
+  .workspace {
+    --page-gutter: 15px;
+    --page-block-space: 20px;
+  }
+  .workspace > .content { padding-bottom: 24px; }
+  #panel-daily .daily-simple { margin-top: 0; padding-top: 8px; }
+}
