@@ -380,6 +380,13 @@
   }
 
   function bindKnowledgeEvents() {
+    document.addEventListener("studyflow:legacy-ideas", () => {
+      syncKnowledgeAccount();
+      state.tag = "灵感实验"; state.query = "";
+      $("#knowledge-search").value = "";
+      setKnowledgeView("notes");
+      loadKnowledge({ preserveSelection: false });
+    });
     document.querySelector('[data-view="knowledge"]')?.addEventListener("click", () => loadKnowledge());
     $("#knowledge-new").addEventListener("click", () => openKnowledgeEditor());
     $("#knowledge-editor-close").addEventListener("click", () => $("#knowledge-editor-dialog").close());

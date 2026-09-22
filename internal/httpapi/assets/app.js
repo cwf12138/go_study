@@ -292,6 +292,8 @@
   }
 
   function showView(view) {
+    const legacyIdeas = view === "lab";
+    if (legacyIdeas) view = "knowledge";
     if (view === "habits") view = "dashboard";
     const labels = {
       dashboard: ["今天也在前进", "学习概览"],
@@ -302,7 +304,6 @@
       calendar: ["SMART CALENDAR", "智能日历"],
       memos: ["PERSONAL NOTES", "备忘录"],
       knowledge: ["KNOWLEDGE GARDEN", "知识花园"],
-      lab: ["IDEA LAB", "灵感实验室"],
       explore: ["LITTLE ADVENTURES", "探索生活"],
       daily: ["A PAGE FOR TODAY", "每日一签"],
       ledger: ["LIFE LEDGER", "生活账本"],
@@ -329,6 +330,7 @@
     $$(".panel").forEach((panel) => panel.classList.toggle("active", panel.id === `panel-${view}`));
     $$(".nav-link").forEach((button) => button.classList.toggle("active", button.dataset.view === view));
     $(".sidebar").classList.remove("open");
+    if (legacyIdeas) document.dispatchEvent(new CustomEvent("studyflow:legacy-ideas"));
   }
 
   function goalListURL() {

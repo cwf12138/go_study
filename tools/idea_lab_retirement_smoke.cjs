@@ -1,0 +1,15 @@
+const fs=require('fs'),path=require('path'),assert=require('assert');
+const root=path.join(__dirname,'../internal/httpapi/assets');
+const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+assert(!html.includes('id="panel-lab"'));
+assert(!html.includes('data-view="lab"'));
+assert(!html.includes('/static/idea-lab.'));
+assert(html.includes('id="panel-knowledge"'));
+const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
+assert(app.includes('if (legacyIdeas) view = "knowledge";'));
+assert(app.includes('new CustomEvent("studyflow:legacy-ideas")'));
+const knowledge=fs.readFileSync(path.join(root,'knowledge.js'),'utf8');
+assert(knowledge.includes('document.addEventListener("studyflow:legacy-ideas"'));
+assert(knowledge.includes('state.tag = "灵感实验"'));
+assert(!fs.existsSync(path.join(root,'idea-lab.js')));
+console.log('Idea lab retirement passed: removed page/assets, legacy navigation and retained knowledge-note access.');

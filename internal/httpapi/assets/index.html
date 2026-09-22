@@ -29,7 +29,6 @@
     <link rel="stylesheet" href="/static/growth-studio.css?v=20260915-1">
     <link rel="stylesheet" href="/static/action-studio.css?v=20260915-1">
     <link rel="stylesheet" href="/static/english-reading.css?v=20260915-1">
-    <link rel="stylesheet" href="/static/idea-lab.css?v=20260915-1">
     <link rel="stylesheet" href="/static/explore.css?v=20260916-1">
     <link rel="stylesheet" href="/static/keepsakes.css?v=20260916-1">
     <link rel="stylesheet" href="/static/playrooms.css?v=20260920-1">
@@ -84,7 +83,6 @@
           <button class="nav-link" type="button" data-view="calendar"><span>▦</span>智能日历</button>
           <button class="nav-link" type="button" data-view="memos"><span>▤</span>备忘录</button>
           <button class="nav-link" type="button" data-view="knowledge"><span>◇</span>知识花园</button>
-          <button class="nav-link" type="button" data-view="lab"><span>✧</span>灵感实验室</button>
           <button class="nav-link" type="button" data-view="explore"><span>✉</span>探索生活</button>
           <button class="nav-link" type="button" data-view="daily"><span>☀</span>每日一签</button>
           <button class="nav-link" type="button" data-view="ledger"><span>¥</span>生活账本</button>
@@ -316,13 +314,6 @@
                 <div class="knowledge-editor-actions"><span id="knowledge-editor-hint">支持标题、列表、引用、粗体、行内代码和双向链接</span><button id="knowledge-editor-cancel" class="quiet" type="button">取消</button><button class="primary" type="submit">保存笔记</button></div>
               </form>
             </dialog>
-          </section>
-
-          <section id="panel-lab" class="panel">
-            <header class="lab-heading"><div><p class="eyebrow">IDEA LAB · 思考不设限</p><h3>让学过的知识，发生新的反应。</h3><p>不急着找答案。试着讲清楚、连起来，再问一次“为什么”。</p></div><span aria-hidden="true">✧</span></header>
-            <div class="lab-modes" role="group" aria-label="选择思考练习"><button type="button" data-lab-mode="explain" aria-pressed="true"><b>01 · 费曼讲解</b><span>把一个概念，讲给初学者听。</span></button><button type="button" data-lab-mode="connect" aria-pressed="false"><b>02 · 知识碰撞</b><span>让两则笔记，长出一个新想法。</span></button><button type="button" data-lab-mode="challenge" aria-pressed="false"><b>03 · 反向思考</b><span>寻找反例，看见观点的边界。</span></button></div>
-            <div class="lab-layout"><aside class="surface lab-source"><p class="eyebrow">START WITH A SPARK</p><h3>今天研究什么？</h3><label>自选主题<input id="lab-topic" maxlength="120" placeholder="例如：为什么需要 Go channel？"></label><button id="lab-start" type="button" class="primary">用这个主题开始</button><div class="lab-divider">或从知识花园寻找灵感</div><button id="lab-draw" class="quiet" type="button">✧ 随机抽取笔记</button><p id="lab-source-hint">费曼讲解与反向思考抽取一则，知识碰撞抽取两则不同笔记。</p><div id="lab-sources"></div><p class="lab-privacy">只读取当前账号的知识笔记。没有 AI 自动评分，也不会向第三方发送内容。</p></aside>
-            <article class="surface lab-writing"><div class="lab-writing-head"><div><p class="eyebrow">THINK ON PAPER</p><h3 id="lab-heading">费曼讲解</h3></div><span id="lab-count">0 字</span></div><p id="lab-context">输入主题或抽取笔记，开始一次思考实验。</p><form id="lab-form"><label><span id="lab-label-one">用初学者听得懂的话解释</span><textarea id="lab-one" rows="5" maxlength="6000" required placeholder="不照抄定义，从自己的理解开始…"></textarea></label><label><span id="lab-label-two">给出一个具体例子或生活类比</span><textarea id="lab-two" rows="4" maxlength="6000" required placeholder="把抽象的想法，放进一个具体场景…"></textarea></label><label><span id="lab-label-three">哪里还讲不清？下一步如何验证？</span><textarea id="lab-three" rows="3" maxlength="6000" required placeholder="诚实地留下疑问，也是一种收获。"></textarea></label><div class="lab-save-row"><button id="lab-save" class="primary" type="submit" disabled>保存到知识花园</button><span id="lab-status" role="status" aria-live="polite">未保存的内容仅在当前页面保留。</span></div></form><p class="lab-footnote">这是开放式练习，没有标准答案。保存后可在知识花园搜索“灵感实验”，再次保存会更新同一则练习笔记。</p></article></div>
           </section>
 
           <section id="panel-explore" class="panel">
@@ -643,18 +634,17 @@
         <div class="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 执行</span><span>全局快捷键 <kbd>Ctrl K</kbd></span></div>
       </div>
     </dialog>
-    <script src="/static/app.js?v=20260923-projects" defer></script>
+    <script src="/static/app.js?v=20260923-simplify-lab" defer></script>
     <script src="/static/projects.js?v=20260923-1" defer></script>
     <script src="/static/ledger.js?v=20260922-1" defer></script>
     <script src="/static/habits.js?v=20260923-dashboard" defer></script>
     <script src="/static/timeline.js?v=20260910-1" defer></script>
     <script src="/static/weather.js?v=20260909-1" defer></script>
     <script src="/static/calendar.js?v=20260922-tools" defer></script>
-    <script src="/static/knowledge.js?v=20260904-1" defer></script>
+    <script src="/static/knowledge.js?v=20260923-legacy-ideas" defer></script>
     <script src="/static/memos.js?v=20260909-1" defer></script>
     <script src="/static/english.js?v=20260901-7" defer></script>
     <script src="/static/english-reading.js?v=20260915-1" defer></script>
-    <script src="/static/idea-lab.js?v=20260915-1" defer></script>
     <script src="/static/explore.js?v=20260920-playrooms" defer></script>
     <script src="/static/keepsakes.js?v=20260916-1" defer></script>
     <div id="sound-mini" class="sound-mini hidden"><span id="sound-mini-label">♫ 声音小屋播放中</span><button id="sound-mini-stop" type="button">停止声音</button></div>
