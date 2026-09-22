@@ -18,6 +18,9 @@ const h={id:'a',title:'<img onerror=alert(1)>',description:'safe',icon:'read',ar
  api.state.items=[h];api.state.loaded=true;api.state.month='2024-02';api.render();
  assert(node('#habit-list').innerHTML.includes('&lt;img'));
  assert(!node('#habit-list').innerHTML.includes('<img'));
+ assert(node('#habit-quick-list').innerHTML.includes('&lt;img'));
+ assert(!node('#habit-quick-list').innerHTML.includes('<img'));
+ assert(!node('#habit-list').innerHTML.includes('连续'));
  let html=api.monthCells(h,'2024-02');
  assert.equal((html.match(/data-habit-date=/g)||[]).length,29);
  assert(/data-habit-date="2024-02-21"[^>]*disabled/.test(html));
@@ -35,6 +38,10 @@ const h={id:'a',title:'<img onerror=alert(1)>',description:'safe',icon:'read',ar
  response=async()=>({ok:true,json:async()=>({data:[]})});await api.load();
  assert.equal(api.state.loaded,true);
  const index=fs.readFileSync(path.join(__dirname,'../internal/httpapi/assets/index.html'),'utf8');
+ assert(!index.includes('data-view="habits"'));
+ assert(index.indexOf('id="panel-habits"')>index.indexOf('id="panel-dashboard"'));
+ assert(index.indexOf('id="panel-habits"')<index.indexOf('id="panel-timeline"'));
+ assert(index.includes('<details id="habit-management">'));
  for(const selector of nodes.keys()) assert(index.includes(`id="${selector.slice(1)}"`),`Missing ${selector}`);
  console.log('Habits UI smoke passed: calendar, escaping, failure recovery, account isolation, DOM wiring.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

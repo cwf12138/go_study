@@ -1,7 +1,7 @@
 (() => {
   'use strict';
-  const $ = selector => document.querySelector(selector), panel = $('#panel-habits');
-  const state = { items: [], selected: '', month: '', busy: false, loaded: false, epoch: 0 };
+  const $ = selector => document.querySelector(selector), panel = $('#panel-habits'), dashboard = $('#panel-dashboard');
+  const state = { items: [], selected: '', month: '', busy: false, loaded: false, epoch: 0, owner: localStorage.getItem('studyflow.token') };
   const controllers = new Set();
   const icons = { read: '▤', listen: '♫', write: '✎', move: '↗', water: '☀' };
   const escape = value => String(value ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
@@ -32,6 +32,7 @@
     finally { if(epoch===state.epoch) { state.busy=false; render(); } }
   }
   function load() {
+    if(state.owner!==localStorage.getItem('studyflow.token'))reset();
     if(!localStorage.getItem('studyflow.token'))return;
     return run(async()=>{ const items=await request(''); if(!Array.isArray(items))throw new Error('习惯列表格式不正确。'); state.items=items;state.loaded=true; },'记录已同步。各习惯按其固定时区计算今天。');
   }
@@ -49,45 +50,59 @@
     }
     return cells.join('');
   }
+  function weekly(h) { return h.weekly_target || 7; }
+  function weekDone(h) {
+    if (Number.isInteger(h.week_completed)) return h.week_completed;
+    const d=new Date(h.today+'T12:00:00');d.setDate(d.getDate()-(d.getDay()+6)%7);
+    const start=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    return h.checkins.filter(date=>date>=start&&date<=h.today).length;
+  }
   function render() {
     const archived=$('#habit-filter').value==='archived', visible=state.items.filter(h=>h.archived===archived), active=state.items.filter(h=>!h.archived);
     if(!visible.some(h=>h.id===state.selected))state.selected=visible[0]?.id || '';
     const h=current(); if(!state.month)state.month=h?.today.slice(0,7)||localMonth();
     $('#habit-active-count').textContent=state.loaded?active.length:'—';
     $('#habit-today-count').textContent=state.loaded?active.filter(h=>h.checkins.includes(h.today)).length:'—';
-    $('#habit-best-count').textContent=state.loaded?Math.max(0,...active.map(h=>h.longest_streak))+' 天':'—';
+    $('#habit-best-count').textContent=state.loaded?active.filter(h=>weekDone(h)>=weekly(h)).length+' 项':'—';
+    $('#habit-quick-list').innerHTML=active.slice().sort((a,b)=>Number(a.checkins.includes(a.today))-Number(b.checkins.includes(b.today))).slice(0,6).map(h=>{
+      const done=h.checkins.includes(h.today),met=weekDone(h)>=weekly(h);
+      return `<article class="habit-quick-card"><span aria-hidden="true">${icons[h.icon]||'❀'}</span><div><strong>${escape(h.title)}</strong><small>本周 ${weekDone(h)} / ${weekly(h)} 天${met?' · 已达标':''}</small></div><button type="button" class="habit-check ${done?'done':''}" data-habit-check="${escape(h.id)}" aria-pressed="${done}" ${state.busy?'disabled':''}>${done?'✓ 已完成':'打卡'}</button></article>`;
+    }).join('') + (active.length>6?'<p class="habit-footnote">其余习惯可在“管理与历史”中查看。</p>':'') || '<p class="habit-footnote">'+(state.loaded?'从一件轻松的小事开始，在“管理与历史”中添加习惯。':'正在准备习惯记录，可展开管理后刷新。')+'</p>';
     $('#habit-list').innerHTML=visible.length?visible.map(item=>{
       const done=item.checkins.includes(item.today);
-      return `<article class="habit-card ${item.id===state.selected?'selected':''}"><button class="habit-select" type="button" data-habit-select="${escape(item.id)}" aria-pressed="${item.id===state.selected}"><span aria-hidden="true">${icons[item.icon]||'❀'}</span><span><strong>${escape(item.title)}</strong><small>${escape(item.description||'每天一点点，慢慢成为习惯。')}</small></span></button><div class="habit-card-bottom"><span>连续 ${item.current_streak} 天</span>${!item.archived?`<button class="habit-check ${done?'done':''}" type="button" data-habit-check="${escape(item.id)}" aria-pressed="${done}" ${state.busy?'disabled':''}>${done?'✓ 已打卡 · 撤销':'＋ 今日打卡'}</button>`:''}<button class="text-button" type="button" data-habit-archive="${escape(item.id)}" ${state.busy?'disabled':''}>${item.archived?'恢复':'归档'}</button></div></article>`;
+      return `<article class="habit-card ${item.id===state.selected?'selected':''}"><button class="habit-select" type="button" data-habit-select="${escape(item.id)}" aria-pressed="${item.id===state.selected}"><span aria-hidden="true">${icons[item.icon]||'❀'}</span><span><strong>${escape(item.title)}</strong><small>${escape(item.description||'每天一点点，慢慢成为习惯。')}</small></span></button><div class="habit-card-bottom"><span>本周 ${weekDone(item)} / ${weekly(item)} 天</span>${!item.archived?`<button class="habit-check ${done?'done':''}" type="button" data-habit-check="${escape(item.id)}" aria-pressed="${done}" ${state.busy?'disabled':''}>${done?'✓ 已打卡 · 撤销':'＋ 今日打卡'}</button>`:''}<button class="text-button" type="button" data-habit-archive="${escape(item.id)}" ${state.busy?'disabled':''}>${item.archived?'恢复':'暂停'}</button></div></article>`;
     }).join(''):`<div class="habit-empty">${!state.loaded?'记录尚未加载，请点击刷新。':archived?'归档的习惯会保留在这里。':'还没有习惯。先从一件容易做到的小事开始。'}</div>`;
     $('#habit-detail-title').textContent=h?.title||'选择一个习惯';
-    $('#habit-detail-meta').textContent=h?`${h.time_zone} · 今天 ${h.today} · ${h.archived?'已归档，只读':'创建于 '+h.start_date}`:'在左侧创建习惯，开始记录。';
+    $('#habit-detail-meta').textContent=h?`${h.time_zone} · 今天 ${h.today} · ${h.archived?'已暂停，只读':'创建于 '+h.start_date}`:'在左侧创建习惯，开始记录。';
     $('#habit-month-label').textContent=state.month.replace('-',' 年 ')+' 月';
     $('#habit-calendar').innerHTML=monthCells(h,state.month);
-    $('#habit-detail-stats').innerHTML=h?`<span>本月 <b>${h.checkins.filter(d=>d.startsWith(state.month)).length}</b> 天</span><span>累计 <b>${h.total}</b> 天</span><span>最长连续 <b>${h.longest_streak}</b> 天</span>`:'';
+    $('#habit-detail-stats').innerHTML=h?`<span>本月 <b>${h.checkins.filter(d=>d.startsWith(state.month)).length}</b> 天</span><span>累计 <b>${h.total}</b> 天</span><span>近两周 <b>${h.recent_completed ?? 0} / ${h.recent_days ?? 0}</b> 天有记录</span>`:'';
     $('#habit-reload').disabled=state.busy;
     $('#habit-form').querySelectorAll('input,textarea,select,button').forEach(field=>{field.disabled=state.busy;});
   }
   function shiftMonth(amount) { const [y,m]=state.month.split('-').map(Number); const d=new Date(y,m-1+amount,1);if(d.getFullYear()<1900||d.getFullYear()>9999)return;state.month=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;render(); }
-  function reset() { state.epoch++;controllers.forEach(c=>c.abort());state.items=[];state.selected='';state.month='';state.loaded=false;state.busy=false;$('#habit-form').reset();$('#habit-status').textContent='等待加载';render(); }
+  function reset() { state.owner=localStorage.getItem('studyflow.token');state.epoch++;controllers.forEach(c=>c.abort());state.items=[];state.selected='';state.month='';state.loaded=false;state.busy=false;$('#habit-form').reset();$('#habit-status').textContent='等待加载';render(); }
   function bind() {
+    const management=$('#habit-management'),toggle=$('#habit-manage-toggle');
+    toggle.addEventListener('click',()=>{management.open=!management.open;toggle.setAttribute('aria-expanded',String(management.open));});
+    management.addEventListener('toggle',()=>{toggle.setAttribute('aria-expanded',String(management.open));});
     $('#habit-reload').addEventListener('click',load);
     $('#habit-filter').addEventListener('change',render);
     $('#habit-prev').addEventListener('click',()=>shiftMonth(-1));$('#habit-next').addEventListener('click',()=>shiftMonth(1));
     $('#habit-current-month').addEventListener('click',()=>{state.month=current()?.today.slice(0,7)||localMonth();render();});
     $('#habit-form').addEventListener('submit',event=>{
       event.preventDefault(); if(state.busy||!event.currentTarget.reportValidity())return;
-      const payload={title:$('#habit-title').value,description:$('#habit-description').value,icon:$('#habit-icon').value,time_zone:$('#habit-zone').value};
+      const payload={title:$('#habit-title').value,description:$('#habit-description').value,icon:$('#habit-icon').value,time_zone:$('#habit-zone').value,weekly_target:Number($('#habit-weekly-target').value)};
       run(async()=>{const h=await request('',{method:'POST',body:JSON.stringify(payload)});state.items.push(h);state.selected=h.id;state.month=h.today.slice(0,7);$('#habit-filter').value='active';$('#habit-form').reset();state.loaded=true;},'习惯已创建。从今天开始，慢慢来。');
     });
     panel.addEventListener('click',event=>{
       const selected=event.target.closest('[data-habit-select]');if(selected){state.selected=selected.dataset.habitSelect;state.month=current()?.today.slice(0,7)||localMonth();render();return;}
       const button=event.target.closest('[data-habit-check]');if(button){const h=state.items.find(h=>h.id===button.dataset.habitCheck);if(h)check(h.id,h.today,!h.checkins.includes(h.today));return;}
       const day=event.target.closest('[data-habit-date]');if(day&&!day.disabled){const h=current();if(h)check(h.id,day.dataset.habitDate,!h.checkins.includes(day.dataset.habitDate));return;}
-      const archive=event.target.closest('[data-habit-archive]');if(archive){const h=state.items.find(h=>h.id===archive.dataset.habitArchive);if(h)run(async()=>replace(await request('/'+h.id+'/archive',{method:'PATCH',body:JSON.stringify({archived:!h.archived})})),h.archived?'习惯已恢复。':'已归档，历史打卡已保留。');}
+      const archive=event.target.closest('[data-habit-archive]');if(archive){const h=state.items.find(h=>h.id===archive.dataset.habitArchive);if(h)run(async()=>replace(await request('/'+h.id+'/archive',{method:'PATCH',body:JSON.stringify({archived:!h.archived})})),h.archived?'习惯已恢复。':'已暂停，历史打卡已保留。');}
     });
-    new MutationObserver(()=>{if(panel.classList.contains('active'))load();}).observe(panel,{attributes:true,attributeFilter:['class']});
-    new MutationObserver(()=>{if($('#app-view').classList.contains('hidden'))reset();}).observe($('#app-view'),{attributes:true,attributeFilter:['class']});
+    new MutationObserver(()=>{if(dashboard.classList.contains('active'))load();}).observe(dashboard,{attributes:true,attributeFilter:['class']});
+    new MutationObserver(()=>{if(state.owner!==localStorage.getItem('studyflow.token')||$('#app-view').classList.contains('hidden'))reset();if(!$('#app-view').classList.contains('hidden')&&dashboard.classList.contains('active'))load();}).observe($('#app-view'),{attributes:true,attributeFilter:['class']});
     document.addEventListener('visibilitychange',()=>{if(!document.hidden&&panel.classList.contains('active'))load();});
     window.setInterval(()=>{if(!document.hidden&&panel.classList.contains('active'))load();},60000);
     render();if(panel.classList.contains('active'))load();

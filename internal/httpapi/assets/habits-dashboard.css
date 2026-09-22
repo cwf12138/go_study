@@ -1,0 +1,12 @@
+#panel-dashboard .dashboard-habits{margin:24px 0;padding:24px;border:1px solid var(--habit-rule);border-radius:18px;background:var(--paper)}
+#panel-habits .habit-heading{margin:0 0 18px;gap:16px}
+#panel-habits .habit-heading h3{font-size:23px;margin:6px 0}
+#panel-habits .habit-heading p{font-size:14px;line-height:1.8}
+#habit-manage-toggle{white-space:nowrap}
+.habit-quick-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.habit-quick-card{display:flex;align-items:center;gap:12px;min-width:0;padding:16px;border:1px solid var(--habit-rule);border-radius:12px;background:var(--habit-soft)}
+.habit-quick-card>span{font-size:24px;color:var(--habit-accent)}
+.habit-quick-card>div{flex:1;min-width:0}.habit-quick-card strong{display:block;font-size:15px;font-weight:600;overflow-wrap:anywhere}.habit-quick-card small{display:block;font-size:13px;color:var(--muted);margin-top:6px}.habit-quick-card button{flex-shrink:0;min-height:40px;font-size:13px}
+#habit-management{margin-top:18px}#habit-management>summary{cursor:pointer;color:var(--habit-accent);font-size:14px;padding:8px 0}#habit-management[open]>summary{margin-bottom:18px}#habit-management .habit-metrics article{padding:16px}#habit-management .habit-metrics strong{font-size:24px}#habit-management .habit-select small,#habit-management .habit-card-bottom>span{font-size:13px}#habit-management .habit-footnote{font-size:13px;line-height:1.8}
+@media(max-width:1100px){#habit-management .habit-workspace{grid-template-columns:1fr}.habit-quick-list{grid-template-columns:1fr}}
+@media(max-width:600px){#panel-dashboard .dashboard-habits{padding:18px}#panel-habits .habit-heading{align-items:flex-start;flex-direction:column}.habit-quick-card{padding:12px}.habit-quick-card>span{display:none}#habit-management .habit-metrics{grid-template-columns:1fr}}

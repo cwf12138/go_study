@@ -292,6 +292,7 @@
   }
 
   function showView(view) {
+    if (view === "habits") view = "dashboard";
     const labels = {
       dashboard: ["今天也在前进", "学习概览"],
       timeline: ["LEARNING TIMELINE", "成长足迹"],

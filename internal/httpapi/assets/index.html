@@ -7,6 +7,7 @@
     <title>StudyFlow · 学习控制台</title>
     <link rel="stylesheet" href="/static/styles.css?v=20260901-6">
     <link rel="stylesheet" href="/static/habits.css?v=20260914-1">
+    <link rel="stylesheet" href="/static/habits-dashboard.css?v=20260923-1">
     <link rel="stylesheet" href="/static/mood-journal.css?v=20260910-1">
     <link rel="stylesheet" href="/static/focus-studio.css?v=20260910-1">
     <link rel="stylesheet" href="/static/task-studio.css?v=20260911-1">
@@ -77,7 +78,6 @@
         <nav class="nav" aria-label="主导航">
           <button class="nav-link active" type="button" data-view="dashboard"><span>◫</span>概览</button>
           <button class="nav-link" type="button" data-view="timeline"><span>↟</span>成长足迹</button>
-          <button class="nav-link" type="button" data-view="habits"><span>❀</span>习惯花园</button>
           <button class="nav-link" type="button" data-view="goals"><span>◎</span>学习目标</button>
           <button class="nav-link" type="button" data-view="moods"><span>☺</span>心情日记</button>
           <button class="nav-link" type="button" data-view="calendar"><span>▦</span>智能日历</button>
@@ -116,6 +116,13 @@
               <article class="metric-card accent-orange"><span>待复习单词</span><strong id="metric-vocabulary">–</strong><small>在单词学习中继续巩固</small></article>
               <article class="metric-card accent-green"><span>今日专注分钟</span><strong id="metric-focus">–</strong><small id="week-focus">本周 0 分钟</small></article>
             </div>
+          <section id="panel-habits" class="dashboard-habits">
+            <header class="habit-heading"><div><p class="eyebrow">SMALL THINGS, AT YOUR PACE</p><h3>日常习惯</h3><p>每周保持自己的节奏，不必每天都满分。</p></div><button id="habit-manage-toggle" class="quiet" type="button" aria-expanded="false" aria-controls="habit-management">管理与历史</button></header><div id="habit-quick-list" class="habit-quick-list"></div><details id="habit-management"><summary>展开管理与历史</summary>
+            <div class="habit-metrics"><article><span>正在养成</span><strong id="habit-active-count">—</strong></article><article><span>今日已打卡</span><strong id="habit-today-count">—</strong></article><article><span>本周已达标</span><strong id="habit-best-count">—</strong></article></div>
+            <div class="habit-toolbar"><label>查看<select id="habit-filter"><option value="active">正在养成</option><option value="archived">已暂停</option></select></label><button id="habit-reload" class="quiet" type="button">刷新记录</button><span id="habit-status" role="status" aria-live="polite">等待加载</span></div>
+            <div class="habit-workspace"><div><div id="habit-list" class="habit-list"></div><article class="surface habit-create"><p class="eyebrow">PLANT A NEW SEED</p><h3>培养一个小习惯</h3><form id="habit-form"><label>习惯名称<input id="habit-title" required maxlength="80" placeholder="例如：每天读 10 页书"></label><div class="habit-form-pair"><label>类型<select id="habit-icon"><option value="read">阅读</option><option value="listen">听力</option><option value="write">写作</option><option value="move">运动</option><option value="water">生活</option></select></label><label>记录时区<select id="habit-zone"><option value="Asia/Shanghai">中国标准时间</option><option value="UTC">UTC</option><option value="America/New_York">纽约时间</option></select></label></div><label>每周目标<select id="habit-weekly-target"><option value="7">每天（每周 7 天）</option><option value="5">每周 5 天</option><option value="3">每周 3 天</option><option value="2">每周 2 天</option><option value="1">每周 1 天</option><option value="4">每周 4 天</option><option value="6">每周 6 天</option></select></label><label>行动提示<textarea id="habit-description" maxlength="300" rows="2" placeholder="例如：睡前放下手机，读完一个小节"></textarea></label><button class="primary" type="submit">＋ 开始养成</button></form><p class="habit-footnote">每周按完成天数计数，一天最多一次；时区创建后固定。暂停保留记录，不会删除。</p></article></div>
+            <article class="surface habit-calendar-card"><p class="eyebrow">YOUR CONSISTENCY</p><h3 id="habit-detail-title">选择一个习惯</h3><p id="habit-detail-meta" class="habit-footnote">在月历中查看、补记或撤销打卡。</p><div class="habit-month-nav"><button id="habit-prev" class="quiet" type="button" aria-label="上个月">‹</button><strong id="habit-month-label"></strong><button id="habit-next" class="quiet" type="button" aria-label="下个月">›</button></div><div class="habit-weekdays" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div><div id="habit-calendar" class="habit-calendar"></div><div id="habit-detail-stats" class="habit-detail-stats"></div><button id="habit-current-month" class="text-button" type="button">回到当前月</button><p class="habit-footnote">点击日期即可打卡，再次点击可撤销。仅可记录创建日起至今天；暂停后只读。漏记不会清空累计记录。</p></article></div>
+          </details></section>
             <div class="dashboard-main" style="margin-top:20px">
               <article class="surface"><div class="surface-head"><div><p class="eyebrow">TASKS</p><h3>下一步行动</h3></div><button class="text-button" type="button" data-goto="tasks">管理任务</button></div><div id="dashboard-tasks" class="stack-list empty-state">还没有任务。创建一个小而明确的下一步吧。</div></article>
             </div>
@@ -130,13 +137,7 @@
             <p class="trail-note">根据现存记录生成，并非永久操作日志。删除记录或撤销完成后，相应足迹也会变化。使用当前设备的 UTC 偏移归属日期，统计随月份与类型筛选变化。</p>
           </section>
 
-          <section id="panel-habits" class="panel">
-            <header class="habit-heading"><div><p class="eyebrow">SMALL THINGS, EVERY DAY</p><h3>把小小的坚持，种成日常。</h3><p>不追求一次做很多，只为每天留下一点进步。</p></div><span aria-hidden="true">❀</span></header>
-            <div class="habit-metrics"><article><span>正在养成</span><strong id="habit-active-count">—</strong></article><article><span>今日已打卡</span><strong id="habit-today-count">—</strong></article><article><span>活跃习惯最长连续</span><strong id="habit-best-count">—</strong></article></div>
-            <div class="habit-toolbar"><label>查看<select id="habit-filter"><option value="active">正在养成</option><option value="archived">已归档</option></select></label><button id="habit-reload" class="quiet" type="button">刷新记录</button><span id="habit-status" role="status" aria-live="polite">等待加载</span></div>
-            <div class="habit-workspace"><div><div id="habit-list" class="habit-list"></div><article class="surface habit-create"><p class="eyebrow">PLANT A NEW SEED</p><h3>培养一个小习惯</h3><form id="habit-form"><label>习惯名称<input id="habit-title" required maxlength="80" placeholder="例如：每天读 10 页书"></label><div class="habit-form-pair"><label>类型<select id="habit-icon"><option value="read">阅读</option><option value="listen">听力</option><option value="write">写作</option><option value="move">运动</option><option value="water">生活</option></select></label><label>记录时区<select id="habit-zone"><option value="Asia/Shanghai">中国标准时间</option><option value="UTC">UTC</option><option value="America/New_York">纽约时间</option></select></label></div><label>行动提示<textarea id="habit-description" maxlength="300" rows="2" placeholder="例如：睡前放下手机，读完一个小节"></textarea></label><button class="primary" type="submit">＋ 开始养成</button></form><p class="habit-footnote">每日打卡；时区创建后固定。归档保留记录，不会删除。</p></article></div>
-            <article class="surface habit-calendar-card"><p class="eyebrow">YOUR CONSISTENCY</p><h3 id="habit-detail-title">选择一个习惯</h3><p id="habit-detail-meta" class="habit-footnote">在月历中查看、补记或撤销打卡。</p><div class="habit-month-nav"><button id="habit-prev" class="quiet" type="button" aria-label="上个月">‹</button><strong id="habit-month-label"></strong><button id="habit-next" class="quiet" type="button" aria-label="下个月">›</button></div><div class="habit-weekdays" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div><div id="habit-calendar" class="habit-calendar"></div><div id="habit-detail-stats" class="habit-detail-stats"></div><button id="habit-current-month" class="text-button" type="button">回到当前月</button><p class="habit-footnote">点击日期即可打卡，再次点击可撤销。仅可记录创建日起至今天；归档后只读。今天尚未打卡时，连续天数暂保留到昨天。</p></article></div>
-          </section>
+
           <section id="panel-goals" class="panel">
             <header class="growth-heading"><div><p class="eyebrow">GOAL ATELIER · 心有所向</p><h3>让想抵达的远方，慢慢清晰。</h3><p>留住重要的方向，给每一个愿望一个开始。</p></div><div class="growth-orbit" aria-hidden="true"><span>↗</span><i></i></div></header>
             <div class="two-column wide-left">
@@ -630,9 +631,9 @@
         <div class="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 执行</span><span>全局快捷键 <kbd>Ctrl K</kbd></span></div>
       </div>
     </dialog>
-    <script src="/static/app.js?v=20260922-ledger" defer></script>
+    <script src="/static/app.js?v=20260923-habits" defer></script>
     <script src="/static/ledger.js?v=20260922-1" defer></script>
-    <script src="/static/habits.js?v=20260914-1" defer></script>
+    <script src="/static/habits.js?v=20260923-dashboard" defer></script>
     <script src="/static/timeline.js?v=20260910-1" defer></script>
     <script src="/static/weather.js?v=20260909-1" defer></script>
     <script src="/static/calendar.js?v=20260922-tools" defer></script>

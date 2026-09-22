@@ -13,17 +13,21 @@ import (
 )
 
 type CreateHabitInput struct {
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Icon        string `json:"icon"`
-	TimeZone    string `json:"time_zone"`
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	Icon         string `json:"icon"`
+	TimeZone     string `json:"time_zone"`
+	WeeklyTarget int    `json:"weekly_target"`
 }
 type HabitView struct {
 	domain.Habit
-	Today         string `json:"today"`
-	CurrentStreak int    `json:"current_streak"`
-	LongestStreak int    `json:"longest_streak"`
-	Total         int    `json:"total"`
+	Today           string `json:"today"`
+	CurrentStreak   int    `json:"current_streak"`
+	LongestStreak   int    `json:"longest_streak"`
+	Total           int    `json:"total"`
+	WeekCompleted   int    `json:"week_completed"`
+	RecentCompleted int    `json:"recent_completed"`
+	RecentDays      int    `json:"recent_days"`
 }
 
 func (s *Service) CreateHabit(ctx context.Context, user string, in CreateHabitInput) (HabitView, error) {
@@ -34,6 +38,12 @@ func (s *Service) CreateHabit(ctx context.Context, user string, in CreateHabitIn
 	}
 	if in.TimeZone == "" {
 		in.TimeZone = "Asia/Shanghai"
+	}
+	if in.WeeklyTarget == 0 {
+		in.WeeklyTarget = 7
+	}
+	if in.WeeklyTarget < 1 || in.WeeklyTarget > 7 {
+		return HabitView{}, fmt.Errorf("%w: 每周目标须为 1–7 天", domain.ErrInvalidInput)
 	}
 	zone, err := time.LoadLocation(in.TimeZone)
 	if err != nil || in.TimeZone == "Local" {
@@ -49,6 +59,7 @@ func (s *Service) CreateHabit(ctx context.Context, user string, in CreateHabitIn
 	}
 	now := s.now().UTC()
 	h := domain.Habit{ID: platform.NewID(), UserID: user, Title: in.Title, Description: in.Description, Icon: in.Icon, TimeZone: in.TimeZone, StartDate: now.In(zone).Format("2006-01-02"), Checkins: []string{}, CreatedAt: now, UpdatedAt: now}
+	h.WeeklyTarget = in.WeeklyTarget
 	if err := s.repo.CreateHabit(ctx, h); err != nil {
 		return HabitView{}, err
 	}
@@ -101,6 +112,19 @@ func habitView(h domain.Habit, now time.Time) HabitView {
 	}
 	today := now.In(zone).Format("2006-01-02")
 	v := HabitView{Habit: h, Today: today}
+	if v.WeeklyTarget == 0 {
+		v.WeeklyTarget = 7
+	}
+	day, _ := time.Parse("2006-01-02", today)
+	weekStart := day.AddDate(0, 0, -(int(day.Weekday())+6)%7).Format("2006-01-02")
+	recentStart := day.AddDate(0, 0, -13).Format("2006-01-02")
+	if h.StartDate > recentStart {
+		recentStart = h.StartDate
+	}
+	start, parseErr := time.Parse("2006-01-02", recentStart)
+	if parseErr == nil && !start.After(day) {
+		v.RecentDays = int(day.Sub(start).Hours()/24) + 1
+	}
 	dates := append([]string{}, h.Checkins...)
 	sort.Strings(dates)
 	seen := map[string]bool{}
@@ -113,6 +137,12 @@ func habitView(h domain.Habit, now time.Time) HabitView {
 		}
 		seen[key] = true
 		v.Total++
+		if key >= weekStart {
+			v.WeekCompleted++
+		}
+		if key >= recentStart {
+			v.RecentCompleted++
+		}
 		if previous == d.AddDate(0, 0, -1).Format("2006-01-02") {
 			run++
 		} else {

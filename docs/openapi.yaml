@@ -219,6 +219,7 @@ paths:
                 description: { type: string, maxLength: 300 }
                 icon: { type: string, enum: [read, listen, write, move, water], default: read }
                 time_zone: { type: string, default: Asia/Shanghai, description: 固定 IANA 时区，不允许 Local }
+                weekly_target: { type: integer, minimum: 1, maximum: 7, default: 7, description: 每周目标完成天数；未传或传 0 兼容为每天，一天最多一次 }
       responses:
         '201': { description: data 为新习惯与统计 }
         '400': { description: 输入无效或超过数量上限 }
