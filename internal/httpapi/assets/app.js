@@ -306,6 +306,7 @@
       explore: ["LITTLE ADVENTURES", "探索生活"],
       daily: ["A PAGE FOR TODAY", "每日一签"],
       ledger: ["LIFE LEDGER", "生活账本"],
+      projects: ["PROJECT STUDIO", "项目空间"],
       english: ["DAILY ENGLISH", "英语精读"],
       literature: ["LITERATURE STUDIO", "阅读书房"],
       tasks: ["TASKS", "学习任务"],

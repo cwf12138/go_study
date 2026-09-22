@@ -24,6 +24,7 @@ type Memory struct {
 	explorations      map[string]domain.Exploration
 	keepsakes         map[string]domain.Keepsake
 	ledger            map[string]domain.LedgerEntry
+	projects          map[string]domain.Project
 	users             map[string]domain.User
 	emails            map[string]string
 	goals             map[string]domain.Goal
@@ -54,6 +55,7 @@ func NewMemory() *Memory {
 		explorations:      make(map[string]domain.Exploration),
 		keepsakes:         make(map[string]domain.Keepsake),
 		ledger:            make(map[string]domain.LedgerEntry),
+		projects:          make(map[string]domain.Project),
 		users:             make(map[string]domain.User),
 		emails:            make(map[string]string),
 		goals:             make(map[string]domain.Goal),
@@ -1129,6 +1131,7 @@ type snapshot struct {
 	Explorations      []domain.Exploration        `json:"explorations"`
 	Keepsakes         []domain.Keepsake           `json:"keepsakes"`
 	Ledger            []domain.LedgerEntry        `json:"ledger"`
+	Projects          []domain.Project            `json:"projects"`
 	Version           int                         `json:"version"`
 	SavedAt           time.Time                   `json:"saved_at"`
 	Users             []persistedUser             `json:"users"`
@@ -1188,6 +1191,9 @@ func (m *Memory) SaveJSON(path string) error {
 	}
 	for _, item := range m.ledger {
 		s.Ledger = append(s.Ledger, item)
+	}
+	for _, item := range m.projects {
+		s.Projects = append(s.Projects, cloneProject(item))
 	}
 	for _, item := range m.users {
 		s.Users = append(s.Users, persistedUser{User: item, PasswordHash: item.PasswordHash})
@@ -1324,6 +1330,10 @@ func (m *Memory) LoadJSON(path string) error {
 	m.explorations = make(map[string]domain.Exploration, len(s.Explorations))
 	m.keepsakes = make(map[string]domain.Keepsake, len(s.Keepsakes))
 	m.ledger = make(map[string]domain.LedgerEntry, len(s.Ledger))
+	m.projects = make(map[string]domain.Project, len(s.Projects))
+	for _, item := range s.Projects {
+		m.projects[item.UserID+":"+item.ID] = cloneProject(item)
+	}
 	for _, item := range s.Ledger {
 		m.ledger[item.UserID+":"+item.ID] = item
 	}
