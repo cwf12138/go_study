@@ -32,13 +32,26 @@
     <link rel="stylesheet" href="/static/explore.css?v=20260916-1">
     <link rel="stylesheet" href="/static/keepsakes.css?v=20260916-1">
     <link rel="stylesheet" href="/static/playrooms.css?v=20260920-1">
-    <link rel="stylesheet" href="/static/daily-card.css?v=20260921-simple">
+    <link rel="stylesheet" href="/static/daily-card.css?v=20260923-dialog">
     <link rel="stylesheet" href="/static/ledger.css?v=20260922-1">
     <link rel="stylesheet" href="/static/calendar-experience.css?v=20260922-2">
     <link rel="stylesheet" href="/static/projects.css?v=20260923-1">
     <link rel="stylesheet" href="/static/layout.css?v=20260922-1">
   </head>
   <body>
+          <dialog id="daily-dialog" aria-labelledby="daily-dialog-title">
+            <button id="daily-close" class="daily-close" type="button" aria-label="关闭今日签">×</button>
+            <div class="daily-simple">
+              <p class="daily-eyebrow">一日一签</p>
+              <h3 id="daily-dialog-title">今日，遇见一点好运。</h3>
+              <p id="daily-date-label"></p>
+              <div id="daily-slip" class="daily-slip" aria-live="polite"><span id="daily-luck">签</span><p id="daily-message">轻点下方，为今天抽一支签。</p></div>
+              <button id="daily-draw" class="primary" type="button" disabled>抽取今日签</button>
+              <button id="daily-retry" class="quiet hidden" type="button">重新加载</button>
+              <p id="daily-status" role="status" aria-live="polite">正在查看今日签…</p>
+              <small>每天一次 · 中国标准时间零点更新<br>仅供娱乐，不作运势预测</small>
+            </div>
+          </dialog>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
     <main id="auth-view" class="auth-shell">
@@ -84,7 +97,6 @@
           <button class="nav-link" type="button" data-view="memos"><span>▤</span>备忘录</button>
           <button class="nav-link" type="button" data-view="knowledge"><span>◇</span>知识花园</button>
           <button class="nav-link" type="button" data-view="explore"><span>✉</span>探索生活</button>
-          <button class="nav-link" type="button" data-view="daily"><span>☀</span>每日一签</button>
           <button class="nav-link" type="button" data-view="ledger"><span>¥</span>生活账本</button>
           <button class="nav-link" type="button" data-view="projects"><span>▥</span>项目空间</button>
           <button class="nav-link" type="button" data-view="tasks"><span>✓</span>学习任务</button>
@@ -103,7 +115,7 @@
         <header class="topbar">
           <button id="mobile-menu" class="icon-button mobile-only" type="button" aria-label="打开菜单">☰</button>
           <div><p id="page-kicker" class="eyebrow">今天也在前进</p><h2 id="page-title">学习概览</h2></div>
-          <div class="user-actions"><button id="command-trigger" class="command-trigger" type="button" aria-label="打开快捷命令"><span>⌕</span><kbd>Ctrl K</kbd></button><button id="theme-toggle" class="theme-toggle" type="button" aria-label="切换至夜间模式" title="切换主题"><span aria-hidden="true">☾</span><span id="theme-toggle-label">夜间</span></button><span id="user-name"></span><button id="logout" class="quiet" type="button">退出</button></div>
+          <div class="user-actions"><button id="daily-trigger" class="daily-trigger" type="button" aria-haspopup="dialog" aria-controls="daily-dialog" aria-label="打开今日签"><span aria-hidden="true">签</span><b id="daily-trigger-label">今日签</b></button><button id="command-trigger" class="command-trigger" type="button" aria-label="打开快捷命令"><span>⌕</span><kbd>Ctrl K</kbd></button><button id="theme-toggle" class="theme-toggle" type="button" aria-label="切换至夜间模式" title="切换主题"><span aria-hidden="true">☾</span><span id="theme-toggle-label">夜间</span></button><span id="user-name"></span><button id="logout" class="quiet" type="button">退出</button></div>
         </header>
 
         <div class="content">
@@ -334,19 +346,6 @@
               <form id="explore-letter-form"><p class="eyebrow">TO MY FUTURE SELF</p><h3>写给未来的自己</h3><label>信封标题<input id="explore-title" required maxlength="120" placeholder="致一年后的我"></label><label>此刻心情<select id="explore-mood"><option>平静</option><option>期待</option><option>开心</option><option>迷茫</option><option>疲惫</option></select></label><label>解锁时间（当前设备时区）<input id="explore-unlock" type="datetime-local" required></label><label>信的内容<textarea id="explore-body" required rows="8" maxlength="12000" placeholder="最近在意什么？希望未来的自己还记得什么？"></textarea></label><button class="primary" type="submit">封存这封信</button><p class="explore-note">封存后不能修改；到期后在这里打开，不会发送邮件。标题和心情始终可见，正文到期前由服务端隐藏。此功能不是加密保险箱，本地数据快照仍包含正文。</p></form>
               <form id="explore-challenge-form" class="hidden"><p class="eyebrow">MAKE ROOM FOR SURPRISE</p><h3>给今天一点新鲜感</h3><label>我有多少时间<select id="explore-minutes"><option value="5">5 分钟</option><option value="15" selected>15 分钟</option><option value="30">30 分钟</option><option value="60">1 小时</option></select></label><label>预算上限<select id="explore-budget"><option value="0">不花钱</option><option value="20">20 元以内</option></select></label><label>想待在哪里<select id="explore-place"><option value="any">都可以</option><option value="indoor">室内</option><option value="outdoor">户外</option></select></label><div class="explore-box" aria-hidden="true">✦</div><button class="primary" type="submit">拆开生活盲盒</button><p class="explore-note">从 12 个原创小挑战中抽取，优先选择没遇到过的内容。预算和时间为参考；不需要购买任何东西，也可以不完成。</p></form>
             </article><section class="surface explore-records"><div class="explore-record-head"><div><p class="eyebrow">YOUR LITTLE COLLECTION</p><h3 id="explore-list-title">我的时光信件</h3></div><select id="explore-filter" aria-label="按记录状态筛选"><option value="all">全部记录</option><option value="waiting">等待中</option><option value="done">已解锁 / 已完成</option></select></div><div id="explore-list"></div><nav class="explore-pages" aria-label="探索记录分页"><button id="explore-prev" class="quiet" type="button">上一页</button><span id="explore-page"></span><button id="explore-next" class="quiet" type="button">下一页</button></nav></section></div>
-          </section>
-
-          <section id="panel-daily" class="panel">
-            <div class="daily-simple">
-              <p class="daily-eyebrow">一日一签</p>
-              <h3>今日，遇见一点好运。</h3>
-              <p id="daily-date-label"></p>
-              <div id="daily-slip" class="daily-slip" aria-live="polite"><span id="daily-luck">签</span><p id="daily-message">轻点下方，为今天抽一支签。</p></div>
-              <button id="daily-draw" class="primary" type="button" disabled>抽取今日签</button>
-              <button id="daily-retry" class="quiet hidden" type="button">重新加载</button>
-              <p id="daily-status" role="status" aria-live="polite">正在查看今日签…</p>
-              <small>每天一次 · 中国标准时间零点更新<br>仅供娱乐，不作运势预测</small>
-            </div>
           </section>
 
           <section id="panel-ledger" class="panel">
@@ -634,7 +633,7 @@
         <div class="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 执行</span><span>全局快捷键 <kbd>Ctrl K</kbd></span></div>
       </div>
     </dialog>
-    <script src="/static/app.js?v=20260923-simplify-lab" defer></script>
+    <script src="/static/app.js?v=20260923-daily-dialog" defer></script>
     <script src="/static/projects.js?v=20260923-1" defer></script>
     <script src="/static/ledger.js?v=20260922-1" defer></script>
     <script src="/static/habits.js?v=20260923-dashboard" defer></script>
@@ -649,7 +648,7 @@
     <script src="/static/keepsakes.js?v=20260916-1" defer></script>
     <div id="sound-mini" class="sound-mini hidden"><span id="sound-mini-label">♫ 声音小屋播放中</span><button id="sound-mini-stop" type="button">停止声音</button></div>
     <script src="/static/playrooms.js?v=20260920-1" defer></script>
-    <script src="/static/daily-card.js?v=20260921-simple" defer></script>
+    <script src="/static/daily-card.js?v=20260923-dialog" defer></script>
     <script src="/static/literature.js?v=20260909-1" defer></script>
   </body>
 </html>

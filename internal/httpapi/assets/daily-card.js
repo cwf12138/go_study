@@ -1,10 +1,13 @@
 (() => {
  'use strict';
- const $=s=>document.querySelector(s),panel=$('#panel-daily');
+ const $=s=>document.querySelector(s),dialog=$('#daily-dialog');
  const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
  const state={token:'',epoch:0,card:null,busy:false,loaded:false,date:today()},controllers=new Set();
  const status=t=>$('#daily-status').textContent=t;
  function render(){
+  const label=state.card&&state.date===today()?'今日签 · '+state.card.title:'今日签';
+  $('#daily-trigger-label').textContent=label;
+  $('#daily-trigger').setAttribute('aria-label',label+'，点击查看');
   $('#daily-date-label').textContent=state.date.replaceAll('-',' / ');
   $('#daily-luck').textContent=state.card?.title||'签';
   $('#daily-message').textContent=state.card?.body||'轻点下方，为今天抽一支签。';
@@ -18,6 +21,7 @@
   if(token===state.token)return;
   controllers.forEach(c=>c.abort());state.epoch++;
   Object.assign(state,{token,card:null,busy:false,loaded:false,date:today()});
+  if(dialog.open)dialog.close();
   status('正在查看今日签…');render();
  }
  async function request(draw){
@@ -35,8 +39,7 @@
  }
  async function run(draw=false){
   sync();if(state.busy)return;
-  // Recheck at midnight before allowing a new draw.
-  if(draw&&state.date!==today()){state.card=null;state.loaded=false;draw=false;}
+  if(state.date!==today()){state.card=null;state.loaded=false;state.date=today();draw=false;}
   if(draw&&(!state.loaded||state.card))return;
   const epoch=state.epoch;state.busy=true;status(draw?'正在抽取今日签…':'正在查看今日签…');render();
   try{const card=await request(draw);if(epoch!==state.epoch)return;state.card=card.body?card:null;state.date=card.date;state.loaded=true;status(card.body?'今日签已保存，刷新不会重新抽取。':'每天只抽一次，点一下就好。');}
@@ -45,9 +48,13 @@
  }
  $('#daily-draw').addEventListener('click',()=>run(true));
  $('#daily-retry').addEventListener('click',()=>run());
- function enter(){sync();if(panel.classList.contains('active')&&state.token&&(!state.loaded||state.date!==today()))run();}
- new MutationObserver(enter).observe(panel,{attributes:true,attributeFilter:['class']});
- new MutationObserver(sync).observe($('#app-view'),{attributes:true,attributeFilter:['class']});
+ function enter(){sync();if(state.token&&!$('#app-view').classList.contains('hidden')&&(!state.loaded||state.date!==today()))run();}
+ $('#daily-trigger').addEventListener('click',()=>{sync();if(!state.token)return;if(!dialog.open)dialog.showModal();if(!state.loaded||state.date!==today())run();});
+ $('#daily-close').addEventListener('click',()=>dialog.close());
+ let backdropStart=false;
+ dialog.addEventListener('pointerdown',e=>{const r=dialog.getBoundingClientRect();backdropStart=e.target===dialog&&(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom);});
+ dialog.addEventListener('click',e=>{const r=dialog.getBoundingClientRect();if(backdropStart&&e.target===dialog&&(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom))dialog.close();backdropStart=false;});
+ new MutationObserver(enter).observe($('#app-view'),{attributes:true,attributeFilter:['class']});
  window.addEventListener('storage',e=>{if(e.key==='studyflow.token')enter();});
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)enter();});
  window.setInterval(()=>{if(!document.hidden)enter();},60000);

@@ -292,6 +292,7 @@
   }
 
   function showView(view) {
+    if (view === "daily") { document.getElementById("daily-trigger")?.click(); return; }
     const legacyIdeas = view === "lab";
     if (legacyIdeas) view = "knowledge";
     if (view === "habits") view = "dashboard";
@@ -305,7 +306,6 @@
       memos: ["PERSONAL NOTES", "备忘录"],
       knowledge: ["KNOWLEDGE GARDEN", "知识花园"],
       explore: ["LITTLE ADVENTURES", "探索生活"],
-      daily: ["A PAGE FOR TODAY", "每日一签"],
       ledger: ["LIFE LEDGER", "生活账本"],
       projects: ["PROJECT STUDIO", "项目空间"],
       english: ["DAILY ENGLISH", "英语精读"],
