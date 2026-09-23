@@ -67,12 +67,18 @@
     .replaceAll("'", "&#039;");
 
   const moodOptions = [
-    { value: "awful", emoji: "😣", label: "很糟" },
-    { value: "low", emoji: "🙁", label: "低落" },
-    { value: "neutral", emoji: "😐", label: "平静" },
-    { value: "good", emoji: "🙂", label: "不错" },
-    { value: "great", emoji: "😄", label: "很好" },
+    { value: "awful", label: "很糟" },
+    { value: "low", label: "低落" },
+    { value: "neutral", label: "平静" },
+    { value: "good", label: "不错" },
+    { value: "great", label: "很好" },
   ];
+
+  function moodAvatar(value) {
+    const mood = moodOptions.find(option => option.value === value);
+    if (!mood) return '<span class="mood-unrecorded" aria-hidden="true">·</span>';
+    return `<img class="mood-avatar" src="/static/mood-art/${mood.value}-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async">`;
+  }
 
   async function api(path, options = {}) {
     const requestToken = state.token;
@@ -551,7 +557,7 @@
       if (entry) classes.push("has-entry");
       if (date === state.moodSelectedDate) classes.push("selected");
       if (date === localDateKey(new Date())) classes.push("today");
-      cells.push(`<button class="${classes.join(" ")}" type="button" data-mood-date="${date}" data-emotion="${entry?.mood || 'none'}" aria-pressed="${date === state.moodSelectedDate}" ${date === localDateKey(new Date()) ? 'aria-current="date"' : ''} aria-label="${date}${option ? `，${option.label}` : "，尚未记录"}${entry?.note ? '，有日记' : ''}"><span class="mood-date">${day}</span><span class="mood-face">${option?.emoji || '·'}</span>${entry?.note ? '<i class="mood-diary-dot" aria-hidden="true"></i>' : ''}</button>`);
+      cells.push(`<button class="${classes.join(" ")}" type="button" data-mood-date="${date}" data-emotion="${option?.value || 'none'}" aria-pressed="${date === state.moodSelectedDate}" ${date === localDateKey(new Date()) ? 'aria-current="date"' : ''} aria-label="${date}${option ? `，${option.label}` : "，尚未记录"}${entry?.note ? '，有日记' : ''}"><span class="mood-date">${day}</span><span class="mood-face">${moodAvatar(entry?.mood)}</span>${entry?.note ? '<i class="mood-diary-dot" aria-hidden="true"></i>' : ''}</button>`);
     }
     calendar.innerHTML = cells.join("");
     $("#mood-month-title").textContent = new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long" }).format(firstDay);
@@ -595,7 +601,7 @@
     $("#mood-distribution").innerHTML = moodOptions.map((option) => {
       const count = Number(distribution[option.value] || 0);
       const width = loggedDays ? Math.round(count * 100 / loggedDays) : 0;
-      return `<div class="mood-distribution-row"><span>${option.emoji} ${option.label}</span><div class="mood-distribution-track"><span style="width:${width}%"></span></div><strong>${count}</strong></div>`;
+      return `<div class="mood-distribution-row" data-emotion="${option.value}"><span>${moodAvatar(option.value)} ${option.label}</span><div class="mood-distribution-track"><span style="width:${width}%"></span></div><strong>${count}</strong></div>`;
     }).join("");
     const activities = insights.top_activities || [];
     $("#mood-top-activities").innerHTML = activities.length
@@ -627,19 +633,19 @@
     const points = entries.map((entry) => ({ ...entry, day: Number(entry.date.slice(-2)), x: x(Number(entry.date.slice(-2))), y: y(entry.score) }));
     const average = Number(state.moodInsights?.average_mood || 0).toFixed(1);
     caption.textContent = `已记录 ${entries.length} 天 · 平均 ${average}`;
-    const grid = moodOptions.map((option, index) => `<line x1="${left}" y1="${y(index + 1)}" x2="${width - right}" y2="${y(index + 1)}" class="mood-trend-grid"/><text x="3" y="${y(index + 1) + 4}" class="mood-trend-label">${option.emoji}</text>`).join("");
+    const grid = moodOptions.map((option, index) => `<line x1="${left}" y1="${y(index + 1)}" x2="${width - right}" y2="${y(index + 1)}" class="mood-trend-grid"/><image href="/static/mood-art/${option.value}-flat-v2.png" x="-2" y="${y(index + 1) - 15}" width="30" height="30" preserveAspectRatio="xMidYMid meet" clip-path="url(#mood-chart-badge)"/>`).join("");
     const segments = []; let segment = [];
     for (const point of points) { if (segment.length && point.day !== segment[segment.length-1].day + 1) { segments.push(segment); segment=[]; } segment.push(point); }
     if (segment.length) segments.push(segment);
     const polylines = segments.filter(group=>group.length>1).map(group=>`<polyline points="${group.map(point=>`${point.x},${point.y}`).join(' ')}" class="mood-trend-line"/>`).join('');
     const dots = points.map((point) => {
       const option = moodOptions[point.score - 1];
-      return `<circle cx="${point.x}" cy="${point.y}" r="5" class="mood-trend-dot"><title>${point.date} · ${option.label}</title></circle>`;
+      return `<circle cx="${point.x}" cy="${point.y}" r="5" class="mood-trend-dot" data-emotion="${option.value}"><title>${point.date} · ${option.label}</title></circle>`;
     }).join("");
     const labels = [1, Math.ceil(daysInMonth / 2), daysInMonth].map((day) => `<text x="${x(day)}" y="${height - 8}" text-anchor="middle" class="mood-trend-axis">${day}日</text>`).join("");
     container.className = "mood-trend";
     container.setAttribute("aria-label", `本月心情记录，未记录日期不连线。${entries.map(entry=>`${entry.date} ${moodOptions[entry.score-1].label}`).join('；')}`);
-    container.innerHTML = `<svg viewBox="0 0 ${width} ${height}" aria-hidden="true">${grid}${polylines}${dots}${labels}</svg><p class="mood-chart-note">每个圆点代表一次记录，空白日期不推测。心情没有标准答案。</p>`;
+    container.innerHTML = `<svg viewBox="0 0 ${width} ${height}" aria-hidden="true"><defs><clipPath id="mood-chart-badge" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath></defs>${grid}${polylines}${dots}${labels}</svg><p class="mood-chart-note">每个圆点代表一次记录，空白日期不推测。心情没有标准答案。</p>`;
   }
 
   let moodLoadVersion = 0;

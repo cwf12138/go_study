@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"image/png"
 	"io"
 	"log/slog"
 	"net/http"
@@ -41,6 +42,34 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 	}
 	if cacheControl := javascript.Header().Get("Cache-Control"); !strings.Contains(cacheControl, "must-revalidate") {
 		t.Fatalf("javascript cache control = %q", cacheControl)
+	}
+
+	for _, mood := range []string{"awful", "low", "neutral", "good", "great"} {
+		t.Run("mood artwork "+mood, func(t *testing.T) {
+			asset := httptest.NewRecorder()
+			handler.ServeHTTP(asset, httptest.NewRequest(http.MethodGet, "/static/mood-art/"+mood+"-flat-v2.png", nil))
+			if asset.Code != http.StatusOK || asset.Header().Get("Content-Type") != "image/png" {
+				t.Fatalf("mood image status = %d, content type = %q", asset.Code, asset.Header().Get("Content-Type"))
+			}
+			picture, err := png.Decode(asset.Body)
+			if err != nil {
+				t.Fatalf("decode mood image: %v", err)
+			}
+			bounds := picture.Bounds()
+			if bounds.Dx() < 256 || bounds.Dx() != bounds.Dy() {
+				t.Fatalf("expected high-resolution square mood art, got %v", bounds)
+			}
+			for _, corner := range [][2]int{{0, 0}, {bounds.Max.X - 1, 0}, {0, bounds.Max.Y - 1}, {bounds.Max.X - 1, bounds.Max.Y - 1}} {
+				// Full-bleed badge textures are clipped into circles in CSS/SVG.
+				// They must remain opaque so matte extraction cannot punch holes.
+				if _, _, _, alpha := picture.At(corner[0], corner[1]).RGBA(); alpha < 0xff00 {
+					t.Fatal("flat mood badge must have an opaque color background")
+				}
+			}
+			if _, _, _, alpha := picture.At(bounds.Dx()/2, bounds.Dy()/2).RGBA(); alpha == 0 {
+				t.Fatal("mood artwork must contain a visible character")
+			}
+		})
 	}
 
 	if !strings.Contains(home.Body.String(), `/static/organizer-studio.css?v=`) {

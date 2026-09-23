@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/static/styles.css?v=20260901-6">
     <link rel="stylesheet" href="/static/habits.css?v=20260914-1">
     <link rel="stylesheet" href="/static/habits-dashboard.css?v=20260923-1">
-    <link rel="stylesheet" href="/static/mood-journal.css?v=20260910-1">
+    <link rel="stylesheet" href="/static/mood-journal.css?v=20260924-mood-unified">
     <link rel="stylesheet" href="/static/focus-studio.css?v=20260910-1">
     <link rel="stylesheet" href="/static/task-studio.css?v=20260911-1">
     <link rel="stylesheet" href="/static/timeline.css?v=20260910-1">
@@ -159,23 +159,23 @@
           </section>
 
           <section id="panel-moods" class="panel">
-            <div class="mood-journal-hero"><div><p class="eyebrow">A LITTLE SPACE FOR YOURSELF</p><h3>给每一种心情，留一个位置。</h3><p>不必每天都很好。记下一点感受，也是一种照顾自己的方式。</p><button id="mood-today" class="quiet" type="button">回到今天 ↗</button></div><div class="mood-hero-art" aria-hidden="true"><span>☁</span><b>☺</b><i>✦</i></div></div>
+            <div class="mood-journal-hero"><div><h3>把心情，轻轻记下来。</h3><p>不必每天都很好。这里留给真实的你。</p></div><button id="mood-today" class="quiet" type="button">回到今天</button></div>
             <div class="mood-workspace">
               <div class="mood-main-column">
                 <article class="surface mood-calendar-card">
-                  <div class="mood-calendar-head"><div><p class="eyebrow">CALENDAR</p><h3 id="mood-month-title">本月</h3></div><div class="mood-month-actions"><button id="mood-prev-month" class="mood-icon-button" type="button" aria-label="上一个月">‹</button><button id="mood-next-month" class="mood-icon-button" type="button" aria-label="下一个月">›</button></div></div>
+                  <div class="mood-calendar-head"><div><h3 id="mood-month-title">本月</h3><p class="mood-section-caption">一个表情，留住一天。</p></div><div class="mood-month-actions"><button id="mood-prev-month" class="mood-icon-button" type="button" aria-label="上一个月">‹</button><button id="mood-next-month" class="mood-icon-button" type="button" aria-label="下一个月">›</button></div></div>
                   <div class="mood-weekdays" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
                   <div id="mood-calendar" class="mood-calendar" aria-label="心情日历"></div>
-                  <div class="mood-legend"><span>😣 很糟</span><span>🙁 低落</span><span>😐 平静</span><span>🙂 不错</span><span>😄 很好</span></div>
+                  <div class="mood-legend"><span><img class="mood-avatar" src="/static/mood-art/awful-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"> 很糟</span><span><img class="mood-avatar" src="/static/mood-art/low-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"> 低落</span><span><img class="mood-avatar" src="/static/mood-art/neutral-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"> 平静</span><span><img class="mood-avatar" src="/static/mood-art/good-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"> 不错</span><span><img class="mood-avatar" src="/static/mood-art/great-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"> 很好</span></div>
                 </article>
-                <article class="surface mood-trend-card"><div class="mood-entry-head"><div><p class="eyebrow">MOOD TREND</p><h3>本月心情走势</h3></div><span id="mood-trend-caption" class="mood-trend-caption">等待记录</span></div><div id="mood-trend" class="mood-trend" role="img" aria-label="本月心情走势图"></div></article>
+                <article class="surface mood-trend-card"><div class="mood-entry-head"><div><h3>心情的起伏</h3><p class="mood-section-caption">起起落落，都是生活。</p></div><span id="mood-trend-caption" class="mood-trend-caption">等待记录</span></div><div id="mood-trend" class="mood-trend" role="img" aria-label="本月心情走势图"></div></article>
               </div>
               <div class="mood-side-column">
                 <article class="surface mood-entry-card">
-                  <div class="mood-entry-head"><div><p class="eyebrow">DAILY CHECK-IN</p><h3 id="mood-selected-date">选择一天</h3></div><button id="delete-mood-entry" class="text-button danger-text" type="button">删除记录</button></div>
+                  <div class="mood-entry-head"><div><h3 id="mood-selected-date">选择一天</h3></div><button id="delete-mood-entry" class="text-button danger-text" type="button">删除记录</button></div>
                   <form id="mood-form" class="mood-form">
                     <input id="mood-value" type="hidden" value="neutral">
-                    <div><span class="mood-field-label">今天感觉如何？</span><div class="mood-picker" role="radiogroup" aria-label="选择心情"><button type="button" data-mood-choice="awful" aria-label="很糟">😣<small>很糟</small></button><button type="button" data-mood-choice="low" aria-label="低落">🙁<small>低落</small></button><button type="button" data-mood-choice="neutral" aria-label="平静">😐<small>平静</small></button><button type="button" data-mood-choice="good" aria-label="不错">🙂<small>不错</small></button><button type="button" data-mood-choice="great" aria-label="很好">😄<small>很好</small></button></div></div>
+                    <div><span class="mood-field-label">此刻，感觉怎么样？</span><p class="mood-picker-hint">选一个最接近此刻的你，不必勉强开心。</p><div class="mood-picker" role="radiogroup" aria-label="选择心情"><button type="button" data-mood-choice="awful" aria-label="很糟"><img class="mood-avatar" src="/static/mood-art/awful-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><small>很糟</small></button><button type="button" data-mood-choice="low" aria-label="低落"><img class="mood-avatar" src="/static/mood-art/low-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><small>低落</small></button><button type="button" data-mood-choice="neutral" aria-label="平静"><img class="mood-avatar" src="/static/mood-art/neutral-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><small>平静</small></button><button type="button" data-mood-choice="good" aria-label="不错"><img class="mood-avatar" src="/static/mood-art/good-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><small>不错</small></button><button type="button" data-mood-choice="great" aria-label="很好"><img class="mood-avatar" src="/static/mood-art/great-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><small>很好</small></button></div></div>
                     <div class="mood-level-grid"><label>压力 <output id="mood-stress-value">3</output><input id="mood-stress" type="range" min="1" max="5" value="3"></label><label>精力 <output id="mood-energy-value">3</output><input id="mood-energy" type="range" min="1" max="5" value="3"></label></div>
                     <div><span class="mood-field-label">今天发生了什么？</span><div id="mood-activities" class="mood-activities"><button type="button" data-mood-activity="学习">学习</button><button type="button" data-mood-activity="工作">工作</button><button type="button" data-mood-activity="运动">运动</button><button type="button" data-mood-activity="社交">社交</button><button type="button" data-mood-activity="休息">休息</button><button type="button" data-mood-activity="睡眠不足">睡眠不足</button></div></div>
                     <label>日记<textarea id="mood-note" rows="5" maxlength="6000" placeholder="写下今天值得记住的片段、感受或念头…"></textarea></label>
@@ -183,7 +183,7 @@
                     <div class="mood-writing-meta"><span id="mood-draft-status" role="status" aria-live="polite">选择一天开始记录</span><span id="mood-note-count">0 / 6000</span></div><button class="primary" type="submit">保存这一天</button>
                   </form>
                 </article>
-<article class="surface mood-insights-card"><div class="mood-entry-head"><div><p class="eyebrow">MONTHLY INSIGHTS</p><h3>本月回顾</h3></div><span id="mood-logged-days" class="pill">0 天</span></div><div class="mood-metrics"><div><span>平均心情</span><strong id="mood-average">–</strong></div><div><span>最长连续记录</span><strong id="mood-streak">0</strong></div><div><span>平均压力</span><strong id="mood-stress-average">–</strong></div><div><span>平均精力</span><strong id="mood-energy-average">–</strong></div></div><div id="mood-distribution" class="mood-distribution"></div><div class="mood-activity-summary"><span>常见活动</span><div id="mood-top-activities">本月还没有活动记录</div></div></article>
+<article class="surface mood-insights-card"><div class="mood-entry-head"><div><h3>本月回顾</h3></div><span id="mood-logged-days" class="pill">0 天</span></div><div class="mood-metrics"><div><span>平均心情</span><strong id="mood-average">–</strong></div><div><span>最长连续记录</span><strong id="mood-streak">0</strong></div><div><span>平均压力</span><strong id="mood-stress-average">–</strong></div><div><span>平均精力</span><strong id="mood-energy-average">–</strong></div></div><div id="mood-distribution" class="mood-distribution"></div><div class="mood-activity-summary"><span>常见活动</span><div id="mood-top-activities">本月还没有活动记录</div></div></article>
               </div>
             </div>
           </section>
@@ -633,7 +633,7 @@
         <div class="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 执行</span><span>全局快捷键 <kbd>Ctrl K</kbd></span></div>
       </div>
     </dialog>
-    <script src="/static/app.js?v=20260923-daily-dialog" defer></script>
+    <script src="/static/app.js?v=20260924-mood-unified" defer></script>
     <script src="/static/projects.js?v=20260923-1" defer></script>
     <script src="/static/ledger.js?v=20260922-1" defer></script>
     <script src="/static/habits.js?v=20260923-dashboard" defer></script>
