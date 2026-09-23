@@ -150,7 +150,7 @@
     (state.overview?.plan_blocks || []).forEach((item) => add(dateKey(new Date(item.start_at)), { type: "plan", id: item.id, title: item.title, time: clock(new Date(item.start_at)), color: "#845fe8", raw: item }));
     (state.overview?.tasks || []).forEach((item) => add(dateKey(new Date(item.due_at)), { type: "task", id: item.id, title: `任务 · ${item.title}`, time: clock(new Date(item.due_at)), color: "#e5963e", raw: item }));
     (state.overview?.todos || []).forEach((item) => add(dateKey(new Date(item.due_at)), { type: "todo", id: item.id, title: `待办 · ${item.title}`, time: clock(new Date(item.due_at)), color: "#e5963e", raw: item }));
-    (state.overview?.mood_entries || []).forEach((item) => add(item.date, { type: "mood", id: item.id, title: `心情 · ${moodEmoji(item.mood)}`, time: "记录", color: "#25ae85", raw: item }));
+    (state.overview?.mood_entries || []).forEach((item) => add(item.date, { type: "mood", id: item.id, title: `心情 · ${calendarMood(item.mood).label}`, time: "记录", color: "#25ae85", raw: item }));
     map.forEach((items) => items.sort((a, b) => a.time.localeCompare(b.time)));
     return map;
   }
@@ -166,7 +166,7 @@
       html += `<button class="calendar-day-cell ${outside ? "outside" : ""} ${isToday(key) ? "today" : ""} ${key === state.selected ? "selected" : ""}" type="button" data-calendar-date="${key}" aria-label="${key}，${cellItems.length} 项安排" aria-pressed="${key === state.selected}" tabindex="${key === state.selected ? 0 : -1}">
         <span class="calendar-cell-head"><span class="calendar-solar-day">${date.getDate()}</span><span class="calendar-lunar-day ${special ? "special" : ""}">${escapeHTML(special || info.lunar)}</span></span>
         ${info.holiday_name ? `<span class="calendar-holiday-tag ${info.holiday_type === "work" ? "work" : ""}">${escapeHTML(info.holiday_type === "work" ? "班" : info.holiday_name)}</span>` : ""}
-        <span class="calendar-cell-items">${cellItems.slice(0, 3).map((item) => `<span class="calendar-cell-item" style="--item-color:${item.color}">${escapeHTML(item.time)} ${escapeHTML(item.title)}</span>`).join("")}${cellItems.length > 3 ? `<span class="calendar-cell-more">另 ${cellItems.length - 3} 项</span>` : ""}</span>
+        <span class="calendar-cell-items">${cellItems.slice(0, 3).map((item) => `<span class="calendar-cell-item${item.type === "mood" ? " has-mood" : ""}" style="--item-color:${item.color}">${escapeHTML(item.time)} ${calendarItemTitle(item)}</span>`).join("")}${cellItems.length > 3 ? `<span class="calendar-cell-more">另 ${cellItems.length - 3} 项</span>` : ""}</span>
       </button>`;
     }
     $("#calendar-canvas").innerHTML = `${html}</div>`;
@@ -361,7 +361,7 @@
     const items = itemsByDate().get(state.selected) || [];
     const agenda = $("#calendar-day-agenda");
     agenda.classList.toggle("empty-state", !items.length);
-    agenda.innerHTML = items.length ? items.map((item) => `<div class="calendar-agenda-item" ${item.type === "event" ? `role="button" tabindex="0" aria-label="编辑 ${escapeHTML(item.title)}" data-calendar-event="${escapeHTML(item.id)}"` : ""}><span class="calendar-agenda-time">${escapeHTML(item.time)}</span><i class="calendar-agenda-color" style="--item-color:${item.color}"></i><span><b>${escapeHTML(item.title)}</b><small>${escapeHTML(item.type === "event" ? item.raw.category : typeLabel(item.type))}</small></span></div>`).join("") : "这一天还没有安排。";
+    agenda.innerHTML = items.length ? items.map((item) => `<div class="calendar-agenda-item" ${item.type === "event" ? `role="button" tabindex="0" aria-label="编辑 ${escapeHTML(item.title)}" data-calendar-event="${escapeHTML(item.id)}"` : ""}><span class="calendar-agenda-time">${escapeHTML(item.time)}</span><i class="calendar-agenda-color" style="--item-color:${item.color}"></i><span><b>${calendarItemTitle(item)}</b><small>${escapeHTML(item.type === "event" ? item.raw.category : typeLabel(item.type))}</small></span></div>`).join("") : "这一天还没有安排。";
   }
 
   function navigate(direction) {
@@ -570,7 +570,19 @@
 
   function shortDate(date) { return `${date.getMonth() + 1}月${date.getDate()}日`; }
   function clock(date) { return Number.isNaN(date.getTime()) ? "" : `${pad(date.getHours())}:${pad(date.getMinutes())}`; }
-  function moodEmoji(value) { return ({ awful: "😣", low: "🙁", neutral: "😐", good: "🙂", great: "😄" })[value] || "😐"; }
+  function calendarMood(value) {
+    return [
+      { value: "awful", label: "很糟" }, { value: "low", label: "低落" },
+      { value: "neutral", label: "平静" }, { value: "good", label: "不错" },
+      { value: "great", label: "很好" },
+    ].find(mood => mood.value === value) || { value: "neutral", label: "平静" };
+  }
+
+  function calendarItemTitle(item) {
+    if (item.type !== "mood") return escapeHTML(item.title);
+    const mood = calendarMood(item.raw?.mood);
+    return `<img class="calendar-mood-icon" src="/static/mood-art/${mood.value}-flat-v2.png" width="20" height="20" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><span class="calendar-mood-label">${escapeHTML(item.title)}</span>`;
+  }
   function typeLabel(value) { return ({ plan: "学习计划", task: "学习任务", todo: "待办事项", mood: "心情日记" })[value] || value; }
 
   bind();

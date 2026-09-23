@@ -3,6 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
+const assert = require("node:assert/strict");
 
 function element() {
   return {
@@ -39,7 +40,7 @@ const scriptPath = path.join(__dirname, "..", "internal", "httpapi", "assets", "
 let source = fs.readFileSync(scriptPath, "utf8");
 const instrumented = source.replace(
   /\n  bind\(\);\r?\n\}\)\(\);\s*$/,
-  "\n  window.__calendarTest = { parseWikipediaHistory, state, renderCalendar };\n  bind();\n})();\n",
+  "\n  window.__calendarTest = { parseWikipediaHistory, state, renderCalendar, calendarItemTitle, itemsByDate };\n  bind();\n})();\n",
 );
 if (instrumented === source) throw new Error("calendar test instrumentation point was not found");
 vm.runInNewContext(instrumented, context, { filename: scriptPath });
@@ -73,3 +74,25 @@ for (const view of ['year', 'month', 'week', 'day']) {
   if (getElement('#panel-calendar').dataset.calendarMode !== view) throw new Error(`calendar mode missing: ${view}`);
 }
 console.log('calendar responsive view hooks passed: year, month, week, day');
+
+const moodTest = context.window.__calendarTest;
+const moods = ['awful', 'low', 'neutral', 'good', 'great'];
+moodTest.state.view = 'month';
+moodTest.state.anchor = new Date(2026, 8, 1);
+moodTest.state.selected = '2026-09-01';
+moodTest.state.overview = { mood_entries: moods.map((mood, i) => ({ id: String(i), mood, date: '2026-09-0' + (i + 1) })) };
+moodTest.renderCalendar();
+for (const mood of moods) {
+  const asset = '/static/mood-art/' + mood + '-flat-v2.png';
+  assert.ok(canvas.innerHTML.includes('src="' + asset + '"'), 'month view must use journal artwork: ' + mood);
+  assert.ok(fs.existsSync(path.join(__dirname, '..', 'internal', 'httpapi', 'assets', 'mood-art', mood + '-flat-v2.png')));
+}
+assert.ok(getElement('#calendar-day-agenda').innerHTML.includes('awful-flat-v2.png'), 'agenda uses same mood badge');
+assert.ok(getElement('#calendar-day-agenda').innerHTML.includes('心情 · 很糟'), 'visible text explains mood');
+assert.doesNotMatch(canvas.innerHTML, /😣|🙁|😐|🙂|😄/);
+assert.equal(moodTest.calendarItemTitle({ type: 'event', title: '<script>' }), '&lt;script&gt;');
+assert.match(moodTest.calendarItemTitle({ type: 'mood', title: '<img>', raw: { mood: '"><script>' } }), /neutral-flat-v2.png/);
+assert.ok(moodTest.calendarItemTitle({ type: 'mood', title: '<img>', raw: {} }).includes('&lt;img&gt;'));
+moodTest.state.query = '低落';
+assert.equal([...moodTest.itemsByDate().values()].flat().length, 1, 'mood labels remain searchable');
+console.log('calendar mood artwork passed: five shared images, month/agenda, readable labels, search and escaping');
