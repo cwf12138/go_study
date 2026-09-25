@@ -24,6 +24,8 @@ type Repository interface {
 	ListKeepsakes(context.Context, string) ([]domain.Keepsake, error)
 	ListLedger(context.Context, string) ([]domain.LedgerEntry, error)
 	ListProjects(context.Context, string) ([]domain.Project, error)
+	ListTravelPlans(context.Context, string) ([]domain.TravelPlan, error)
+	SaveTravelPlan(context.Context, domain.TravelPlan, int) (domain.TravelPlan, error)
 	SaveProject(context.Context, domain.Project, int) (domain.Project, error)
 	SaveLedger(context.Context, domain.LedgerEntry, int) (domain.LedgerEntry, error)
 	SaveKeepsake(context.Context, domain.Keepsake, int) (domain.Keepsake, error)

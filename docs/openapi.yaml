@@ -21,7 +21,50 @@ tags:
   - name: English
   - name: Literature
   - name: Exports
+  - name: Travel
 paths:
+  /api/v1/travel-plans:
+    get:
+      tags: [Travel]
+      summary: 当前账号的旅行档案，含归档
+      description: 最多 50 条，按更新时间倒序；同一更新时间按 ID 排序。日期和时间均为目的地当地时间，不转换时区。
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: 当前账号的旅行数组
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/TravelPlan' } }
+        '401': { description: 未登录 }
+  /api/v1/travel-plans/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,80}$' } }
+    put:
+      tags: [Travel]
+      summary: 完整保存旅行、行程、预算和行李清单
+      description: '首次 revision 为 0；修改传上次版本。相同版本及内容紧邻重试幂等，版本冲突返回 409。ID 按账号隔离。最多 50 趟旅行（含归档）、每趟 200 个行程和 100 个行李项；请求体上限 1 MiB。保存写入内存，落盘沿用周期快照机制。'
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TravelPlanInput' }
+      responses:
+        '200':
+          description: 保存后的旅行，含递增 revision；幂等重试保持原版本
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/TravelPlan' }
+        '400': { description: 字段不合法、日期超出范围、重复标识或超过限额 }
+        '401': { description: 未登录 }
+        '404': { description: 更新目标不存在 }
+        '409': { description: 旅行版本冲突，请保留草稿后重新读取 }
   /api/v1/projects:
     get:
       summary: 当前账号的项目列表（含归档项目与回收站卡片）
@@ -2410,6 +2453,54 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
   schemas:
+    TravelPlanInput:
+      type: object
+      required: [title, destination, start_date, end_date, revision]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 80 }
+        destination: { type: string, minLength: 1, maxLength: 120 }
+        start_date: { type: string, format: date, description: 'YYYY-MM-DD，2000–2100 年' }
+        end_date: { type: string, format: date, description: 含首尾连续 1–31 天，不早于出发日期 }
+        notes: { type: string, maxLength: 4000 }
+        budget_cents: { type: integer, format: int64, minimum: 0, maximum: 100000000, description: 人民币分，0 表示不设预算 }
+        archived: { type: boolean }
+        revision: { type: integer, minimum: 0, maximum: 1000000 }
+        stops: { type: array, maxItems: 200, items: { $ref: '#/components/schemas/TravelStop' } }
+        packing: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/TravelPack' } }
+    TravelPlan:
+      allOf:
+        - $ref: '#/components/schemas/TravelPlanInput'
+        - type: object
+          required: [id, user_id, created_at, updated_at]
+          properties:
+            id: { type: string }
+            user_id: { type: string }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+    TravelStop:
+      type: object
+      required: [id, title, date, category, minutes]
+      properties:
+        id: { type: string, pattern: '^[A-Za-z0-9_-]{8,80}$', description: 在同一旅行的行程与行李中唯一 }
+        title: { type: string, minLength: 1, maxLength: 120 }
+        date: { type: string, format: date, description: 必须在旅行日期范围内 }
+        time: { type: string, description: '空字符串或 HH:mm；开始时间加时长不能超过当天 24:00' }
+        minutes: { type: integer, minimum: 1, maximum: 1440 }
+        category: { type: string, enum: [sight, food, transport, stay, other] }
+        location: { type: string, maxLength: 180 }
+        notes: { type: string, maxLength: 2000 }
+        estimated_cents: { type: integer, format: int64, minimum: 0, maximum: 100000000 }
+        spent_cents: { type: integer, format: int64, minimum: 0, maximum: 100000000 }
+        done: { type: boolean }
+    TravelPack:
+      type: object
+      required: [id, title, category, quantity]
+      properties:
+        id: { type: string, pattern: '^[A-Za-z0-9_-]{8,80}$', description: 在同一旅行的行程与行李中唯一 }
+        title: { type: string, minLength: 1, maxLength: 100 }
+        category: { type: string, enum: [essentials, clothes, electronics, care, other] }
+        quantity: { type: integer, minimum: 1, maximum: 99 }
+        packed: { type: boolean }
     CalendarEventInput:
       type: object
       required: [title, start_at, end_at]
