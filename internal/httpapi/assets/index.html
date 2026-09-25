@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="/static/habits.css?v=20260914-1">
     <link rel="stylesheet" href="/static/habits-dashboard.css?v=20260923-1">
     <link rel="stylesheet" href="/static/mood-journal.css?v=20260924-mood-unified">
-    <link rel="stylesheet" href="/static/focus-studio.css?v=20260910-1">
+    <link rel="stylesheet" href="/static/focus-studio.css?v=20260925-2">
     <link rel="stylesheet" href="/static/task-studio.css?v=20260911-1">
     <link rel="stylesheet" href="/static/timeline.css?v=20260910-1">
     <link rel="stylesheet" href="/static/sync-status.css?v=20260909-1">
@@ -560,14 +560,14 @@
 
           <section id="panel-focus" class="panel">
             <header class="focus-studio-header">
-              <div><p class="eyebrow">FOCUS STUDIO · 专注空间</p><h3>把时间，留给眼前这一件事。</h3><p>一段专注，一次小小的前进。</p></div>
+              <div><p class="eyebrow">FOCUS STUDIO / 专注空间</p><h3>此刻，只做一件事。</h3><p>让注意力慢慢落定，按自己的节奏向前。</p></div>
               <button id="focus-quiet-toggle" class="quiet" type="button" aria-pressed="false" aria-controls="focus-workspace">简洁模式</button>
             </header>
             <div id="focus-workspace" class="focus-workspace">
               <article class="surface focus-session-card">
-                <div class="focus-card-head"><div><p class="eyebrow">YOUR MOMENT</p><h3>专注时钟</h3></div><span id="focus-session-step" class="focus-session-step">准备开始</span></div>
+                <div class="focus-card-head"><div><p class="eyebrow">A MOMENT FOR YOU</p><h3>专注时钟</h3></div><span id="focus-session-step" class="focus-session-step">准备开始</span></div>
                 <div class="focus-clock-stage">
-                  <div id="focus-timer" class="focus-timer" style="--progress:0%">
+                  <div id="focus-timer" class="focus-timer" style="--progress:0%" tabindex="0" role="group" aria-label="专注倒计时" aria-describedby="focus-keyboard-hint">
                     <div class="focus-timer-ticks" aria-hidden="true"></div>
                     <div class="focus-timer-inner"><div id="focus-clock" class="focus-clock" role="timer" aria-label="当前阶段剩余时间" aria-live="off">25:00</div></div>
                   </div>
@@ -581,28 +581,30 @@
                   <button id="finish-focus" class="focus-control-button hidden" type="button" title="提前结束也会记录已投入的专注时间"><span aria-hidden="true">✓</span><span>完成并记录</span></button>
                   <button id="abandon-focus" class="focus-control-button hidden" type="button"><span aria-hidden="true">×</span><span>放弃</span></button>
                 </div>
+                <p id="focus-keyboard-hint" class="focus-keyboard-hint">时钟获得焦点后，按空格暂停 / 继续</p>
+                <p id="focus-action-status" class="focus-action-status hidden" role="status" aria-live="polite"></p>
                 <div id="focus-transition-notice" class="focus-transition-notice hidden" role="status"><span id="focus-transition-message"></span><button id="focus-retry-transition" type="button" class="text-button">重试同步</button></div>
                 <ol id="focus-phase-track" class="focus-phase-track" aria-label="本次专注流程"></ol>
                 <p class="focus-session-footnote">专注与休息自动衔接 · 暂停不计入时长</p>
               </article>
               <article class="surface form-surface focus-setup-card">
-                <div class="focus-card-head"><div><p class="eyebrow">MAKE A LITTLE SPACE</p><h3>安排这一段时间</h3></div><span class="focus-card-number" aria-hidden="true">01</span></div>
+                <div class="focus-card-head"><div><p class="eyebrow">SET YOUR PACE</p><h3>安排这一段时间</h3></div><span id="focus-setup-state" class="focus-setup-state">自由安排</span></div>
                 <form id="focus-form" class="form-grid">
                   <label>关联任务 <span class="focus-field-optional">可选，也可以自由专注</span><select id="focus-task"><option value="">不关联任务</option></select></label>
-                  <label class="focus-duration-field">专注时长<div><input id="focus-minutes" type="number" min="1" max="240" step="1" value="25" required aria-describedby="focus-duration-help"><span>分钟</span></div></label>
+                  <div class="focus-duration-field"><label for="focus-minutes">专注时长</label><div class="focus-duration-stepper"><button id="focus-duration-less" type="button" aria-label="减少 5 分钟">−</button><input id="focus-minutes" type="number" min="1" max="240" step="1" value="25" required aria-describedby="focus-duration-help"><span>分钟</span><button id="focus-duration-more" type="button" aria-label="增加 5 分钟">＋</button></div></div>
                   <div class="duration-presets" aria-label="常用专注时长"><button type="button" data-focus-duration="15" aria-pressed="false">15<small>轻量启动</small></button><button type="button" data-focus-duration="25" aria-pressed="true">25<small>经典节奏</small></button><button type="button" data-focus-duration="45" aria-pressed="false">45<small>深入学习</small></button><button type="button" data-focus-duration="60" aria-pressed="false">60<small>长时沉浸</small></button></div>
                   <p id="focus-duration-help" class="focus-field-help">支持 1–240 分钟；休息时间另计。</p>
                   <label class="check-label focus-option"><input id="focus-break-enabled" type="checkbox"><span><strong>中途休息 5 分钟</strong><small>专注均分为两段，给自己一点缓冲。</small></span></label>
-                  <label class="check-label focus-option"><input id="focus-complete-task" type="checkbox" checked><span><strong>同步完成关联任务</strong><small>完成本次专注时，将任务标记为已完成。</small></span></label>
+                  <label class="check-label focus-option"><input id="focus-complete-task" type="checkbox" checked><span><strong>同步完成关联任务</strong><small id="focus-complete-task-hint">选择任务后可用；提前完成也会完成任务。</small></span></label>
                 </form>
-                <div class="focus-plan-summary"><span>本次安排</span><strong id="focus-plan-summary">25 分钟专注</strong><p id="focus-setup-hint">调整好节奏，在左侧时钟下开始。</p></div>
+                <div class="focus-plan-summary"><span>本次安排</span><strong id="focus-plan-summary">25 分钟专注</strong><div class="focus-end-row"><span id="focus-end-label">现在开始，预计结束</span><time id="focus-end-time">—</time></div><p id="focus-setup-hint">调整好节奏，在时钟下点击开始。</p><button id="focus-setup-start" class="primary" type="submit" form="focus-form">开始这段专注 ↗</button></div>
               </article>
-              <article class="surface focus-task-card"><div class="focus-card-head"><div><p class="eyebrow">ONE THING AT A TIME</p><h3>挑一件事，开始就好</h3></div><button class="text-button" type="button" data-goto="tasks">全部任务 ↗</button></div><p class="focus-field-help">点击关联任务，不会立即启动计时。</p><div id="focus-task-preview" class="focus-task-preview"></div></article>
+              <article class="surface focus-task-card"><div class="focus-card-head"><div><p class="eyebrow">ONE THING AT A TIME</p><h3>选一件值得投入的事</h3></div><button class="text-button" type="button" data-goto="tasks">全部任务 ↗</button></div><div class="focus-task-tools"><p class="focus-field-help">点击关联，不会立即计时。</p><button id="focus-clear-task" type="button" class="text-button">改为自由专注</button></div><div id="focus-task-preview" class="focus-task-preview"></div></article>
               <article class="surface focus-progress-card">
-                <div class="focus-card-head"><div><p class="eyebrow">SMALL STEPS, EVERY DAY</p><h3>今天的积累</h3></div><button id="edit-daily-goal" class="focus-icon-button" type="button" aria-label="调整每日目标" title="调整每日目标">✎</button></div>
+                <div class="focus-card-head"><div><p class="eyebrow">SMALL STEPS, EVERY DAY</p><h3>今天的积累</h3></div><button id="edit-daily-goal" class="focus-icon-button" type="button" aria-label="调整每日目标" title="调整每日目标" aria-expanded="false" aria-controls="daily-goal-form">✎</button></div>
                 <div class="daily-progress-visual"><div class="daily-stat"><span>今日完成</span><strong id="focus-today-minutes">0</strong><small>分钟</small></div><div id="focus-daily-ring" class="focus-daily-ring" style="--daily-progress:0%"><div class="focus-daily-ring-inner"><span>每日目标</span><strong id="focus-daily-goal-value">1</strong><small id="focus-daily-goal-unit">小时</small></div></div><div class="daily-stat"><span>本周累计</span><strong id="focus-week-minutes">0</strong><small>分钟</small></div></div>
                 <p id="focus-progress-caption" class="focus-progress-caption">每天一点点，也是很好的进步。</p>
-                <form id="daily-goal-form" class="daily-goal-form hidden"><label>每日目标（分钟）<input id="daily-goal-minutes" type="number" min="10" max="720" step="5" required></label><button class="primary" type="submit">保存目标</button></form>
+                <form id="daily-goal-form" class="daily-goal-form hidden"><label>每日目标（分钟）<input id="daily-goal-minutes" type="number" min="10" max="720" step="5" required></label><div class="daily-goal-actions"><button id="cancel-daily-goal" class="quiet" type="button">取消</button><button class="primary" type="submit">保存</button></div></form>
                 <p class="focus-field-help focus-progress-note">完成并记录后更新统计；不包含休息与暂停。</p>
               </article>
             </div>
@@ -655,7 +657,7 @@
         <div class="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 执行</span><span>全局快捷键 <kbd>Ctrl K</kbd></span></div>
       </div>
     </dialog>
-    <script src="/static/app.js?v=20260925-travel" defer></script>
+    <script src="/static/app.js?v=20260925-focus-2" defer></script>
     <script src="/static/travel.js?v=20260925-1" defer></script>
     <script src="/static/projects.js?v=20260923-1" defer></script>
     <script src="/static/ledger.js?v=20260922-1" defer></script>

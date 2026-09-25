@@ -53,6 +53,8 @@
     isFinishingFocus: false,
     isUpdatingFocus: false,
     isStartingFocus: false,
+    focusMessage: "",
+    focusMessageError: false,
     toastTimer: null,
     vocabularySearchTimer: null,
   };
@@ -235,6 +237,7 @@
 
   function enterApp(user) {
     state.user = user;
+    setFocusFeedback();
     state.dailyFocusGoalMinutes = loadDailyFocusGoal();
     if (state.focus && state.focus.userID !== user.id) {
       state.focus = null;
@@ -290,6 +293,7 @@
     state.weeklyReview = null;
     state.focus = null;
     state.dailyFocusGoalMinutes = 60;
+    setFocusFeedback();
     localStorage.removeItem("studyflow.token");
     persistFocus();
     $("#app-view").classList.add("hidden");
@@ -1664,6 +1668,10 @@
     $("#start-focus").disabled = Boolean(active) || updating;
     $("#start-focus").classList.toggle("hidden", Boolean(active));
     $("#start-focus").textContent = state.isStartingFocus ? "正在开启…" : "▶ 开始专注";
+    $("#focus-setup-start").disabled = Boolean(active) || updating;
+    $("#focus-setup-start").classList.toggle("hidden", Boolean(active));
+    $("#focus-setup-start").textContent = state.isStartingFocus ? "正在开启…" : "开始这段专注 ↗";
+    $("#focus-form").setAttribute("aria-busy", String(updating));
     form.querySelectorAll("input,select").forEach((field) => { field.disabled = Boolean(active) || updating; });
     $$("[data-focus-duration]").forEach((button) => { button.disabled = Boolean(active) || updating; });
     $("#focus-quiet-toggle").disabled = !active;
@@ -1677,6 +1685,13 @@
     } else {
       setFocusQuiet(false);
     }
+    const hasTask = Boolean(active?.taskID || $("#focus-task").value);
+    $("#focus-complete-task").disabled = Boolean(active) || updating || !hasTask;
+    $("#focus-complete-task-hint").textContent = hasTask ? "完成本次专注时同步完成任务，提前完成也适用。" : "自由专注不会修改任务，关联任务后可开启。";
+    $("#focus-clear-task").disabled = Boolean(active) || updating || !hasTask;
+    $("#focus-setup-state").textContent = active ? "本次已锁定" : state.isStartingFocus ? "正在开启" : "自由安排";
+    $("#focus-keyboard-hint").textContent = active ? "时钟获得焦点后，按空格暂停 / 继续" : "可直接开始，也可以先在设置中挑选节奏";
+    renderFocusFeedback();
     renderFocusPlan();
     renderFocusTransitionNotice();
     renderFocusProgress();
@@ -1701,9 +1716,71 @@
 
   function renderReadyCountdown() {
     const plannedMinutes = clampPlannedMinutes($("#focus-minutes").value);
-    $("#focus-clock").textContent = formatDuration(plannedMinutes * 60);
+    const first = focusPlanSegments(plannedMinutes, $("#focus-break-enabled").checked)[0];
+    const display = formatDuration(first.seconds);
+    if ($("#focus-clock").textContent !== display) $("#focus-clock").textContent = display;
     $("#focus-timer").style.setProperty("--progress", "0%");
     renderFocusTicks(0);
+    renderFocusEndTime();
+  }
+
+  function renderFocusFeedback() {
+    const message = state.isStartingFocus ? "正在开启专注，请稍候…" : state.isFinishingFocus ? "正在保存本次会话…" : state.isUpdatingFocus ? "正在同步计时状态…" : state.focusMessage;
+    const node = $("#focus-action-status");
+    node.classList.toggle("hidden", !message);
+    node.classList.toggle("is-error", Boolean(state.focusMessageError && !state.isStartingFocus && !state.isUpdatingFocus && !state.isFinishingFocus));
+    if (node.textContent !== message) node.textContent = message;
+  }
+
+  function setFocusFeedback(message = "", isError = false) {
+    state.focusMessage = message;
+    state.focusMessageError = isError;
+    renderFocusFeedback();
+  }
+
+  function renderFocusEndTime() {
+    const active = state.focus;
+    const label = $("#focus-end-label"), output = $("#focus-end-time");
+    let text, end = null;
+    if (active?.status === "paused") {
+      label.textContent = "预计结束（本机时间）";
+      text = "继续后更新";
+    } else if (active?.transitionError) {
+      label.textContent = "预计结束（本机时间）";
+      text = "等待同步";
+    } else {
+      const minutes = active?.plannedMinutes ?? clampPlannedMinutes($("#focus-minutes").value);
+      const segments = focusPlanSegments(minutes, active ? active.breakEnabled : $("#focus-break-enabled").checked, active?.breakMinutes ?? 5);
+      const index = active ? segments.findIndex(s => s.phase === active.phase) : -1;
+      const remaining = active ? phaseRemainingSeconds(active) + segments.slice(index + 1).reduce((sum, s) => sum + s.seconds, 0) : segments.reduce((sum, s) => sum + s.seconds, 0);
+      // Running sessions use the precise phase deadline, so the estimate doesn't jump a minute every tick.
+      const phaseEnd = active ? new Date(active.phaseStartedAt).getTime() + active.phaseRemainingSeconds * 1000 : 0;
+      const total = active && Number.isFinite(phaseEnd) ? Math.max(Date.now(), phaseEnd) + segments.slice(index + 1).reduce((sum, s) => sum + s.seconds, 0) * 1000 : Date.now() + remaining * 1000;
+      end = new Date(total);
+      const now = new Date(Date.now());
+      text = (end.toDateString() !== now.toDateString() ? "明天 " : "") + end.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
+      label.textContent = active ? "预计结束（本机时间）" : "现在开始，预计结束";
+    }
+    if (output.textContent !== text) output.textContent = text;
+    output.setAttribute("datetime", end ? end.toISOString() : "");
+  }
+
+  function adjustFocusDuration(delta) {
+    if (state.focus || state.isStartingFocus || state.isUpdatingFocus || state.isFinishingFocus) return;
+    $("#focus-minutes").value = clampPlannedMinutes(clampPlannedMinutes($("#focus-minutes").value) + delta);
+    renderReadyCountdown();
+    renderFocusPlan();
+  }
+
+  function handleFocusClockKey(event) {
+    if (event.key !== " " || event.target !== $("#focus-timer") || state.currentView !== "focus" || !state.focus || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    event.preventDefault();
+    if (event.repeat || state.isUpdatingFocus || state.isFinishingFocus || state.focus.transitionError) return;
+    return state.focus.status === "paused" ? resumeFocus() : pauseFocus();
+  }
+
+  function handoffFocusControl(previous, selector) {
+    if (previous && state.currentView === "focus" && (document.activeElement === previous || document.activeElement === document.body)) $(selector).focus({ preventScroll: true });
   }
 
   function focusPlanSegments(minutes, breakEnabled, breakMinutes = 5) {
@@ -1726,6 +1803,10 @@
     $("#focus-plan-summary").textContent = `${minutes} 分钟专注${breakEnabled ? ` + ${segments[1].seconds / 60} 分钟休息` : " · 不间断时段"}`;
     $("#focus-setup-hint").textContent = active ? "本次设置已锁定，结束后可安排下一次专注。" : "调整好节奏，在时钟下点击开始。";
     $$("[data-focus-duration]").forEach((button) => button.setAttribute("aria-pressed", String(Number(button.dataset.focusDuration) === minutes)));
+    const locked = Boolean(active || state.isStartingFocus || state.isUpdatingFocus || state.isFinishingFocus);
+    $("#focus-duration-less").disabled = locked || minutes <= 1;
+    $("#focus-duration-more").disabled = locked || minutes >= 240;
+    renderFocusEndTime();
   }
 
   function setFocusQuiet(enabled) {
@@ -1784,9 +1865,11 @@
     const totalSeconds = phaseTotalSeconds(state.focus);
     const remainingSeconds = phaseRemainingSeconds(state.focus);
     const progress = Math.min(100, ((totalSeconds - remainingSeconds) / totalSeconds) * 100);
-    $("#focus-clock").textContent = formatDuration(remainingSeconds);
+    const display = formatDuration(remainingSeconds);
+    if ($("#focus-clock").textContent !== display) $("#focus-clock").textContent = display;
     $("#focus-timer").style.setProperty("--progress", `${progress}%`);
     renderFocusTicks(progress);
+    renderFocusEndTime();
     if (remainingSeconds === 0 && state.focus.status === "running" && !state.isFinishingFocus && !state.isUpdatingFocus && !state.focus.autoFinishAttempted) {
       state.focus.autoFinishAttempted = true;
       persistFocus();
@@ -1863,7 +1946,7 @@
     const tasks = (selected ? [selected, ...available.filter((task) => task.id !== selected.id)] : available).slice(0, 5);
     if (!tasks.length) {
       container.className = "focus-task-preview empty-state";
-      container.textContent = "还没有待办任务。先创建一项足够小、可以立刻开始的任务。";
+      container.textContent = "暂时没有待专注的任务。不必先做计划，也可以直接开始一段自由专注。";
       return;
     }
     container.className = "focus-task-preview";
@@ -2212,7 +2295,17 @@
     $("#focus-minutes").addEventListener("input", () => {
       if (!state.focus && !state.isStartingFocus) { renderReadyCountdown(); renderFocusPlan(); }
     });
-    $("#focus-break-enabled").addEventListener("change", renderFocusPlan);
+    $("#focus-break-enabled").addEventListener("change", () => { renderReadyCountdown(); renderFocusPlan(); });
+    $("#focus-duration-less").addEventListener("click", () => adjustFocusDuration(-5));
+    $("#focus-duration-more").addEventListener("click", () => adjustFocusDuration(5));
+    $("#focus-timer").addEventListener("keydown", handleFocusClockKey);
+    $("#focus-clear-task").addEventListener("click", () => {
+      if (state.focus || state.isStartingFocus || state.isUpdatingFocus || state.isFinishingFocus) return;
+      $("#focus-task").value = "";
+      renderFocus();
+      $("#focus-task").focus();
+      setFocusFeedback("已切换为自由专注，不会修改任何任务。");
+    });
     $("#focus-quiet-toggle").addEventListener("click", () => setFocusQuiet(!$("#panel-focus").classList.contains("is-quiet")));
     $("#focus-retry-transition").addEventListener("click", retryFocusTransition);
     document.addEventListener("keydown", (event) => {
@@ -2241,17 +2334,27 @@
     $("#edit-daily-goal").addEventListener("click", () => {
       const form = $("#daily-goal-form");
       form.classList.toggle("hidden");
+      $("#edit-daily-goal").setAttribute("aria-expanded", String(!form.classList.contains("hidden")));
       if (!form.classList.contains("hidden")) {
         $("#daily-goal-minutes").value = state.dailyFocusGoalMinutes;
         $("#daily-goal-minutes").focus();
         $("#daily-goal-minutes").select();
       }
     });
+    $("#cancel-daily-goal").addEventListener("click", () => {
+      $("#daily-goal-form").classList.add("hidden");
+      $("#edit-daily-goal").setAttribute("aria-expanded", "false");
+      $("#edit-daily-goal").focus();
+      renderFocusProgress();
+    });
     $("#daily-goal-form").addEventListener("submit", (event) => {
       event.preventDefault();
+      if (!$("#daily-goal-form").reportValidity()) return;
       state.dailyFocusGoalMinutes = clampDailyFocusGoal($("#daily-goal-minutes").value);
       persistDailyFocusGoal();
       $("#daily-goal-form").classList.add("hidden");
+      $("#edit-daily-goal").setAttribute("aria-expanded", "false");
+      $("#edit-daily-goal").focus();
       renderFocusProgress();
       notify(`每日专注目标已设置为 ${state.dailyFocusGoalMinutes} 分钟。`);
     });
@@ -2479,7 +2582,9 @@
     const plannedMinutes = clampPlannedMinutes($("#focus-minutes").value);
     const breakEnabled = $("#focus-break-enabled").checked;
     const taskID = $("#focus-task").value;
-    const completeTask = $("#focus-complete-task").checked;
+    const completeTask = Boolean(taskID && $("#focus-complete-task").checked);
+    const previousControl = document.activeElement;
+    setFocusFeedback();
     state.isStartingFocus = true;
     renderFocus();
     try {
@@ -2489,10 +2594,12 @@
       renderFocus();
       notify(breakEnabled ? "倒计时已开始：前半段专注后将自动休息 5 分钟。" : `${session.planned_minutes} 分钟倒计时已开始，享受这一段不被打扰的时间。`);
     } catch (error) {
+      setFocusFeedback(`未能确认开启：${error.message}。请核对连接，必要时刷新以恢复已开启的会话。`, true);
       notify(error.message, "error");
     } finally {
       state.isStartingFocus = false;
       renderFocus();
+      if (state.focus) handoffFocusControl(previousControl, "#pause-focus");
     }
   }
 
@@ -2507,6 +2614,7 @@
   async function advanceFocus(automatic = false) {
     if (!state.focus || state.isUpdatingFocus || state.isFinishingFocus) return;
     const focusID = state.focus.id;
+    setFocusFeedback();
     state.isUpdatingFocus = true;
     renderFocus();
     try {
@@ -2516,6 +2624,7 @@
       notify(session.phase === "break" ? "第一段专注完成，开始休息 5 分钟。" : automatic ? "休息结束，开始第二段专注。" : "已进入下一阶段。");
     } catch (error) {
       if (automatic && state.focus?.id === focusID) state.focus.transitionError = error.message;
+      if (!automatic) setFocusFeedback(`未能确认切换阶段：${error.message}`, true);
       notify(error.message, "error");
     } finally {
       state.isUpdatingFocus = false;
@@ -2525,6 +2634,8 @@
 
   async function updateFocusSession(action, message) {
     if (!state.focus || state.isUpdatingFocus || state.isFinishingFocus) return;
+    const previousControl = document.activeElement;
+    setFocusFeedback();
     state.isUpdatingFocus = true;
     renderFocus();
     try {
@@ -2533,22 +2644,27 @@
       renderFocus();
       notify(message);
     } catch (error) {
+      setFocusFeedback(`未能确认${action === "pause" ? "暂停" : "继续"}：${error.message}。请刷新核对当前状态。`, true);
       notify(error.message, "error");
     } finally {
       state.isUpdatingFocus = false;
       renderFocus();
+      if (previousControl !== $("#focus-timer") && state.focus) handoffFocusControl(previousControl, state.focus.status === "paused" ? "#resume-focus" : "#pause-focus");
     }
   }
 
   async function finishFocus(abandoned, automatic = false) {
     if (!state.focus || state.isFinishingFocus || state.isUpdatingFocus) return;
     const completedFocus = state.focus;
+    const previousControl = document.activeElement;
+    setFocusFeedback();
     state.isFinishingFocus = true;
     renderFocus();
     try {
       await api(`/api/v1/focus-sessions/${completedFocus.id}/finish`, { method: "PATCH", body: JSON.stringify({ abandoned }) });
       state.focus = null;
       persistFocus();
+      setFocusFeedback(abandoned ? "已放弃本次会话，不计入今日积累。" : "这一段专注已记录。休息一下，再开始下一段吧。");
       await refresh();
       if (!abandoned && completedFocus.completeTask && completedFocus.taskID) {
         const task = state.tasks.find((item) => item.id === completedFocus.taskID);
@@ -2567,10 +2683,12 @@
       notify(abandoned ? "已放弃本次专注会话。" : automatic ? "倒计时结束，专注会话已自动完成。" : "专注会话已完成，做得好。");
     } catch (error) {
       if (automatic && state.focus?.id === completedFocus.id) state.focus.transitionError = error.message;
+      if (!automatic) setFocusFeedback(state.focus ? `未能确认保存：${error.message}。请刷新核对会话状态。` : `会话已保存，但页面同步失败：${error.message}。请刷新查看统计。`, true);
       notify(error.message, "error");
     } finally {
       state.isFinishingFocus = false;
       renderFocus();
+      if (!state.focus && !automatic) handoffFocusControl(previousControl, "#start-focus");
     }
   }
 
