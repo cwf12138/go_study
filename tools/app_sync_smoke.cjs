@@ -17,6 +17,11 @@ async function test(){
   app.state.plannerDraftRevision=0;app.renderPlanner();
   assert.equal(element('#planner-session-minutes').value,50,'clean planner form should reflect saved preferences');
   context.fetch=async path=>{
+    if(path.startsWith('/api/v1/calendar?')) {
+      const query=new URLSearchParams(path.split('?')[1]);
+      assert(query.get('end')>query.get('start'),'calendar end must be exclusive and after start');
+      return response({events:[],plan_blocks:[]});
+    }
     if(path==='/api/v1/tasks'||path==='/api/v1/focus-sessions/active')return response({},503);
     if(path==='/api/v1/dashboard')return response({active_goals:7});
     return response([]);

@@ -1,5 +1,4 @@
-// Browserless regression checks for the knowledge garden's safe renderer and
-// for the contract between its JavaScript selectors and the HTML shell.
+// Legacy renderer remains safe for cached clients, but the new shell must not load it.
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
@@ -35,9 +34,7 @@ const scriptPath = path.join(root, "internal", "httpapi", "assets", "knowledge.j
 const htmlPath = path.join(root, "internal", "httpapi", "assets", "index.html");
 let source = fs.readFileSync(scriptPath, "utf8");
 const html = fs.readFileSync(htmlPath, "utf8");
-for (const match of source.matchAll(/\$\("#([a-z0-9-]+)"\)/g)) {
-  if (!html.includes(`id="${match[1]}"`)) throw new Error(`missing HTML element for #${match[1]}`);
-}
+if (html.includes('id="panel-knowledge"') || html.includes('/static/knowledge.js')) throw new Error('retired knowledge UI is still loaded');
 const instrumented = source.replace(
   /\n  bindKnowledgeEvents\(\);\r?\n\}\)\(\);\s*$/,
   "\n  window.__knowledgeTest = { renderMarkdown, graphPosition };\n  bindKnowledgeEvents();\n})();\n",
@@ -54,4 +51,4 @@ const satellite = context.window.__knowledgeTest.graphPosition(1, 8);
 if (center.x !== 500 || center.y !== 300 || (satellite.x === center.x && satellite.y === center.y)) {
   throw new Error(`invalid graph layout: ${JSON.stringify({ center, satellite })}`);
 }
-console.log("knowledge UI smoke ok: selectors, safe markdown and graph layout");
+console.log("knowledge retirement smoke ok: old page unloaded, legacy safe markdown and graph layout retained");

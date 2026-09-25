@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: StudyFlow API
+  title: Daynest API
   version: 1.0.0
   description: 学习目标、任务、专注会话、词汇学习和实时事件 API。
 servers:

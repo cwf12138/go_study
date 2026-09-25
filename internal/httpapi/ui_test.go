@@ -25,7 +25,7 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 
 	home := httptest.NewRecorder()
 	handler.ServeHTTP(home, httptest.NewRequest(http.MethodGet, "/", nil))
-	if home.Code != http.StatusOK || !strings.Contains(home.Body.String(), "StudyFlow") || !strings.Contains(home.Body.String(), "mood-trend") || !strings.Contains(home.Body.String(), "theme-toggle") || !strings.Contains(home.Body.String(), "vocab-catalogs") || !strings.Contains(home.Body.String(), "vocab-pagination") || !strings.Contains(home.Body.String(), "panel-calendar") || !strings.Contains(home.Body.String(), "panel-memos") || !strings.Contains(home.Body.String(), "memo-editor") || !strings.Contains(home.Body.String(), "panel-knowledge") || !strings.Contains(home.Body.String(), "panel-english") || !strings.Contains(home.Body.String(), "panel-literature") || !strings.Contains(home.Body.String(), "ebook-reader-dialog") || !strings.Contains(home.Body.String(), "classic-reader-dialog") || !strings.Contains(home.Body.String(), "english-reader-dialog") || !strings.Contains(home.Body.String(), "command-dialog") || !strings.Contains(home.Body.String(), "memos.js?v=20260909-1") || !regexp.MustCompile(`src="/static/app.js\?v=[^"]+"`).MatchString(home.Body.String()) || strings.Contains(home.Body.String(), "panel-review") || strings.Contains(home.Body.String(), `data-view="review"`) {
+	if home.Code != http.StatusOK || !strings.Contains(home.Body.String(), "Daynest") || !strings.Contains(home.Body.String(), "mood-trend") || !strings.Contains(home.Body.String(), "theme-toggle") || !strings.Contains(home.Body.String(), "vocab-catalogs") || !strings.Contains(home.Body.String(), "vocab-pagination") || !strings.Contains(home.Body.String(), "panel-calendar") || !strings.Contains(home.Body.String(), "panel-memos") || !strings.Contains(home.Body.String(), "memo-editor") || strings.Contains(home.Body.String(), "panel-knowledge") || !strings.Contains(home.Body.String(), "panel-english") || !strings.Contains(home.Body.String(), "panel-literature") || !strings.Contains(home.Body.String(), "ebook-reader-dialog") || !strings.Contains(home.Body.String(), "classic-reader-dialog") || !strings.Contains(home.Body.String(), "english-reader-dialog") || !strings.Contains(home.Body.String(), "command-dialog") || !strings.Contains(home.Body.String(), "memos.js?v=20260925-daynest") || !regexp.MustCompile(`src="/static/app.js\?v=[^"]+"`).MatchString(home.Body.String()) || strings.Contains(home.Body.String(), "panel-review") || strings.Contains(home.Body.String(), `data-view="review"`) {
 		t.Fatalf("home status = %d, body = %q", home.Code, home.Body.String())
 	}
 	if contentType := home.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "text/html") {
@@ -126,6 +126,16 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 	handler.ServeHTTP(knowledgeScript, httptest.NewRequest(http.MethodGet, "/static/knowledge.js", nil))
 	if knowledgeScript.Code != http.StatusOK || !strings.Contains(knowledgeScript.Body.String(), "function renderKnowledgeGraph") {
 		t.Fatalf("knowledge script status = %d", knowledgeScript.Code)
+	}
+	commandsScript := httptest.NewRecorder()
+	handler.ServeHTTP(commandsScript, httptest.NewRequest(http.MethodGet, "/static/commands.js", nil))
+	if commandsScript.Code != http.StatusOK || !strings.Contains(commandsScript.Body.String(), "daynest:search-memos") {
+		t.Fatalf("commands script status = %d", commandsScript.Code)
+	}
+	daynestStyle := httptest.NewRecorder()
+	handler.ServeHTTP(daynestStyle, httptest.NewRequest(http.MethodGet, "/static/daynest.css", nil))
+	if daynestStyle.Code != http.StatusOK || !strings.Contains(daynestStyle.Body.String(), ".today-grid") {
+		t.Fatalf("Daynest stylesheet status = %d", daynestStyle.Code)
 	}
 	memosScript := httptest.NewRecorder()
 	handler.ServeHTTP(memosScript, httptest.NewRequest(http.MethodGet, "/static/memos.js", nil))

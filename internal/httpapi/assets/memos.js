@@ -362,6 +362,24 @@
   function folderColorValue(color) { return { yellow: "#e8b846", orange: "#e7924c", rose: "#de758c", violet: "#8d78d4", blue: "#6595df", mint: "#54b991", gray: "#929cab" }[color] || "#6595df"; }
 
   function bindEvents() {
+    document.addEventListener("daynest:search-memos", async event => {
+      const token = syncAccount();
+      if (!token || typeof event.detail?.query !== "string") return;
+      if (state.dirty && !(await saveCurrent({ quiet: true }))) return;
+      if (token !== (localStorage.getItem("studyflow.token") || "")) return;
+      state.view = "all"; state.folderID = ""; state.tag = ""; state.query = event.detail.query;
+      $("#memo-search").value = state.query;
+      await loadMemos({ preserveSelection: false });
+    });
+    document.addEventListener("studyflow:legacy-ideas", async () => {
+      const token = syncAccount();
+      if (!token || (state.dirty && !(await saveCurrent({ quiet: true })))) return;
+      if (token !== (localStorage.getItem("studyflow.token") || "")) return;
+      state.view = "all"; state.folderID = ""; state.query = ""; state.tag = "灵感实验";
+      $("#memo-search").value = "";
+      await loadMemos({ preserveSelection: false });
+    });
+    document.addEventListener("daynest:legacy-knowledge", () => loadMemos());
     $("#memo-save").addEventListener("click", () => saveCurrent());
     $("#memo-focus").addEventListener("click", () => {
       const focused = $(".memo-workspace").classList.toggle("memo-focused");

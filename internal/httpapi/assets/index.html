@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="StudyFlow 学习成长与专注管理控制台">
-    <title>StudyFlow · 学习控制台</title>
+    <meta name="description" content="日常 Daynest：日程、待办、随手记录与个人成长的生活空间">
+    <title>日常 · Daynest</title>
     <link rel="stylesheet" href="/static/styles.css?v=20260901-6">
     <link rel="stylesheet" href="/static/habits.css?v=20260914-1">
     <link rel="stylesheet" href="/static/habits-dashboard.css?v=20260923-1">
@@ -19,7 +19,6 @@
     <link rel="stylesheet" href="/static/exports.css?v=20260901-6">
     <link rel="stylesheet" href="/static/vocabulary-catalogs.css?v=20260901-6">
     <link rel="stylesheet" href="/static/calendar.css?v=20260901-6">
-    <link rel="stylesheet" href="/static/knowledge.css?v=20260901-6">
     <link rel="stylesheet" href="/static/memos.css?v=20260904-1">
     <link rel="stylesheet" href="/static/memos-refresh.css?v=20260909-1">
     <link rel="stylesheet" href="/static/english.css?v=20260901-7">
@@ -37,6 +36,7 @@
     <link rel="stylesheet" href="/static/calendar-experience.css?v=20260924-mood-icons">
     <link rel="stylesheet" href="/static/projects.css?v=20260923-1">
     <link rel="stylesheet" href="/static/travel.css?v=20260925-1">
+    <link rel="stylesheet" href="/static/daynest.css?v=20260925-1">
     <link rel="stylesheet" href="/static/layout.css?v=20260922-1">
   </head>
   <body>
@@ -57,13 +57,13 @@
 
     <main id="auth-view" class="auth-shell">
       <section class="hero">
-        <p class="eyebrow">STUDYFLOW</p>
-        <h1>把每次学习，变成可持续的进步。</h1>
-        <p>目标、任务、专注与学习记录，在同一条清晰的成长轨迹里协作。</p>
+        <p class="eyebrow">DAYNEST · 日常</p>
+        <h1>把日子，过成自己的节奏。</h1>
+        <p>安排今天的事，留住随手的想法，也为成长和有趣的生活留一点空间。</p>
         <ul>
-          <li>用目标拆解长期计划</li>
-          <li>用专注会话记录深度工作</li>
-          <li>通过词书与阅读建立可持续的学习积累</li>
+          <li>日历与待办，让日常安排井井有条</li>
+          <li>备忘录与心情，记录生活中的小事</li>
+          <li>阅读、专注与探索，按自己的节奏继续</li>
         </ul>
       </section>
       <section class="auth-card">
@@ -74,7 +74,7 @@
         <form id="login-form" class="auth-form">
           <label>邮箱<input id="login-email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
           <label>密码<input id="login-password" type="password" autocomplete="current-password" required minlength="8" placeholder="至少 8 位"></label>
-          <button class="primary full" type="submit">进入学习控制台</button>
+          <button class="primary full" type="submit">进入我的日常</button>
         </form>
         <form id="register-form" class="auth-form hidden">
           <label>昵称<input id="register-name" autocomplete="name" required maxlength="80" placeholder="例如：Ada"></label>
@@ -88,27 +88,34 @@
 
     <div id="app-view" class="app-shell hidden">
       <aside class="sidebar">
-        <a class="brand" href="#dashboard" aria-label="StudyFlow 首页"><span class="brand-mark">S</span><span>StudyFlow</span></a>
-        <nav class="nav" aria-label="主导航">
-          <button class="nav-link active" type="button" data-view="dashboard"><span>◫</span>概览</button>
-          <button class="nav-link" type="button" data-view="timeline"><span>↟</span>成长足迹</button>
-          <button class="nav-link" type="button" data-view="goals"><span>◎</span>学习目标</button>
-          <button class="nav-link" type="button" data-view="moods"><span>☺</span>心情日记</button>
-          <button class="nav-link" type="button" data-view="calendar"><span>▦</span>智能日历</button>
-          <button class="nav-link" type="button" data-view="memos"><span>▤</span>备忘录</button>
-          <button class="nav-link" type="button" data-view="knowledge"><span>◇</span>知识花园</button>
-          <button class="nav-link" type="button" data-view="explore"><span>✉</span>探索生活</button>
-          <button class="nav-link" type="button" data-view="ledger"><span>¥</span>生活账本</button>
-          <button class="nav-link" type="button" data-view="projects"><span>▥</span>项目空间</button>
-          <button class="nav-link" type="button" data-view="travel"><span>↗</span>旅行手账</button>
-          <button class="nav-link" type="button" data-view="tasks"><span>✓</span>学习任务</button>
-          <button class="nav-link" type="button" data-view="todo"><span>☑</span>待办清单</button>
-          <button class="nav-link" type="button" data-view="planner"><span>▦</span>智能规划</button>
-          <button class="nav-link" type="button" data-view="insights"><span>⌁</span>学习洞察</button>
-          <button class="nav-link" type="button" data-view="vocabulary"><span>Aa</span>单词学习</button>
-          <button class="nav-link" type="button" data-view="english"><span>En</span>英语精读</button>
-          <button class="nav-link" type="button" data-view="literature"><span>阅</span>阅读书房</button>
-          <button class="nav-link" type="button" data-view="focus"><span>◷</span>专注会话</button>
+        <a class="brand" href="#dashboard" aria-label="日常 Daynest 首页" data-goto="dashboard"><span class="brand-mark">D</span><span>日常 <small>Daynest</small></span></a>
+        <nav class="nav daynest-nav" aria-label="主导航">
+          <div class="nav-group" role="group" aria-label="今天"><p class="nav-group-label">今天</p>
+            <button class="nav-link active" type="button" data-view="dashboard"><span aria-hidden="true">◫</span>今天</button>
+            <button class="nav-link" type="button" data-view="calendar"><span aria-hidden="true">▦</span>智能日历</button>
+            <button class="nav-link" type="button" data-view="todo"><span aria-hidden="true">☑</span>待办清单</button>
+            <button class="nav-link" type="button" data-view="planner"><span aria-hidden="true">▦</span>智能规划</button>
+            <button class="nav-link" type="button" data-view="projects"><span aria-hidden="true">▥</span>项目空间</button>
+          </div>
+          <div class="nav-group" role="group" aria-label="记录"><p class="nav-group-label">记录</p>
+            <button class="nav-link" type="button" data-view="memos"><span aria-hidden="true">▤</span>备忘录</button>
+            <button class="nav-link" type="button" data-view="moods"><span aria-hidden="true">☺</span>心情日记</button>
+            <button class="nav-link" type="button" data-view="ledger"><span aria-hidden="true">¥</span>生活账本</button>
+            <button class="nav-link" type="button" data-view="timeline"><span aria-hidden="true">↟</span>生活足迹</button>
+          </div>
+          <div class="nav-group" role="group" aria-label="成长"><p class="nav-group-label">成长</p>
+            <button class="nav-link" type="button" data-view="focus"><span aria-hidden="true">◷</span>专注会话</button>
+            <button class="nav-link" type="button" data-view="goals"><span aria-hidden="true">◎</span>学习目标</button>
+            <button class="nav-link" type="button" data-view="tasks"><span aria-hidden="true">✓</span>学习任务</button>
+            <button class="nav-link" type="button" data-view="vocabulary"><span aria-hidden="true">Aa</span>单词学习</button>
+            <button class="nav-link" type="button" data-view="english"><span aria-hidden="true">En</span>英语精读</button>
+            <button class="nav-link" type="button" data-view="literature"><span aria-hidden="true">阅</span>阅读书房</button>
+            <button class="nav-link" type="button" data-view="insights"><span aria-hidden="true">⌁</span>学习洞察</button>
+          </div>
+          <div class="nav-group" role="group" aria-label="探索"><p class="nav-group-label">探索</p>
+            <button class="nav-link" type="button" data-view="explore"><span aria-hidden="true">✉</span>探索生活</button>
+            <button class="nav-link" type="button" data-view="travel"><span aria-hidden="true">↗</span>旅行手账</button>
+          </div>
         </nav>
         <div class="sidebar-footer"><span class="status-dot"></span>API 已连接</div>
       </aside>
@@ -116,13 +123,26 @@
       <section class="workspace">
         <header class="topbar">
           <button id="mobile-menu" class="icon-button mobile-only" type="button" aria-label="打开菜单">☰</button>
-          <div><p id="page-kicker" class="eyebrow">今天也在前进</p><h2 id="page-title">学习概览</h2></div>
+          <div><p id="page-kicker" class="eyebrow">DAYNEST · YOUR EVERYDAY</p><h2 id="page-title">今天</h2></div>
           <div class="user-actions"><button id="daily-trigger" class="daily-trigger" type="button" aria-haspopup="dialog" aria-controls="daily-dialog" aria-label="打开今日签"><span aria-hidden="true">签</span><b id="daily-trigger-label">今日签</b></button><button id="command-trigger" class="command-trigger" type="button" aria-label="打开快捷命令"><span>⌕</span><kbd>Ctrl K</kbd></button><button id="theme-toggle" class="theme-toggle" type="button" aria-label="切换至夜间模式" title="切换主题"><span aria-hidden="true">☾</span><span id="theme-toggle-label">夜间</span></button><span id="user-name"></span><button id="logout" class="quiet" type="button">退出</button></div>
         </header>
 
         <div class="content">
           <div class="app-sync-bar"><span id="app-sync-status" role="status" aria-live="polite">等待同步</span><button id="app-sync-retry" class="quiet" type="button">刷新数据</button></div>
           <section id="panel-dashboard" class="panel active">
+            <header class="today-heading"><div><p class="eyebrow" id="today-date">DAYNEST · 日常</p><h3>今天，按自己的节奏来。</h3><p>先照顾眼前的小事，再留一点时间给自己。</p></div><span class="today-emblem" aria-hidden="true">☀</span></header>
+            <div class="today-shortcuts" aria-label="常用功能">
+              <button type="button" data-goto="calendar"><span aria-hidden="true">▦</span><b>看看日程</b><small>安排今天</small></button>
+              <button type="button" data-goto="todo"><span aria-hidden="true">✓</span><b>添加待办</b><small>卸下脑中琐事</small></button>
+              <button type="button" data-goto="moods"><span aria-hidden="true"><img src="/static/mood-art/good-flat-v2.png" width="32" height="32" alt=""></span><b>记录心情</b><small>此刻感觉如何</small></button>
+              <button type="button" data-goto="focus"><span aria-hidden="true">◷</span><b>留点专注</b><small>做一件喜欢的事</small></button>
+            </div>
+            <div class="today-grid">
+              <article class="surface today-agenda"><div class="surface-head"><div><p class="eyebrow">TODAY</p><h3>今日安排</h3></div><button class="text-button" type="button" data-goto="calendar">打开日历 ↗</button></div><div id="today-agenda" role="status">正在整理今天的日程…</div></article>
+              <article class="surface today-todos"><div class="surface-head"><div><p class="eyebrow">ONE THING AT A TIME</p><h3>今天要做</h3></div><button class="text-button" type="button" data-goto="todo">全部待办 ↗</button></div><div id="today-todos">正在整理待办…</div></article>
+              <article class="surface today-capture"><div class="surface-head"><div><p class="eyebrow">A LITTLE NOTE</p><h3>随手记，不必整理</h3></div><button class="text-button" type="button" data-goto="memos">备忘录 ↗</button></div><form id="today-note-form"><label class="today-note-label" for="today-note">一个想法、一句话，或是一张临时清单</label><textarea id="today-note" rows="3" maxlength="2000" placeholder="先写下来，标题和分类以后再说。" required></textarea><div><span id="today-note-status" role="status" aria-live="polite">保存后可在备忘录继续编辑。</span><button class="primary" type="submit">存入备忘录</button></div></form></article>
+            </div>
+            <details class="today-growth"><summary>成长概况 <span>目标、任务、单词与专注</span></summary>
             <div class="summary-grid">
               <article class="metric-card accent-blue"><span>进行中的目标</span><strong id="metric-goals">–</strong><small>向长期方向持续投入</small></article>
               <article class="metric-card accent-violet"><span>待完成任务</span><strong id="metric-tasks">–</strong><small>优先处理最重要的事</small></article>
@@ -130,6 +150,7 @@
               <article class="metric-card accent-orange"><span>待复习单词</span><strong id="metric-vocabulary">–</strong><small>在单词学习中继续巩固</small></article>
               <article class="metric-card accent-green"><span>今日专注分钟</span><strong id="metric-focus">–</strong><small id="week-focus">本周 0 分钟</small></article>
             </div>
+            </details>
           <section id="panel-habits" class="dashboard-habits">
             <header class="habit-heading"><div><p class="eyebrow">SMALL THINGS, AT YOUR PACE</p><h3>日常习惯</h3><p>每周保持自己的节奏，不必每天都满分。</p></div><button id="habit-manage-toggle" class="quiet" type="button" aria-expanded="false" aria-controls="habit-management">管理与历史</button></header><div id="habit-quick-list" class="habit-quick-list"></div><details id="habit-management"><summary>展开管理与历史</summary>
             <div class="habit-metrics"><article><span>正在养成</span><strong id="habit-active-count">—</strong></article><article><span>今日已打卡</span><strong id="habit-today-count">—</strong></article><article><span>本周已达标</span><strong id="habit-best-count">—</strong></article></div>
@@ -138,7 +159,7 @@
             <article class="surface habit-calendar-card"><p class="eyebrow">YOUR CONSISTENCY</p><h3 id="habit-detail-title">选择一个习惯</h3><p id="habit-detail-meta" class="habit-footnote">在月历中查看、补记或撤销打卡。</p><div class="habit-month-nav"><button id="habit-prev" class="quiet" type="button" aria-label="上个月">‹</button><strong id="habit-month-label"></strong><button id="habit-next" class="quiet" type="button" aria-label="下个月">›</button></div><div class="habit-weekdays" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div><div id="habit-calendar" class="habit-calendar"></div><div id="habit-detail-stats" class="habit-detail-stats"></div><button id="habit-current-month" class="text-button" type="button">回到当前月</button><p class="habit-footnote">点击日期即可打卡，再次点击可撤销。仅可记录创建日起至今天；暂停后只读。漏记不会清空累计记录。</p></article></div>
           </details></section>
             <div class="dashboard-main" style="margin-top:20px">
-              <article class="surface"><div class="surface-head"><div><p class="eyebrow">TASKS</p><h3>下一步行动</h3></div><button class="text-button" type="button" data-goto="tasks">管理任务</button></div><div id="dashboard-tasks" class="stack-list empty-state">还没有任务。创建一个小而明确的下一步吧。</div></article>
+              <article class="surface"><div class="surface-head"><div><p class="eyebrow">TASKS</p><h3>学习中的下一步</h3></div><button class="text-button" type="button" data-goto="tasks">管理任务</button></div><div id="dashboard-tasks" class="stack-list empty-state">还没有任务。创建一个小而明确的下一步吧。</div></article>
             </div>
           </section>
 
@@ -280,54 +301,6 @@
               </article>
             </div>
             <dialog id="memo-folder-dialog" class="memo-folder-dialog"><form id="memo-folder-form" method="dialog"><div><p class="eyebrow">NEW FOLDER</p><h3>新建文件夹</h3><p>把同类备忘录放在一起，更容易回到重要内容。</p></div><label>文件夹名称<input id="memo-folder-name" required maxlength="80" placeholder="例如：工作、灵感、旅行"></label><fieldset><legend>标识颜色</legend><div class="memo-folder-colors"><button class="active blue" type="button" data-memo-folder-color="blue"></button><button class="violet" type="button" data-memo-folder-color="violet"></button><button class="yellow" type="button" data-memo-folder-color="yellow"></button><button class="rose" type="button" data-memo-folder-color="rose"></button><button class="mint" type="button" data-memo-folder-color="mint"></button><button class="gray" type="button" data-memo-folder-color="gray"></button></div></fieldset><div class="memo-dialog-actions"><button id="memo-folder-cancel" class="quiet" type="button">取消</button><button class="primary" type="submit">创建文件夹</button></div></form></dialog>
-          </section>
-
-          <section id="panel-knowledge" class="panel">
-            <div class="section-intro knowledge-intro">
-              <div><p class="eyebrow">KNOWLEDGE GARDEN · 思有所生</p><h3>让零散的灵感，在这里生长。</h3><p>记录自己的理解，用 <code>[[笔记标题]]</code> 连接想法，慢慢长成一片知识花园。</p></div>
-              <div class="knowledge-intro-actions"><div class="knowledge-view-switch" role="tablist" aria-label="知识库视图"><button class="active" type="button" data-knowledge-view="notes">笔记</button><button type="button" data-knowledge-view="graph">图谱</button></div><button id="knowledge-new" class="primary" type="button">＋ 新建笔记</button></div>
-            </div>
-            <div class="knowledge-stat-grid">
-              <article><span class="knowledge-stat-icon violet">✦</span><div><small>全部笔记</small><strong id="knowledge-total">0</strong></div></article>
-              <article><span class="knowledge-stat-icon blue">↗</span><div><small>已连接</small><strong id="knowledge-linked">0</strong></div></article>
-              <article><span class="knowledge-stat-icon amber">○</span><div><small>待连接</small><strong id="knowledge-orphans">0</strong></div></article>
-              <article><span class="knowledge-stat-icon green">#</span><div><small>主题标签</small><strong id="knowledge-tag-count">0</strong></div></article>
-            </div>
-            <div id="knowledge-notes-view" class="knowledge-workspace">
-              <aside class="surface knowledge-library-panel">
-                <div class="growth-library-heading"><p class="eyebrow">YOUR COLLECTION</p><h3>我的笔记</h3></div><div class="knowledge-search-wrap"><span aria-hidden="true">⌕</span><input id="knowledge-search" type="search" aria-label="搜索知识笔记的标题、正文或标签" placeholder="搜索标题、正文或标签" autocomplete="off"></div>
-                <div class="knowledge-filter-head"><span>笔记库</span><button id="knowledge-clear-filter" class="text-button hidden" type="button">清除筛选</button></div>
-                <div id="knowledge-tags" class="knowledge-tags"></div>
-                <div id="knowledge-note-list" class="knowledge-note-list"><div class="knowledge-list-loading">正在整理知识卡片…</div></div>
-              </aside>
-              <article class="surface knowledge-reader-panel">
-                <div id="knowledge-reader-empty" class="knowledge-reader-empty"><div class="knowledge-empty-orbit"><span>◇</span></div><h3>从一则笔记开始</h3><p>记录概念、读书摘录与自己的思考，再通过双向链接把它们组织起来。</p><button class="quiet" type="button" data-knowledge-create>写下第一则笔记</button></div>
-                <div id="knowledge-reader" class="knowledge-reader hidden">
-                  <header class="knowledge-reader-head"><div><div id="knowledge-reader-tags" class="knowledge-reader-tags"></div><h2 id="knowledge-reader-title"></h2><p id="knowledge-reader-meta"></p></div><div class="knowledge-reader-actions"><button id="knowledge-pin" class="icon-button" type="button" title="置顶笔记" aria-label="置顶笔记">☆</button><button id="knowledge-edit" class="quiet" type="button">编辑</button><button id="knowledge-delete" class="icon-button danger-text" type="button" title="删除笔记" aria-label="删除笔记">⌫</button></div></header>
-                  <div id="knowledge-content" class="knowledge-content"></div>
-                </div>
-              </article>
-              <aside class="surface knowledge-context-panel">
-                <div class="knowledge-context-section"><div class="knowledge-context-title"><span>链接到这里</span><b id="knowledge-backlink-count">0</b></div><div id="knowledge-backlinks" class="knowledge-link-list empty-state">选择笔记后查看反向链接。</div></div>
-                <div class="knowledge-context-section"><div class="knowledge-context-title"><span>本文链接</span><b id="knowledge-outgoing-count">0</b></div><div id="knowledge-outgoing" class="knowledge-link-list empty-state">尚未建立链接。</div></div>
-                <div class="knowledge-context-tip"><span>TIP</span><p>在正文中输入 <code>[[标题]]</code>，即可把两则笔记连接起来。</p></div>
-              </aside>
-            </div>
-            <article id="knowledge-graph-view" class="surface knowledge-graph-panel hidden">
-              <div class="knowledge-graph-head"><div><p class="eyebrow">CONNECTION MAP</p><h3>知识连接图谱</h3><p>节点越大，连接越多。点击节点可以回到对应笔记。</p></div><div class="knowledge-graph-legend"><span><i class="connected"></i>已连接</span><span><i class="pinned"></i>置顶</span><span><i class="orphan"></i>孤立笔记</span></div></div>
-              <div id="knowledge-graph" class="knowledge-graph"><div class="knowledge-graph-empty">创建两则笔记并用 <code>[[标题]]</code> 连接后，关系会出现在这里。</div></div>
-            </article>
-
-            <dialog id="knowledge-editor-dialog" class="knowledge-editor-dialog">
-              <form id="knowledge-editor-form" method="dialog">
-                <div class="knowledge-editor-head"><div><p class="eyebrow">KNOWLEDGE NOTE</p><h3 id="knowledge-editor-heading">新建笔记</h3></div><button id="knowledge-editor-close" class="icon-button" type="button" aria-label="关闭">×</button></div>
-                <input id="knowledge-note-id" type="hidden">
-                <div class="knowledge-editor-meta"><label>标题<input id="knowledge-note-title" required maxlength="160" placeholder="例如：Go channel 的设计原则"></label><label>标签（逗号分隔）<input id="knowledge-note-tags" maxlength="600" placeholder="go, 并发, 读书笔记"></label><label class="check-label"><input id="knowledge-note-pinned" type="checkbox">置顶</label></div>
-                <div class="knowledge-editor-toolbar" aria-label="编辑工具"><button type="button" data-knowledge-insert="## ">H2</button><button type="button" data-knowledge-wrap="**">B</button><button type="button" data-knowledge-wrap="`">Code</button><button type="button" data-knowledge-insert="- ">列表</button><button type="button" data-knowledge-insert="[[笔记标题]]">双向链接</button><span id="knowledge-editor-count">0 字</span></div>
-                <div class="knowledge-editor-body"><textarea id="knowledge-note-content" aria-label="笔记正文，支持 Markdown 和双向链接" maxlength="100000" spellcheck="true" placeholder="# 核心概念&#10;&#10;写下自己的理解，而不只是复制资料。&#10;&#10;## 关联思考&#10;&#10;它和 [[另一则笔记]] 有什么关系？"></textarea><div class="knowledge-preview"><div class="knowledge-preview-label">实时预览</div><div id="knowledge-editor-preview" class="knowledge-content"></div></div></div>
-                <div class="knowledge-editor-actions"><span id="knowledge-editor-hint">支持标题、列表、引用、粗体、行内代码和双向链接</span><button id="knowledge-editor-cancel" class="quiet" type="button">取消</button><button class="primary" type="submit">保存笔记</button></div>
-              </form>
-            </dialog>
           </section>
 
           <section id="panel-explore" class="panel">
@@ -652,12 +625,12 @@
     </dialog>
     <dialog id="command-dialog" class="command-dialog">
       <div class="command-shell">
-        <div class="command-search"><span>⌕</span><input id="command-input" type="search" placeholder="跳转页面、创建内容或搜索笔记…" autocomplete="off"><kbd>ESC</kbd></div>
+        <div class="command-search"><span>⌕</span><input id="command-input" type="search" placeholder="跳转功能、添加待办或搜索备忘录…" autocomplete="off"><kbd>ESC</kbd></div>
         <div id="command-results" class="command-results"></div>
         <div class="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 执行</span><span>全局快捷键 <kbd>Ctrl K</kbd></span></div>
       </div>
     </dialog>
-    <script src="/static/app.js?v=20260925-focus-2" defer></script>
+    <script src="/static/app.js?v=20260925-daynest" defer></script>
     <script src="/static/travel.js?v=20260925-1" defer></script>
     <script src="/static/projects.js?v=20260923-1" defer></script>
     <script src="/static/ledger.js?v=20260922-1" defer></script>
@@ -665,8 +638,8 @@
     <script src="/static/timeline.js?v=20260910-1" defer></script>
     <script src="/static/weather.js?v=20260909-1" defer></script>
     <script src="/static/calendar.js?v=20260924-mood-icons" defer></script>
-    <script src="/static/knowledge.js?v=20260923-legacy-ideas" defer></script>
-    <script src="/static/memos.js?v=20260909-1" defer></script>
+    <script src="/static/commands.js?v=20260925-daynest" defer></script>
+    <script src="/static/memos.js?v=20260925-daynest" defer></script>
     <script src="/static/english.js?v=20260901-7" defer></script>
     <script src="/static/english-reading.js?v=20260915-1" defer></script>
     <script src="/static/explore.js?v=20260920-playrooms" defer></script>

@@ -17,7 +17,7 @@ const selectors = [...script.matchAll(/\$\("#([^"]+)"\)/g)].map((match) => match
 const missing = [...new Set(selectors.filter((id) => !ids.has(id)))];
 if (missing.length) throw new Error(`memos.js references missing HTML ids: ${missing.join(", ")}`);
 
-for (const marker of ['data-view="memos"', 'id="panel-memos"', 'id="memo-editor"', '/static/memos.js?v=20260909-1', '/static/memos-refresh.css?v=20260909-1']) {
+for (const marker of ['data-view="memos"', 'id="panel-memos"', 'id="memo-editor"', '/static/memos.js?v=20260925-daynest', '/static/memos-refresh.css?v=20260909-1']) {
   if (!html.includes(marker)) throw new Error(`missing HTML marker: ${marker}`);
 }
 for (const marker of ["/api/v1/memo-folders", "/api/v1/memos/overview", "/restore", "/duplicate", "/permanent", "saveCurrent", "renderMarkdown"]) {

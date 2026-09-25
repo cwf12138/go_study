@@ -5,6 +5,10 @@
     token: localStorage.getItem("studyflow.token") || "",
     user: null,
     dashboard: null,
+    todayCalendar: null,
+    todayCalendarDate: "",
+    todayCalendarError: false,
+    todayTodosError: false,
     goals: [],
     goalPage: [],
     goalMeta: { count: 0, total: 0, page: 1, page_size: 8, total_pages: 0 },
@@ -254,6 +258,12 @@
     state.token = "";
     state.user = null;
     state.dashboard = null;
+    state.todayCalendar = null;
+    state.todayCalendarDate = "";
+    state.todayCalendarError = false;
+    state.todayTodosError = false;
+    $("#today-note").value = "";
+    $("#today-note-status").textContent = "保存后可在备忘录继续编辑。";
     state.goals = [];
     state.goalPage = [];
     state.goalMeta = { count: 0, total: 0, page: 1, page_size: 8, total_pages: 0 };
@@ -304,17 +314,17 @@
   function showView(view) {
     if (view === "daily") { document.getElementById("daily-trigger")?.click(); return; }
     const legacyIdeas = view === "lab";
-    if (legacyIdeas) view = "knowledge";
+    const legacyKnowledge = view === "knowledge";
+    if (legacyIdeas || legacyKnowledge) view = "memos";
     if (view === "habits") view = "dashboard";
     const labels = {
-      dashboard: ["今天也在前进", "学习概览"],
-      timeline: ["LEARNING TIMELINE", "成长足迹"],
+      dashboard: ["DAYNEST · YOUR EVERYDAY", "今天"],
+      timeline: ["LIFE TIMELINE", "生活足迹"],
       habits: ["HABIT GARDEN", "习惯花园"],
       goals: ["GOALS", "学习目标"],
       moods: ["MOOD JOURNAL", "心情日记"],
       calendar: ["SMART CALENDAR", "智能日历"],
       memos: ["PERSONAL NOTES", "备忘录"],
-      knowledge: ["KNOWLEDGE GARDEN", "知识花园"],
       explore: ["LITTLE ADVENTURES", "探索生活"],
       ledger: ["LIFE LEDGER", "生活账本"],
       projects: ["PROJECT STUDIO", "项目空间"],
@@ -342,6 +352,7 @@
     $$(".nav-link").forEach((button) => button.classList.toggle("active", button.dataset.view === view));
     $(".sidebar").classList.remove("open");
     if (legacyIdeas) document.dispatchEvent(new CustomEvent("studyflow:legacy-ideas"));
+    if (legacyKnowledge) document.dispatchEvent(new CustomEvent("daynest:legacy-knowledge"));
   }
 
   function goalListURL() {
@@ -359,6 +370,8 @@
   async function refresh() {
     const version = ++refreshVersion, token = state.token;
     const moodMonth = state.moodMonth, moodVersion = moodLoadVersion;
+    const today = localDateKey(new Date());
+    const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
     setSyncStatus("正在同步核心模块…", true);
     const todoListsRequest = api("/api/v1/todo-lists");
     const todosRequest = todoListsRequest.then(() => api(`/api/v1/todos?view=all&date=${localDateKey(new Date())}`));
@@ -390,11 +403,15 @@
       api(`/api/v1/analytics/learning?days=${state.insightsDays}`),
       api(`/api/v1/reviews/weekly?week_start=${encodeURIComponent(state.weeklyReviewWeekStart)}`),
       api("/api/v1/focus-sessions/active"),
+      api(`/api/v1/calendar?start=${today}&end=${localDateKey(tomorrow)}`),
     ]);
     if (version !== refreshVersion || token !== state.token || !state.user) return;
     const fallback = [state.dashboard, {data:state.goalPage,meta:state.goalMeta}, {data:state.goals}, state.moodEntries, state.moodInsights, state.tasks, state.todoLists, state.todos, {books:state.wordBooks,selectedBookID:state.vocabularyBookID,words:state.vocabularyWords,wordMeta:state.vocabularyMeta,queue:state.vocabularyQueue,overview:state.vocabularyOverview}, state.vocabularyCatalogs, state.plannerWeek, state.learningInsights, state.weeklyReview, null];
     const [dashboard, goalPageResponse, activeGoalsResponse, moods, moodInsights, tasks, todoLists, todos, vocabulary, vocabularyCatalogs, plannerWeek, learningInsights, weeklyReview, activeFocus] = results.map((result,index) => result.status === "fulfilled" ? result.value : fallback[index]);
     state.dashboard = dashboard;
+    state.todayCalendarError = results[14].status === "rejected";
+    state.todayCalendar = state.todayCalendarError ? null : results[14].value;
+    state.todayCalendarDate = today;
     state.goalPage = goalPageResponse.data || [];
     state.goalMeta = goalPageResponse.meta || state.goalMeta;
     state.goals = activeGoalsResponse.data || [];
@@ -405,6 +422,7 @@
     state.tasks = tasks;
     state.todoLists = todoLists || [];
     state.todos = todos || [];
+    state.todayTodosError = results[7].status === "rejected";
     state.wordBooks = vocabulary.books || [];
     state.vocabularyBookID = vocabulary.selectedBookID || "";
     state.vocabularyWords = vocabulary.words || [];
@@ -417,7 +435,7 @@
     state.weeklyReview = weeklyReview || null;
     if (results[13].status === "fulfilled") syncActiveFocus(activeFocus);
     render();
-    const names = ["概览","目标","目标选项","心情记录","心情统计","任务","待办分类","待办事项","单词学习","词书目录","学习规划","学习分析","周回顾","专注会话"];
+    const names = ["概览","目标","目标选项","心情记录","心情统计","任务","待办分类","待办事项","单词学习","词书目录","学习规划","学习分析","周回顾","专注会话","今日安排"];
     const failures = results.flatMap((result,index) => result.status === "rejected" ? [names[index]] : []);
     setSyncStatus(failures.length ? `未更新：${failures.join("、")}。这些模块暂保留上次数据（首次加载可能为空）。` : `已同步 · ${new Date().toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})}`, false, failures.length > 0);
   }
@@ -472,6 +490,7 @@
   }
 
   function renderDashboard() {
+    renderToday();
     const data = state.dashboard || {};
     $("#metric-goals").textContent = data.active_goals ?? 0;
     $("#metric-tasks").textContent = data.pending_tasks ?? 0;
@@ -487,6 +506,40 @@
       <div class="list-row"><div class="row-main"><h4>${escapeHTML(task.title)}</h4><p>${priorityLabel(task.priority)}优先级 · ${task.due_at ? `截止 ${formatDate(task.due_at)}` : "未设置截止时间"}</p></div><span class="pill ${task.status}">${taskStatusLabel(task.status)}</span></div>`).join("")
       : "<div class=\"empty-state\">还没有待处理任务。创建一个小而明确的下一步吧。</div>";
 
+  }
+
+  function renderToday() {
+    const now = new Date(), today = localDateKey(now);
+    $("#today-date").textContent = now.toLocaleDateString("zh-CN", { month: "long", day: "numeric", weekday: "long" });
+    const calendar = state.todayCalendarDate === today ? state.todayCalendar : null;
+    const agenda = [...(calendar?.events || []).map(item => ({ title: item.title, time: item.occurrence_start, allDay: item.all_day })),
+      ...(calendar?.plan_blocks || []).map(item => ({ title: item.title, time: item.start_at, allDay: false }))]
+      .sort((a, b) => Number(b.allDay) - Number(a.allDay) || new Date(a.time) - new Date(b.time));
+    $("#today-agenda").innerHTML = state.todayCalendarError
+      ? '<p class="today-empty">日程暂未加载成功，请使用顶部“刷新数据”重试。</p>'
+      : agenda.length ? agenda.slice(0, 5).map(item => `<button class="today-row" type="button" data-goto="calendar"><time>${item.allDay ? "全天" : escapeHTML(new Date(item.time).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }))}</time><span>${escapeHTML(item.title)}</span><i aria-hidden="true">↗</i></button>`).join("")
+        : '<p class="today-empty">今天暂没有安排，给生活留一点空白。<button class="text-button" type="button" data-goto="calendar">打开日历</button></p>';
+    const todos = state.todos.filter(item => item.status !== "completed" && (item.my_day_date === today || (item.due_at && localDateKey(new Date(item.due_at)) <= today)))
+      .sort((a, b) => (a.due_at || "9999").localeCompare(b.due_at || "9999"));
+    $("#today-todos").innerHTML = state.todayTodosError ? '<p class="today-empty">待办暂未加载成功，请使用顶部“刷新数据”重试。</p>' : todos.length ? todos.slice(0, 5).map(item => `<div class="today-row"><button class="todo-complete" type="button" data-todo-completed="true" data-id="${escapeHTML(item.id)}" aria-label="完成待办 ${escapeHTML(item.title)}"></button><button class="today-todo-title" type="button" data-goto="todo">${escapeHTML(item.title)}${item.due_at && localDateKey(new Date(item.due_at)) < today ? '<small>已逾期</small>' : ""}</button></div>`).join("")
+      : '<p class="today-empty">今天没有待处理事项。<button class="text-button" type="button" data-goto="todo">添加待办</button></p>';
+  }
+
+  async function saveTodayNote(event) {
+    event.preventDefault();
+    const input = $("#today-note"), button = event.currentTarget.querySelector('button[type="submit"]');
+    const original = input.value, content = original.trim(), token = state.token;
+    if (!content || !token || button.disabled) return;
+    button.disabled = true;
+    $("#today-note-status").textContent = "正在保存…";
+    try {
+      await api("/api/v1/memos", { method: "POST", body: JSON.stringify({ title: content.split(/\r?\n/)[0].slice(0, 80), content, color: "default", tags: [] }) });
+      if (token !== state.token) return;
+      if (input.value === original) input.value = "";
+      $("#today-note-status").textContent = "已存入备忘录，可以继续记录。";
+    } catch (error) {
+      if (token === state.token) $("#today-note-status").textContent = `保存失败：${error.message}；文字已保留，可重试。`;
+    } finally { button.disabled = false; }
   }
 
   function renderGoals() {
@@ -2032,6 +2085,7 @@
   }
 
   function bindEvents() {
+    $("#today-note-form").addEventListener("submit", saveTodayNote);
     $("#planner-preferences-form").addEventListener("input", markPlannerDraft);
     $("#planner-preferences-form").addEventListener("change", markPlannerDraft);
     $("#planner-discard-draft").addEventListener("click", () => {
@@ -2046,10 +2100,17 @@
     $("#theme-toggle").addEventListener("click", toggleTheme);
     $("#logout").addEventListener("click", () => { leaveApp(); notify("已退出登录"); });
     $("#mobile-menu").addEventListener("click", () => $(".sidebar").classList.toggle("open"));
-    $$("[data-view]").forEach((button) => button.addEventListener("click", () => showView(button.dataset.view)));
+    $$("[data-view]").forEach((button) => button.addEventListener("click", () => {
+      showView(button.dataset.view);
+      if (button.dataset.view === "dashboard" && state.user) refresh().catch(error => setSyncStatus(error.message, false, true));
+    }));
     document.addEventListener("click", async (event) => {
       const goto = event.target.closest("[data-goto]");
-      if (goto) showView(goto.dataset.goto);
+      if (goto) {
+        event.preventDefault();
+        const nav = $$(".nav-link[data-view]").find(button => button.dataset.view === goto.dataset.goto);
+        if (nav) nav.click(); else showView(goto.dataset.goto);
+      }
       const goalButton = event.target.closest("[data-goal-status]");
       if (goalButton) await changeGoalStatus(goalButton.dataset.id, goalButton.dataset.goalStatus);
       const deleteGoalButton = event.target.closest("[data-goal-delete]");

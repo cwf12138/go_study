@@ -45,6 +45,13 @@ func main() {
 			os.Exit(1)
 		}
 	}
+	if count := repository.MigrateKnowledgeToMemos(); count > 0 {
+		if err := repository.SaveJSON(cfg.DataFile); err != nil {
+			logger.Error("persist knowledge-to-memo migration; startup stopped", "error", err)
+			os.Exit(1)
+		}
+		logger.Info("knowledge notes copied into memos; originals retained", "count", count)
+	}
 	bus := event.NewBus()
 	tokens := security.NewTokenManager(cfg.JWTSecret, cfg.JWTIssuer, cfg.TokenTTL)
 	services := service.New(repository, tokens, bus)
@@ -76,7 +83,7 @@ func main() {
 		runSnapshotter(ctx, logger, repository, cfg.DataFile, cfg.SnapshotInterval)
 	}()
 	go func() {
-		logger.Info("StudyFlow API started", "address", cfg.HTTPAddr)
+		logger.Info("Daynest API started", "address", cfg.HTTPAddr)
 		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("http server failed", "error", err)
 			stop()
@@ -93,7 +100,7 @@ func main() {
 	if err := repository.SaveJSON(cfg.DataFile); err != nil {
 		logger.Error("save final data snapshot", "error", err)
 	}
-	logger.Info("StudyFlow API stopped")
+	logger.Info("Daynest API stopped")
 }
 
 func runSnapshotter(ctx context.Context, logger *slog.Logger, repository *store.Memory, path string, interval time.Duration) {

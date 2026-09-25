@@ -18,68 +18,70 @@ import (
 type Memory struct {
 	// Lock order: snapshotMu, then mu. Disk I/O never holds mu.
 	// This serializes one repository's snapshots, not multiple processes.
-	snapshotMu        sync.Mutex
-	mu                sync.RWMutex
-	habits            map[string]domain.Habit
-	explorations      map[string]domain.Exploration
-	keepsakes         map[string]domain.Keepsake
-	ledger            map[string]domain.LedgerEntry
-	projects          map[string]domain.Project
-	travelPlans       map[string]domain.TravelPlan
-	users             map[string]domain.User
-	emails            map[string]string
-	goals             map[string]domain.Goal
-	moods             map[string]domain.MoodEntry
-	tasks             map[string]domain.StudyTask
-	todoLists         map[string]domain.TodoList
-	todos             map[string]domain.TodoItem
-	calendarEvents    map[string]domain.CalendarEvent
-	wordBooks         map[string]domain.WordBook
-	words             map[string]domain.VocabularyWord
-	wordReviews       map[string]domain.VocabularyReview
-	plannerPrefs      map[string]domain.PlannerPreferences
-	planBlocks        map[string]domain.StudyPlanBlock
-	plannerReports    map[string]domain.PlannerReport
-	weeklyReflections map[string]domain.WeeklyReflection
-	knowledgeNotes    map[string]domain.KnowledgeNote
-	memoFolders       map[string]domain.MemoFolder
-	memoNotes         map[string]domain.MemoNote
-	englishReadings   map[string]domain.EnglishReading
-	ebookReadings     map[string]domain.EBookReading
-	classicalStudies  map[string]domain.ClassicalStudy
-	sessions          map[string]domain.FocusSession
+	snapshotMu              sync.Mutex
+	mu                      sync.RWMutex
+	habits                  map[string]domain.Habit
+	explorations            map[string]domain.Exploration
+	keepsakes               map[string]domain.Keepsake
+	ledger                  map[string]domain.LedgerEntry
+	projects                map[string]domain.Project
+	travelPlans             map[string]domain.TravelPlan
+	users                   map[string]domain.User
+	emails                  map[string]string
+	goals                   map[string]domain.Goal
+	moods                   map[string]domain.MoodEntry
+	tasks                   map[string]domain.StudyTask
+	todoLists               map[string]domain.TodoList
+	todos                   map[string]domain.TodoItem
+	calendarEvents          map[string]domain.CalendarEvent
+	wordBooks               map[string]domain.WordBook
+	words                   map[string]domain.VocabularyWord
+	wordReviews             map[string]domain.VocabularyReview
+	plannerPrefs            map[string]domain.PlannerPreferences
+	planBlocks              map[string]domain.StudyPlanBlock
+	plannerReports          map[string]domain.PlannerReport
+	weeklyReflections       map[string]domain.WeeklyReflection
+	knowledgeNotes          map[string]domain.KnowledgeNote
+	knowledgeMemoMigrations map[string]string
+	memoFolders             map[string]domain.MemoFolder
+	memoNotes               map[string]domain.MemoNote
+	englishReadings         map[string]domain.EnglishReading
+	ebookReadings           map[string]domain.EBookReading
+	classicalStudies        map[string]domain.ClassicalStudy
+	sessions                map[string]domain.FocusSession
 }
 
 func NewMemory() *Memory {
 	return &Memory{
-		habits:            make(map[string]domain.Habit),
-		explorations:      make(map[string]domain.Exploration),
-		keepsakes:         make(map[string]domain.Keepsake),
-		ledger:            make(map[string]domain.LedgerEntry),
-		projects:          make(map[string]domain.Project),
-		travelPlans:       make(map[string]domain.TravelPlan),
-		users:             make(map[string]domain.User),
-		emails:            make(map[string]string),
-		goals:             make(map[string]domain.Goal),
-		moods:             make(map[string]domain.MoodEntry),
-		tasks:             make(map[string]domain.StudyTask),
-		todoLists:         make(map[string]domain.TodoList),
-		todos:             make(map[string]domain.TodoItem),
-		calendarEvents:    make(map[string]domain.CalendarEvent),
-		wordBooks:         make(map[string]domain.WordBook),
-		words:             make(map[string]domain.VocabularyWord),
-		wordReviews:       make(map[string]domain.VocabularyReview),
-		plannerPrefs:      make(map[string]domain.PlannerPreferences),
-		planBlocks:        make(map[string]domain.StudyPlanBlock),
-		plannerReports:    make(map[string]domain.PlannerReport),
-		weeklyReflections: make(map[string]domain.WeeklyReflection),
-		knowledgeNotes:    make(map[string]domain.KnowledgeNote),
-		memoFolders:       make(map[string]domain.MemoFolder),
-		memoNotes:         make(map[string]domain.MemoNote),
-		englishReadings:   make(map[string]domain.EnglishReading),
-		ebookReadings:     make(map[string]domain.EBookReading),
-		classicalStudies:  make(map[string]domain.ClassicalStudy),
-		sessions:          make(map[string]domain.FocusSession),
+		habits:                  make(map[string]domain.Habit),
+		explorations:            make(map[string]domain.Exploration),
+		keepsakes:               make(map[string]domain.Keepsake),
+		ledger:                  make(map[string]domain.LedgerEntry),
+		projects:                make(map[string]domain.Project),
+		travelPlans:             make(map[string]domain.TravelPlan),
+		users:                   make(map[string]domain.User),
+		emails:                  make(map[string]string),
+		goals:                   make(map[string]domain.Goal),
+		moods:                   make(map[string]domain.MoodEntry),
+		tasks:                   make(map[string]domain.StudyTask),
+		todoLists:               make(map[string]domain.TodoList),
+		todos:                   make(map[string]domain.TodoItem),
+		calendarEvents:          make(map[string]domain.CalendarEvent),
+		wordBooks:               make(map[string]domain.WordBook),
+		words:                   make(map[string]domain.VocabularyWord),
+		wordReviews:             make(map[string]domain.VocabularyReview),
+		plannerPrefs:            make(map[string]domain.PlannerPreferences),
+		planBlocks:              make(map[string]domain.StudyPlanBlock),
+		plannerReports:          make(map[string]domain.PlannerReport),
+		weeklyReflections:       make(map[string]domain.WeeklyReflection),
+		knowledgeNotes:          make(map[string]domain.KnowledgeNote),
+		knowledgeMemoMigrations: make(map[string]string),
+		memoFolders:             make(map[string]domain.MemoFolder),
+		memoNotes:               make(map[string]domain.MemoNote),
+		englishReadings:         make(map[string]domain.EnglishReading),
+		ebookReadings:           make(map[string]domain.EBookReading),
+		classicalStudies:        make(map[string]domain.ClassicalStudy),
+		sessions:                make(map[string]domain.FocusSession),
 	}
 }
 
@@ -1129,35 +1131,36 @@ type persistedUser struct {
 }
 
 type snapshot struct {
-	Habits            []domain.Habit              `json:"habits"`
-	Explorations      []domain.Exploration        `json:"explorations"`
-	Keepsakes         []domain.Keepsake           `json:"keepsakes"`
-	Ledger            []domain.LedgerEntry        `json:"ledger"`
-	Projects          []domain.Project            `json:"projects"`
-	TravelPlans       []domain.TravelPlan         `json:"travel_plans,omitempty"`
-	Version           int                         `json:"version"`
-	SavedAt           time.Time                   `json:"saved_at"`
-	Users             []persistedUser             `json:"users"`
-	Goals             []domain.Goal               `json:"goals"`
-	Moods             []domain.MoodEntry          `json:"moods"`
-	Tasks             []domain.StudyTask          `json:"tasks"`
-	TodoLists         []domain.TodoList           `json:"todo_lists"`
-	Todos             []domain.TodoItem           `json:"todos"`
-	CalendarEvents    []domain.CalendarEvent      `json:"calendar_events"`
-	WordBooks         []domain.WordBook           `json:"word_books"`
-	Words             []domain.VocabularyWord     `json:"vocabulary_words"`
-	WordReviews       []domain.VocabularyReview   `json:"vocabulary_reviews"`
-	PlannerPrefs      []domain.PlannerPreferences `json:"planner_preferences"`
-	PlanBlocks        []domain.StudyPlanBlock     `json:"plan_blocks"`
-	PlannerReports    []domain.PlannerReport      `json:"planner_reports"`
-	WeeklyReflections []domain.WeeklyReflection   `json:"weekly_reflections"`
-	KnowledgeNotes    []domain.KnowledgeNote      `json:"knowledge_notes"`
-	MemoFolders       []domain.MemoFolder         `json:"memo_folders"`
-	MemoNotes         []domain.MemoNote           `json:"memo_notes"`
-	EnglishReadings   []domain.EnglishReading     `json:"english_readings"`
-	EBookReadings     []domain.EBookReading       `json:"ebook_readings"`
-	ClassicalStudies  []domain.ClassicalStudy     `json:"classical_studies"`
-	Sessions          []domain.FocusSession       `json:"focus_sessions"`
+	Habits                  []domain.Habit              `json:"habits"`
+	Explorations            []domain.Exploration        `json:"explorations"`
+	Keepsakes               []domain.Keepsake           `json:"keepsakes"`
+	Ledger                  []domain.LedgerEntry        `json:"ledger"`
+	Projects                []domain.Project            `json:"projects"`
+	TravelPlans             []domain.TravelPlan         `json:"travel_plans,omitempty"`
+	Version                 int                         `json:"version"`
+	SavedAt                 time.Time                   `json:"saved_at"`
+	Users                   []persistedUser             `json:"users"`
+	Goals                   []domain.Goal               `json:"goals"`
+	Moods                   []domain.MoodEntry          `json:"moods"`
+	Tasks                   []domain.StudyTask          `json:"tasks"`
+	TodoLists               []domain.TodoList           `json:"todo_lists"`
+	Todos                   []domain.TodoItem           `json:"todos"`
+	CalendarEvents          []domain.CalendarEvent      `json:"calendar_events"`
+	WordBooks               []domain.WordBook           `json:"word_books"`
+	Words                   []domain.VocabularyWord     `json:"vocabulary_words"`
+	WordReviews             []domain.VocabularyReview   `json:"vocabulary_reviews"`
+	PlannerPrefs            []domain.PlannerPreferences `json:"planner_preferences"`
+	PlanBlocks              []domain.StudyPlanBlock     `json:"plan_blocks"`
+	PlannerReports          []domain.PlannerReport      `json:"planner_reports"`
+	WeeklyReflections       []domain.WeeklyReflection   `json:"weekly_reflections"`
+	KnowledgeNotes          []domain.KnowledgeNote      `json:"knowledge_notes"`
+	KnowledgeMemoMigrations map[string]string           `json:"knowledge_memo_migrations,omitempty"`
+	MemoFolders             []domain.MemoFolder         `json:"memo_folders"`
+	MemoNotes               []domain.MemoNote           `json:"memo_notes"`
+	EnglishReadings         []domain.EnglishReading     `json:"english_readings"`
+	EBookReadings           []domain.EBookReading       `json:"ebook_readings"`
+	ClassicalStudies        []domain.ClassicalStudy     `json:"classical_studies"`
+	Sessions                []domain.FocusSession       `json:"focus_sessions"`
 }
 
 // SnapshotRecoveryError reports a recoverable snapshot failure. The caller may
@@ -1245,6 +1248,10 @@ func (m *Memory) SaveJSON(path string) error {
 	}
 	for _, item := range m.knowledgeNotes {
 		s.KnowledgeNotes = append(s.KnowledgeNotes, cloneKnowledgeNote(item))
+	}
+	s.KnowledgeMemoMigrations = make(map[string]string, len(m.knowledgeMemoMigrations))
+	for source, target := range m.knowledgeMemoMigrations {
+		s.KnowledgeMemoMigrations[source] = target
 	}
 	for _, item := range m.memoFolders {
 		s.MemoFolders = append(s.MemoFolders, item)
@@ -1371,6 +1378,10 @@ func (m *Memory) LoadJSON(path string) error {
 	m.plannerReports = make(map[string]domain.PlannerReport, len(s.PlannerReports))
 	m.weeklyReflections = make(map[string]domain.WeeklyReflection, len(s.WeeklyReflections))
 	m.knowledgeNotes = make(map[string]domain.KnowledgeNote, len(s.KnowledgeNotes))
+	m.knowledgeMemoMigrations = make(map[string]string, len(s.KnowledgeMemoMigrations))
+	for source, target := range s.KnowledgeMemoMigrations {
+		m.knowledgeMemoMigrations[source] = target
+	}
 	m.memoFolders = make(map[string]domain.MemoFolder, len(s.MemoFolders))
 	m.memoNotes = make(map[string]domain.MemoNote, len(s.MemoNotes))
 	m.englishReadings = make(map[string]domain.EnglishReading, len(s.EnglishReadings))
