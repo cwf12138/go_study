@@ -23,6 +23,7 @@ type Memory struct {
 	habits                  map[string]domain.Habit
 	explorations            map[string]domain.Exploration
 	keepsakes               map[string]domain.Keepsake
+	inventory               map[string]domain.InventoryItem
 	ledger                  map[string]domain.LedgerEntry
 	projects                map[string]domain.Project
 	travelPlans             map[string]domain.TravelPlan
@@ -56,6 +57,7 @@ func NewMemory() *Memory {
 		habits:                  make(map[string]domain.Habit),
 		explorations:            make(map[string]domain.Exploration),
 		keepsakes:               make(map[string]domain.Keepsake),
+		inventory:               make(map[string]domain.InventoryItem),
 		ledger:                  make(map[string]domain.LedgerEntry),
 		projects:                make(map[string]domain.Project),
 		travelPlans:             make(map[string]domain.TravelPlan),
@@ -1134,6 +1136,7 @@ type snapshot struct {
 	Habits                  []domain.Habit              `json:"habits"`
 	Explorations            []domain.Exploration        `json:"explorations"`
 	Keepsakes               []domain.Keepsake           `json:"keepsakes"`
+	Inventory               []domain.InventoryItem      `json:"inventory,omitempty"`
 	Ledger                  []domain.LedgerEntry        `json:"ledger"`
 	Projects                []domain.Project            `json:"projects"`
 	TravelPlans             []domain.TravelPlan         `json:"travel_plans,omitempty"`
@@ -1197,6 +1200,9 @@ func (m *Memory) SaveJSON(path string) error {
 	}
 	for _, item := range m.ledger {
 		s.Ledger = append(s.Ledger, item)
+	}
+	for _, item := range m.inventory {
+		s.Inventory = append(s.Inventory, item)
 	}
 	for _, item := range m.projects {
 		s.Projects = append(s.Projects, cloneProject(item))
@@ -1343,6 +1349,10 @@ func (m *Memory) LoadJSON(path string) error {
 	m.explorations = make(map[string]domain.Exploration, len(s.Explorations))
 	m.keepsakes = make(map[string]domain.Keepsake, len(s.Keepsakes))
 	m.ledger = make(map[string]domain.LedgerEntry, len(s.Ledger))
+	m.inventory = make(map[string]domain.InventoryItem, len(s.Inventory))
+	for _, item := range s.Inventory {
+		m.inventory[item.UserID+":"+item.ID] = item
+	}
 	m.projects = make(map[string]domain.Project, len(s.Projects))
 	m.travelPlans = make(map[string]domain.TravelPlan, len(s.TravelPlans))
 	for _, item := range s.TravelPlans {

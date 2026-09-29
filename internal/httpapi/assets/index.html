@@ -37,6 +37,7 @@
     <link rel="stylesheet" href="/static/projects.css?v=20260923-1">
     <link rel="stylesheet" href="/static/travel.css?v=20260925-1">
     <link rel="stylesheet" href="/static/daynest.css?v=20260925-1">
+    <link rel="stylesheet" href="/static/inventory.css?v=20260929-1">
     <link rel="stylesheet" href="/static/layout.css?v=20260922-1">
   </head>
   <body>
@@ -101,6 +102,7 @@
             <button class="nav-link" type="button" data-view="memos"><span aria-hidden="true">▤</span>备忘录</button>
             <button class="nav-link" type="button" data-view="moods"><span aria-hidden="true">☺</span>心情日记</button>
             <button class="nav-link" type="button" data-view="ledger"><span aria-hidden="true">¥</span>生活账本</button>
+            <button class="nav-link" type="button" data-view="inventory"><span aria-hidden="true">▣</span>物品管家</button>
             <button class="nav-link" type="button" data-view="timeline"><span aria-hidden="true">↟</span>生活足迹</button>
           </div>
           <div class="nav-group" role="group" aria-label="成长"><p class="nav-group-label">成长</p>
@@ -163,6 +165,14 @@
             </div>
           </section>
 
+          <section id="panel-inventory" class="panel">
+            <header class="inventory-hero"><div><p class="eyebrow">EVERYTHING IN ITS PLACE</p><h3>让每件物品，都有归处。</h3><p>记住放在哪里，也记住何时该关照它。</p><button id="inventory-new" type="button" class="primary">＋ 收录一件物品</button></div><div class="inventory-art" aria-hidden="true"><span>HOME<br>COLLECTION</span><i>▣</i><b>有物 · 有序</b></div></header>
+            <div class="inventory-stats" aria-label="在库物品概览"><article><span>在库记录 / 总件数</span><strong id="inventory-total">—</strong><small>不含归档</small></article><article><span>登记购入总价</span><strong id="inventory-value">—</strong><small>人民币 · 非当前估值</small></article><article><span>需要关注</span><strong id="inventory-due">—</strong><small>30 天内到期、保修结束或归还</small></article><article><span>借出中</span><strong id="inventory-lent">—</strong><small>归还后可恢复收纳</small></article></div>
+            <div class="inventory-toolbar"><label class="inventory-search">搜索物品<input id="inventory-search" type="search" maxlength="200" placeholder="名称、位置、借用人或备注…"></label><label>分类<select id="inventory-category"><option value="">全部分类</option></select></label><label>查看<select id="inventory-view"><option value="active">在库物品</option><option value="attention">需要关注</option><option value="lent">借出中</option><option value="archived">已归档</option></select></label><label>排序<select id="inventory-sort"><option value="updated">最近更新</option><option value="deadline">最近到期优先</option><option value="name">名称</option><option value="price">购入价格从高到低</option></select></label><button id="inventory-export" class="quiet" type="button" disabled>导出筛选结果</button><button id="inventory-reload" class="quiet" type="button">刷新</button></div>
+            <p id="inventory-status" role="status" aria-live="polite"></p><div id="inventory-list" class="inventory-grid"></div>
+            <nav class="inventory-pagination" aria-label="物品列表分页"><button id="inventory-prev" class="quiet" type="button">上一页</button><span id="inventory-page">第 1 页</span><button id="inventory-next" class="quiet" type="button">下一页</button></nav>
+            <p class="inventory-footnote">提醒仅在本页面展示，不会发送系统通知。购入总价不会自动记入账本；归档可恢复，不会永久删除记录。</p>
+          </section>
           <section id="panel-timeline" class="panel">
             <header class="trail-hero"><div><p class="eyebrow">YOUR LEARNING STORY</p><h3>每一步，都值得被看见</h3><p>回望完成的小事，发现持续积累的力量。</p></div><span aria-hidden="true">↟</span></header>
             <form id="trail-filter" class="trail-controls"><label>月份<input id="trail-month" type="month" required></label><label>记录类型<select id="trail-kind"><option value="">全部足迹</option><option value="task">完成任务</option><option value="todo">完成待办</option><option value="focus">专注完成</option><option value="book">读完书籍</option><option value="memo">新建备忘录</option></select></label><button class="primary" type="submit">查看足迹</button><button id="trail-today" class="quiet" type="button">回到本月</button></form>
@@ -623,6 +633,25 @@
         </div>
       </div>
     </dialog>
+    <dialog id="inventory-dialog" class="inventory-dialog" aria-labelledby="inventory-dialog-title">
+      <form id="inventory-form"><header><div><p class="eyebrow">MY COLLECTION</p><h2 id="inventory-dialog-title">收录物品</h2></div><button id="inventory-close" type="button" class="icon-button" aria-label="关闭物品编辑器">×</button></header>
+        <p class="inventory-field-help">名称、分类、数量必填，其他信息按需填写。</p>
+        <div class="inventory-form-grid"><label>物品名称<input id="inventory-name" type="text" maxlength="80" required placeholder="例如：降噪耳机 / 备用滤芯"></label>
+<label>分类<input id="inventory-edit-category" type="text" maxlength="24" required list="inventory-categories"></label>
+<label>收纳位置<input id="inventory-location" type="text" maxlength="80" placeholder="书房 · 第二层抽屉"></label>
+<label>数量<input id="inventory-quantity" type="number" min="1" max="9999" step="1" required></label>
+<label>购入总价（元，可留空）<input id="inventory-price" type="text" inputmode="decimal" maxlength="12" placeholder="例如 199.90"></label>
+<label>购入日期<input id="inventory-purchased" type="date" min="1900-01-01" max="2200-12-31"></label>
+<label>保修截止<input id="inventory-warranty" type="date" min="1900-01-01" max="2200-12-31"></label>
+<label>物品到期日期<input id="inventory-expiry" type="date" min="1900-01-01" max="2200-12-31"></label>
+<label>借用人（留空表示未借出）<input id="inventory-borrower" type="text" maxlength="80"></label>
+<label>预计归还日期<input id="inventory-return" type="date" min="1900-01-01" max="2200-12-31"></label>
+          <label class="inventory-wide">备注<textarea id="inventory-note" rows="3" maxlength="2000" placeholder="型号、保养方式、购买渠道…请勿存放密码等敏感信息。"></textarea></label>
+        </div>
+        <datalist id="inventory-categories"><option value="数码设备"><option value="家居用品"><option value="衣物配饰"><option value="日常用品"><option value="食品饮品"><option value="运动户外"><option value="其他"></datalist>
+        <p id="inventory-save-status" role="status" aria-live="polite"></p><footer><button id="inventory-draft-export" type="button" class="quiet">导出草稿</button><button id="inventory-save" type="submit" class="primary">保存物品</button></footer>
+      </form>
+    </dialog>
     <dialog id="command-dialog" class="command-dialog">
       <div class="command-shell">
         <div class="command-search"><span>⌕</span><input id="command-input" type="search" placeholder="跳转功能、添加待办或搜索备忘录…" autocomplete="off"><kbd>ESC</kbd></div>
@@ -630,8 +659,9 @@
         <div class="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 执行</span><span>全局快捷键 <kbd>Ctrl K</kbd></span></div>
       </div>
     </dialog>
-    <script src="/static/app.js?v=20260925-daynest" defer></script>
+    <script src="/static/app.js?v=20260929-inventory" defer></script>
     <script src="/static/travel.js?v=20260925-1" defer></script>
+    <script src="/static/inventory.js?v=20260930-response-fix" defer></script>
     <script src="/static/projects.js?v=20260923-1" defer></script>
     <script src="/static/ledger.js?v=20260922-1" defer></script>
     <script src="/static/habits.js?v=20260923-dashboard" defer></script>
