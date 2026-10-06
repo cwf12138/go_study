@@ -23,7 +23,46 @@ tags:
   - name: Exports
   - name: Travel
   - name: Inventory
+  - name: Shopping
 paths:
+  /api/v1/shopping:
+    get:
+      tags: [Shopping]
+      summary: 当前账号的购物条目，包含已移除记录
+      description: 最多 2000 条；按更新时间倒序。同名已购条目可复用，不提供独立购买历史。
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: JSON data 数组，条目为 ShoppingInput 的字段，加上 id、user_id、created_at、updated_at；revision 为已保存版本。
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { type: object } }
+        '401': { description: 未登录 }
+  /api/v1/shopping/{id}:
+    put:
+      tags: [Shopping]
+      summary: 创建或完整更新购物条目
+      description: 新建版本为 0，更新传入当前 revision。同 ID/版本/内容原样重试幂等。待购条目按去首尾空格、合并空白、转小写后的名称去重，检查在写锁内完成。移除设 deleted=true；买到设 purchased=true；复购设 purchased=false。
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,80}$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShoppingInput' }
+      responses:
+        '200': { description: JSON data 为已保存条目，含新 revision、id、user_id、created_at、updated_at }
+        '400': { description: 输入无效或超过容量 }
+        '401': { description: 未登录 }
+        '404': { description: 非零版本指向不存在的条目 }
+        '409': { description: 版本冲突或已有同名待购项 }
   /api/v1/inventory:
     get:
       tags: [Inventory]
@@ -2501,6 +2540,18 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
   schemas:
+    ShoppingInput:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80, description: 单行名称 }
+        quantity: { type: string, maxLength: 30, description: 可选文本数量，例如 2盒 }
+        note: { type: string, maxLength: 500 }
+        frequent: { type: boolean, default: false }
+        purchased: { type: boolean, default: false }
+        deleted: { type: boolean, default: false }
+        revision: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
     InventoryInput:
       type: object
       additionalProperties: false

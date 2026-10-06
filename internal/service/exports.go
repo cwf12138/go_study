@@ -28,6 +28,7 @@ type UserDataExport struct {
 	Keepsakes          []domain.Keepsake         `json:"keepsakes"`
 	Ledger             []domain.LedgerEntry      `json:"ledger"`
 	Inventory          []domain.InventoryItem    `json:"inventory"`
+	Shopping           []domain.ShoppingItem     `json:"shopping"`
 	Projects           []domain.Project          `json:"projects"`
 	TravelPlans        []domain.TravelPlan       `json:"travel_plans"`
 	Moods              []domain.MoodEntry        `json:"moods"`
@@ -75,6 +76,9 @@ func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataEx
 		return bundle, err
 	}
 	if bundle.Inventory, err = s.repo.ListInventory(ctx, userID); err != nil {
+		return UserDataExport{}, err
+	}
+	if bundle.Shopping, err = s.repo.ListShopping(ctx, userID); err != nil {
 		return UserDataExport{}, err
 	}
 	if bundle.Projects, err = s.repo.ListProjects(ctx, userID); err != nil {
@@ -140,6 +144,7 @@ func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataEx
 		"keepsakes":    len(bundle.Keepsakes),
 		"ledger":       len(bundle.Ledger),
 		"inventory":    len(bundle.Inventory),
+		"shopping":     len(bundle.Shopping),
 		"projects":     len(bundle.Projects),
 		"travel_plans": len(bundle.TravelPlans),
 		"goals":        len(bundle.Goals), "moods": len(bundle.Moods), "tasks": len(bundle.Tasks), "todo_lists": len(bundle.TodoLists),

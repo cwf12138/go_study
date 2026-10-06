@@ -18,6 +18,7 @@
     <link rel="stylesheet" href="/static/weekly-review.css?v=20260901-6">
     <link rel="stylesheet" href="/static/exports.css?v=20260901-6">
     <link rel="stylesheet" href="/static/vocabulary-catalogs.css?v=20260901-6">
+    <link rel="stylesheet" href="/static/vocabulary-studio.css?v=20261007-1">
     <link rel="stylesheet" href="/static/calendar.css?v=20260901-6">
     <link rel="stylesheet" href="/static/memos.css?v=20260904-1">
     <link rel="stylesheet" href="/static/memos-refresh.css?v=20260909-1">
@@ -38,6 +39,7 @@
     <link rel="stylesheet" href="/static/travel.css?v=20260925-1">
     <link rel="stylesheet" href="/static/daynest.css?v=20260925-1">
     <link rel="stylesheet" href="/static/inventory.css?v=20260929-1">
+    <link rel="stylesheet" href="/static/shopping.css?v=20261007-1">
     <link rel="stylesheet" href="/static/layout.css?v=20260922-1">
   </head>
   <body>
@@ -139,6 +141,7 @@
               <button type="button" data-goto="moods"><span aria-hidden="true"><img src="/static/mood-art/good-flat-v2.png" width="32" height="32" alt=""></span><b>记录心情</b><small>此刻感觉如何</small></button>
               <button type="button" data-goto="focus"><span aria-hidden="true">◷</span><b>留点专注</b><small>做一件喜欢的事</small></button>
             </div>
+            <aside class="shopping-home"><button id="shopping-home-open" type="button"><b>买点什么</b><span id="shopping-home-count">打开购物清单</span><span aria-hidden="true">↗</span></button><form id="shopping-home-form"><label class="shopping-sr-only" for="shopping-home-input">添加待购物品</label><input id="shopping-home-input" maxlength="120" placeholder="顺手记下要买的东西…" required><button id="shopping-home-add" type="submit" aria-label="加入购物清单">＋</button></form><p id="shopping-home-status" role="status"></p></aside>
             <div class="today-grid">
               <article class="surface today-agenda"><div class="surface-head"><div><p class="eyebrow">TODAY</p><h3>今日安排</h3></div><button class="text-button" type="button" data-goto="calendar">打开日历 ↗</button></div><div id="today-agenda" role="status">正在整理今天的日程…</div></article>
               <article class="surface today-todos"><div class="surface-head"><div><p class="eyebrow">ONE THING AT A TIME</p><h3>今天要做</h3></div><button class="text-button" type="button" data-goto="todo">全部待办 ↗</button></div><div id="today-todos">正在整理待办…</div></article>
@@ -166,12 +169,25 @@
           </section>
 
           <section id="panel-inventory" class="panel">
+            <div class="shopping-tabs" role="tablist" aria-label="物品管家"><button id="collection-tab" type="button" role="tab" aria-selected="true" aria-controls="inventory-collection">物品档案</button><button id="shopping-tab" type="button" role="tab" aria-selected="false" aria-controls="shopping-space" tabindex="-1">买点什么</button></div>
+            <div id="shopping-space" role="tabpanel" aria-labelledby="shopping-tab" hidden>
+              <header class="shopping-heading"><div><p class="eyebrow">LITTLE THINGS, LESS TO REMEMBER</p><h3>想到了，就记下来。</h3><p>出门时带上清单，给脑袋腾一点空间。</p></div><span aria-hidden="true">✓</span></header>
+              <form id="shopping-add-form" class="shopping-capture"><label for="shopping-input">需要买什么？</label><div><textarea id="shopping-input" rows="2" maxlength="4000" placeholder="牛奶 2盒&#10;鸡蛋" required></textarea><button class="primary" id="shopping-add" type="submit">＋ 加入清单</button></div><small>Enter 添加 · Shift+Enter 换行 · 可粘贴多行，最多 30 项</small></form>
+              <div class="shopping-tools"><div role="group" aria-label="购物状态"><button id="shopping-pending" type="button" aria-pressed="true">待购买</button><button id="shopping-bought" type="button" aria-pressed="false">已买到</button></div><div><button id="shopping-mode" class="quiet" type="button" aria-pressed="false">购物模式</button><button id="shopping-refresh" class="quiet" type="button">刷新</button></div></div>
+              <p id="shopping-status" role="status" aria-live="polite"></p>
+              <div id="shopping-undo-bar" class="shopping-undo" hidden><span id="shopping-undo-label"></span><button id="shopping-undo" type="button" class="text-button">撤销</button></div>
+              <div id="shopping-list" class="shopping-list"></div><button id="shopping-more" class="quiet" type="button" hidden>显示更多</button>
+              <section class="shopping-favorites"><h4>常买这些 <small>在编辑中点亮星标，下次一键加入</small></h4><div id="shopping-favorites"></div></section>
+              <p class="shopping-footnote">不自动扣预算、不自动入库。购物模式仅放大操作区域，不会阻止手机息屏。</p>
+            </div>
+            <div id="inventory-collection" role="tabpanel" aria-labelledby="collection-tab">
             <header class="inventory-hero"><div><p class="eyebrow">EVERYTHING IN ITS PLACE</p><h3>让每件物品，都有归处。</h3><p>记住放在哪里，也记住何时该关照它。</p><button id="inventory-new" type="button" class="primary">＋ 收录一件物品</button></div><div class="inventory-art" aria-hidden="true"><span>HOME<br>COLLECTION</span><i>▣</i><b>有物 · 有序</b></div></header>
             <div class="inventory-stats" aria-label="在库物品概览"><article><span>在库记录 / 总件数</span><strong id="inventory-total">—</strong><small>不含归档</small></article><article><span>登记购入总价</span><strong id="inventory-value">—</strong><small>人民币 · 非当前估值</small></article><article><span>需要关注</span><strong id="inventory-due">—</strong><small>30 天内到期、保修结束或归还</small></article><article><span>借出中</span><strong id="inventory-lent">—</strong><small>归还后可恢复收纳</small></article></div>
             <div class="inventory-toolbar"><label class="inventory-search">搜索物品<input id="inventory-search" type="search" maxlength="200" placeholder="名称、位置、借用人或备注…"></label><label>分类<select id="inventory-category"><option value="">全部分类</option></select></label><label>查看<select id="inventory-view"><option value="active">在库物品</option><option value="attention">需要关注</option><option value="lent">借出中</option><option value="archived">已归档</option></select></label><label>排序<select id="inventory-sort"><option value="updated">最近更新</option><option value="deadline">最近到期优先</option><option value="name">名称</option><option value="price">购入价格从高到低</option></select></label><button id="inventory-export" class="quiet" type="button" disabled>导出筛选结果</button><button id="inventory-reload" class="quiet" type="button">刷新</button></div>
             <p id="inventory-status" role="status" aria-live="polite"></p><div id="inventory-list" class="inventory-grid"></div>
             <nav class="inventory-pagination" aria-label="物品列表分页"><button id="inventory-prev" class="quiet" type="button">上一页</button><span id="inventory-page">第 1 页</span><button id="inventory-next" class="quiet" type="button">下一页</button></nav>
             <p class="inventory-footnote">提醒仅在本页面展示，不会发送系统通知。购入总价不会自动记入账本；归档可恢复，不会永久删除记录。</p>
+            </div>
           </section>
           <section id="panel-timeline" class="panel">
             <header class="trail-hero"><div><p class="eyebrow">YOUR LEARNING STORY</p><h3>每一步，都值得被看见</h3><p>回望完成的小事，发现持续积累的力量。</p></div><span aria-hidden="true">↟</span></header>
@@ -483,15 +499,17 @@
           </section>
 
           <section id="panel-vocabulary" class="panel">
-            <div class="section-intro"><div><p class="eyebrow">VOCABULARY</p><h3>单词学习</h3><p>通过主动回忆、拼写练习和智能回顾，把“见过”逐渐变成“真正掌握”。</p></div></div>
-            <div class="vocab-stat-grid"><article><span>今日待复习</span><strong id="vocab-due-count">0</strong></article><article><span>今日已复习</span><strong id="vocab-reviewed-count">0</strong></article><article><span>今日正确率</span><strong id="vocab-accuracy">—</strong></article><article><span>连续学习</span><strong id="vocab-streak">0 天</strong></article></div>
-            <div class="vocab-workspace">
-              <article class="surface vocab-catalog-card"><div class="vocab-catalog-head"><div><p class="eyebrow">EXAM CATALOGS</p><h3>雅思与托福内置词书</h3><p>来自 MIT 许可的 ECDICT 考试标签数据；安装后完全离线，并沿用当前智能回顾与拼写练习流程。</p></div><a href="https://github.com/skywind3000/ECDICT" target="_blank" rel="noreferrer">数据来源 ↗</a></div><div id="vocab-catalogs" class="vocab-catalogs"><div class="empty-state">正在读取内置词书…</div></div></article>
-              <aside class="surface vocab-books-card"><div class="vocab-section-head"><div><p class="eyebrow">WORD BOOKS</p><h3>我的词书</h3></div></div><div id="vocab-books" class="vocab-books"></div><form id="vocab-book-form" class="vocab-book-form"><input id="vocab-book-name" required maxlength="100" placeholder="新建词书"><textarea id="vocab-book-description" rows="2" maxlength="1000" placeholder="词书说明（可选）"></textarea><label>每日新词<input id="vocab-book-limit" type="number" min="1" max="100" value="15"></label><button class="quiet" type="submit">创建词书</button></form></aside>
-              <article class="surface vocab-study-card"><div class="vocab-study-head"><div><p class="eyebrow">DAILY REVIEW</p><h3 id="vocab-study-book">开始今日学习</h3></div><span id="vocab-queue-progress" class="pill">0 / 0</span></div><div class="vocab-mode-tabs"><button class="active" type="button" data-vocab-mode="flashcard">翻卡回忆</button><button type="button" data-vocab-mode="spelling">拼写练习</button></div><div id="vocab-empty" class="vocab-empty"><span>✓</span><h4>当前词书已经复习完成</h4><p>可以添加新词，或者切换到其他词书继续。</p></div><div id="vocab-study" class="vocab-study hidden"><div class="vocab-card-top"><span id="vocab-stage" class="vocab-stage">新词</span><button id="vocab-speak" class="vocab-speak" type="button" aria-label="朗读当前单词">🔊</button></div><div id="vocab-flashcard-mode"><h2 id="vocab-term">word</h2><p id="vocab-phonetic" class="vocab-phonetic"></p><button id="vocab-reveal" class="primary vocab-reveal" type="button">显示释义</button></div><form id="vocab-spelling-mode" class="vocab-spelling hidden"><p id="vocab-spelling-definition"></p><label>请输入对应单词<input id="vocab-spelling-input" autocomplete="off" spellcheck="false"></label><button class="primary" type="submit">检查拼写</button><p id="vocab-spelling-result" class="vocab-spelling-result"></p></form><div id="vocab-answer" class="vocab-answer hidden"><h4 id="vocab-definition"></h4><p id="vocab-example" class="vocab-example"></p><p id="vocab-example-translation" class="vocab-example-translation"></p><div id="vocab-rating-actions" class="vocab-rating-actions"><button type="button" data-vocab-rating="1"><strong>忘记</strong><small>10 分钟</small></button><button type="button" data-vocab-rating="2"><strong>模糊</strong><small>较快复习</small></button><button type="button" data-vocab-rating="3"><strong>认识</strong><small>正常间隔</small></button><button type="button" data-vocab-rating="4"><strong>熟练</strong><small>更长间隔</small></button></div></div></div></article>
-              <article class="surface form-surface vocab-add-card"><div><p class="eyebrow">ADD WORD</p><h3>添加单词</h3></div><form id="vocab-word-form" class="form-grid"><label>词书<select id="vocab-word-book" required></select></label><label>单词<input id="vocab-word-term" required maxlength="160" placeholder="concurrency"></label><label>音标<input id="vocab-word-phonetic" maxlength="200" placeholder="/kənˈkʌrənsi/"></label><label>释义<textarea id="vocab-word-definition" required rows="3" maxlength="3000" placeholder="并发；同时发生"></textarea></label><label>例句<textarea id="vocab-word-example" rows="2" maxlength="3000" placeholder="Go makes concurrency easier to express."></textarea></label><label>例句翻译<textarea id="vocab-word-example-translation" rows="2" maxlength="3000"></textarea></label><label>标签（逗号分隔）<input id="vocab-word-tags" maxlength="600" placeholder="go, chapter-1"></label><label>笔记<textarea id="vocab-word-notes" rows="2" maxlength="4000"></textarea></label><button class="primary" type="submit">加入词书</button></form></article>
-              <article class="surface vocab-library-card"><div class="vocab-library-head"><div><p class="eyebrow">LIBRARY</p><h3>词库管理</h3><small id="vocab-library-total">0 个单词</small></div><div><input id="vocab-search" type="search" placeholder="搜索单词或释义"><select id="vocab-stage-filter"><option value="">全部阶段</option><option value="new">新词</option><option value="learning">学习中</option><option value="reviewing">复习中</option><option value="mastered">已掌握</option></select></div></div><div id="vocab-word-list" class="vocab-word-list empty-state">词库中还没有单词。</div><div id="vocab-pagination" class="vocab-pagination hidden"><button id="vocab-page-prev" class="quiet" type="button">上一页</button><span id="vocab-page-label">第 1 / 1 页</span><button id="vocab-page-next" class="quiet" type="button">下一页</button></div></article>
+            <header class="vocab-studio-hero"><div><p class="eyebrow">A FEW WORDS, EVERY DAY</p><h3>选一本词书，把每天的一点坚持留下。</h3><p>不用整理词条，直接开始回忆与练习。</p></div><button id="vocab-open-catalog" type="button" class="primary">选择 / 安装词书</button></header><div class="vocab-stat-grid"><article><span>本批待学</span><strong id="vocab-due-count">0</strong></article><article><span>今日练习次数</span><strong id="vocab-reviewed-count">0</strong></article><article><span>今日正确率</span><strong id="vocab-accuracy">—</strong></article><article><span>连续学习</span><strong id="vocab-streak">0 天</strong></article></div>
+            <div class="vocab-status-bar"><span id="vocab-status" role="status" aria-live="polite">正在同步学习记录…</span><button id="vocab-refresh" class="quiet" type="button">刷新学习</button></div><div class="vocab-workspace">
+
+              <aside class="surface vocab-books-card"><div class="vocab-section-head"><div><p class="eyebrow">WORD BOOKS</p><h3>我的词书</h3></div></div><div id="vocab-books" class="vocab-books"></div><p class="vocab-books-tip">点选词书切换学习；已有自建词书与学习记录仍保留。</p></aside>
+              <article class="surface vocab-study-card"><div class="vocab-study-head"><div><p class="eyebrow">DAILY REVIEW</p><h3 id="vocab-study-book">开始今日学习</h3></div><span id="vocab-queue-progress" class="pill">0 / 0</span></div><p id="vocab-plan-summary" class="vocab-plan-summary"></p><div class="vocab-mode-tabs" role="group" aria-label="学习方式"><button class="active" type="button" data-vocab-mode="flashcard">翻卡回忆</button><button type="button" data-vocab-mode="spelling">拼写练习</button></div><div id="vocab-empty" class="vocab-empty"><span>✓</span><h4 id="vocab-empty-title">先选一本词书</h4><p id="vocab-empty-description">安装词书后就可以开始学习。</p></div><div id="vocab-study" class="vocab-study hidden"><div class="vocab-card-top"><span id="vocab-stage" class="vocab-stage">新词</span><button id="vocab-speak" class="vocab-speak" type="button" aria-label="朗读当前单词">🔊</button></div><div id="vocab-flashcard-mode"><h2 id="vocab-term">word</h2><p id="vocab-phonetic" class="vocab-phonetic"></p><button id="vocab-reveal" class="primary vocab-reveal" type="button">显示释义</button></div><form id="vocab-spelling-mode" class="vocab-spelling hidden"><p id="vocab-spelling-definition"></p><label>请输入对应单词<input id="vocab-spelling-input" autocomplete="off" spellcheck="false" autocapitalize="none" required></label><button class="primary" type="submit">检查拼写</button><p id="vocab-spelling-result" class="vocab-spelling-result"></p></form><div id="vocab-answer" class="vocab-answer hidden"><h4 id="vocab-definition"></h4><p id="vocab-example" class="vocab-example"></p><p id="vocab-example-translation" class="vocab-example-translation"></p><div id="vocab-rating-actions" class="vocab-rating-actions"><button type="button" data-vocab-rating="1"><strong>忘记</strong><small>10 分钟</small></button><button type="button" data-vocab-rating="2"><strong>模糊</strong><small>较快复习</small></button><button type="button" data-vocab-rating="3"><strong>认识</strong><small>正常间隔</small></button><button type="button" data-vocab-rating="4"><strong>熟练</strong><small>更长间隔</small></button></div></div></div></article>
+
+
             </div>
+            <details id="vocab-catalog-drawer" class="vocab-drawer"><summary>词书书架 <span>按需安装，一次选好就能学习</span></summary><article class="surface vocab-catalog-card"><div class="vocab-catalog-head"><div><p class="eyebrow">EXAM CATALOGS</p><h3>雅思与托福内置词书</h3><p>来自 MIT 许可的 ECDICT 考试标签数据；安装后完全离线，并沿用当前智能回顾与拼写练习流程。</p></div><a href="https://github.com/skywind3000/ECDICT" target="_blank" rel="noreferrer">数据来源 ↗</a></div><div id="vocab-catalogs" class="vocab-catalogs"><div class="empty-state">正在读取内置词书…</div></div></article></details>
+            <details class="vocab-drawer"><summary>浏览本书单词 <span>搜索释义，查看学习阶段</span></summary><article class="surface vocab-library-card"><div class="vocab-library-head"><div><p class="eyebrow">LIBRARY</p><h3>浏览本书单词</h3><small id="vocab-library-total">0 个单词</small></div><div><input id="vocab-search" aria-label="搜索本书单词或释义" type="search" placeholder="搜索单词或释义"><select id="vocab-stage-filter" aria-label="按学习阶段筛选"><option value="">全部阶段</option><option value="new">新词</option><option value="learning">学习中</option><option value="reviewing">复习中</option><option value="mastered">已掌握</option></select></div></div><div id="vocab-word-list" class="vocab-word-list empty-state">词库中还没有单词。</div><div id="vocab-pagination" class="vocab-pagination hidden"><button id="vocab-page-prev" class="quiet" type="button">上一页</button><span id="vocab-page-label">第 1 / 1 页</span><button id="vocab-page-next" class="quiet" type="button">下一页</button></div></article></details>
+            <p class="vocab-footnote">每日新词按词书限额安排，到期旧词优先；统计日沿用服务端 UTC 日期。发音取决于浏览器可用语音。</p>
           </section>
 
           <section id="panel-english" class="panel">
@@ -652,6 +670,11 @@
         <p id="inventory-save-status" role="status" aria-live="polite"></p><footer><button id="inventory-draft-export" type="button" class="quiet">导出草稿</button><button id="inventory-save" type="submit" class="primary">保存物品</button></footer>
       </form>
     </dialog>
+    <dialog id="shopping-dialog" class="shopping-dialog" aria-labelledby="shopping-edit-title">
+      <form id="shopping-edit-form"><header><h2 id="shopping-edit-title">改一改这件小事</h2><button id="shopping-close" type="button" class="icon-button" aria-label="关闭购物编辑">×</button></header>
+      <label>名称<input id="shopping-name" maxlength="80" required></label><label>数量（可选）<input id="shopping-quantity" maxlength="30" placeholder="2盒 / 一袋 / 按需"></label><label>备注（可选）<textarea id="shopping-note" rows="3" maxlength="500" placeholder="品牌、口味，或顺手记下的要求"></textarea></label>
+      <label class="shopping-check-label"><input id="shopping-frequent" type="checkbox"> ★ 设为常买</label><p id="shopping-edit-status" role="status"></p><button id="shopping-save" class="primary" type="submit">保存修改</button></form>
+    </dialog>
     <dialog id="command-dialog" class="command-dialog">
       <div class="command-shell">
         <div class="command-search"><span>⌕</span><input id="command-input" type="search" placeholder="跳转功能、添加待办或搜索备忘录…" autocomplete="off"><kbd>ESC</kbd></div>
@@ -659,9 +682,10 @@
         <div class="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 执行</span><span>全局快捷键 <kbd>Ctrl K</kbd></span></div>
       </div>
     </dialog>
-    <script src="/static/app.js?v=20260929-inventory" defer></script>
+    <script src="/static/app.js?v=20261007-vocabulary" defer></script>
     <script src="/static/travel.js?v=20260925-1" defer></script>
-    <script src="/static/inventory.js?v=20260930-response-fix" defer></script>
+    <script src="/static/inventory.js?v=20261007-shopping" defer></script>
+    <script src="/static/shopping.js?v=20261007-1" defer></script>
     <script src="/static/projects.js?v=20260923-1" defer></script>
     <script src="/static/ledger.js?v=20260922-1" defer></script>
     <script src="/static/habits.js?v=20260923-dashboard" defer></script>

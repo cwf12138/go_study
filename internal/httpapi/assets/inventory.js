@@ -122,6 +122,17 @@
   function csvCell(value){let text=String(value??'');if(/^[\s]*[=+@-]/.test(text)||/^[\t\r\n]/.test(text))text="'"+text;return '"'+text.replaceAll('"','""')+'"';}
   function exportCSV(){if(!state.loaded||state.busy||state.token!==token())return;const rows=[['名称','分类','位置','数量','购入总价（元）','购入日期','保修截止','到期日期','借用人','预计归还','备注','状态'],...filtered().map(item=>[item.name,item.category,item.location,item.quantity,(item.price/100).toFixed(2),item.purchased_on,item.warranty_until,item.expires_on,item.borrower,item.return_on,item.note,item.archived?'归档':'在库'])];download('\uFEFF'+rows.map(row=>row.map(csvCell).join(',')).join('\r\n'),'text/csv;charset=utf-8',`Daynest-物品-${day()}.csv`);status('已导出当前全部筛选结果，文件包含借用人和备注，请妥善保存。');}
   function bind() {
+    document.addEventListener('daynest:shopping-store',async event=>{
+      const owner=syncAccount(),item=event.detail;
+      if(!owner||state.busy||!item||typeof item.id!=='string'||typeof item.name!=='string')return;
+      if($('dialog').open){status('请先保存或关闭当前物品编辑器。',true);return;}
+      await load();if(owner!==token()||!state.loaded||state.busy)return;
+      const id='shopping-'+item.id,existing=state.items.find(row=>row.id===id);
+      if(existing){open(existing);return;}
+      const quantity=Number(String(item.quantity||'').match(/^\d+/)?.[0]||1);
+      open({id,revision:0,archived:false,name:item.name,category:'日常用品',quantity:Math.min(9999,Math.max(1,quantity)),note:[item.note,item.quantity?'购物数量：'+item.quantity:''].filter(Boolean).join('\n')});
+      status('已预填购物内容，请核对数量并确认保存；不会自动记账。',false,'save-status');
+    });
     document.querySelector('[data-view="inventory"]')?.addEventListener('click',load);
     $('new').addEventListener('click',()=>open());$('reload').addEventListener('click',load);$('form').addEventListener('submit',save);$('close').addEventListener('click',close);
     $('dialog').addEventListener('cancel',event=>{event.preventDefault();close();});

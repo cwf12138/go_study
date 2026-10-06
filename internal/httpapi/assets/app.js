@@ -39,7 +39,12 @@
     vocabularySearch: "",
     vocabularyStage: "",
     vocabularyPage: 1,
-    vocabularyPageSize: 100,
+    vocabularyPageSize: 20,
+    vocabularyLoading: false,
+    vocabularyReviewing: false,
+    vocabularyInstalling: "",
+    vocabularyError: false,
+    vocabularyDisplayKey: "",
     vocabularyMeta: { total: 0, page: 1, total_pages: 1 },
     plannerWeekStart: mondayKey(new Date()),
     plannerWeek: null,
@@ -241,6 +246,7 @@
 
   function enterApp(user) {
     state.user = user;
+    try { state.vocabularyBookID = localStorage.getItem(`studyflow.vocabularyBook.${user.id}`) || ""; } catch (_) { /* Storage may be disabled. */ }
     setFocusFeedback();
     state.dailyFocusGoalMinutes = loadDailyFocusGoal();
     if (state.focus && state.focus.userID !== user.id) {
@@ -250,6 +256,7 @@
     $("#auth-view").classList.add("hidden");
     $("#app-view").classList.remove("hidden");
     $("#user-name").textContent = user.name;
+    document.dispatchEvent(new CustomEvent("daynest:account-ready"));
     showView(state.currentView);
     refresh().catch((error) => notify(error.message, "error"));
   }
@@ -286,6 +293,8 @@
     state.vocabularyOverview = null;
     state.vocabularyCatalogs = [];
     state.vocabularyBookID = "";
+    state.vocabularyLoading = false; state.vocabularyReviewing = false; state.vocabularyInstalling = ""; state.vocabularyError = false; state.vocabularyDisplayKey = "";
+    vocabularyVersion++; vocabularyLibraryVersion++;
     state.vocabularyMode = "flashcard";
     state.vocabularyRevealed = false;
     state.vocabularySearch = "";
@@ -371,6 +380,7 @@
   async function refresh() {
     const version = ++refreshVersion, token = state.token;
     const moodMonth = state.moodMonth, moodVersion = moodLoadVersion;
+    const vocabVersion = vocabularyVersion, vocabLibraryVersion = vocabularyLibraryVersion;
     const today = localDateKey(new Date());
     const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
     setSyncStatus("正在同步核心模块…", true);
@@ -379,11 +389,11 @@
     const vocabularyRequest = api("/api/v1/word-books").then(async (books = []) => {
       const selectedBookID = books.some((book) => book.id === state.vocabularyBookID)
         ? state.vocabularyBookID
-        : (books[0]?.id || "");
+        : (books.find(book=>book.source_id)?.id || books[0]?.id || "");
       if (!selectedBookID) return { books, selectedBookID, words: [], queue: [], overview: null };
       const bookQuery = `book_id=${encodeURIComponent(selectedBookID)}`;
       const [wordPage, queue, overview] = await Promise.all([
-        api(`/api/v1/words?${bookQuery}&page=1&page_size=${state.vocabularyPageSize}`, { returnEnvelope: true }),
+        api(`/api/v1/words?${bookQuery}&page=${state.vocabularyPage}&page_size=${state.vocabularyPageSize}&q=${encodeURIComponent(state.vocabularySearch)}&stage=${encodeURIComponent(state.vocabularyStage)}`, { returnEnvelope: true }),
         api(`/api/v1/words/queue?${bookQuery}&limit=100`),
         api(`/api/v1/vocabulary/overview?${bookQuery}`),
       ]);
@@ -424,13 +434,16 @@
     state.todoLists = todoLists || [];
     state.todos = todos || [];
     state.todayTodosError = results[7].status === "rejected";
+    if (vocabVersion === vocabularyVersion && vocabLibraryVersion === vocabularyLibraryVersion && !state.vocabularyLoading && !state.vocabularyReviewing && !state.vocabularyInstalling) {
     state.wordBooks = vocabulary.books || [];
     state.vocabularyBookID = vocabulary.selectedBookID || "";
     state.vocabularyWords = vocabulary.words || [];
     state.vocabularyMeta = vocabulary.wordMeta || { total: state.vocabularyWords.length, page: 1, total_pages: 1 };
     state.vocabularyQueue = vocabulary.queue || [];
     state.vocabularyOverview = vocabulary.overview || null;
-    state.vocabularyCatalogs = vocabularyCatalogs || [];
+    state.vocabularyError = results[8].status === "rejected";
+    }
+    if (vocabVersion === vocabularyVersion && !state.vocabularyInstalling) state.vocabularyCatalogs = vocabularyCatalogs || [];
     state.plannerWeek = plannerWeek || null;
     state.learningInsights = learningInsights || null;
     state.weeklyReview = weeklyReview || null;
@@ -1525,6 +1538,7 @@
     }
   }
 
+  let vocabularyVersion = 0, vocabularyLibraryVersion = 0;
   const vocabularyStageLabel = (stage) => ({
     new: "新词",
     learning: "学习中",
@@ -1541,16 +1555,27 @@
     const overview = state.vocabularyOverview || {};
     const currentBook = state.wordBooks.find((book) => book.id === state.vocabularyBookID);
     const word = currentVocabularyWord();
-    $("#vocab-due-count").textContent = overview.due_today ?? 0;
+    $("#vocab-due-count").textContent = state.vocabularyQueue.length;
     $("#vocab-reviewed-count").textContent = overview.reviewed_today ?? 0;
     $("#vocab-accuracy").textContent = overview.reviewed_today ? `${overview.accuracy_today ?? 0}%` : "—";
     $("#vocab-streak").textContent = `${overview.study_streak ?? 0} 天`;
     $("#vocab-study-book").textContent = currentBook?.name || "开始今日学习";
-    $("#vocab-queue-progress").textContent = word ? `待复习 ${state.vocabularyQueue.length}` : "今日完成";
+    const blocked = state.vocabularyLoading || state.vocabularyReviewing || Boolean(state.vocabularyInstalling) || state.vocabularyError;
+    $("#vocab-queue-progress").textContent = word ? `本批剩余 ${state.vocabularyQueue.length}` : "暂无待学";
+    $("#vocab-plan-summary").textContent = currentBook ? `每日最多 ${currentBook.daily_new_limit} 个新词 · 到期旧词优先 · 全书 ${overview.total || 0} 词` : "先安装词书，再开始每日学习。";
+    $("#vocab-status").textContent = state.vocabularyLoading ? "正在加载词书…" : state.vocabularyReviewing ? "正在保存学习反馈…" : state.vocabularyInstalling ? "正在安装词书，请稍候…" : state.vocabularyError ? "学习数据未更新，请点击刷新学习；本页保留上次数据。" : "先回忆，再看释义，最后选择熟悉程度。";
+    $("#vocab-status").classList.toggle("vocab-error",state.vocabularyError);
+    $("#vocab-refresh").disabled = state.vocabularyLoading || state.vocabularyReviewing || Boolean(state.vocabularyInstalling);
+    $("#vocab-reveal").disabled = blocked;
+    $("#vocab-rating-actions").querySelectorAll("button").forEach(button=>{button.disabled=blocked;});
+    $$("[data-vocab-mode]").forEach(button=>{button.disabled=blocked;button.setAttribute("aria-pressed",String(button.dataset.vocabMode===state.vocabularyMode));});
+    $("#vocab-empty-title").textContent = state.vocabularyLoading ? "正在准备学习…" : state.vocabularyError ? "暂时无法加载学习内容" : !currentBook || !overview.total ? "先选一本有内容的词书" : "当前没有到期待学单词";
+    $("#vocab-empty-description").textContent = state.vocabularyError ? "请刷新重试，不会清除已有学习记录。" : !currentBook || !overview.total ? "打开词书书架，安装雅思或托福词书即可开始。" : "可能已达到每日新词限额，或旧词尚未到复习时间；稍后刷新，或切换其他词书。";
+    if (!currentBook && !state.vocabularyError) $("#vocab-catalog-drawer").open = true;
 
     $("#vocab-books").innerHTML = state.wordBooks.map((book) => {
-      const count = book.id === state.vocabularyBookID ? `${state.vocabularyMeta.total || 0} 词` : `每日 ${book.daily_new_limit} 新词`;
-      return `<button class="vocab-book-button ${book.id === state.vocabularyBookID ? "active" : ""}" type="button" data-vocab-book="${book.id}"><span><strong>${escapeHTML(book.name)}</strong><small>${escapeHTML(book.description || book.language?.toUpperCase() || "词书")}</small></span><b>${count}</b></button>`;
+      const count = book.id === state.vocabularyBookID ? `${overview.total || 0} 词` : `每日 ${book.daily_new_limit} 新词`;
+      return `<button class="vocab-book-button ${book.id === state.vocabularyBookID ? "active" : ""}" type="button" data-vocab-book="${book.id}" aria-pressed="${book.id === state.vocabularyBookID}" ${state.vocabularyReviewing || state.vocabularyInstalling ? "disabled" : ""}><span><strong>${escapeHTML(book.name)}</strong><small>${escapeHTML(book.description || book.language?.toUpperCase() || "词书")}</small></span><b>${count}</b></button>`;
     }).join("");
 
     $$('[data-vocab-mode]').forEach((button) => button.classList.toggle("active", button.dataset.vocabMode === state.vocabularyMode));
@@ -1559,6 +1584,11 @@
     $("#vocab-flashcard-mode").classList.toggle("hidden", state.vocabularyMode !== "flashcard");
     $("#vocab-spelling-mode").classList.toggle("hidden", state.vocabularyMode !== "spelling");
 
+    const displayKey = word ? word.id + ":" + state.vocabularyMode : "";
+    if (state.vocabularyDisplayKey !== displayKey) {
+      state.vocabularyDisplayKey = displayKey; state.vocabularyRevealed = false;
+      $("#vocab-spelling-input").value = ""; $("#vocab-spelling-result").textContent = ""; $("#vocab-spelling-result").className = "vocab-spelling-result";
+    }
     if (word) {
       $("#vocab-stage").textContent = vocabularyStageLabel(word.stage);
       $("#vocab-stage").className = `vocab-stage ${word.stage}`;
@@ -1572,22 +1602,18 @@
       $("#vocab-example-translation").classList.toggle("hidden", !word.example_translation);
       $("#vocab-answer").classList.toggle("hidden", !state.vocabularyRevealed);
       $("#vocab-reveal").classList.toggle("hidden", state.vocabularyRevealed);
-      $("#vocab-spelling-input").disabled = state.vocabularyRevealed;
-      if (!state.vocabularyRevealed) {
-        $("#vocab-spelling-input").value = "";
-        $("#vocab-spelling-result").textContent = "";
-        $("#vocab-spelling-result").className = "vocab-spelling-result";
-      }
+      $("#vocab-spelling-input").disabled = state.vocabularyRevealed || blocked;
+      $("#vocab-spelling-mode").querySelector("button").disabled = state.vocabularyRevealed || blocked;
     }
 
     const words = state.vocabularyWords;
     const library = $("#vocab-word-list");
     if (!words.length) {
       library.className = "vocab-word-list empty-state";
-      library.textContent = state.vocabularyWords.length ? "没有匹配筛选条件的单词。" : "词库中还没有单词。";
+      library.textContent = state.vocabularySearch || state.vocabularyStage ? "没有匹配的单词，试试其他关键词或学习阶段。" : "本书还没有单词，可从词书书架安装词书。";
     } else {
       library.className = "vocab-word-list";
-      library.innerHTML = words.map((item) => `<article class="vocab-word-row"><div class="vocab-word-main"><div><h4>${escapeHTML(item.term)}</h4>${item.phonetic ? `<span>${escapeHTML(item.phonetic)}</span>` : ""}</div><p>${escapeHTML(item.definition)}</p>${(item.tags || []).map((tag) => `<span class="tag">#${escapeHTML(tag)}</span>`).join("")}</div><div class="vocab-word-meta"><span class="vocab-stage ${item.stage}">${vocabularyStageLabel(item.stage)}</span><small>${item.stage === "new" ? `创建于 ${formatDate(item.created_at)}` : `下次 ${formatDate(item.due_at, true)}`}</small><button class="vocab-delete" type="button" data-vocab-delete="${item.id}" aria-label="删除单词 ${escapeHTML(item.term)}" title="删除单词">×</button></div></article>`).join("");
+      library.innerHTML = words.map((item) => `<article class="vocab-word-row"><div class="vocab-word-main"><div><h4>${escapeHTML(item.term)}</h4>${item.phonetic ? `<span>${escapeHTML(item.phonetic)}</span>` : ""}</div><p>${escapeHTML(item.definition)}</p>${(item.tags || []).map((tag) => `<span class="tag">#${escapeHTML(tag)}</span>`).join("")}</div><div class="vocab-word-meta"><span class="vocab-stage ${item.stage}">${vocabularyStageLabel(item.stage)}</span><small>${item.stage === "new" ? `创建于 ${formatDate(item.created_at)}` : `下次 ${formatDate(item.due_at, true)}`}</small></div></article>`).join("");
     }
     const totalPages = Number(state.vocabularyMeta.total_pages || 1);
     $("#vocab-library-total").textContent = `${Number(state.vocabularyMeta.total || 0).toLocaleString()} 个匹配单词`;
@@ -1607,54 +1633,61 @@
     container.innerHTML = state.vocabularyCatalogs.map((catalog) => {
       const complete = catalog.installed && catalog.installed_word_count >= catalog.word_count;
       const progress = catalog.word_count ? Math.min(100, Number(catalog.installed_word_count || 0) / catalog.word_count * 100) : 0;
-      return `<article class="vocab-catalog ${catalog.installed ? "installed" : ""}"><div class="vocab-catalog-badge">${escapeHTML(catalog.exam)}</div><div class="vocab-catalog-main"><div><h4>${escapeHTML(catalog.name)}</h4><span>${catalog.word_count.toLocaleString()} 词 · ${escapeHTML(catalog.license)} 许可</span></div><p>${escapeHTML(catalog.description)}</p><div class="vocab-catalog-track"><span style="width:${progress}%"></span></div><small>${catalog.installed ? `已安装 ${catalog.installed_word_count.toLocaleString()} / ${catalog.word_count.toLocaleString()} 词` : `来源 ${escapeHTML(catalog.source_name)} · 可离线学习`}</small></div><button class="${complete ? "quiet" : "primary"}" type="button" data-vocab-catalog="${catalog.id}" ${complete ? "disabled" : ""}>${complete ? "已安装" : catalog.installed ? "补全词书" : "安装词书"}</button></article>`;
+      return `<article class="vocab-catalog ${catalog.installed ? "installed" : ""}"><div class="vocab-catalog-badge">${escapeHTML(catalog.exam)}</div><div class="vocab-catalog-main"><div><h4>${escapeHTML(catalog.name)}</h4><span>${catalog.word_count.toLocaleString()} 词 · ${escapeHTML(catalog.license)} 许可</span></div><p>${escapeHTML(catalog.description)}</p><div class="vocab-catalog-track"><span style="width:${progress}%"></span></div><small>${catalog.installed ? `已安装 ${catalog.installed_word_count.toLocaleString()} / ${catalog.word_count.toLocaleString()} 词` : `来源 ${escapeHTML(catalog.source_name)} · 可离线学习`}</small></div><button class="${complete ? "quiet" : "primary"}" type="button" data-vocab-catalog="${catalog.id}" ${state.vocabularyInstalling || state.vocabularyReviewing || state.vocabularyLoading ? "disabled" : ""}>${state.vocabularyInstalling === catalog.id ? "正在安装…" : complete ? "开始学习" : catalog.installed ? "补全词书" : "安装词书"}</button></article>`;
     }).join("");
   }
 
   async function importVocabularyCatalog(catalogID, button) {
-    const catalog = state.vocabularyCatalogs.find((item) => item.id === catalogID);
-    if (!catalog || button.disabled) return;
-    const original = button.textContent;
-    button.disabled = true;
-    button.textContent = "正在安装…";
-    try {
-      const result = await api(`/api/v1/vocabulary/catalogs/${encodeURIComponent(catalogID)}/import`, { method: "POST", body: JSON.stringify({ daily_new_limit: 20 }) });
-      state.vocabularyBookID = result.book.id;
-      state.vocabularyPage = 1;
-      state.vocabularySearch = "";
-      state.vocabularyStage = "";
-      await refresh();
-      showView("vocabulary");
-      notify(`${result.book.name} 已安装：新增 ${result.added.toLocaleString()} 词，跳过 ${result.skipped.toLocaleString()} 词。`);
-    } catch (error) {
-      button.disabled = false;
-      button.textContent = original;
-      notify(error.message, "error");
+    const catalog = state.vocabularyCatalogs.find(item=>item.id===catalogID);
+    if (!catalog || button.disabled || state.vocabularyInstalling || state.vocabularyReviewing) return;
+    if (catalog.installed && catalog.installed_word_count >= catalog.word_count) {
+      await selectVocabularyBook(catalog.installed_book_id);
+      $("#vocab-catalog-drawer").open = false;
+      return;
     }
+    const token = state.token;
+    state.vocabularyInstalling = catalogID; vocabularyVersion++; renderVocabulary();
+    try {
+      const result = await api(`/api/v1/vocabulary/catalogs/${encodeURIComponent(catalogID)}/import`,{method:"POST",body:JSON.stringify({daily_new_limit:20})});
+      if (token !== state.token) return;
+      state.wordBooks = state.wordBooks.filter(book=>book.id!==result.book.id).concat(result.book);
+      state.vocabularyBookID = result.book.id; state.vocabularyPage=1; state.vocabularySearch="";state.vocabularyStage="";
+      try { localStorage.setItem(`studyflow.vocabularyBook.${state.user.id}`, result.book.id); } catch (_) {}
+      $("#vocab-search").value="";$("#vocab-stage-filter").value="";
+      const installed = state.vocabularyCatalogs.find(item=>item.id===catalogID);
+      if (installed) Object.assign(installed,{installed:true,installed_book_id:result.book.id,installed_word_count:result.added+result.skipped});
+      state.vocabularyInstalling = "";
+      await refreshVocabulary();
+      $("#vocab-catalog-drawer").open = false;
+      notify(`${result.book.name} 已安装，可以开始学习。`);
+    } catch(error) { if(token===state.token) notify(error.message,"error"); }
+    finally { if(token===state.token){state.vocabularyInstalling="";renderVocabulary();} }
   }
 
-  async function refreshVocabulary() {
-    if (!state.vocabularyBookID) return;
-    const bookQuery = `book_id=${encodeURIComponent(state.vocabularyBookID)}`;
-    const wordQuery = new URLSearchParams({ book_id: state.vocabularyBookID, page: String(state.vocabularyPage), page_size: String(state.vocabularyPageSize) });
-    if (state.vocabularySearch) wordQuery.set("q", state.vocabularySearch);
-    if (state.vocabularyStage) wordQuery.set("stage", state.vocabularyStage);
-    const [wordPage, queue, overview] = await Promise.all([
-      api(`/api/v1/words?${wordQuery}`, { returnEnvelope: true }),
-      api(`/api/v1/words/queue?${bookQuery}&limit=100`),
-      api(`/api/v1/vocabulary/overview?${bookQuery}`),
-    ]);
-    state.vocabularyWords = wordPage.data || [];
-    state.vocabularyMeta = wordPage.meta || { total: state.vocabularyWords.length, page: 1, total_pages: 1 };
-    state.vocabularyQueue = queue || [];
-    state.vocabularyOverview = overview || null;
-    state.vocabularyRevealed = false;
-    renderVocabulary();
+  async function refreshVocabulary({ libraryOnly = false } = {}) {
+    if (!state.vocabularyBookID) { renderVocabulary(); return; }
+    const owner=state.token,bookID=state.vocabularyBookID,version=libraryOnly?vocabularyVersion:++vocabularyVersion,libraryVersion=++vocabularyLibraryVersion;
+    const wordQuery=new URLSearchParams({book_id:bookID,page:String(state.vocabularyPage),page_size:String(state.vocabularyPageSize)});
+    if(state.vocabularySearch)wordQuery.set("q",state.vocabularySearch);
+    if(state.vocabularyStage)wordQuery.set("stage",state.vocabularyStage);
+    if(!libraryOnly){state.vocabularyLoading=true;renderVocabulary();}
+    try{
+      const wordRequest=api(`/api/v1/words?${wordQuery}`,{returnEnvelope:true});
+      const [wordPage,queue,overview]=await Promise.all(libraryOnly?[wordRequest]:[wordRequest,api(`/api/v1/words/queue?book_id=${encodeURIComponent(bookID)}&limit=100`),api(`/api/v1/vocabulary/overview?book_id=${encodeURIComponent(bookID)}`)]);
+      if(owner!==state.token||bookID!==state.vocabularyBookID||version!==vocabularyVersion)return;
+      if(libraryVersion===vocabularyLibraryVersion){state.vocabularyWords=wordPage.data||[];state.vocabularyMeta=wordPage.meta||{total:0,page:1,total_pages:1};}
+      if(!libraryOnly){state.vocabularyQueue=queue||[];state.vocabularyOverview=overview||null;state.vocabularyError=false;}
+      renderVocabulary();
+    }catch(error){if(owner===state.token&&bookID===state.vocabularyBookID&&version===vocabularyVersion){if(!libraryOnly)state.vocabularyError=true;throw error;}}
+    finally{if(!libraryOnly&&owner===state.token&&version===vocabularyVersion){state.vocabularyLoading=false;renderVocabulary();}}
   }
 
   async function selectVocabularyBook(bookID) {
-    if (!bookID || bookID === state.vocabularyBookID) return;
+    if (!bookID || state.vocabularyReviewing || state.vocabularyInstalling) return;
+    window.clearTimeout(state.vocabularySearchTimer);
+    state.vocabularyQueue=[];state.vocabularyWords=[];state.vocabularyOverview=null;state.vocabularyRevealed=false;
     state.vocabularyBookID = bookID;
+    try { localStorage.setItem(`studyflow.vocabularyBook.${state.user.id}`, bookID); } catch (_) {}
     state.vocabularyPage = 1;
     state.vocabularySearch = "";
     state.vocabularyStage = "";
@@ -1684,25 +1717,17 @@
   }
 
   async function reviewVocabularyWord(rating) {
-    const word = currentVocabularyWord();
-    if (!word || !state.vocabularyRevealed) return;
-    try {
-      await api(`/api/v1/words/${word.id}/reviews`, { method: "POST", body: JSON.stringify({ rating, mode: state.vocabularyMode }) });
+    const word=currentVocabularyWord(),owner=state.token;
+    if(!word||!state.vocabularyRevealed||state.vocabularyReviewing||state.vocabularyLoading||state.vocabularyInstalling||state.vocabularyError)return;
+    state.vocabularyReviewing=true;vocabularyVersion++;renderVocabulary();
+    let saved=false;
+    try{
+      await api(`/api/v1/words/${word.id}/reviews`,{method:"POST",body:JSON.stringify({rating,mode:state.vocabularyMode})});
+      if(owner!==state.token)return;
+      saved=true;state.vocabularyQueue=state.vocabularyQueue.filter(item=>item.id!==word.id);state.vocabularyRevealed=false;
       await refreshVocabulary();
-      notify("已记录这次回忆，系统会在合适的时间再次提醒。");
-    } catch (error) {
-      notify(error.message, "error");
-    }
-  }
-
-  async function deleteVocabularyWord(id) {
-    try {
-      await api(`/api/v1/words/${id}`, { method: "DELETE" });
-      await refreshVocabulary();
-      notify("单词已从词书中删除。");
-    } catch (error) {
-      notify(error.message, "error");
-    }
+    }catch(error){if(owner===state.token){state.vocabularyError=true;notify(saved?"反馈已保存，但下一词加载失败，请刷新学习。":error.message+" 请先刷新学习确认记录，再继续评分。","error");}}
+    finally{if(owner===state.token){state.vocabularyReviewing=false;renderVocabulary();}}
   }
 
   function renderFocus() {
@@ -2040,13 +2065,6 @@
     todoList.innerHTML = state.todoLists.map((list) => `<option value="${list.id}">${escapeHTML(list.name)}${list.kind === "inbox" ? "（收集箱）" : ""}</option>`).join("");
     todoList.value = state.todoLists.some((list) => list.id === previousTodoList) ? previousTodoList : (state.todoLists[0]?.id || "");
 
-    const vocabularyBook = $("#vocab-word-book");
-    const previousVocabularyBook = vocabularyBook.value;
-    vocabularyBook.innerHTML = state.wordBooks.map((book) => `<option value="${book.id}">${escapeHTML(book.name)}</option>`).join("");
-    vocabularyBook.value = state.wordBooks.some((book) => book.id === previousVocabularyBook)
-      ? previousVocabularyBook
-      : state.vocabularyBookID;
-
     renderPlannerSourceSelect();
   }
 
@@ -2172,7 +2190,7 @@
       const vocabularyCatalog = event.target.closest("[data-vocab-catalog]");
       if (vocabularyCatalog) await importVocabularyCatalog(vocabularyCatalog.dataset.vocabCatalog, vocabularyCatalog);
       const vocabularyMode = event.target.closest("[data-vocab-mode]");
-      if (vocabularyMode) {
+      if (vocabularyMode && !vocabularyMode.disabled) {
         state.vocabularyMode = vocabularyMode.dataset.vocabMode;
         state.vocabularyRevealed = false;
         renderVocabulary();
@@ -2180,8 +2198,6 @@
       }
       const vocabularyRating = event.target.closest("[data-vocab-rating]");
       if (vocabularyRating) await reviewVocabularyWord(Number(vocabularyRating.dataset.vocabRating));
-      const vocabularyDelete = event.target.closest("[data-vocab-delete]");
-      if (vocabularyDelete) await deleteVocabularyWord(vocabularyDelete.dataset.vocabDelete);
       const goalPageButton = event.target.closest("[data-goal-page]");
       if (goalPageButton && !goalPageButton.disabled) await updateGoalQuery({ page: Number(goalPageButton.dataset.goalPage) });
       const focusTaskButton = event.target.closest("[data-focus-task-select]");
@@ -2221,8 +2237,8 @@
         event.preventDefault();
         toggleGoalActions(goalCard);
       }
-      if (state.currentView !== "vocabulary" || event.target.closest?.("input, textarea, select, button")) return;
-      if (event.key === " " && currentVocabularyWord() && !state.vocabularyRevealed) {
+      if (state.currentView !== "vocabulary" || event.isComposing || event.repeat || state.vocabularyLoading || state.vocabularyReviewing || state.vocabularyError || event.target.closest?.("input, textarea, select, button") || document.querySelector("dialog[open]")) return;
+      if (event.key === " " && state.vocabularyMode === "flashcard" && currentVocabularyWord() && !state.vocabularyRevealed) {
         event.preventDefault();
         state.vocabularyRevealed = true;
         renderVocabulary();
@@ -2245,19 +2261,21 @@
       state.todoFilters.tag = $("#todo-tag-filter").value;
       renderTodos();
     });
+    $("#vocab-open-catalog").addEventListener("click",()=>{const drawer=$("#vocab-catalog-drawer");drawer.open=true;drawer.scrollIntoView({block:"start",behavior:"auto"});drawer.querySelector("summary").focus();});
+    $("#vocab-refresh").addEventListener("click",()=> (state.vocabularyBookID && state.vocabularyCatalogs.length ? refreshVocabulary() : refresh()).catch(error=>notify(error.message,"error")));
     $("#vocab-search").addEventListener("input", () => {
       state.vocabularySearch = $("#vocab-search").value.trim();
       state.vocabularyPage = 1;
       window.clearTimeout(state.vocabularySearchTimer);
-      state.vocabularySearchTimer = window.setTimeout(() => refreshVocabulary().catch((error) => notify(error.message, "error")), 260);
+      state.vocabularySearchTimer = window.setTimeout(() => refreshVocabulary({libraryOnly:true}).catch((error) => notify(error.message, "error")), 260);
     });
     $("#vocab-stage-filter").addEventListener("change", () => {
       state.vocabularyStage = $("#vocab-stage-filter").value;
       state.vocabularyPage = 1;
-      refreshVocabulary().catch((error) => notify(error.message, "error"));
+      refreshVocabulary({libraryOnly:true}).catch((error) => notify(error.message, "error"));
     });
-    $("#vocab-page-prev").addEventListener("click", () => { if (state.vocabularyPage > 1) { state.vocabularyPage--; refreshVocabulary().catch((error) => notify(error.message, "error")); } });
-    $("#vocab-page-next").addEventListener("click", () => { if (state.vocabularyPage < Number(state.vocabularyMeta.total_pages || 1)) { state.vocabularyPage++; refreshVocabulary().catch((error) => notify(error.message, "error")); } });
+    $("#vocab-page-prev").addEventListener("click", () => { if (state.vocabularyPage > 1) { state.vocabularyPage--; refreshVocabulary({libraryOnly:true}).catch((error) => notify(error.message, "error")); } });
+    $("#vocab-page-next").addEventListener("click", () => { if (state.vocabularyPage < Number(state.vocabularyMeta.total_pages || 1)) { state.vocabularyPage++; refreshVocabulary({libraryOnly:true}).catch((error) => notify(error.message, "error")); } });
     $("#vocab-reveal").addEventListener("click", () => {
       state.vocabularyRevealed = true;
       renderVocabulary();
@@ -2335,7 +2353,7 @@
     $("#vocab-spelling-mode").addEventListener("submit", (event) => {
       event.preventDefault();
       const word = currentVocabularyWord();
-      if (!word || state.vocabularyRevealed) return;
+      if (!word || state.vocabularyRevealed || state.vocabularyLoading || state.vocabularyReviewing || state.vocabularyError) return;
       const expected = word.term.trim().toLocaleLowerCase();
       const actual = $("#vocab-spelling-input").value.trim().toLocaleLowerCase();
       const correct = actual === expected;
@@ -2449,34 +2467,6 @@
     $("#task-form").addEventListener("submit", createTask);
     $("#todo-list-form").addEventListener("submit", (event) => submitForm(event, () => api("/api/v1/todo-lists", { method: "POST", body: JSON.stringify({ name: $("#todo-list-name").value, color: $("#todo-list-color").value }) }), "分类已创建。"));
     $("#todo-form").addEventListener("submit", (event) => submitForm(event, () => api("/api/v1/todos", { method: "POST", body: JSON.stringify({ list_id: $("#todo-list").value, title: $("#todo-title").value, notes: $("#todo-notes").value, priority: $("#todo-priority").value, due_at: toISO($("#todo-due").value), my_day_date: $("#todo-my-day").checked ? localDateKey(new Date()) : "", repeat_rule: $("#todo-repeat").value, tags: $("#todo-tags").value.split(",").map((tag) => tag.trim()).filter(Boolean), steps: $("#todo-steps").value.split("\n").map((step) => step.trim()).filter(Boolean) }) }), "待办已加入清单。"));
-    $("#vocab-book-form").addEventListener("submit", (event) => submitForm(event, () => api("/api/v1/word-books", { method: "POST", body: JSON.stringify({ name: $("#vocab-book-name").value, description: $("#vocab-book-description").value, language: "en", daily_new_limit: Number($("#vocab-book-limit").value || 15) }) }), "词书已创建。"));
-    $("#vocab-word-form").addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const form = event.currentTarget;
-      const button = form.querySelector("button[type=submit]");
-      const bookID = $("#vocab-word-book").value;
-      button.disabled = true;
-      try {
-        await api(`/api/v1/word-books/${bookID}/words`, { method: "POST", body: JSON.stringify({
-          term: $("#vocab-word-term").value,
-          phonetic: $("#vocab-word-phonetic").value,
-          definition: $("#vocab-word-definition").value,
-          example: $("#vocab-word-example").value,
-          example_translation: $("#vocab-word-example-translation").value,
-          tags: $("#vocab-word-tags").value.split(",").map((tag) => tag.trim()).filter(Boolean),
-          notes: $("#vocab-word-notes").value,
-        }) });
-        form.reset();
-        state.vocabularyBookID = bookID;
-        await refreshVocabulary();
-        renderSelects();
-        notify("单词已加入词书，今天就可以开始学习。");
-      } catch (error) {
-        notify(error.message, "error");
-      } finally {
-        button.disabled = false;
-      }
-    });
     $("#planner-block-form").addEventListener("submit", async (event) => {
       event.preventDefault();
       const form = event.currentTarget;
