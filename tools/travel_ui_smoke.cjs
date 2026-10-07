@@ -106,9 +106,10 @@ function target(dataset) { return { dataset, closest: () => ({ dataset }) }; }
   for (const id of nodes.keys()) assert(html.includes(`id="${id}"`), 'missing DOM: ' + id);
   assert(html.includes('data-view="travel"')); assert(html.includes('/static/travel.js')); assert(html.includes('/static/travel.css'));
   // Catch accidental panel nesting and duplicate IDs, a previous source of empty feature pages.
-  const panelStart = html.indexOf('<section id="panel-travel"'), projectStart = html.indexOf('<section id="panel-projects"');
-  assert(panelStart > 0 && projectStart > panelStart);
-  const travelSegment = html.slice(panelStart, projectStart);
+  const panelStart = html.indexOf('<section id="panel-travel"');
+  const followingPanel = html.indexOf('<section id="panel-', panelStart + 1);
+  assert(panelStart > 0 && followingPanel > panelStart);
+  const travelSegment = html.slice(panelStart, followingPanel);
   assert.equal((travelSegment.match(/<section\b/g) || []).length, (travelSegment.match(/<\/section>/g) || []).length);
   const ids = [...html.matchAll(/\bid="(travel[^"]*|panel-travel)"/g)].map(m => m[1]); assert.equal(new Set(ids).size, ids.length);
   const css = fs.readFileSync(path.join(root, 'travel.css'), 'utf8');

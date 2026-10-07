@@ -6,7 +6,7 @@ for (const name of ['今天','记录','成长','探索']) assert(html.includes(`
 assert(!html.includes('id="panel-knowledge"') && !html.includes('/static/knowledge.js'));
 for (const match of html.matchAll(/(?:src|href)="\/static\/([^"?]+)(?:\?[^" ]*)?"/g)) assert(fs.existsSync(root+match[1]), `missing asset ${match[1]}`);
 const navs = [...html.matchAll(/class="nav-link[^"]*"[^>]*data-view="([^"]+)"/g)].map(m=>m[1]);
-assert.equal(navs.length,20); assert(navs.includes('bookmarks')); for (const name of navs) assert(html.includes(`id="panel-${name}"`));
+assert.equal(navs.length,19); assert(navs.includes('bookmarks')); assert(!navs.includes('projects')); for (const name of navs) assert(html.includes(`id="panel-${name}"`));
 const elements = new Map();
 function el(key) { if (!elements.has(key)) elements.set(key,{value:'',textContent:'',innerHTML:'',disabled:false,classList:{toggle(){},remove(){}},parentElement:{classList:{toggle(){}}}}); return elements.get(key); }
 const context = {Date,Intl,URLSearchParams,AbortController,Headers:class{set(){}has(){return false}},console,
