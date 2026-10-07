@@ -41,6 +41,8 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 	private.HandleFunc("GET /api/v1/ledger", s.listLedger)
 	private.HandleFunc("GET /api/v1/inventory", s.listInventory)
 	private.HandleFunc("GET /api/v1/shopping", s.listShopping)
+	private.HandleFunc("GET /api/v1/bookmarks", s.listBookmarks)
+	private.HandleFunc("PUT /api/v1/bookmarks/{id}", s.saveBookmark)
 	private.HandleFunc("PUT /api/v1/shopping/{id}", s.saveShopping)
 	private.HandleFunc("PUT /api/v1/inventory/{id}", s.saveInventory)
 	private.HandleFunc("GET /api/v1/projects", s.listProjects)

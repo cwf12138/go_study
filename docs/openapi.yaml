@@ -24,7 +24,52 @@ tags:
   - name: Travel
   - name: Inventory
   - name: Shopping
+  - name: Bookmarks
 paths:
+  /api/v1/bookmarks:
+    get:
+      tags: [Bookmarks]
+      summary: 当前账号全部收藏，含回收站
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: 最多 3000 条，按更新时间倒序
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: '#/components/schemas/Bookmark' } }
+        '401': { description: 未登录 }
+  /api/v1/bookmarks/{id}:
+    put:
+      tags: [Bookmarks]
+      summary: 创建或完整更新收藏
+      description: 新建传 revision=0，更新传当前版本。相同 ID/版本/内容原样重试幂等；正常收藏按标准化后的 URL 去重，回收站可恢复但不提供永久删除。
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,80}$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BookmarkInput' }
+      responses:
+        '200':
+          description: 保存后的收藏
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Bookmark' }
+        '400': { description: 无效字段或超过数量限制 }
+        '401': { description: 未登录 }
+        '404': { description: 更新目标不存在 }
+        '409': { description: 版本冲突或重复网址 }
   /api/v1/shopping:
     get:
       tags: [Shopping]
@@ -2540,6 +2585,27 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
   schemas:
+    BookmarkInput:
+      type: object
+      required: [url, revision]
+      properties:
+        url: { type: string, maxLength: 2048, description: HTTP/HTTPS 地址，不支持内嵌用户名密码；省略协议自动添加 HTTPS，服务端按字节限制长度 }
+        title: { type: string, maxLength: 160 }
+        folder: { type: string, maxLength: 30 }
+        note: { type: string, maxLength: 2000 }
+        pinned: { type: boolean }
+        read: { type: boolean }
+        deleted: { type: boolean }
+        revision: { type: integer, minimum: 0, maximum: 1000000 }
+    Bookmark:
+      allOf:
+        - $ref: '#/components/schemas/BookmarkInput'
+        - type: object
+          properties:
+            id: { type: string }
+            user_id: { type: string }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
     ShoppingInput:
       type: object
       additionalProperties: false

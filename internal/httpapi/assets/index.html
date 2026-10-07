@@ -40,6 +40,7 @@
     <link rel="stylesheet" href="/static/daynest.css?v=20260925-1">
     <link rel="stylesheet" href="/static/inventory.css?v=20260929-1">
     <link rel="stylesheet" href="/static/shopping.css?v=20261007-1">
+    <link rel="stylesheet" href="/static/bookmarks.css?v=20261007-1">
     <link rel="stylesheet" href="/static/layout.css?v=20260922-1">
   </head>
   <body>
@@ -105,6 +106,7 @@
             <button class="nav-link" type="button" data-view="moods"><span aria-hidden="true">☺</span>心情日记</button>
             <button class="nav-link" type="button" data-view="ledger"><span aria-hidden="true">¥</span>生活账本</button>
             <button class="nav-link" type="button" data-view="inventory"><span aria-hidden="true">▣</span>物品管家</button>
+            <button class="nav-link" type="button" data-view="bookmarks"><span aria-hidden="true">▱</span>随手收藏</button>
             <button class="nav-link" type="button" data-view="timeline"><span aria-hidden="true">↟</span>生活足迹</button>
           </div>
           <div class="nav-group" role="group" aria-label="成长"><p class="nav-group-label">成长</p>
@@ -166,6 +168,17 @@
             <div class="dashboard-main" style="margin-top:20px">
               <article class="surface"><div class="surface-head"><div><p class="eyebrow">TASKS</p><h3>学习中的下一步</h3></div><button class="text-button" type="button" data-goto="tasks">管理任务</button></div><div id="dashboard-tasks" class="stack-list empty-state">还没有任务。创建一个小而明确的下一步吧。</div></article>
             </div>
+          </section>
+
+          <section id="panel-bookmarks" class="panel">
+            <header class="bookmark-hero"><div><p class="eyebrow">A LITTLE LIBRARY OF THE INTERNET</p><h2>好东西，留在手边。</h2><p>常用网站、想读的文章、偶然发现的灵感。<br>不必一直开着标签页，下次来这里找。</p><button id="bookmark-new" class="primary" type="button">＋ 收藏一个链接</button></div><div class="bookmark-hero-art" aria-hidden="true"><span>READ<br>LATER.</span><i>↗</i><b>为下次遇见，留个位置</b></div></header>
+            <div class="bookmark-layout"><aside class="bookmark-sidebar"><p class="eyebrow">我的收藏架</p><div id="bookmark-views"></div><div class="bookmark-folder-heading"><h3>文件夹</h3><small>保存时即可新建</small></div><div id="bookmark-folders"></div><p class="bookmark-help">只保存链接和你的备注，不抓取网页。点击原文将在新标签页打开。</p></aside><main class="bookmark-main">
+              <div class="bookmark-toolbar"><label class="bookmark-search"><span class="bookmark-sr">搜索收藏</span><input id="bookmark-search" type="search" placeholder="搜索标题、网址或备注…" maxlength="200"></label><label><span class="bookmark-sr">排序</span><select id="bookmark-sort"><option value="newest">最近收藏</option><option value="oldest">最早收藏</option><option value="title">标题 A–Z</option></select></label><button id="bookmark-refresh" type="button" class="quiet">刷新</button><button id="bookmark-export" type="button" class="quiet">导出</button></div>
+              <div class="bookmark-section-title"><h3 id="bookmark-heading">全部收藏</h3><span id="bookmark-count"></span></div><p id="bookmark-status" role="status" aria-live="polite"></p>
+              <div id="bookmark-recovery" class="bookmark-recovery" hidden><span>保存结果尚未确认，草稿已保留。请先重试或核对服务器记录。</span><button id="bookmark-retry" class="quiet" type="button">原样重试</button><button id="bookmark-draft" class="quiet" type="button">导出草稿</button><button id="bookmark-reconcile" class="quiet" type="button">重新核对</button></div>
+              <div id="bookmark-grid" class="bookmark-grid"></div><footer class="bookmark-pagination"><button id="bookmark-prev" type="button" class="quiet">← 上一页</button><span id="bookmark-page"></span><button id="bookmark-next" type="button" class="quiet">下一页 →</button></footer>
+            </main></div>
+            <dialog id="bookmark-dialog" class="bookmark-dialog" aria-labelledby="bookmark-editor-title"><form id="bookmark-form"><header><div><p class="eyebrow">KEEP SOMETHING GOOD</p><h2 id="bookmark-editor-title">收藏一个链接</h2></div><button id="bookmark-close" type="button" class="quiet" aria-label="关闭收藏编辑">×</button></header><fieldset id="bookmark-fields"><label>网址<input id="bookmark-url" required maxlength="2048" placeholder="粘贴网址，例如 example.com" autocomplete="url"></label><label>标题 <small>可留空，自动使用网站域名</small><input id="bookmark-title" maxlength="160" placeholder="给它起一个好找的名字"></label><label>文件夹<input id="bookmark-folder" maxlength="30" list="bookmark-folder-options" placeholder="未分类，或输入新文件夹名称"></label><datalist id="bookmark-folder-options"></datalist><label>留一句备注<textarea id="bookmark-note" rows="3" maxlength="2000" placeholder="为什么收藏它？下次想用它做什么？"></textarea></label><div class="bookmark-checks"><label><input id="bookmark-pinned" type="checkbox"> 置顶常用</label><label><input id="bookmark-read" type="checkbox"> 已读</label></div></fieldset><p id="bookmark-form-status" role="status"></p><footer><small>请勿收藏含密码、访问令牌的私密链接。</small><button id="bookmark-save" class="primary" type="submit">保存收藏</button></footer></form></dialog>
           </section>
 
           <section id="panel-inventory" class="panel">
@@ -682,10 +695,11 @@
         <div class="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 执行</span><span>全局快捷键 <kbd>Ctrl K</kbd></span></div>
       </div>
     </dialog>
-    <script src="/static/app.js?v=20261007-vocabulary" defer></script>
+    <script src="/static/app.js?v=20261007-bookmarks" defer></script>
     <script src="/static/travel.js?v=20260925-1" defer></script>
     <script src="/static/inventory.js?v=20261007-shopping" defer></script>
     <script src="/static/shopping.js?v=20261007-1" defer></script>
+    <script src="/static/bookmarks.js?v=20261007-1" defer></script>
     <script src="/static/projects.js?v=20260923-1" defer></script>
     <script src="/static/ledger.js?v=20260922-1" defer></script>
     <script src="/static/habits.js?v=20260923-dashboard" defer></script>

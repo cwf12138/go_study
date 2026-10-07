@@ -337,6 +337,7 @@
       explore: ["LITTLE ADVENTURES", "探索生活"],
       ledger: ["LIFE LEDGER", "生活账本"],
       inventory: ["EVERYDAY COLLECTION", "物品管家"],
+      bookmarks: ["LINK LIBRARY", "随手收藏"],
       projects: ["PROJECT STUDIO", "项目空间"],
       travel: ["NEXT STOP", "旅行手账"],
       english: ["DAILY ENGLISH", "英语精读"],
