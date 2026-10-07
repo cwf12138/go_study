@@ -339,6 +339,7 @@
       ledger: ["LIFE LEDGER", "生活账本"],
       inventory: ["EVERYDAY COLLECTION", "物品管家"],
       bookmarks: ["LINK LIBRARY", "随手收藏"],
+      toolkit: ["EVERYDAY ESSENTIALS", "随身工具"],
       travel: ["NEXT STOP", "旅行手账"],
       english: ["DAILY ENGLISH", "英语精读"],
       literature: ["LITERATURE STUDIO", "阅读书房"],

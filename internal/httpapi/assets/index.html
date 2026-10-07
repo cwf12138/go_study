@@ -40,6 +40,7 @@
     <link rel="stylesheet" href="/static/inventory.css?v=20260929-1">
     <link rel="stylesheet" href="/static/shopping.css?v=20261007-1">
     <link rel="stylesheet" href="/static/bookmarks.css?v=20261007-1">
+    <link rel="stylesheet" href="/static/toolkit.css?v=20261008-1">
     <link rel="stylesheet" href="/static/layout.css?v=20260922-1">
   </head>
   <body>
@@ -98,6 +99,7 @@
             <button class="nav-link" type="button" data-view="calendar"><span aria-hidden="true">▦</span>智能日历</button>
             <button class="nav-link" type="button" data-view="todo"><span aria-hidden="true">☑</span>待办清单</button>
             <button class="nav-link" type="button" data-view="planner"><span aria-hidden="true">▦</span>智能规划</button>
+            <button class="nav-link" type="button" data-view="toolkit"><span aria-hidden="true">⊞</span>随身工具</button>
           </div>
           <div class="nav-group" role="group" aria-label="记录"><p class="nav-group-label">记录</p>
             <button class="nav-link" type="button" data-view="memos"><span aria-hidden="true">▤</span>备忘录</button>
@@ -133,6 +135,7 @@
 
         <div class="content">
           <div class="app-sync-bar"><span id="app-sync-status" role="status" aria-live="polite">等待同步</span><button id="app-sync-retry" class="quiet" type="button">刷新数据</button></div>
+          <div id="toolkit-running" class="toolkit-running" hidden><span id="toolkit-running-message" role="status"></span><button id="toolkit-running-open" type="button">查看计时器 <span id="toolkit-running-time"></span> →</button></div>
           <section id="panel-dashboard" class="panel active">
             <header class="today-heading"><div><p class="eyebrow" id="today-date">DAYNEST · 日常</p><h3>今天，按自己的节奏来。</h3><p>先照顾眼前的小事，再留一点时间给自己。</p></div><span class="today-emblem" aria-hidden="true">☀</span></header>
             <div class="today-shortcuts" aria-label="常用功能">
@@ -166,6 +169,16 @@
             <div class="dashboard-main" style="margin-top:20px">
               <article class="surface"><div class="surface-head"><div><p class="eyebrow">TASKS</p><h3>学习中的下一步</h3></div><button class="text-button" type="button" data-goto="tasks">管理任务</button></div><div id="dashboard-tasks" class="stack-list empty-state">还没有任务。创建一个小而明确的下一步吧。</div></article>
             </div>
+          </section>
+
+          <section id="panel-toolkit" class="panel">
+            <header class="toolkit-heading"><div><p class="eyebrow">SMALL TOOLS. EVERYDAY MAGIC.</p><h2>生活里的小事，顺手解决。</h2><p>算一笔账，等一壶水，记录一次用时。熟悉的小工具，现在就在手边。</p></div><span class="toolkit-local">● 本机运算 · 无需外部接口</span></header>
+            <div class="toolkit-tabs" role="tablist" aria-label="选择随身工具"><button id="toolkit-tab-calc" type="button" role="tab" aria-controls="toolkit-calc" aria-selected="true" data-tool="calc"><b aria-hidden="true">＋</b><span>计算器<small>随手算一算</small></span></button><button id="toolkit-tab-timer" type="button" role="tab" aria-controls="toolkit-timer" aria-selected="false" tabindex="-1" data-tool="timer"><b aria-hidden="true">◴</b><span>倒计时<small>把等待交给时间</small></span></button><button id="toolkit-tab-watch" type="button" role="tab" aria-controls="toolkit-watch" aria-selected="false" tabindex="-1" data-tool="watch"><b aria-hidden="true">◷</b><span>秒表<small>每一段都算数</small></span></button><button id="toolkit-tab-convert" type="button" role="tab" aria-controls="toolkit-convert" aria-selected="false" tabindex="-1" data-tool="convert"><b aria-hidden="true">⇄</b><span>单位换算<small>熟悉另一种尺度</small></span></button></div>
+            <p id="toolkit-storage-status" class="toolkit-footnote" role="status"></p>
+            <section id="toolkit-calc" class="toolkit-content" role="tabpanel" aria-labelledby="toolkit-tab-calc"><div class="toolkit-calculator"><div class="toolkit-screen"><label for="toolkit-expression">输入算式 · 支持键盘</label><input id="toolkit-expression" maxlength="160" autocomplete="off" spellcheck="false" inputmode="text" placeholder="0"><output id="toolkit-result" aria-live="polite">0</output><p id="toolkit-calc-status" role="status">括号优先，先乘除后加减。</p></div><div id="toolkit-keys" class="toolkit-keys"></div><div class="toolkit-calc-actions"><button id="toolkit-copy-result" type="button" class="quiet">复制结果</button><small>% 表示除以 100，例如 200 × 10% = 20</small></div></div><aside class="toolkit-history"><header><div><p class="eyebrow">RECENT CALCULATIONS</p><h3>刚刚算过</h3></div><button id="toolkit-clear-history" class="quiet" type="button">清空</button></header><div id="toolkit-history-list"></div><p class="toolkit-footnote">保留最近 20 条，可点击重新使用。采用浮点近似计算，不适合财务结算或高精度计算。</p></aside></section>
+            <section id="toolkit-timer" class="toolkit-content" role="tabpanel" aria-labelledby="toolkit-tab-timer" hidden><div class="toolkit-clock-card"><p class="eyebrow">A MOMENT, WELL SPENT</p><div id="toolkit-timer-ring" class="toolkit-ring"><div><span id="toolkit-timer-label">留一点时间</span><output id="toolkit-timer-display" aria-label="剩余时间" aria-live="off">00:05:00</output><small id="toolkit-timer-state" role="status">准备开始</small></div></div><div class="toolkit-clock-actions"><button id="toolkit-timer-reset" class="quiet" type="button">重置</button><button id="toolkit-timer-toggle" class="primary" type="button">开始计时</button></div></div><aside class="toolkit-settings"><p class="eyebrow">SET YOUR MOMENT</p><h3>这一会儿，留给什么？</h3><fieldset id="toolkit-timer-fields"><label>计时名称<input id="toolkit-timer-name" maxlength="40" placeholder="例如：泡茶、拉伸、休息"></label><div class="toolkit-time-inputs"><label>时<input id="toolkit-timer-hours" type="number" min="0" max="24" step="1" value="0"></label><label>分<input id="toolkit-timer-minutes" type="number" min="0" max="59" step="1" value="5"></label><label>秒<input id="toolkit-timer-seconds" type="number" min="0" max="59" step="1" value="0"></label></div><div class="toolkit-presets"><button type="button" data-timer-minutes="1">1 分钟</button><button type="button" data-timer-minutes="3">3 分钟</button><button type="button" data-timer-minutes="5">5 分钟</button><button type="button" data-timer-minutes="10">10 分钟</button><button type="button" data-timer-minutes="15">15 分钟</button></div><label class="toolkit-sound"><input id="toolkit-timer-sound" type="checkbox"> 到时播放提示音</label></fieldset><p id="toolkit-timer-feedback" role="status"></p><div class="toolkit-tip"><b>轻量计时，不打扰专注记录。</b><p>支持 1 秒至 24 小时，不计入专注统计。暂停后可继续；更改时长请先重置。</p></div><p class="toolkit-footnote">切换页面或同标签页刷新可恢复。浏览器休眠、系统静音或关闭网页时不保证响铃，请勿用于必须准时提醒的事项。</p></aside></section>
+            <section id="toolkit-watch" class="toolkit-content" role="tabpanel" aria-labelledby="toolkit-tab-watch" hidden><div class="toolkit-clock-card"><p class="eyebrow">MAKE EVERY SECOND COUNT</p><div class="toolkit-watch-face"><span>总用时</span><output id="toolkit-watch-display" aria-label="秒表总用时" aria-live="off">00:00:00.00</output><p id="toolkit-watch-state" role="status">准备开始</p></div><div class="toolkit-clock-actions"><button id="toolkit-watch-lap" type="button" class="quiet" disabled>分段</button><button id="toolkit-watch-toggle" type="button" class="primary">开始</button><button id="toolkit-watch-reset" type="button" class="quiet">重置</button></div><p class="toolkit-footnote">支持暂停、继续，最多记录 50 段。显示精度为百分之一秒，不作为专业测量工具。</p></div><aside class="toolkit-history"><header><div><p class="eyebrow">LAP BY LAP</p><h3>分段记录</h3></div><span id="toolkit-lap-count">0 / 50</span></header><div class="toolkit-lap-head"><span>分段</span><span>单段用时</span><span>累计用时</span></div><div id="toolkit-laps"></div></aside></section>
+            <section id="toolkit-convert" class="toolkit-content" role="tabpanel" aria-labelledby="toolkit-tab-convert" hidden><div class="toolkit-converter"><p class="eyebrow">SAME THING. DIFFERENT SCALE.</p><h3>换一种单位，就懂了。</h3><label>换算类别<select id="toolkit-unit-category"></select></label><div class="toolkit-convert-box"><label>原数值<input id="toolkit-unit-value" type="number" step="any" value="1"></label><label>原单位<select id="toolkit-unit-from"></select></label></div><button id="toolkit-unit-swap" class="quiet toolkit-swap" type="button" aria-label="交换原单位和目标单位">⇅ 交换单位</button><div class="toolkit-convert-box is-result"><div><span>换算结果</span><output id="toolkit-unit-result" aria-live="polite">—</output></div><label>目标单位<select id="toolkit-unit-to"></select></label></div><p id="toolkit-unit-status" role="status"></p><button id="toolkit-unit-copy" type="button" class="quiet">复制结果</button></div><aside class="toolkit-settings"><p class="eyebrow">KEEP IT SIMPLE</p><h3>常用尺度，一次换清。</h3><div class="toolkit-tip"><b>六类日常单位</b><p>长度、重量、温度、面积、容量和时间。输入即换算，支持反向交换。</p></div><div class="toolkit-tip"><b>不依赖网络数据</b><p>使用固定换算比例，不提供汇率；小数结果为近似值，按最多 12 位有效数字显示。</p></div><p class="toolkit-footnote">工具记录仅保留在当前浏览器标签页，不上传服务器、不跨设备同步。退出登录会清空本页工具记录。</p></aside></section>
           </section>
 
           <section id="panel-bookmarks" class="panel">
@@ -683,11 +696,13 @@
         <div class="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 执行</span><span>全局快捷键 <kbd>Ctrl K</kbd></span></div>
       </div>
     </dialog>
-    <script src="/static/app.js?v=20261007-retire-projects" defer></script>
+    <script src="/static/app.js?v=20261008-toolkit" defer></script>
     <script src="/static/travel.js?v=20260925-1" defer></script>
     <script src="/static/inventory.js?v=20261007-shopping" defer></script>
     <script src="/static/shopping.js?v=20261007-1" defer></script>
     <script src="/static/bookmarks.js?v=20261007-1" defer></script>
+    <script src="/static/toolkit-core.js?v=20261008-1" defer></script>
+    <script src="/static/toolkit.js?v=20261008-1" defer></script>
     <script src="/static/ledger.js?v=20260922-1" defer></script>
     <script src="/static/habits.js?v=20260923-dashboard" defer></script>
     <script src="/static/timeline.js?v=20260910-1" defer></script>
