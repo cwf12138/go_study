@@ -7,13 +7,18 @@ const script = fs.readFileSync(path.join(root, "internal/httpapi/assets/english.
 const styles = fs.readFileSync(path.join(root, "internal/httpapi/assets/english.css"), "utf8");
 
 const ids = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]));
+const learningSources = html.match(/<article class="surface english-source-card">[\s\S]*?<\/article>/)?.[0] || "";
+for (const url of ['https://language.chinadaily.com.cn/', 'https://elllo.org/', 'https://www.rong-chang.com/']) {
+  if (!learningSources.includes(`href="${url}"`)) throw new Error(`missing learning source: ${url}`);
+}
+if (/voanews|bbc\.co\.uk|nasa\.gov/.test(learningSources)) throw new Error('unavailable learning sources remain');
 const selectors = [...script.matchAll(/\$\("#([^"]+)"\)/g)].map((match) => match[1]);
 const missing = [...new Set(selectors.filter((id) => !ids.has(id)))];
 if (missing.length) throw new Error(`english.js references missing HTML ids: ${missing.join(", ")}`);
 
 for (const marker of [
   'data-view="english"', 'id="panel-english"', 'id="english-reader-dialog"',
-  '/static/english.js?v=20260901-7', '/static/english.css?v=20260901-7',
+  '/static/english.js?v=20261007-2', '/static/english.css?v=20261007-1',
 ]) if (!html.includes(marker)) throw new Error(`missing HTML marker: ${marker}`);
 
 for (const marker of [

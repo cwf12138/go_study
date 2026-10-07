@@ -21,6 +21,7 @@ type Service struct {
 	historyMu         sync.RWMutex
 	historyCache      map[string]historyCacheEntry
 	englishMu         sync.RWMutex
+	englishFetching   chan struct{}
 	englishCache      englishCacheEntry
 	literatureMu      sync.RWMutex
 	literatureCatalog map[string]literatureCatalogCacheEntry

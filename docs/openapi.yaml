@@ -3398,6 +3398,9 @@ components:
     EnglishSourceStatus:
       type: object
       properties:
+        error: { type: string, description: Sanitized source failure reason }
+        stale: { type: boolean, description: Articles are retained from a previous successful fetch }
+        last_success_at: { type: string, format: date-time }
         name: { type: string }
         url: { type: string, format: uri }
         available: { type: boolean }
@@ -3405,6 +3408,8 @@ components:
     EnglishFeed:
       type: object
       properties:
+        offline: { type: boolean, description: Only original offline exercises are available }
+        next_refresh_at: { type: string, format: date-time }
         articles: { type: array, items: { $ref: "#/components/schemas/EnglishArticle" } }
         sources: { type: array, items: { $ref: "#/components/schemas/EnglishSourceStatus" } }
         fetched_at: { type: string, format: date-time }

@@ -9,6 +9,7 @@ import (
 )
 
 func (s *Server) englishArticles(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
 	refresh, _ := strconv.ParseBool(r.URL.Query().Get("refresh"))
 	feed, err := s.service.EnglishFeed(r.Context(), refresh)
 	if err != nil {

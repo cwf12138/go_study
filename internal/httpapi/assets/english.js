@@ -1,6 +1,9 @@
 (() => {
   "use strict";
 
+  let loadVersion = 0;
+  let lastAttempt = 0;
+
   const state = { feed: null, articles: [], library: [], overview: {}, books: [], selected: null, words: [], initialized: false, loading: false, query: "", category: "", level: "", token: "" };
   const $ = (selector) => document.querySelector(selector);
   const escapeHTML = (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
@@ -10,13 +13,20 @@
     const token = localStorage.getItem("studyflow.token") || "";
     if (token) headers.set("Authorization", `Bearer ${token}`);
     if (options.body) headers.set("Content-Type", "application/json");
-    let response;
-    try { response = await fetch(path, { ...options, headers }); }
-    catch { throw new Error("无法连接英语精读服务，请确认后端仍在运行。"); }
-    if (response.status === 204) return null;
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload?.error?.message || `请求失败（${response.status}）`);
-    return payload.data;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 20000);
+    try {
+      const response = await fetch(path, { ...options, headers, signal: controller.signal, cache: "no-store" });
+      if (token !== (localStorage.getItem("studyflow.token") || "")) throw new Error("账号已切换，请重新加载。");
+      if (response.status === 204) return null;
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error?.message || `请求失败（${response.status}），请检查后端版本与登录状态。`);
+      if (!payload || !("data" in payload)) throw new Error("服务返回格式异常，请确认访问的是当前版本后端。");
+      return payload.data;
+    } catch (error) {
+      if (error.name === "AbortError") throw new Error("请求超时，请稍后重试。");
+      throw error;
+    } finally { window.clearTimeout(timer); }
   }
 
   function notify(message, type = "success") {
@@ -26,7 +36,7 @@
   }
 
   function formatPublished(value) {
-    const date = new Date(value); if (Number.isNaN(date.getTime()) || date.getUTCFullYear() < 2000) return "最新内容";
+    const date = new Date(value); if (Number.isNaN(date.getTime()) || date.getUTCFullYear() < 2000) return "未提供发布时间";
     const diff = Date.now() - date.getTime();
     if (diff >= 0 && diff < 3_600_000) return `${Math.max(1, Math.floor(diff / 60_000))} 分钟前`;
     if (diff >= 0 && diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`;
@@ -36,9 +46,19 @@
   const categoryLabel = (value) => ({ world: "世界", science: "科学", technology: "科技", learning: "学习方法" }[value] || "综合");
   const existingReading = (articleID) => state.library.find((item) => item.article?.id === articleID);
 
+  function setRefreshBusy(busy) {
+    const button = $("#english-refresh");
+    if (!button) return;
+    button.disabled = busy;
+    button.textContent = busy ? "↻ 更新中…" : "↻ 更新内容";
+    button.setAttribute("aria-busy", String(busy));
+  }
+
   function syncEnglishAccount() {
     const token = localStorage.getItem("studyflow.token") || "";
     if (token === state.token) return token;
+    loadVersion++; state.loading = false;
+    setRefreshBusy(false);
     state.token = token; state.feed = null; state.articles = []; state.library = []; state.overview = {}; state.books = []; state.selected = null; state.words = []; state.initialized = false;
     return token;
   }
@@ -68,10 +88,12 @@
 
   function renderSources() {
     const sources = state.feed?.sources || [];
-    $("#english-sources").innerHTML = sources.length ? sources.map((source) => `<div class="english-source-row ${source.available ? "available" : ""}"><span><i></i>${escapeHTML(source.name)}</span><b>${source.available ? `${source.count} 篇` : "暂不可用"}</b></div>`).join("") : '<span class="english-loading">暂无状态信息</span>';
+    $("#english-sources").innerHTML = sources.length ? sources.map((source) => `<div class="english-source-item"><div class="english-source-row ${source.available ? "available" : ""}"><span><i></i>${escapeHTML(source.name)}</span><b>${source.available ? `${source.count} 篇` : source.stale ? `缓存 ${source.count} 篇` : "暂不可用"}</b></div>${source.error ? `<small>${escapeHTML(source.error)}</small>` : ""}${source.stale && source.last_success_at ? `<small>最近成功：${escapeHTML(new Date(source.last_success_at).toLocaleString("zh-CN"))}</small>` : ""}</div>`).join("") : '<span class="english-loading">暂无状态信息</span>';
     const status = $("#english-feed-status");
-    if (state.feed?.degraded) { status.className = "english-feed-status warning"; status.textContent = "实时 RSS 暂时不可达，已切换到 StudyFlow 原创离线精读；恢复联网后点击“更新内容”。"; }
-    else { const available = sources.filter((source) => source.available).length; status.className = "english-feed-status"; status.textContent = `已连接 ${available}/${sources.length} 个官方资讯源 · ${state.articles.length} 篇摘要 · ${formatPublished(state.feed?.fetched_at)}`; }
+    const offline = state.feed?.offline || (state.articles.length > 0 && state.articles.every((article) => article.offline));
+    const checked = state.feed?.fetched_at ? new Date(state.feed.fetched_at).toLocaleString("zh-CN") : "尚未检查";
+    status.classList.toggle("warning", !!state.feed?.degraded);
+    status.textContent = offline ? `资讯暂不可达，当前为原创离线练习，并非最新新闻。检查于 ${checked}；页面打开期间将自动重试。` : `可用来源 ${sources.filter((source) => source.available).length}/${sources.length} · ${state.articles.length} 篇摘要${sources.some((source) => source.stale) ? "（含缓存内容）" : ""} · 检查于 ${checked}。按来源发布节奏更新，可手动刷新。`;
   }
 
   function renderOverview() {
@@ -87,15 +109,49 @@
     container.innerHTML = state.library.map((reading) => `<article class="english-library-row"><div><div><span class="english-library-status ${reading.status}">${reading.status === "completed" ? "已精读" : "稍后读"}</span> <span class="english-source-label">${escapeHTML(reading.article.source)}</span></div><h4>${escapeHTML(reading.article.title)}</h4><p>${reading.article.reading_minutes || 1} 分钟 · ${reading.new_words?.length || 0} 个生词 · 更新于 ${formatPublished(reading.updated_at)}</p></div><div class="english-library-row-actions"><button class="quiet" type="button" data-english-open="${escapeHTML(reading.article.id)}">打开</button><button class="quiet" type="button" data-english-toggle="${escapeHTML(reading.id)}">${reading.status === "completed" ? "转为待读" : "标记完成"}</button><button class="quiet danger-text" type="button" data-english-delete="${escapeHTML(reading.id)}">删除</button></div></article>`).join("");
   }
 
+  async function loadReadingData(version, token) {
+    const [library, overview, books] = await Promise.allSettled([englishAPI("/api/v1/english/library"), englishAPI("/api/v1/english/overview"), englishAPI("/api/v1/word-books")]);
+    if (version !== loadVersion || token !== (localStorage.getItem("studyflow.token") || "")) return;
+    if (library.status === "fulfilled") state.library = library.value || [];
+    if (overview.status === "fulfilled") state.overview = overview.value || {};
+    if (books.status === "fulfilled") state.books = books.value || [];
+    renderOverview(); renderLibrary();
+    if (!$("#english-reader-dialog").open) renderWordBooks();
+    if (state.feed) renderFeed();
+  }
+
   async function loadEnglish(refresh = false) {
-    if (!syncEnglishAccount()) return;
+    if (!syncEnglishAccount()) {
+      setRefreshBusy(false);
+      if (refresh) notify("请先登录，再更新英语资讯。", "error");
+      return;
+    }
     if (state.loading) return; state.loading = true;
+    const version = ++loadVersion, token = state.token;
+    lastAttempt = Date.now();
+    setRefreshBusy(true);
+    $("#english-feed-status").textContent = "正在检查资讯来源…";
+    const oldIDs = new Set(state.articles.map((article) => article.id));
+    // Reading data must never hold the feed refresh button disabled.
+    if (!refresh || !state.initialized) loadReadingData(version, token).catch(() => {});
     try {
-      const [feed, library, overview, books] = await Promise.all([englishAPI(`/api/v1/english/articles${refresh ? "?refresh=true" : ""}`), englishAPI("/api/v1/english/library"), englishAPI("/api/v1/english/overview"), englishAPI("/api/v1/word-books")]);
-      state.feed = feed; state.articles = feed?.articles || []; state.library = library || []; state.overview = overview || {}; state.books = books || []; state.initialized = true;
-      renderFeed(); renderSources(); renderOverview(); renderLibrary(); renderWordBooks();
-    } catch (error) { $("#english-article-grid").innerHTML = `<div class="english-empty">${escapeHTML(error.message)}<br><button class="quiet" type="button" data-english-retry>重新加载</button></div>`; notify(error.message, "error"); }
-    finally { state.loading = false; $("#english-refresh").disabled = false; }
+      const feed = await englishAPI(`/api/v1/english/articles${refresh ? "?refresh=true" : ""}`);
+      if (version !== loadVersion || token !== (localStorage.getItem("studyflow.token") || "")) return;
+      if (!Array.isArray(feed?.articles)) throw new Error("资讯返回格式异常");
+      state.feed = feed; state.articles = feed.articles; state.initialized = true;
+      renderFeed(); renderSources();
+      if (refresh) {
+        const added = state.articles.filter((article) => !article.offline && !oldIDs.has(article.id)).length;
+        if (feed.degraded) notify("已检查来源；部分来源暂不可用，详情见资讯源状态。", "error");
+        else notify(added ? `更新完成，新增 ${added} 篇摘要。` : "已检查最新资讯，暂无新增内容。");
+      }
+    } catch (error) {
+      if (version !== loadVersion || token !== (localStorage.getItem("studyflow.token") || "")) return;
+      $("#english-feed-status").classList.add("warning");
+      $("#english-feed-status").textContent = `${error.message}${state.articles.length ? " 已保留上次内容。" : " 请点击更新内容重试。"}`;
+      if (!state.articles.length) $("#english-article-grid").innerHTML = `<div class="english-empty">${escapeHTML(error.message)}<br><button class="quiet" type="button" data-english-retry>重新加载</button></div>`;
+      notify(error.message, "error");
+    } finally { if (version === loadVersion) { state.loading = false; setRefreshBusy(false); } }
   }
 
   function renderWordBooks() {
@@ -153,7 +209,7 @@
 
   function bindEvents() {
     document.querySelector('[data-view="english"]')?.addEventListener("click", () => { syncEnglishAccount(); if (!state.initialized) loadEnglish(); });
-    $("#english-refresh").addEventListener("click", () => { $("#english-refresh").disabled = true; loadEnglish(true); });
+    $("#english-refresh").addEventListener("click", () => loadEnglish(true));
     $("#english-search").addEventListener("input", () => { state.query = $("#english-search").value.trim(); renderFeed(); });
     $("#english-category").addEventListener("change", () => { state.category = $("#english-category").value; renderFeed(); });
     $("#english-level").addEventListener("change", () => { state.level = $("#english-level").value; renderFeed(); });
@@ -181,4 +237,9 @@
   }
 
   bindEvents();
+  window.setInterval(() => {
+    if (document.hidden || !$("#panel-english")?.classList.contains("active") || $("#english-reader-dialog")?.open || state.loading) return;
+    const next = Date.parse(state.feed?.next_refresh_at || "") || 0;
+    if (Date.now() >= next && Date.now() - lastAttempt >= 60000) loadEnglish();
+  }, 60000);
 })();

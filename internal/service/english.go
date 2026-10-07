@@ -5,8 +5,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -33,10 +35,9 @@ type englishFetchResult struct {
 
 var englishHTMLTags = regexp.MustCompile(`<[^>]*>`)
 var englishSources = []englishFeedSource{
-	{Name: "BBC World", URL: "https://feeds.bbci.co.uk/news/world/rss.xml", Homepage: "https://www.bbc.com/news/world", Category: "world"},
-	{Name: "BBC Science", URL: "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml", Homepage: "https://www.bbc.com/news/science_and_environment", Category: "science"},
-	{Name: "BBC Technology", URL: "https://feeds.bbci.co.uk/news/technology/rss.xml", Homepage: "https://www.bbc.com/news/technology", Category: "technology"},
-	{Name: "NASA JPL", URL: "https://www.jpl.nasa.gov/feeds/news/", Homepage: "https://www.jpl.nasa.gov/news/", Category: "science"},
+	{Name: "ScienceDaily", URL: "https://www.sciencedaily.com/rss/top/science.xml", Homepage: "https://www.sciencedaily.com/", Category: "science"},
+	{Name: "ScienceDaily Technology", URL: "https://www.sciencedaily.com/rss/top/technology.xml", Homepage: "https://www.sciencedaily.com/news/matter_energy/technology/", Category: "technology"},
+	{Name: "UN News", URL: "https://news.un.org/feed/subscribe/en/news/all/rss.xml", Homepage: "https://news.un.org/en/", Category: "world"},
 }
 
 type rssDocument struct {
@@ -62,17 +63,32 @@ type rssItem struct {
 
 func (s *Service) EnglishFeed(ctx context.Context, refresh bool) (domain.EnglishFeed, error) {
 	now := s.now().UTC()
-	if !refresh {
-		s.englishMu.RLock()
-		cached := s.englishCache
-		s.englishMu.RUnlock()
-		if !cached.expiresAt.IsZero() && now.Before(cached.expiresAt) {
-			return cached.feed, nil
+	s.englishMu.Lock()
+	if pending := s.englishFetching; pending != nil {
+		s.englishMu.Unlock()
+		select {
+		case <-ctx.Done():
+			return domain.EnglishFeed{}, ctx.Err()
+		case <-pending:
+			return s.EnglishFeed(ctx, false)
 		}
 	}
-	requestCtx, cancel := context.WithTimeout(ctx, 6*time.Second)
+	previous := s.englishCache
+	if !refresh && now.Before(previous.expiresAt) {
+		s.englishMu.Unlock()
+		return previous.feed, nil
+	}
+	s.englishFetching = make(chan struct{})
+	s.englishMu.Unlock()
+	defer func() {
+		s.englishMu.Lock()
+		close(s.englishFetching)
+		s.englishFetching = nil
+		s.englishMu.Unlock()
+	}()
+	requestCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
 	defer cancel()
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := &http.Client{Timeout: 10 * time.Second}
 	results := make(chan englishFetchResult, len(englishSources))
 	for _, source := range englishSources {
 		go func(source englishFeedSource) {
@@ -83,22 +99,73 @@ func (s *Service) EnglishFeed(ctx context.Context, refresh bool) (domain.English
 	feed := domain.EnglishFeed{Articles: []domain.EnglishArticle{}, Sources: []domain.EnglishSourceStatus{}, FetchedAt: now}
 	for range englishSources {
 		result := <-results
-		feed.Sources = append(feed.Sources, domain.EnglishSourceStatus{Name: result.source.Name, URL: result.source.Homepage, Available: result.err == nil, Count: len(result.articles)})
+		status := domain.EnglishSourceStatus{Name: result.source.Name, URL: result.source.Homepage, Available: result.err == nil}
+		if result.err == nil {
+			status.LastSuccessAt = &now
+		} else {
+			feed.Degraded = true
+			status.Error = englishSourceError(result.err)
+			for _, old := range previous.feed.Sources {
+				if old.Name == status.Name && old.LastSuccessAt != nil {
+					status.LastSuccessAt = old.LastSuccessAt
+					if age := now.Sub(*old.LastSuccessAt); age >= 0 && age < 24*time.Hour {
+						for _, article := range previous.feed.Articles {
+							if article.Source == status.Name && !article.Offline {
+								result.articles = append(result.articles, article)
+							}
+						}
+					}
+				}
+			}
+			status.Stale = len(result.articles) > 0
+		}
+		status.Count = len(result.articles)
+		feed.Sources = append(feed.Sources, status)
 		feed.Articles = append(feed.Articles, result.articles...)
 	}
 	sort.Slice(feed.Sources, func(i, j int) bool { return feed.Sources[i].Name < feed.Sources[j].Name })
 	sort.Slice(feed.Articles, func(i, j int) bool { return feed.Articles[i].PublishedAt.After(feed.Articles[j].PublishedAt) })
 	if len(feed.Articles) == 0 {
 		feed.Degraded = true
+		feed.Offline = true
 		feed.Articles = offlineEnglishArticles(now)
 	}
 	if len(feed.Articles) > 48 {
 		feed.Articles = feed.Articles[:48]
 	}
+	if err := ctx.Err(); err != nil {
+		return domain.EnglishFeed{}, err
+	}
+	ttl := 20 * time.Minute
+	if feed.Degraded {
+		ttl = time.Minute
+	}
+	feed.FetchedAt = s.now().UTC()
+	feed.NextRefreshAt = feed.FetchedAt.Add(ttl)
 	s.englishMu.Lock()
-	s.englishCache = englishCacheEntry{feed: feed, expiresAt: now.Add(20 * time.Minute)}
+	s.englishCache = englishCacheEntry{feed: feed, expiresAt: feed.NextRefreshAt}
 	s.englishMu.Unlock()
 	return feed, nil
+}
+
+type englishHTTPError int
+
+func (e englishHTTPError) Error() string { return fmt.Sprintf("来源返回 HTTP %d", e) }
+
+func englishSourceError(err error) string {
+	var status englishHTTPError
+	var network net.Error
+	var syntax *xml.SyntaxError
+	switch {
+	case errors.As(err, &status):
+		return status.Error()
+	case errors.As(err, &network) && network.Timeout():
+		return "连接超时，请检查网络或代理"
+	case errors.As(err, &syntax):
+		return "来源返回的 RSS 格式无法解析"
+	default:
+		return "来源连接失败或无可用摘要，请检查网络后重试"
+	}
 }
 
 func fetchEnglishSource(ctx context.Context, client *http.Client, source englishFeedSource) ([]domain.EnglishArticle, error) {
@@ -114,7 +181,7 @@ func fetchEnglishSource(ctx context.Context, client *http.Client, source english
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("feed returned %s", resp.Status)
+		return nil, englishHTTPError(resp.StatusCode)
 	}
 	var document rssDocument
 	if err := xml.NewDecoder(io.LimitReader(resp.Body, 2<<20)).Decode(&document); err != nil {

@@ -670,17 +670,22 @@ type EnglishArticle struct {
 }
 
 type EnglishSourceStatus struct {
-	Name      string `json:"name"`
-	URL       string `json:"url"`
-	Available bool   `json:"available"`
-	Count     int    `json:"count"`
+	Error         string     `json:"error,omitempty"`
+	Stale         bool       `json:"stale"`
+	LastSuccessAt *time.Time `json:"last_success_at,omitempty"`
+	Name          string     `json:"name"`
+	URL           string     `json:"url"`
+	Available     bool       `json:"available"`
+	Count         int        `json:"count"`
 }
 
 type EnglishFeed struct {
-	Articles  []EnglishArticle      `json:"articles"`
-	Sources   []EnglishSourceStatus `json:"sources"`
-	FetchedAt time.Time             `json:"fetched_at"`
-	Degraded  bool                  `json:"degraded"`
+	Offline       bool                  `json:"offline"`
+	NextRefreshAt time.Time             `json:"next_refresh_at"`
+	Articles      []EnglishArticle      `json:"articles"`
+	Sources       []EnglishSourceStatus `json:"sources"`
+	FetchedAt     time.Time             `json:"fetched_at"`
+	Degraded      bool                  `json:"degraded"`
 }
 
 type EnglishReading struct {
