@@ -11,7 +11,7 @@ let now=1000000,subject='user-one';const store=new Map();
 class Clock extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}}
 function harness(){
   const elements=new Map();
-  function el(id){if(!elements.has(id))elements.set(id,{id,value:'',checked:false,disabled:false,hidden:false,textContent:'',innerHTML:'',dataset:{},listeners:{},style:{setProperty(){}},classList:{contains(){return id==='panel-toolkit';}},addEventListener(type,fn){this.listeners[type]=fn;},setAttribute(k,v){this[k]=v;},focus(){},querySelectorAll(selector){if(id==='panel-toolkit'&&selector==='[data-tool]')return ['calc','timer','watch','convert'].map(name=>{const b=el('toolkit-tab-'+name);b.dataset.tool=name;return b;});return[];}});return elements.get(id);}
+  function el(id){if(!elements.has(id))elements.set(id,{id,value:'',checked:false,disabled:false,hidden:false,textContent:'',innerHTML:'',dataset:{},listeners:{},style:{setProperty(){}},classList:{toggle(){},contains(){return id==='panel-toolkit';}},addEventListener(type,fn){this.listeners[type]=fn;},setAttribute(k,v){this[k]=v;},focus(){},setRangeText(text,start,end){this.value=this.value.slice(0,start)+text+this.value.slice(end);this.selectionStart=this.selectionEnd=start+text.length;},querySelectorAll(selector){if(id==='panel-toolkit'&&selector==='[data-tool]')return ['calc','timer','watch','convert','clock'].map(name=>{const b=el('toolkit-tab-'+name);b.dataset.tool=name;return b;});return[];}});return elements.get(id);}
   el('toolkit-unit-value').value='1';
   const window={setInterval(){}};
   const context=vm.createContext({window,Date:Clock,Intl,console,confirm:()=>true,atob:v=>Buffer.from(v,'base64').toString(),localStorage:{getItem:()=>subject?'x.'+Buffer.from(JSON.stringify({sub:subject})).toString('base64url')+'.x':''},sessionStorage:{getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)},navigator:{clipboard:{writeText:async()=>{}}},MutationObserver:class{observe(){}},document:{getElementById:el,querySelector:()=>({click(){}}),addEventListener(){}},});
@@ -23,6 +23,13 @@ function harness(){
 const {C,api,el}=harness();
 for(const [expression,value] of [['2+3*4',14],['(2+3)*4',20],['-2*-3',6],['.1+.2',.3],['200×10%',20],['100+10%',100.1],['1e3/2',500],['-(3+4)',-7]])assert.equal(C.calculate(expression),value,expression);
 for(const expression of ['1/0','1+','alert(1)','2**3','1..2','()','2(3)','Infinity','1e999'])assert.throws(()=>C.calculate(expression),expression);
+for(const [expression,value] of [['2^3^2',512],['-2^2',-4],['(-2)^2',4],['2^-3',.125],['sqrt(81)',9],['cbrt(-8)',-2],['log(100)',2],['ln(e)',1],['sin(30)',.5],['cos(180)',-1],['tan(45)',1],['5!',120],['0!',1],['abs(-3)',3]])assert.equal(C.calculate(expression),value,expression);
+assert.equal(C.calculate('sin(pi/2)','rad'),1);
+for(const expression of ['sqrt(-1)','log(0)','ln(-2)','tan(90)','(-1)!','171!','2.5!','sin','foo(2)','2pi','1.constructor'])assert.throws(()=>C.calculate(expression),expression);
+const midnight=C.clockTime(Date.parse('2026-10-08T16:00:00Z'),'Asia/Shanghai');assert.equal(midnight.hour,0);assert.match(midnight.date,/10月9日/);
+assert.equal(C.clockTime(Date.parse('2026-01-01T12:00:00Z'),'America/New_York').hour,7);
+assert.equal(C.clockTime(Date.parse('2026-07-01T12:00:00Z'),'America/New_York').hour,8);
+assert.equal(C.clockTime(Date.parse('2026-10-08T23:00:00Z'),'Asia/Tokyo').hour,8);
 assert.equal(C.convert(1,'length','mile','m'),1609.344);assert.equal(C.convert(1,'mass','lb','g'),453.59237);assert.equal(C.convert(0,'temperature','c','f'),32);assert.equal(C.convert(32,'temperature','f','c'),0);assert.equal(C.convert(0,'temperature','k','c'),-273.15);assert.equal(C.convert(1,'volume','m3','l'),1000);assert.equal(C.convert(1,'area','ha','m2'),10000);assert.equal(C.convert(2,'time','hour','minute'),120);
 assert.throws(()=>C.convert(-274,'temperature','c','f'));assert.throws(()=>C.convert('','length','m','km'));assert.throws(()=>C.convert('oops','length','m','km'));
 assert.equal(C.duration(3661123,true),'01:01:01.12');
@@ -43,5 +50,14 @@ el('toolkit-timer-hours').value='24';el('toolkit-timer-minutes').value='1';el('t
 el('toolkit-timer-hours').value='0';el('toolkit-timer-minutes').value='0';api.timerToggle();assert(!api.data.timer.running);
 for(let i=0;i<25;i++){el('toolkit-expression').value=String(i)+'+1';api.evaluate();}assert.equal(api.data.history.length,20);
 const storageFailure=harness();storageFailure.context.sessionStorage.setItem=()=>{throw Error('storage denied');};storageFailure.el('toolkit-expression').value='3*4';storageFailure.api.evaluate();assert.equal(storageFailure.el('toolkit-result').textContent,'12');assert.match(storageFailure.el('toolkit-storage-status').textContent,/无法保存/);
-subject='';api.sync();assert(el('toolkit-timer-toggle').disabled);assert(el('toolkit-running').hidden);
-console.log('Toolkit passed: arithmetic/unsafe input, six unit categories, timer pause/resume/expiry/refresh, stopwatch laps, tabs, history and account isolation.');
+el('toolkit-mode-scientific').listeners.click();assert.equal(el('toolkit-science-keys').hidden,false);
+el('toolkit-expression').value='30';el('toolkit-expression').selectionStart=0;el('toolkit-expression').selectionEnd=2;
+el('toolkit-science-keys').listeners.click({target:{closest:()=>({dataset:{science:'sin'}})}});assert.equal(el('toolkit-expression').value,'sin(30)');api.evaluate();assert.equal(el('toolkit-result').textContent,'0.5');
+el('toolkit-angle').listeners.click();el('toolkit-expression').value='sin(pi/2)';api.evaluate();assert.equal(el('toolkit-result').textContent,'1');assert.equal(api.data.history[0].angle,'rad');
+el('toolkit-mode-basic').listeners.click();assert.equal(el('toolkit-science-keys').hidden,true);assert.equal(el('toolkit-expression').value,'sin(pi/2)');
+el('toolkit-history-list').listeners.click({target:{closest:()=>({dataset:{history:'0'}})}});assert.equal(api.data.calculator.mode,'scientific');assert.equal(api.data.calculator.angle,'rad');
+now=Date.parse('2026-10-08T16:00:00Z');el('toolkit-clock-zone').value='Asia/Shanghai';el('toolkit-clock-12h').checked=true;el('toolkit-clock-zone').listeners.change();api.selectTool('clock');api.tick();assert.equal(el('toolkit-clock-digital').textContent,'12:00:00');assert.equal(el('toolkit-clock-period').textContent,'上午');
+el('toolkit-clock-seconds').checked=false;el('toolkit-clock-seconds').listeners.change();assert.equal(el('toolkit-clock-digital').textContent,'12:00');assert.equal(el('toolkit-clock-second').style.display,'none');
+assert.equal(C.restore({calculator:{mode:'scientific',angle:'rad'},clock:{zone:'Asia/Tokyo',hour12:true,seconds:false}},now).clock.zone,'Asia/Tokyo');
+subject='';api.sync();assert(el('toolkit-timer-toggle').disabled);assert(el('toolkit-running').hidden);assert.equal(api.data.calculator.mode,'basic');assert.equal(api.data.clock.zone,'local');
+console.log('Toolkit passed: basic/scientific parser, angle history/modes, clock midnight/DST/12h, units, timer recovery, stopwatch laps and account isolation.');

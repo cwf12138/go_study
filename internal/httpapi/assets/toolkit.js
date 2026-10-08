@@ -4,6 +4,7 @@
   if(!C||!panel)return;
   const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   let data=C.fresh(),owner=null,currentTool='calc',calcResult=null,unitResult=null,audio=null;
+  let wallClockKey='',clockQuiet=false;
   const storageKey=id=>'daynest.toolkit.session.v1.'+id;
   const showText=(id,value)=>{if($(id).textContent!==value)$(id).textContent=value;};
   function account(){try{const token=localStorage.getItem('studyflow.token')||'',part=token.split('.')[1]||'';const claim=JSON.parse(atob(part.replace(/-/g,'+').replace(/_/g,'/').padEnd(Math.ceil(part.length/4)*4,'=')));return typeof claim.sub==='string'&&/^[A-Za-z0-9_-]{1,100}$/.test(claim.sub)?claim.sub:'';}catch{return '';}}
@@ -14,21 +15,23 @@
     owner=next;data=C.fresh();calcResult=null;$('expression').value='';$('result').textContent='0';$('calc-status').textContent='括号优先，先乘除后加减。';$('timer-feedback').textContent='';$('storage-status').textContent='当前标签页保存 · 同标签页刷新可恢复 · 退出登录后清空';
     if(owner){try{data=C.restore(JSON.parse(sessionStorage.getItem(storageKey(owner))),Date.now());}catch{}}
     $('unit-value').value='1';$('unit-category').value='length';units(true);
-    renderHistory();renderTimerSettings();renderLaps();renderClocks();return !!owner;
+    $('clock-zone').value=data.clock.zone;$('clock-12h').checked=data.clock.hour12;$('clock-seconds').checked=data.clock.seconds;
+    clockQuiet=false;$('clock').classList.toggle('is-quiet',false);$('clock-quiet').setAttribute('aria-pressed','false');$('clock-quiet').textContent='简洁表盘';wallClockKey='';renderWallClock();
+    renderCalcMode();renderHistory();renderTimerSettings();renderLaps();renderClocks();return !!owner;
   }
   function selectTool(name,focus=false){
-    if(!['calc','timer','watch','convert'].includes(name))return;
+    if(!['calc','timer','watch','convert','clock'].includes(name))return;
     currentTool=name;
     for(const button of panel.querySelectorAll('[data-tool]')){const active=button.dataset.tool===name;button.setAttribute('aria-selected',String(active));button.tabIndex=active?0:-1;$(button.dataset.tool).hidden=!active;}
-    if(focus)$('tab-'+name).focus();renderClocks();
+    if(focus)$('tab-'+name).focus();renderClocks();if(name==='clock')renderWallClock();
   }
   function renderHistory(){
-    $('history-list').innerHTML=data.history.map((h,i)=>`<button type="button" data-history="${i}" title="重新使用此算式"><span>${escape(h.expression)}</span><strong>= ${escape(h.result)}</strong></button>`).join('')||'<p class="toolkit-empty">还没有计算记录。<br>算过的答案，会留在这里。</p>';
+    $('history-list').innerHTML=data.history.map((h,i)=>`<button type="button" data-history="${i}" title="重新使用此算式"><span>${escape(h.expression)} · ${h.angle==='rad'?'RAD':'DEG'}</span><strong>= ${escape(h.result)}</strong></button>`).join('')||'<p class="toolkit-empty">还没有计算记录。<br>算过的答案，会留在这里。</p>';
     $('clear-history').disabled=!data.history.length;
   }
   function evaluate(){
     if(!sync()){ $('calc-status').textContent='请先登录。';return; }
-    try{const expression=$('expression').value.trim();calcResult=C.calculate(expression);$('result').textContent=String(calcResult);$('calc-status').textContent='已计算，可复制结果或点击历史重用。';data.history=[{expression,result:calcResult},...data.history].slice(0,20);renderHistory();persist();}
+    try{const expression=$('expression').value.trim();calcResult=C.calculate(expression,data.calculator.angle);$('result').textContent=String(calcResult);$('calc-status').textContent='已计算，可复制结果或点击历史重用。';data.history=[{expression,result:calcResult,angle:data.calculator.angle},...data.history].slice(0,20);renderHistory();persist();}
     catch(error){calcResult=null;$('result').textContent='—';$('calc-status').textContent=error.message;}
   }
   function key(value){
@@ -39,6 +42,19 @@
     if(value==='⌫'){const pos=start===end?Math.max(0,start-1):start;input.setRangeText('',pos,end,'end');}
     else if(input.value.length-(end-start)+value.length<=160)input.setRangeText(value,start,end,'end');
     input.focus();
+  }
+  function renderCalcMode(){
+    const scientific=data.calculator.mode==='scientific';$('science-keys').hidden=!scientific;$('science-hint').hidden=!scientific;$('angle').hidden=!scientific;
+    $('mode-basic').setAttribute('aria-pressed',String(!scientific));$('mode-scientific').setAttribute('aria-pressed',String(scientific));$('angle').textContent=data.calculator.angle==='rad'?'RAD · 弧度':'DEG · 角度';
+  }
+  function scienceKey(action){
+    if(['π','e','^'].includes(action)){key(action);return;}
+    const input=$('expression'),start=input.selectionStart??0,end=input.selectionEnd??0,selected=start!==end;
+    const value=selected?input.value.slice(start,end):input.value;
+    const next=action==='square'?`(${value||'0'})^2`:action==='inverse'?`1/(${value||'0'})`:action==='factorial'?`(${value||'0'})!`:value?`${action}(${value})`:`${action}(`;
+    const left=selected?start:0,right=selected?end:input.value.length;
+    if(input.value.length-(right-left)+next.length>160){$('calc-status').textContent='算式最多 160 个字符。';return;}
+    input.setRangeText(next,left,right,'end');input.focus();
   }
   async function copy(value,status){try{if(value===null)throw Error();await navigator.clipboard.writeText(String(value));$(status).textContent='已复制结果。';}catch{$(status).textContent='无法复制，请选中显示的结果手动复制。';}}
   function renderTimerSettings(){
@@ -86,7 +102,16 @@
     $('running').hidden=!owner||!runningOrPaused;showText('running-message',t.finished?`${t.label||'倒计时'} · 时间到了`:t.running?(t.label||'倒计时进行中'):'倒计时已暂停');showText('running-time',C.duration(Math.ceil(ms/1000)*1000));
     showText('watch-display',C.duration(C.elapsed(w,now),true));showText('watch-toggle',w.running?'暂停':w.elapsed?'继续':'开始');$('watch-toggle').disabled=!owner;showText('watch-state',w.running?'正在计时':w.elapsed?'已暂停':'准备开始');$('watch-lap').disabled=!w.running||w.laps.length>=50;
   }
-  function tick(){if(!sync())return;const t=data.timer;if(t.running&&C.remaining(t,Date.now())<=0){t.running=false;t.remaining=0;t.finished=true;persist();alarm();$('timer-feedback').textContent='时间到了。可以再计一次，或重置时长。';}if(t.running||t.finished||data.watch.running||panel.classList.contains('active'))renderClocks();}
+  function tick(){if(!sync())return;const t=data.timer;if(t.running&&C.remaining(t,Date.now())<=0){t.running=false;t.remaining=0;t.finished=true;persist();alarm();$('timer-feedback').textContent='时间到了。可以再计一次，或重置时长。';}if(t.running||t.finished||data.watch.running||panel.classList.contains('active'))renderClocks();if(currentTool==='clock'&&panel.classList.contains('active'))renderWallClock();}
+  function renderWallClock(){
+    const now=Date.now(),settings=data.clock,key=JSON.stringify([Math.floor(now/1000),settings]);if(key===wallClockKey)return;wallClockKey=key;
+    const value=C.clockTime(now,settings.zone),pad=n=>String(n).padStart(2,'0');
+    showText('clock-digital',`${pad(settings.hour12?(value.hour%12||12):value.hour)}:${pad(value.minute)}${settings.seconds?':'+pad(value.second):''}`);
+    $('clock-digital').setAttribute('datetime',new Date(now).toISOString());showText('clock-period',settings.hour12?(value.hour<12?'上午':'下午'):'');showText('clock-date',value.date);showText('clock-zone-label',(settings.zone==='local'?'设备本地 · ':'')+value.zone);
+    $('clock-hour').setAttribute('transform',`rotate(${(value.hour%12)*30+value.minute/2+value.second/120} 150 150)`);
+    $('clock-minute').setAttribute('transform',`rotate(${value.minute*6+value.second/10} 150 150)`);
+    $('clock-second').setAttribute('transform',`rotate(${value.second*6} 150 150)`);$('clock-second').style.display=settings.seconds?'':'none';
+  }
   function units(reset=false){
     const category=$('unit-category').value,group=C.units[category].units;
     if(reset){const html=Object.entries(group).map(([id,[label]])=>`<option value="${id}">${label}</option>`).join('');$('unit-from').innerHTML=html;$('unit-to').innerHTML=html;$('unit-from').value=Object.keys(group)[0];$('unit-to').value=Object.keys(group)[1];}
@@ -97,10 +122,14 @@
   const keyValues=['AC','(',')','⌫','7','8','9','÷','4','5','6','×','1','2','3','−','0','.','%','+','='];
   $('keys').innerHTML=keyValues.map(k=>`<button type="button" data-key="${k}" class="${k==='='?'is-equals':['÷','×','−','+'].includes(k)?'is-operator':''}"${k==='⌫'?' aria-label="退格"':k==='AC'?' aria-label="清空算式"':''}>${k}</button>`).join('');
   $('keys').addEventListener('click',e=>{const button=e.target.closest('[data-key]');if(button)key(button.dataset.key);});
+  $('science-keys').innerHTML=[['square','x²'],['^','xʸ'],['sqrt','√x'],['cbrt','∛x'],['sin','sin'],['cos','cos'],['tan','tan'],['inverse','1/x'],['log','log₁₀'],['ln','ln'],['exp','eˣ'],['factorial','n!'],['π','π'],['e','e'],['abs','|x|']].map(([action,label])=>`<button type="button" data-science="${action}">${label}</button>`).join('');
+  $('science-keys').addEventListener('click',e=>{const b=e.target.closest('[data-science]');if(b)scienceKey(b.dataset.science);});
+  for(const mode of ['basic','scientific'])$('mode-'+mode).addEventListener('click',()=>{if(!sync())return;data.calculator.mode=mode;renderCalcMode();persist();});
+  $('angle').addEventListener('click',()=>{if(!sync())return;data.calculator.angle=data.calculator.angle==='deg'?'rad':'deg';renderCalcMode();persist();$('calc-status').textContent='角度单位已切换，请按 = 重新计算。';});
   $('expression').addEventListener('keydown',e=>{if(e.isComposing)return;if(e.key==='Enter'){e.preventDefault();evaluate();}if(e.key==='Escape')key('AC');});
   $('copy-result').addEventListener('click',()=>copy(calcResult,'calc-status'));
   $('clear-history').addEventListener('click',()=>{if(sync()){data.history=[];persist();renderHistory();}});
-  $('history-list').addEventListener('click',e=>{const button=e.target.closest('[data-history]');if(button&&sync()){const row=data.history[Number(button.dataset.history)];if(row){$('expression').value=row.expression;calcResult=row.result;$('result').textContent=String(row.result);$('expression').focus();}}});
+    $('history-list').addEventListener('click',e=>{const button=e.target.closest('[data-history]');if(button&&sync()){const row=data.history[Number(button.dataset.history)];if(row){$('expression').value=row.expression;calcResult=row.result;data.calculator.angle=row.angle==='rad'?'rad':'deg';if(/[a-zπ^!]/i.test(row.expression))data.calculator.mode='scientific';renderCalcMode();persist();$('result').textContent=String(row.result);$('expression').focus();}}});
   const tabs=[...panel.querySelectorAll('[data-tool]')];
   tabs.forEach((button,index)=>{button.addEventListener('click',()=>selectTool(button.dataset.tool));button.addEventListener('keydown',e=>{let next;if(e.key==='ArrowRight')next=(index+1)%tabs.length;if(e.key==='ArrowLeft')next=(index+tabs.length-1)%tabs.length;if(e.key==='Home')next=0;if(e.key==='End')next=tabs.length-1;if(next!==undefined){e.preventDefault();selectTool(tabs[next].dataset.tool,true);}});});
   $('timer-toggle').addEventListener('click',timerToggle);$('timer-reset').addEventListener('click',timerReset);
@@ -112,6 +141,10 @@
   $('unit-category').addEventListener('change',()=>units(true));['unit-value','unit-from','unit-to'].forEach(id=>$(id).addEventListener('input',()=>units()));
   $('unit-swap').addEventListener('click',()=>{const from=$('unit-from').value;$('unit-from').value=$('unit-to').value;$('unit-to').value=from;if(unitResult!==null)$('unit-value').value=unitResult;units();});$('unit-copy').addEventListener('click',()=>copy(unitResult,'unit-status'));
   $('running-open').addEventListener('click',()=>{document.querySelector('.nav-link[data-view="toolkit"]')?.click();selectTool('timer');});
+  $('clock-ticks').innerHTML=Array.from({length:60},(_,i)=>`<line x1="150" y1="${i%5===0?19:23}" x2="150" y2="${i%5===0?31:28}" transform="rotate(${i*6} 150 150)" class="${i%5===0?'is-hour':''}"/>`).join('');
+  $('clock-numbers').innerHTML=[12,3,6,9].map(n=>{const angle=n/12*Math.PI*2;return `<text x="${150+Math.sin(angle)*101}" y="${150-Math.cos(angle)*101}">${n}</text>`;}).join('');
+  ['clock-zone','clock-12h','clock-seconds'].forEach(id=>$(id).addEventListener('change',()=>{if(!sync())return;data.clock={zone:$('clock-zone').value,hour12:$('clock-12h').checked,seconds:$('clock-seconds').checked};persist();renderWallClock();}));
+  $('clock-quiet').addEventListener('click',()=>{clockQuiet=!clockQuiet;$('clock').classList.toggle('is-quiet',clockQuiet);$('clock-quiet').setAttribute('aria-pressed',String(clockQuiet));$('clock-quiet').textContent=clockQuiet?'退出简洁表盘':'简洁表盘';});
   document.getElementById('logout').addEventListener('click',()=>{if(owner){try{sessionStorage.removeItem(storageKey(owner));}catch{}}owner=null;sync();});
   window.addEventListener('storage',e=>{if(e.key==='studyflow.token')sync();});document.addEventListener('visibilitychange',tick);
   new MutationObserver(()=>sync()).observe(document.getElementById('app-view'),{attributes:true,attributeFilter:['class']});
