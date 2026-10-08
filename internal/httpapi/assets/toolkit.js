@@ -20,7 +20,7 @@
     renderCalcMode();renderHistory();renderTimerSettings();renderLaps();renderClocks();return !!owner;
   }
   function selectTool(name,focus=false){
-    if(!['calc','timer','watch','convert','clock'].includes(name))return;
+    if(!['calc','timer','watch','convert','clock','dates','image','record'].includes(name))return;
     currentTool=name;
     for(const button of panel.querySelectorAll('[data-tool]')){const active=button.dataset.tool===name;button.setAttribute('aria-selected',String(active));button.tabIndex=active?0:-1;$(button.dataset.tool).hidden=!active;}
     if(focus)$('tab-'+name).focus();renderClocks();if(name==='clock')renderWallClock();
