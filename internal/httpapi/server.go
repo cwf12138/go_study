@@ -87,6 +87,7 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 	private.HandleFunc("DELETE /api/v1/todos/{todo_id}/my-day", s.removeTodoFromMyDay)
 	private.HandleFunc("PATCH /api/v1/todos/{todo_id}/steps/{step_id}", s.toggleTodoStep)
 	private.HandleFunc("GET /api/v1/calendar", s.calendarOverview)
+	private.HandleFunc("GET /api/v1/holidays/next", s.nextHoliday)
 	private.HandleFunc("GET /api/v1/calendar/days/{date}", s.calendarDay)
 	private.HandleFunc("POST /api/v1/calendar/events", s.createCalendarEvent)
 	private.HandleFunc("PATCH /api/v1/calendar/events/{event_id}", s.updateCalendarEvent)

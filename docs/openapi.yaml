@@ -981,6 +981,30 @@ paths:
                 completed: { type: boolean }
       responses:
         "200": { description: Updated }
+  /api/v1/holidays/next:
+    get:
+      tags: [Calendar]
+      security: [{ bearerAuth: [] }]
+      summary: 顶部节假日倒计时（北京时间、中国大陆）
+      description: 内置已核实的 2026 年安排；其他年份只提供节日当天，不推测放假/调休。当前假期单独返回，next 为之后的下一假期或节日。超出支持范围时 next 为 null。
+      responses:
+        "200":
+          description: Holiday countdown, Cache-Control no-store
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    required: [today, timezone, schedule_through, current, next]
+                    properties:
+                      today: { type: string, format: date }
+                      timezone: { type: string, const: Asia/Shanghai }
+                      schedule_through: { type: integer, example: 2026 }
+                      current: { $ref: "#/components/schemas/HolidayOccurrence" }
+                      next: { $ref: "#/components/schemas/HolidayOccurrence" }
+        "401": { description: Authentication required }
   /api/v1/calendar:
     get:
       tags: [Calendar]
@@ -2585,6 +2609,17 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
   schemas:
+    HolidayOccurrence:
+      type: [object, "null"]
+      required: [name, start_date, end_date, days_until, duration, confirmed]
+      properties:
+        name: { type: string }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date }
+        days_until: { type: integer, minimum: 0, description: 距放假首日的自然日数；未核实安排则距节日当天；当前假期为 0 }
+        duration: { type: integer, minimum: 0, description: 已核实的假期天数；未知安排为 0，不代表无假期 }
+        confirmed: { type: boolean }
+        source_url: { type: string, format: uri, description: 已核实年度的官方来源 }
     BookmarkInput:
       type: object
       required: [url, revision]

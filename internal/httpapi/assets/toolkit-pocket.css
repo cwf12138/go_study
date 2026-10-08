@@ -1,17 +1,9 @@
 /* Keep the phone-like tools in a compact, shared launcher. */
+#toolkit-image .toolkit-settings>label{margin:18px 0}
 #panel-toolkit .toolkit-tabs{grid-template-columns:repeat(4,minmax(0,1fr))}
 #panel-toolkit .toolkit-tabs button:last-child{grid-column:auto}
-#toolkit-dates,#toolkit-image,#toolkit-record{align-items:stretch}
-.pocket-date-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
-#panel-toolkit .pocket-check{display:flex;align-items:center;gap:10px;margin:22px 0}
-.pocket-check input{width:18px;height:18px;accent-color:var(--tk-accent)}
-.pocket-result{border:1px solid var(--tk-line);background:var(--tk-soft);border-radius:18px;padding:24px;margin:24px 0 18px}
-.pocket-result>span{color:var(--muted);font-size:14px}
-.pocket-result output{display:block;font-size:clamp(27px,3vw,42px);font-weight:600;letter-spacing:-.04em;font-variant-numeric:tabular-nums;margin:12px 0;overflow-wrap:anywhere}
-.pocket-result p{font-size:14px;line-height:1.8;color:var(--muted);margin-bottom:0}
-#toolkit-dates aside>label,#toolkit-image .toolkit-settings>label{margin:18px 0}
-.pocket-presets,.pocket-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:18px 0}
-.pocket-presets button{padding:9px 13px;border:1px solid var(--tk-line);border-radius:22px;color:var(--tk-accent);background:var(--paper);font-size:14px}
+#toolkit-image,#toolkit-record{align-items:stretch}
+.pocket-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:18px 0}
 .pocket-actions button{min-height:44px;min-width:76px}
 #panel-toolkit [id^="pocket-"][role="status"]{color:var(--muted);font-size:14px;line-height:1.8;min-height:26px;overflow-wrap:anywhere}
 #panel-toolkit .pocket-file{padding:22px;border:1px dashed var(--tk-accent);border-radius:16px;background:var(--tk-soft);color:var(--ink)}
@@ -30,7 +22,7 @@
 #toolkit-record .toolkit-clock-card .pocket-actions{justify-content:center;margin:26px 0}
 #pocket-record-preview{width:100%;display:block;margin:24px 0}
 html[data-theme="dark"] .pocket-record-mark.is-recording{color:#ff9aac;background:#492a34}
-@media(max-width:1050px){#panel-toolkit .toolkit-tabs button>b{width:34px;height:34px;font-size:22px}#panel-toolkit .toolkit-tabs button>span{font-size:14px}.pocket-date-pair{grid-template-columns:1fr}.pocket-result{padding:20px}}
-@media(max-width:760px){#panel-toolkit .toolkit-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}.pocket-date-pair{grid-template-columns:repeat(2,minmax(0,1fr))}.pocket-image-preview{min-height:220px}}
-@media(max-width:400px){.pocket-date-pair{grid-template-columns:1fr}.pocket-result output{font-size:28px}.pocket-record-mark{margin-top:24px}.pocket-file{padding:16px}}
+@media(max-width:1050px){#panel-toolkit .toolkit-tabs button>b{width:34px;height:34px;font-size:22px}#panel-toolkit .toolkit-tabs button>span{font-size:14px}}
+@media(max-width:760px){#panel-toolkit .toolkit-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}.pocket-image-preview{min-height:220px}}
+@media(max-width:400px){.pocket-record-mark{margin-top:24px}.pocket-file{padding:16px}}
 @media(prefers-reduced-motion:reduce){.pocket-record-mark{transition:none}}

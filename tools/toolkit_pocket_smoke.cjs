@@ -60,24 +60,9 @@ function harness(){
 }
 (async()=>{
   const h=harness(),{P,E}=h;
-  assert.equal(P.dateSpan('2024-02-28','2024-03-01').days,2);
-  assert.equal(P.dateSpan('2026-03-07','2026-03-09').days,2); // US DST transition
-  assert.equal(P.dateSpan('2026-10-09','2026-10-09').days,0);
-  assert.equal(P.dateSpan('2026-10-09','2026-10-09',true).weekdays,1);
-  assert.equal(P.dateSpan('2026-10-10','2026-10-10',true).weekdays,0);
-  assert.equal(P.dateSpan('2026-10-12','2026-10-09').signed,-3);
-  assert.equal(P.dateSpan('2026-10-09','2026-10-12').weekdays,1);
-  assert.equal(P.dateSpan('2026-10-05','2026-10-18',true).weekdays,10);
-  for(const date of ['2023-02-29','1900-02-29','2026-13-01','2026-04-31','1899-01-01','2201-01-01','',null])assert.throws(()=>P.parseDate(date));
-  assert.equal(P.shiftDate('2024-02-28',1),'2024-02-29');assert.equal(P.shiftDate('2026-01-01',-1),'2025-12-31');
-  for(const offset of ['',1.5,36501,Infinity])assert.throws(()=>P.shiftDate('2026-01-01',offset));
-  assert.throws(()=>P.shiftDate('2200-12-31',1));assert.throws(()=>P.shiftDate('1900-01-01',-1));
   assert.equal(P.fitImage(4000,3000,1920).height,1440);assert.equal(P.fitImage(100,50,640).width,100);
   assert.throws(()=>P.fitImage(6000,6000,1920));assert.throws(()=>P.fitImage(0,10,640));assert.throws(()=>P.fitImage(100,100,999));
   assert.equal(P.fileBase('my:photo.png'),'my_photo');assert.equal(P.audioExtension('audio/mp4'),'m4a');assert.equal(P.audioExtension('audio/ogg;codecs=opus'),'ogg');
-  E('date-start').value='2024-02-28';E('date-end').value='2024-03-01';h.input('date-start');assert.equal(E('date-result').textContent,'2 天');
-  E('date-inclusive').checked=true;h.input('date-inclusive');assert.equal(E('date-result').textContent,'3 天');
-  E('shift-days').value='';h.input('shift-days');assert(E('shift-copy').disabled);
 
   await h.image();assert(!E('image-process').disabled);await h.click('image-process');assert(!E('image-download').disabled);assert.match(E('image-info').textContent,/1920 × 1440/);
   h.click('image-download');assert.equal(h.downloads.at(-1).name,'holiday-轻量.jpg');assert.equal(h.urls.size,1);
@@ -102,5 +87,5 @@ function harness(){
   await h.click('record-start');h.hide();await settle();assert(h.streams.at(-1).track.stopped);assert(!E('record-download').disabled);
   h.unload();assert.equal(h.urls.size,0);assert(E('record-download').disabled);
   const unsupported=harness();unsupported.window.isSecureContext=false;await unsupported.click('record-start');assert.match(unsupported.E('record-status').textContent,/HTTPS/);assert.equal(unsupported.streams.length,0);
-  console.log('Pocket tools passed: date boundaries/DST/weekdays, image validation/encoding/cancellation/URLs, mic permissions/pause/resume/final chunks/limits/navigation/account cleanup (mocked browser APIs).');
+  console.log('Pocket tools passed: image validation/encoding/cancellation/URLs, mic permissions/pause/resume/final chunks/limits/navigation/account cleanup (mocked browser APIs).');
 })().catch(error=>{console.error(error);process.exitCode=1;});

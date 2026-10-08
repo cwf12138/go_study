@@ -8,11 +8,6 @@
   let owner=token(),imageEpoch=0,image=null,imageFile=null,imageURL='',imageBlob=null,imageBusy=false;
   let micEpoch=0,micPending=false,record=null,audioURL='',audioBlob=null;
   const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
-  function dateInputs(){['date-start','date-end','shift-start'].forEach(id=>$(id).value=today());$('shift-days').value=30;$('date-inclusive').checked=false;renderDates();renderShift();}
-  function renderDates(){try{const r=P.dateSpan($('date-start').value,$('date-end').value,$('date-inclusive').checked);$('date-result').textContent=r.days+' 天';$('date-detail').textContent=`${r.weeks} 周 ${r.remainder} 天 · 其中周一至周五 ${r.weekdays} 天`;
-    status('date-status',r.signed<0?'结束日期早于开始日期；上方显示绝对间隔。':$('date-inclusive').checked?'已包含首尾两天；同一天计为 1 天。':'不含较早日期，包含较晚日期；同一天计为 0 天。');}
-    catch(error){$('date-result').textContent='—';$('date-detail').textContent='';status('date-status',error.message);}}
-  function renderShift(){try{$('shift-result').textContent=P.shiftDate($('shift-start').value,$('shift-days').value);$('shift-copy').disabled=false;status('shift-status','');}catch(error){$('shift-result').textContent='—';$('shift-copy').disabled=true;status('shift-status',error.message);}}
   function download(url,name){const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();}
   function clearImageOutput(){if(imageURL)URL.revokeObjectURL(imageURL);imageURL='';imageBlob=null;$('image-preview').removeAttribute('src');$('image-preview').hidden=true;$('image-empty').hidden=false;$('image-info').textContent='';$('image-download').disabled=true;}
   function imageControls(){$('image-process').disabled=!image||imageBusy;$('image-download').disabled=!imageBlob||imageBusy;$('image-process').textContent=imageBusy?'处理中…':'处理图片';$('image-quality').disabled=$('image-format').value==='image/png';$('image-quality-label').textContent=$('image-format').value==='image/png'?'PNG 不使用质量参数':$('image-quality').value+'%';}
@@ -91,11 +86,8 @@
     micEpoch++;micPending=false;const r=record;record=null;if(r){try{if(r.media.state!=='inactive')r.media.stop();}catch{}release(r.stream);r.chunks=[];}
     clearAudio();clearImage();$('record-time').textContent='00:00';$('record-name').value='';status('record-status','点击开始后才会请求麦克风权限。');
   }
-  function sync(){const next=token();if(next!==owner){owner=next;cleanup();dateInputs();}return !!owner;}
+  function sync(){const next=token();if(next!==owner){owner=next;cleanup();}return !!owner;}
   function leave(){if(recordPanel.hidden||!panel.classList.contains('active')||document.hidden){stopRecording('已离开录音工具，录音自动结束。');$('record-preview').pause();}}
-  ['date-start','date-end','date-inclusive'].forEach(id=>$(id).addEventListener('input',renderDates));$('date-today').addEventListener('click',dateInputs);
-  ['shift-start','shift-days'].forEach(id=>$(id).addEventListener('input',renderShift));panel.querySelectorAll('[data-day-offset]').forEach(b=>b.addEventListener('click',()=>{$('shift-days').value=b.dataset.dayOffset;renderShift();}));
-  $('shift-copy').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('shift-result').textContent);status('shift-status','日期已复制。');}catch{status('shift-status','无法复制，请手动选中目标日期复制。');}});
   $('image-file').addEventListener('change',()=>chooseImage($('image-file').files[0]));$('image-process').addEventListener('click',processImage);$('image-clear').addEventListener('click',clearImage);
   ['image-edge','image-format','image-quality'].forEach(id=>$(id).addEventListener('input',resetImageOptions));
   $('image-download').addEventListener('click',()=>{if(!sync()||!imageBlob)return;const ext={'image/png':'png','image/webp':'webp','image/jpeg':'jpg'}[imageBlob.type]||'png';download(imageURL,P.fileBase(imageFile.name)+'-轻量.'+ext);});
@@ -104,8 +96,8 @@
   $('record-clear').addEventListener('click',()=>{if(record||micPending||!sync())return;if(confirm('清空当前录音？如需保留请先下载。')){clearAudio();$('record-time').textContent='00:00';status('record-status','已清空，可以重新录音。');}});
   new MutationObserver(()=>{sync();leave();}).observe(panel,{attributes:true,attributeFilter:['class']});new MutationObserver(leave).observe(recordPanel,{attributes:true,attributeFilter:['hidden']});
   new MutationObserver(sync).observe(document.getElementById('app-view'),{attributes:true,attributeFilter:['class']});
-  document.getElementById('logout').addEventListener('click',()=>{cleanup();owner=token();dateInputs();});window.addEventListener('storage',e=>{if(e.key==='studyflow.token')sync();});document.addEventListener('visibilitychange',()=>{sync();leave();});
+  document.getElementById('logout').addEventListener('click',()=>{cleanup();owner=token();});window.addEventListener('storage',e=>{if(e.key==='studyflow.token')sync();});document.addEventListener('visibilitychange',()=>{sync();leave();});
   window.addEventListener('pagehide',cleanup);window.addEventListener('beforeunload',e=>{if(record||micPending||audioBlob){e.preventDefault();e.returnValue='';}});
   window.setInterval(()=>{sync();const r=record;if(!r)return;const ms=elapsed(r);showElapsed(ms);if(ms>=1800000)stopRecording('已达到 30 分钟上限，录音已结束。');},250);
-  dateInputs();imageControls();recordControls();
+  imageControls();recordControls();
 })();

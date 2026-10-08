@@ -11,7 +11,9 @@
   const widget = document.createElement('button');
   widget.type = 'button'; widget.className = 'weather-widget'; widget.setAttribute('aria-haspopup', 'dialog');
   widget.innerHTML = '<span class="weather-symbol" aria-hidden="true">⛅</span><span class="weather-copy"><strong>当前天气</strong><small>选择城市，开启天气小组件</small></span><span class="weather-temp">—</span>';
-  topbar.insertBefore(widget, topbar.querySelector('.user-actions'));
+  const glance = document.getElementById('topbar-glance');
+  if (glance) glance.prepend(widget);
+  else topbar.insertBefore(widget, topbar.querySelector('.user-actions'));
   const dialog = document.createElement('dialog'); dialog.className = 'weather-dialog'; dialog.setAttribute('aria-labelledby', 'weather-title');
   dialog.innerHTML = `<header><h3 id="weather-title">此刻的天气</h3><button type="button" class="quiet" data-close aria-label="关闭天气详情">✕</button></header>
     <div class="weather-detail">选择城市后显示天气</div>
