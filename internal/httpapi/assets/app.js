@@ -326,7 +326,7 @@
     const legacyKnowledge = view === "knowledge";
     if (legacyIdeas || legacyKnowledge) view = "memos";
     if (view === "habits") view = "dashboard";
-    if (view === "projects") view = "dashboard";
+    if (view === "projects" || view === "travel") view = "dashboard";
     const labels = {
       dashboard: ["DAYNEST · YOUR EVERYDAY", "今天"],
       timeline: ["LIFE TIMELINE", "生活足迹"],
@@ -340,7 +340,6 @@
       inventory: ["EVERYDAY COLLECTION", "物品管家"],
       bookmarks: ["LINK LIBRARY", "随手收藏"],
       toolkit: ["EVERYDAY ESSENTIALS", "随身工具"],
-      travel: ["NEXT STOP", "旅行手账"],
       english: ["DAILY ENGLISH", "英语精读"],
       literature: ["LITERATURE STUDIO", "阅读书房"],
       tasks: ["TASKS", "学习任务"],
