@@ -63,6 +63,7 @@ function harness(){
   assert.equal(P.fitImage(4000,3000,1920).height,1440);assert.equal(P.fitImage(100,50,640).width,100);
   assert.throws(()=>P.fitImage(6000,6000,1920));assert.throws(()=>P.fitImage(0,10,640));assert.throws(()=>P.fitImage(100,100,999));
   assert.equal(P.fileBase('my:photo.png'),'my_photo');assert.equal(P.audioExtension('audio/mp4'),'m4a');assert.equal(P.audioExtension('audio/ogg;codecs=opus'),'ogg');
+  assert.equal(P.fileBase('10.09 会议',false),'10.09 会议');assert.equal(P.fileBase('CON',false),'_CON');assert.equal(P.fileBase('voice. ',false),'voice');
 
   await h.image();assert(!E('image-process').disabled);await h.click('image-process');assert(!E('image-download').disabled);assert.match(E('image-info').textContent,/1920 × 1440/);
   h.click('image-download');assert.equal(h.downloads.at(-1).name,'holiday-轻量.jpg');assert.equal(h.urls.size,1);
@@ -79,7 +80,7 @@ function harness(){
   h.options.deferPermission=false;h.enter();await h.click('record-start');assert.equal(h.recorders.at(-1).state,'recording');h.advance(3000);assert.equal(E('record-time').textContent,'00:03');
   h.click('record-pause');await settle();h.advance(7000);assert.equal(E('record-time').textContent,'00:03');h.click('record-pause');await settle();h.advance(2000);assert.equal(E('record-time').textContent,'00:05');
   h.click('record-stop');assert(h.streams.at(-1).track.stopped);await settle();assert(!E('record-preview').hidden);assert(!E('record-download').disabled);assert.equal(E('record-time').textContent,'00:05');
-  E('record-name').value='my:voice';h.click('record-download');assert.equal(h.downloads.at(-1).name,'my_voice.webm');assert.equal(h.urls.size,1);
+  E('record-name').value='10.09 my:voice';h.click('record-download');assert.equal(h.downloads.at(-1).name,'10.09 my_voice.webm');assert.equal(h.urls.size,1);
   h.options.permissionError={name:'NotFoundError'};await h.click('record-start');assert(!E('record-download').disabled);assert.equal(h.urls.size,1); // denial retains previous audio
   h.options.permissionError=null;await h.click('record-start');assert.equal(h.urls.size,0);h.advance(1800000);await settle();assert.match(E('record-status').textContent,/30 分钟/);assert(h.streams.at(-1).track.stopped);
   await h.click('record-start');h.leave();await settle();assert(!E('record-download').disabled);assert(h.streams.at(-1).track.stopped);

@@ -1,0 +1,17 @@
+#toolkit-text{grid-template-columns:1fr;gap:18px}
+#toolkit-text :is(label,input,select,textarea){min-width:0}
+.text-tool-toolbar,.text-tool-card{background:var(--paper);border:1px solid var(--line);border-radius:20px;padding:24px;min-width:0}
+.text-tool-toolbar>header,.text-tool-card>header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px}
+.text-tool-toolbar h3,.text-tool-card h3{margin:6px 0;font-size:20px}.text-tool-badge{font-size:12px;color:var(--muted);padding:7px 12px;border:1px solid var(--line);border-radius:20px;white-space:nowrap}
+.text-tool-settings{display:grid;grid-template-columns:240px 1fr;gap:18px;align-items:end}.text-tool-settings label{display:grid;gap:8px;font-size:14px;color:var(--muted)}
+#text-tool-replace-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}#text-tool-replace-fields[hidden]{display:none}
+#toolkit-text :is(input,select,textarea){background:var(--paper);color:var(--ink);border-color:var(--line)}
+#text-tool-hint,#text-tool-status,#text-tool-summary{font-size:14px;line-height:1.8;color:var(--muted);margin:14px 0 0;overflow-wrap:anywhere}
+.text-tool-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch}.text-tool-card{display:flex;flex-direction:column}.text-tool-card textarea{min-height:300px;resize:vertical;font-size:16px;line-height:1.85;border-radius:12px;tab-size:4;white-space:pre-wrap;overflow-wrap:anywhere}
+.text-tool-card textarea:focus-visible{outline:3px solid var(--tk-accent);outline-offset:2px}
+.text-tool-stats{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);padding:16px 0}.text-tool-stats b{color:var(--ink);font-variant-numeric:tabular-nums;font-size:17px;margin-right:4px}
+.text-tool-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:auto;padding-top:18px}.text-tool-actions button{min-height:42px}
+.text-tool-card.is-preview{background:linear-gradient(145deg,var(--tk-soft),var(--paper));border-color:var(--tk-accent)}
+.text-tool-note{font-size:12px;color:var(--muted);line-height:1.85;margin:0}
+@media(max-width:900px){.text-tool-grid{grid-template-columns:1fr}.text-tool-settings{grid-template-columns:1fr}.text-tool-card textarea{min-height:240px}}
+@media(max-width:500px){.text-tool-card,.text-tool-toolbar{padding:18px}#text-tool-replace-fields{grid-template-columns:1fr}.text-tool-badge{display:none}}

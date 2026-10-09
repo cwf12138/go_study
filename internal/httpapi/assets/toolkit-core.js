@@ -2,7 +2,7 @@
   'use strict';
   // Small arithmetic parser. Never execute user input as JavaScript.
   function calculate(input,angle='deg') {
-    const text=String(input).replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-').replace(/\s/g,'');
+    const text=String(input).replace(/[０-９＋－＊／（）．％＾！]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xfee0)).replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-').replace(/\s/g,'');
     if(!text||text.length>160)throw Error('请输入算式，最多 160 个字符。');
     let i=0;
     const fail=()=>{throw Error('算式不完整，请检查数字、运算符和括号。');};

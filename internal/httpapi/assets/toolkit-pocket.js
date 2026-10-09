@@ -92,7 +92,7 @@
   ['image-edge','image-format','image-quality'].forEach(id=>$(id).addEventListener('input',resetImageOptions));
   $('image-download').addEventListener('click',()=>{if(!sync()||!imageBlob)return;const ext={'image/png':'png','image/webp':'webp','image/jpeg':'jpg'}[imageBlob.type]||'png';download(imageURL,P.fileBase(imageFile.name)+'-轻量.'+ext);});
   $('record-start').addEventListener('click',startRecording);$('record-pause').addEventListener('click',pauseRecording);$('record-stop').addEventListener('click',()=>stopRecording());
-  $('record-download').addEventListener('click',()=>{if(sync()&&audioBlob)download(audioURL,P.fileBase($('record-name').value||'录音-'+today())+'.'+P.audioExtension(audioBlob.type));});
+  $('record-download').addEventListener('click',()=>{if(sync()&&audioBlob)download(audioURL,P.fileBase($('record-name').value||'录音-'+today(),false)+'.'+P.audioExtension(audioBlob.type));});
   $('record-clear').addEventListener('click',()=>{if(record||micPending||!sync())return;if(confirm('清空当前录音？如需保留请先下载。')){clearAudio();$('record-time').textContent='00:00';status('record-status','已清空，可以重新录音。');}});
   new MutationObserver(()=>{sync();leave();}).observe(panel,{attributes:true,attributeFilter:['class']});new MutationObserver(leave).observe(recordPanel,{attributes:true,attributeFilter:['hidden']});
   new MutationObserver(sync).observe(document.getElementById('app-view'),{attributes:true,attributeFilter:['class']});
