@@ -26,6 +26,7 @@ type Memory struct {
 	inventory               map[string]domain.InventoryItem
 	shopping                map[string]domain.ShoppingItem
 	bookmarks               map[string]domain.Bookmark
+	subscriptions           map[string]domain.Subscription
 	ledger                  map[string]domain.LedgerEntry
 	projects                map[string]domain.Project
 	travelPlans             map[string]domain.TravelPlan
@@ -62,6 +63,7 @@ func NewMemory() *Memory {
 		inventory:               make(map[string]domain.InventoryItem),
 		shopping:                make(map[string]domain.ShoppingItem),
 		bookmarks:               make(map[string]domain.Bookmark),
+		subscriptions:           make(map[string]domain.Subscription),
 		ledger:                  make(map[string]domain.LedgerEntry),
 		projects:                make(map[string]domain.Project),
 		travelPlans:             make(map[string]domain.TravelPlan),
@@ -1143,6 +1145,7 @@ type snapshot struct {
 	Inventory               []domain.InventoryItem      `json:"inventory,omitempty"`
 	Shopping                []domain.ShoppingItem       `json:"shopping,omitempty"`
 	Bookmarks               []domain.Bookmark           `json:"bookmarks,omitempty"`
+	Subscriptions           []domain.Subscription       `json:"subscriptions,omitempty"`
 	Ledger                  []domain.LedgerEntry        `json:"ledger"`
 	Projects                []domain.Project            `json:"projects"`
 	TravelPlans             []domain.TravelPlan         `json:"travel_plans,omitempty"`
@@ -1215,6 +1218,9 @@ func (m *Memory) SaveJSON(path string) error {
 	}
 	for _, item := range m.bookmarks {
 		s.Bookmarks = append(s.Bookmarks, item)
+	}
+	for _, item := range m.subscriptions {
+		s.Subscriptions = append(s.Subscriptions, item)
 	}
 	for _, item := range m.projects {
 		s.Projects = append(s.Projects, cloneProject(item))
@@ -1366,6 +1372,10 @@ func (m *Memory) LoadJSON(path string) error {
 	m.bookmarks = make(map[string]domain.Bookmark, len(s.Bookmarks))
 	for _, item := range s.Bookmarks {
 		m.bookmarks[item.UserID+":"+item.ID] = item
+	}
+	m.subscriptions = make(map[string]domain.Subscription, len(s.Subscriptions))
+	for _, item := range s.Subscriptions {
+		m.subscriptions[item.UserID+":"+item.ID] = item
 	}
 	for _, item := range s.Shopping {
 		m.shopping[item.UserID+":"+item.ID] = item

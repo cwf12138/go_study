@@ -6,6 +6,7 @@ info:
 servers:
   - url: http://localhost:8080
 tags:
+  - name: Subscriptions
   - name: Auth
   - name: Goals
   - name: Moods
@@ -26,6 +27,46 @@ tags:
   - name: Shopping
   - name: Bookmarks
 paths:
+  /api/v1/subscriptions:
+    get:
+      tags: [Subscriptions]
+      security: [{ bearerAuth: [] }]
+      summary: 获取当前账号订阅（含回收站）
+      responses:
+        "200":
+          description: Subscription list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/Subscription" } }
+        "401": { description: Authentication required }
+  /api/v1/subscriptions/{id}:
+    put:
+      tags: [Subscriptions]
+      security: [{ bearerAuth: [] }]
+      summary: 完整保存订阅，期望版本校验及相同请求重试
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,80}$' } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubscriptionInput" }
+      responses:
+        "200":
+          description: Saved subscription
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Subscription" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { description: Authentication required }
+        "404": { description: Missing record with nonzero revision }
+        "409": { description: Version conflict }
   /api/v1/bookmarks:
     get:
       tags: [Bookmarks]
@@ -2609,6 +2650,30 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
   schemas:
+    SubscriptionInput:
+      type: object
+      required: [name, amount_cents, cycle, anchor_date, state, revision]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        category: { type: string, maxLength: 30 }
+        amount_cents: { type: integer, minimum: 0, maximum: 100000000, description: 每期人民币整数分 }
+        cycle: { type: string, enum: [weekly, monthly, quarterly, yearly] }
+        anchor_date: { type: string, format: date, description: 原始扣费起点，2000–2100 年 }
+        paid_cycles: { type: integer, minimum: 0, maximum: 12000, default: 0 }
+        last_paid_date: { type: string, description: 最近确认付款日期，可为空，不能晚于北京时间今天 }
+        state: { type: string, enum: [active, paused, cancelled] }
+        note: { type: string, maxLength: 2000 }
+        deleted: { type: boolean, default: false }
+        revision: { type: integer, minimum: 0, maximum: 1000000 }
+    Subscription:
+      allOf:
+        - { $ref: "#/components/schemas/SubscriptionInput" }
+        - type: object
+          properties:
+            id: { type: string }
+            user_id: { type: string }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
     HolidayOccurrence:
       type: [object, "null"]
       required: [name, start_date, end_date, days_until, duration, confirmed]

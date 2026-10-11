@@ -30,6 +30,7 @@ type UserDataExport struct {
 	Inventory          []domain.InventoryItem    `json:"inventory"`
 	Shopping           []domain.ShoppingItem     `json:"shopping"`
 	Bookmarks          []domain.Bookmark         `json:"bookmarks"`
+	Subscriptions      []domain.Subscription     `json:"subscriptions"`
 	Projects           []domain.Project          `json:"projects"`
 	TravelPlans        []domain.TravelPlan       `json:"travel_plans"`
 	Moods              []domain.MoodEntry        `json:"moods"`
@@ -83,6 +84,9 @@ func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataEx
 		return UserDataExport{}, err
 	}
 	if bundle.Bookmarks, err = s.repo.ListBookmarks(ctx, userID); err != nil {
+		return UserDataExport{}, err
+	}
+	if bundle.Subscriptions, err = s.repo.ListSubscriptions(ctx, userID); err != nil {
 		return UserDataExport{}, err
 	}
 	if bundle.Projects, err = s.repo.ListProjects(ctx, userID); err != nil {
@@ -143,16 +147,17 @@ func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataEx
 		return UserDataExport{}, err
 	}
 	bundle.Counts = map[string]int{
-		"habits":       len(bundle.Habits),
-		"explorations": len(bundle.Explorations),
-		"keepsakes":    len(bundle.Keepsakes),
-		"ledger":       len(bundle.Ledger),
-		"inventory":    len(bundle.Inventory),
-		"shopping":     len(bundle.Shopping),
-		"bookmarks":    len(bundle.Bookmarks),
-		"projects":     len(bundle.Projects),
-		"travel_plans": len(bundle.TravelPlans),
-		"goals":        len(bundle.Goals), "moods": len(bundle.Moods), "tasks": len(bundle.Tasks), "todo_lists": len(bundle.TodoLists),
+		"habits":        len(bundle.Habits),
+		"explorations":  len(bundle.Explorations),
+		"keepsakes":     len(bundle.Keepsakes),
+		"ledger":        len(bundle.Ledger),
+		"inventory":     len(bundle.Inventory),
+		"shopping":      len(bundle.Shopping),
+		"bookmarks":     len(bundle.Bookmarks),
+		"subscriptions": len(bundle.Subscriptions),
+		"projects":      len(bundle.Projects),
+		"travel_plans":  len(bundle.TravelPlans),
+		"goals":         len(bundle.Goals), "moods": len(bundle.Moods), "tasks": len(bundle.Tasks), "todo_lists": len(bundle.TodoLists),
 		"todos": len(bundle.Todos), "calendar_events": len(bundle.CalendarEvents), "word_books": len(bundle.WordBooks), "vocabulary_words": len(bundle.VocabularyWords),
 		"vocabulary_reviews": len(bundle.VocabularyReviews), "plan_blocks": len(bundle.PlanBlocks), "weekly_reflections": len(bundle.WeeklyReflections),
 		"memo_folders": len(bundle.MemoFolders), "memos": len(bundle.Memos),

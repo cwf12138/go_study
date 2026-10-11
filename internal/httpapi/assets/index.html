@@ -43,6 +43,7 @@
     <link rel="stylesheet" href="/static/toolkit-pocket.css?v=20261009-2">
     <link rel="stylesheet" href="/static/holiday.css?v=20261009-1">
     <link rel="stylesheet" href="/static/text-tools.css?v=20261009-1">
+    <link rel="stylesheet" href="/static/subscriptions.css?v=20261011-1">
     <link rel="stylesheet" href="/static/layout.css?v=20260922-1">
   </head>
   <body>
@@ -107,6 +108,7 @@
             <button class="nav-link" type="button" data-view="memos"><span aria-hidden="true">▤</span>备忘录</button>
             <button class="nav-link" type="button" data-view="moods"><span aria-hidden="true">☺</span>心情日记</button>
             <button class="nav-link" type="button" data-view="ledger"><span aria-hidden="true">¥</span>生活账本</button>
+            <button class="nav-link" type="button" data-view="subscriptions"><span aria-hidden="true">↻</span>订阅管家</button>
             <button class="nav-link" type="button" data-view="inventory"><span aria-hidden="true">▣</span>物品管家</button>
             <button class="nav-link" type="button" data-view="bookmarks"><span aria-hidden="true">▱</span>随手收藏</button>
             <button class="nav-link" type="button" data-view="timeline"><span aria-hidden="true">↟</span>生活足迹</button>
@@ -397,6 +399,14 @@
             </article><section class="surface explore-records"><div class="explore-record-head"><div><p class="eyebrow">YOUR LITTLE COLLECTION</p><h3 id="explore-list-title">我的时光信件</h3></div><select id="explore-filter" aria-label="按记录状态筛选"><option value="all">全部记录</option><option value="waiting">等待中</option><option value="done">已解锁 / 已完成</option></select></div><div id="explore-list"></div><nav class="explore-pages" aria-label="探索记录分页"><button id="explore-prev" class="quiet" type="button">上一页</button><span id="explore-page"></span><button id="explore-next" class="quiet" type="button">下一页</button></nav></section></div>
           </section>
 
+          <section id="panel-subscriptions" class="panel">
+            <header class="sub-heading"><div><p class="eyebrow">RECURRING, BUT NEVER FORGOTTEN.</p><h2>每一份订阅，都心中有数。</h2><p>会员、软件、云空间。把周期花费收好，为下一次续费留一点余量。</p></div><div><button id="sub-export" class="quiet" type="button">导出 CSV</button><button id="sub-refresh" class="quiet" type="button">刷新</button><button id="sub-new" class="primary" type="button" disabled>＋ 添加订阅</button></div></header>
+            <div class="sub-metrics"><article><span>月均支出估算</span><strong id="sub-monthly">—</strong><small>进行中订阅的年度估算 ÷ 12</small></article><article><span>年度支出估算</span><strong id="sub-annual">—</strong><small>假设当前价格持续一年</small></article><article><span>未来 30 天预计扣费</span><strong id="sub-upcoming-total">—</strong><small>含今天，按周期逐次计算</small></article><article class="sub-metric-due"><span>今天及逾期，待确认</span><strong id="sub-due-count">—</strong><small>确认本期已付后推进日期</small></article></div>
+            <p id="sub-status" role="status"></p><div id="sub-recovery" class="sub-recovery" role="alert" hidden><p>这次保存尚未完成核对。可原样重试，或先导出草稿再重新加载。</p><button id="sub-retry" class="primary" type="button">重试保存</button><button id="sub-draft" class="quiet" type="button">导出草稿</button><button id="sub-reconcile" class="quiet" type="button">重新加载</button></div>
+            <div class="sub-workspace"><main class="sub-library"><div id="sub-views" class="sub-views" role="group" aria-label="订阅状态"></div><div class="sub-filters"><label><span class="sr-only">搜索订阅</span><input id="sub-search" type="search" placeholder="搜索名称、分类或备注" maxlength="100"></label><select id="sub-category" aria-label="分类筛选"><option value="">所有分类</option></select><select id="sub-sort" aria-label="排序"><option value="due">扣费日期从近到远</option><option value="name">名称排序</option><option value="price">每期金额从高到低</option></select></div><p id="sub-count" class="sub-muted"></p><div id="sub-grid" class="sub-grid"></div><nav class="sub-pagination" aria-label="订阅分页"><button id="sub-prev" class="quiet" type="button">上一页</button><span id="sub-page">1 / 1</span><button id="sub-next" class="quiet" type="button">下一页</button></nav></main><aside class="sub-agenda-card"><p class="eyebrow">NEXT ON THE CALENDAR</p><h3>近期续费日历</h3><p id="sub-agenda-count" class="sub-muted"></p><div id="sub-agenda"></div><div class="sub-tip"><b>让花费保持可见。</b><p>暂停或取消后将不计入预测。取消实际服务请前往对应平台操作。</p></div></aside></div>
+            <p class="sub-footnote">人民币手动管理 · 预测使用当前价格，不含未记录的试用、折扣或税费。每周订阅按平均公历年估算。确认已付只记录本期并推进日期，不自动写入生活账本；付款及取消请在服务商处操作。这里没有后台扣费提醒，建议同时设置自己的日历提醒。</p>
+          </section>
+          <dialog id="sub-dialog" aria-labelledby="sub-editor-title"><form id="sub-form"><header><div><p class="eyebrow">A RECURRING DETAIL</p><h3 id="sub-editor-title">添加一项订阅</h3></div><button id="sub-close" class="quiet" type="button" aria-label="关闭订阅编辑">×</button></header><fieldset id="sub-fields"><label>订阅名称<input id="sub-name" required maxlength="80" placeholder="例如：云存储、音乐会员"></label><label>分类<input id="sub-entry-category" maxlength="30" placeholder="例如：影音、软件、生活"></label><div class="sub-form-pair"><label>每期金额（元）<input id="sub-amount" inputmode="decimal" required maxlength="12" placeholder="0.00"></label><label>扣费周期<select id="sub-cycle"><option value="weekly">每周</option><option value="monthly" selected>每月</option><option value="quarterly">每季</option><option value="yearly">每年</option></select></label></div><div class="sub-form-pair"><label>下一扣费日<input id="sub-date" type="date" required min="2000-01-01" max="2100-12-31"></label><label>状态<select id="sub-state"><option value="active">进行中</option><option value="paused">暂停</option><option value="cancelled">已取消</option></select></label></div><label>备注<textarea id="sub-note" rows="3" maxlength="2000" placeholder="续费方式、套餐信息或取消路径…"></textarea></label></fieldset><p id="sub-form-status" role="status"></p><p class="sub-muted">修改扣费日或周期会以新日期重新起算；没有改动时保留原月底扣费日。请填下一次尚未支付的日期。</p><footer><button id="sub-save" class="primary" type="submit">保存订阅</button></footer></form></dialog>
           <section id="panel-ledger" class="panel">
             <header class="ledger-heading"><div><p class="eyebrow">LIFE LEDGER / 每一笔，都是生活</p><h3>把日子，记得清楚一点。</h3><p>看见钱花在哪里，也为喜欢的生活留一点余地。</p></div><button id="ledger-new" class="primary" type="button">＋ 记一笔</button></header>
             <div class="ledger-toolbar"><div class="ledger-month-nav"><button id="ledger-prev" class="quiet" type="button" aria-label="上个月">←</button><label>账本月份<input id="ledger-month" type="month" min="2000-01" max="2100-12"></label><button id="ledger-next" class="quiet" type="button" aria-label="下个月">→</button><button id="ledger-now" class="quiet" type="button">本月</button></div><button id="ledger-refresh" class="quiet" type="button">刷新账本</button></div>
@@ -700,7 +710,9 @@
         <div class="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 执行</span><span>全局快捷键 <kbd>Ctrl K</kbd></span></div>
       </div>
     </dialog>
-    <script src="/static/app.js?v=20261009-travel-retired" defer></script>
+    <script src="/static/app.js?v=20261011-subscriptions" defer></script>
+    <script src="/static/subscriptions-core.js?v=20261011-1" defer></script>
+    <script src="/static/subscriptions.js?v=20261011-1" defer></script>
     <script src="/static/inventory.js?v=20261007-shopping" defer></script>
     <script src="/static/shopping.js?v=20261007-1" defer></script>
     <script src="/static/bookmarks.js?v=20261007-1" defer></script>

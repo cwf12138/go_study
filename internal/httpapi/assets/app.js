@@ -337,6 +337,7 @@
       memos: ["PERSONAL NOTES", "备忘录"],
       explore: ["LITTLE ADVENTURES", "探索生活"],
       ledger: ["LIFE LEDGER", "生活账本"],
+      subscriptions: ["RECURRING DETAILS", "订阅管家"],
       inventory: ["EVERYDAY COLLECTION", "物品管家"],
       bookmarks: ["LINK LIBRARY", "随手收藏"],
       toolkit: ["EVERYDAY ESSENTIALS", "随身工具"],
