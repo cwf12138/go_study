@@ -6,6 +6,7 @@ info:
 servers:
   - url: http://localhost:8080
 tags:
+  - name: Meals
   - name: Subscriptions
   - name: Auth
   - name: Goals
@@ -27,6 +28,77 @@ tags:
   - name: Shopping
   - name: Bookmarks
 paths:
+  /api/v1/meals:
+    get:
+      tags: [Meals]
+      security: [{ bearerAuth: [] }]
+      summary: 获取当前账号菜谱及菜单（含软删除记录）
+      responses:
+        "200":
+          description: Meal entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/MealEntry" } }
+        "401": { description: Authentication required }
+  /api/v1/meals/{id}:
+    put:
+      tags: [Meals]
+      security: [{ bearerAuth: [] }]
+      summary: 完整保存菜谱或菜单，期望版本校验及相同请求重试
+      parameters:
+        - { in: path, name: id, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,80}$' } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MealInput" }
+      responses:
+        "200":
+          description: Saved meal entry
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/MealEntry" }
+        "400": { description: Invalid recipe, date, ingredients or unavailable recipe }
+        "401": { description: Authentication required }
+        "404": { description: Update target not found }
+        "409": { description: Stale revision, duplicate dish or recipe referenced by a menu }
+  /api/v1/meals/shopping:
+    post:
+      tags: [Meals]
+      security: [{ bearerAuth: [] }]
+      summary: 原子合并所选菜谱或菜单食材至待购买清单，不覆盖已有数量
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids: { type: array, minItems: 1, maxItems: 21, items: { type: string } }
+                have: { type: array, maxItems: 840, items: { type: string, maxLength: 80 } }
+      responses:
+        "200":
+          description: Added and existing pending ingredient counts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      added: { type: integer, minimum: 0 }
+                      existing: { type: integer, minimum: 0 }
+        "400": { description: Invalid request or insufficient shopping capacity; no partial writes }
+        "401": { description: Authentication required }
+        "404": { description: Recipe or plan not found for this account }
   /api/v1/subscriptions:
     get:
       tags: [Subscriptions]
@@ -2650,6 +2722,57 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
   schemas:
+    MealInput:
+      type: object
+      required: [kind, revision]
+      properties:
+        kind: { type: string, enum: [recipe, plan] }
+        title: { type: string, maxLength: 80 }
+        category: { type: string, maxLength: 20 }
+        minutes: { type: integer, minimum: 0, maximum: 600 }
+        servings: { type: integer, minimum: 0, maximum: 20 }
+        ingredients:
+          type: array
+          maxItems: 40
+          items:
+            type: object
+            required: [name]
+            properties:
+              name: { type: string, minLength: 1, maxLength: 80 }
+              quantity: { type: string, maxLength: 30 }
+        steps: { type: array, maxItems: 30, items: { type: string, minLength: 1, maxLength: 500 } }
+        note: { type: string, maxLength: 500 }
+        favorite: { type: boolean }
+        recipe_id: { type: string }
+        date: { type: string }
+        slot: { type: string }
+        cooked: { type: boolean }
+        deleted: { type: boolean }
+        revision: { type: integer, minimum: 0, maximum: 1000000 }
+      oneOf:
+        - required: [title, minutes, servings, ingredients, steps]
+          properties:
+            kind: { const: recipe }
+            title: { minLength: 1 }
+            minutes: { minimum: 1 }
+            servings: { minimum: 1 }
+            ingredients: { minItems: 1 }
+            steps: { minItems: 1 }
+        - required: [recipe_id, date, slot]
+          properties:
+            kind: { const: plan }
+            recipe_id: { pattern: '^[A-Za-z0-9_-]{8,80}$' }
+            date: { format: date, description: 有效日期，范围 2000–2100 年 }
+            slot: { enum: [breakfast, lunch, dinner] }
+    MealEntry:
+      allOf:
+        - $ref: "#/components/schemas/MealInput"
+        - type: object
+          properties:
+            id: { type: string }
+            user_id: { type: string }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
     SubscriptionInput:
       type: object
       required: [name, amount_cents, cycle, anchor_date, state, revision]

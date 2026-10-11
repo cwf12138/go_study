@@ -44,6 +44,7 @@
     <link rel="stylesheet" href="/static/holiday.css?v=20261009-1">
     <link rel="stylesheet" href="/static/text-tools.css?v=20261009-1">
     <link rel="stylesheet" href="/static/subscriptions.css?v=20261011-1">
+    <link rel="stylesheet" href="/static/meals.css?v=20261011-1">
     <link rel="stylesheet" href="/static/layout.css?v=20260922-1">
   </head>
   <body>
@@ -103,6 +104,7 @@
             <button class="nav-link" type="button" data-view="todo"><span aria-hidden="true">☑</span>待办清单</button>
             <button class="nav-link" type="button" data-view="planner"><span aria-hidden="true">▦</span>智能规划</button>
             <button class="nav-link" type="button" data-view="toolkit"><span aria-hidden="true">⊞</span>随身工具</button>
+            <button class="nav-link" type="button" data-view="meals"><span aria-hidden="true">♨</span>今天吃什么</button>
           </div>
           <div class="nav-group" role="group" aria-label="记录"><p class="nav-group-label">记录</p>
             <button class="nav-link" type="button" data-view="memos"><span aria-hidden="true">▤</span>备忘录</button>
@@ -142,6 +144,21 @@
         </header>
 
         <div class="content">
+          <section id="panel-meals" class="panel meal-workspace" aria-label="今天吃什么">
+            <header class="meal-hero"><div><p class="meal-eyebrow">A LITTLE EVERYDAY DELIGHT</p><h2>好好吃饭，<br>也是生活的一部分。</h2><p>从一道喜欢的菜开始，把今天的选择变简单。</p><div class="meal-hero-actions"><button id="meal-pick" type="button" class="meal-primary">♨ 帮我选一道</button><button id="meal-new" type="button">＋ 记下我的菜谱</button></div></div><div class="meal-hero-art" aria-hidden="true"><span class="meal-art-orbit"></span><span class="meal-art-plate">🥗</span><span class="meal-art-note">一餐一味 · 好好生活</span></div></header>
+            <div class="meal-summary"><span><b id="meal-recipe-count">0</b> 道私藏菜谱</span><span><b id="meal-plan-count">0</b> 道本周安排</span><span><b id="meal-cooked-count">0</b> 道本周已做</span><button id="meal-shopping" type="button">购物清单 ↗</button><button id="meal-refresh" type="button">↻ 同步</button></div>
+            <p id="meal-status" role="status" aria-live="polite"></p>
+            <div id="meal-recovery" class="meal-recovery" hidden><p>保存结果尚未确认或发生冲突。先保留草稿，再重试或重新核对。</p><button id="meal-retry" type="button">原样重试</button><button id="meal-draft" type="button">导出请求草稿</button><button id="meal-reconcile" type="button">重新核对</button></div>
+            <div class="meal-layout"><div class="meal-main"><div class="meal-section-heading"><div class="meal-tabs" role="group" aria-label="厨房视图"><button id="meal-tab-recipes" type="button" aria-pressed="true">我的菜谱</button><button id="meal-tab-week" type="button" aria-pressed="false">一周菜单</button></div><button id="meal-examples" type="button">添加示例菜谱</button></div>
+              <div id="meal-recipes-view"><div class="meal-filters"><label class="meal-search"><span class="meal-sr-only">搜索菜名或食材</span><input id="meal-search" type="search" maxlength="100" placeholder="搜索菜名、食材…"></label><label><span class="meal-sr-only">菜谱分类</span><select id="meal-category"><option value="">全部分类</option></select></label><label><span class="meal-sr-only">制作耗时</span><select id="meal-minutes"><option value="0">不限时间</option><option value="15">15 分钟内</option><option value="30">30 分钟内</option><option value="60">60 分钟内</option></select></label></div><div class="meal-filter-toggles"><label><input id="meal-favorites" type="checkbox"> 只看常吃</label><label><input id="meal-ready" type="checkbox"> 食材已备齐</label><span id="meal-filter-count"></span></div><div id="meal-grid" class="meal-grid"></div><div class="meal-pagination"><button id="meal-prev" type="button">上一页</button><span id="meal-page">1 / 1</span><button id="meal-next" type="button">下一页</button></div></div>
+              <div id="meal-week-view" hidden><div class="meal-week-toolbar"><button id="meal-week-prev" type="button" aria-label="上一周">‹</button><button id="meal-this-week" type="button">本周</button><button id="meal-week-next" type="button" aria-label="下一周">›</button><strong id="meal-week-label"></strong><button id="meal-week-shop" type="button">本周未做菜品 → 购物清单</button></div><p class="meal-muted">点击餐次添加菜品，一餐可安排多道；完成后点勾，保留做饭记录。日期按中国标准时间。</p><div id="meal-week" class="meal-week"></div></div>
+            </div><aside class="meal-side"><article class="meal-pantry"><p class="meal-eyebrow">ALREADY AT HOME</p><h3>家里有什么？</h3><p>记下手边食材，选菜和购物就少一点纠结。</p><label for="meal-have">已有食材 · 逗号或换行分隔</label><textarea id="meal-have" rows="4" maxlength="4000" placeholder="鸡蛋，番茄，食用油，盐"></textarea><div id="meal-have-tags" class="meal-have-tags"></div><small>按名称精确匹配，不自动判断用量与新鲜度；仅在当前页面内存中保留。</small></article><article class="meal-today"><p class="meal-eyebrow">ON THE TABLE TODAY</p><h3>今天的餐桌</h3><div id="meal-today-list"></div><button id="meal-today-plan" type="button">安排今天</button></article><article class="meal-tip"><span aria-hidden="true">✦</span><p>计划不用填满。<br>给冰箱里的食材，<br>也给临时的好心情留个位置。</p></article></aside></div>
+            <dialog id="meal-editor" class="meal-dialog" aria-labelledby="meal-editor-title"><form id="meal-form"><header><div><p class="meal-eyebrow">MY RECIPE BOOK</p><h3 id="meal-editor-title">记下一道好菜</h3></div><button id="meal-editor-close" type="button" aria-label="关闭菜谱编辑">×</button></header><fieldset id="meal-fields"><label>菜名<input id="meal-title" required maxlength="80" placeholder="例如：番茄炒蛋"></label><div class="meal-form-row"><label>分类<input id="meal-edit-category" maxlength="20" list="meal-categories" placeholder="家常菜"></label><label>耗时 / 分钟<input id="meal-edit-minutes" type="number" min="1" max="600" required value="20"></label><label>参考人数<input id="meal-servings" type="number" min="1" max="20" required value="2"></label></div><label>食材 · 每行「名称 | 用量」<textarea id="meal-ingredients" rows="5" required maxlength="6000" placeholder="番茄 | 2个&#10;鸡蛋 | 3个&#10;盐 | 适量"></textarea></label><label>做法 · 每行一个步骤<textarea id="meal-steps" rows="5" required maxlength="16000" placeholder="洗净番茄，切块。&#10;打散鸡蛋…"></textarea></label><label>我的小贴士<textarea id="meal-note" rows="2" maxlength="500"></textarea></label><label class="meal-check"><input id="meal-favorite" type="checkbox"> 加入常吃菜谱</label></fieldset><p id="meal-form-status" role="status"></p><button id="meal-save" class="meal-primary" type="submit">保存菜谱</button></form></dialog>
+            <datalist id="meal-categories"><option value="家常菜"><option value="主食"><option value="早餐"><option value="汤羹"><option value="轻食"></datalist>
+            <dialog id="meal-detail" class="meal-dialog meal-detail-dialog" aria-labelledby="meal-detail-title"><header><p id="meal-detail-kicker" class="meal-eyebrow">FROM MY KITCHEN</p><button id="meal-detail-close" type="button" aria-label="关闭菜谱详情">×</button></header><div id="meal-detail-body"></div><div class="meal-detail-actions"><button id="meal-detail-plan" class="meal-primary" type="button">安排进菜单</button><button id="meal-detail-shop" type="button">买缺少的食材</button><button id="meal-detail-edit" type="button">编辑</button><button id="meal-detail-delete" type="button">删除菜谱</button></div><p class="meal-muted">示例为家常做法，耗时和用量仅供参考；请留意过敏原，生熟分开并确保食材熟透。</p><p id="meal-detail-status" role="status"></p></dialog>
+            <dialog id="meal-plan-dialog" class="meal-dialog" aria-labelledby="meal-plan-title"><form id="meal-plan-form"><header><h3 id="meal-plan-title">安排一餐</h3><button id="meal-plan-close" type="button" aria-label="关闭菜单编辑">×</button></header><fieldset id="meal-plan-fields"><label>选一道菜<select id="meal-plan-recipe" required></select></label><div class="meal-form-row"><label>日期<input id="meal-plan-date" type="date" required min="2000-01-01" max="2100-12-31"></label><label>餐次<select id="meal-plan-slot"><option value="breakfast">早餐</option><option value="lunch">午餐</option><option value="dinner">晚餐</option></select></label></div></fieldset><p id="meal-plan-status" role="status"></p><button id="meal-plan-save" class="meal-primary" type="submit">加入菜单</button></form></dialog>
+            <dialog id="meal-shop-dialog" class="meal-dialog" aria-labelledby="meal-shop-title"><header><div><p class="meal-eyebrow">A SMALL SHOPPING LIST</p><h3 id="meal-shop-title">买这些就够了</h3></div><button id="meal-shop-close" type="button" aria-label="关闭食材清单">×</button></header><p class="meal-muted">勾选要买的食材。已有食材默认不选；同名待购物品会跳过，不覆盖原数量。用量保存在备注中，不自动相加。</p><div id="meal-shop-items"></div><p id="meal-shop-status" role="status"></p><button id="meal-shop-confirm" class="meal-primary" type="button">加入购物清单</button></dialog>
+          </section>
           <div class="app-sync-bar"><span id="app-sync-status" role="status" aria-live="polite">等待同步</span><button id="app-sync-retry" class="quiet" type="button">刷新数据</button></div>
           <div id="toolkit-running" class="toolkit-running" hidden><span id="toolkit-running-message" role="status"></span><button id="toolkit-running-open" type="button">查看计时器 <span id="toolkit-running-time"></span> →</button></div>
           <section id="panel-dashboard" class="panel active">
@@ -710,11 +727,13 @@
         <div class="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 执行</span><span>全局快捷键 <kbd>Ctrl K</kbd></span></div>
       </div>
     </dialog>
-    <script src="/static/app.js?v=20261011-subscriptions" defer></script>
+    <script src="/static/app.js?v=20261011-meals" defer></script>
     <script src="/static/subscriptions-core.js?v=20261011-1" defer></script>
     <script src="/static/subscriptions.js?v=20261011-1" defer></script>
     <script src="/static/inventory.js?v=20261007-shopping" defer></script>
-    <script src="/static/shopping.js?v=20261007-1" defer></script>
+    <script src="/static/shopping.js?v=20261011-meals" defer></script>
+    <script src="/static/meals-core.js?v=20261011-1" defer></script>
+    <script src="/static/meals.js?v=20261011-1" defer></script>
     <script src="/static/bookmarks.js?v=20261011-2" defer></script>
     <script src="/static/toolkit-core.js?v=20261009-text" defer></script>
     <script src="/static/toolkit.js?v=20261009-text" defer></script>

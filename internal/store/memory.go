@@ -27,6 +27,7 @@ type Memory struct {
 	shopping                map[string]domain.ShoppingItem
 	bookmarks               map[string]domain.Bookmark
 	subscriptions           map[string]domain.Subscription
+	meals                   map[string]domain.MealEntry
 	ledger                  map[string]domain.LedgerEntry
 	projects                map[string]domain.Project
 	travelPlans             map[string]domain.TravelPlan
@@ -64,6 +65,7 @@ func NewMemory() *Memory {
 		shopping:                make(map[string]domain.ShoppingItem),
 		bookmarks:               make(map[string]domain.Bookmark),
 		subscriptions:           make(map[string]domain.Subscription),
+		meals:                   make(map[string]domain.MealEntry),
 		ledger:                  make(map[string]domain.LedgerEntry),
 		projects:                make(map[string]domain.Project),
 		travelPlans:             make(map[string]domain.TravelPlan),
@@ -1146,6 +1148,7 @@ type snapshot struct {
 	Shopping                []domain.ShoppingItem       `json:"shopping,omitempty"`
 	Bookmarks               []domain.Bookmark           `json:"bookmarks,omitempty"`
 	Subscriptions           []domain.Subscription       `json:"subscriptions,omitempty"`
+	Meals                   []domain.MealEntry          `json:"meals,omitempty"`
 	Ledger                  []domain.LedgerEntry        `json:"ledger"`
 	Projects                []domain.Project            `json:"projects"`
 	TravelPlans             []domain.TravelPlan         `json:"travel_plans,omitempty"`
@@ -1221,6 +1224,9 @@ func (m *Memory) SaveJSON(path string) error {
 	}
 	for _, item := range m.subscriptions {
 		s.Subscriptions = append(s.Subscriptions, item)
+	}
+	for _, item := range m.meals {
+		s.Meals = append(s.Meals, cloneMeal(item))
 	}
 	for _, item := range m.projects {
 		s.Projects = append(s.Projects, cloneProject(item))
@@ -1374,6 +1380,10 @@ func (m *Memory) LoadJSON(path string) error {
 		m.bookmarks[item.UserID+":"+item.ID] = item
 	}
 	m.subscriptions = make(map[string]domain.Subscription, len(s.Subscriptions))
+	m.meals = make(map[string]domain.MealEntry, len(s.Meals))
+	for _, item := range s.Meals {
+		m.meals[item.UserID+":"+item.ID] = cloneMeal(item)
+	}
 	for _, item := range s.Subscriptions {
 		m.subscriptions[item.UserID+":"+item.ID] = item
 	}

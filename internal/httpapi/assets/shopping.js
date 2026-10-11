@@ -112,6 +112,8 @@
     $('edit-form').addEventListener('submit',async e=>{e.preventDefault();if(!state.editing||state.busy)return;const owner=state.owner,changes=JSON.parse(draft());lock(true);try{const saved=await mutate(state.editing,changes,null);if(saved){state.editing=null;$('dialog').close();}}finally{if(owner===token()){lock(false);render();}}});
     $('close').addEventListener('click',close);$('dialog').addEventListener('cancel',e=>{e.preventDefault();close();});
     document.addEventListener('daynest:account-ready',load);document.getElementById('logout').addEventListener('click',()=>{state.owner='invalid';sync();});
+    document.addEventListener('daynest:shopping-changed',()=>{if(state.busy){message('菜谱食材已加入购物清单，当前操作完成后请刷新查看。');return;}load();});
+    document.addEventListener('daynest:open-shopping',()=>{showTab(true);load();});
     window.addEventListener('storage',e=>{if(e.key==='studyflow.token'){sync();if(token())load();}});
     window.addEventListener('beforeunload',e=>{if($('input').value.trim()||$('home-input').value.trim()||(state.editing&&draft()!==state.baseline)){e.preventDefault();e.returnValue='';}});
     if(token())load();else render();

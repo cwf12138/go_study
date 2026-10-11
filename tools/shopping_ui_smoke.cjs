@@ -2,6 +2,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const root='internal/httpapi/assets/',source=fs.readFileSync(root+'shopping.js','utf8'),html=fs.readFileSync(root+'index.html','utf8');
 for(const m of source.matchAll(/\$\('([\w-]+)'\)/g))assert(html.includes(`id="shopping-${m[1]}"`),`missing shopping-${m[1]}`);
 const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);assert.equal(ids.length,new Set(ids).size);
+assert(source.includes("document.addEventListener('daynest:shopping-changed'"));assert(source.includes("document.addEventListener('daynest:open-shopping'"));
 const elements=new Map();function el(id){if(!elements.has(id))elements.set(id,{value:'',checked:false,hidden:false,disabled:false,open:false,innerHTML:'',textContent:'',attrs:{},classList:{toggle(){}},querySelectorAll(){return []},setAttribute(k,v){this.attrs[k]=v},reset(){},focus(){},close(){this.open=false},showModal(){this.open=true}});return elements.get(id)}
 let owner='alice',event=null;const context={console,Date,crypto:crypto.webcrypto,AbortController,setTimeout,clearTimeout,
  localStorage:{getItem(){return owner}},document:{getElementById:el,dispatchEvent(e){event=e}},window:{confirm(){return true}},CustomEvent:class{constructor(type,options){this.type=type;this.detail=options?.detail}}};

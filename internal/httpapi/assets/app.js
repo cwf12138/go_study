@@ -338,6 +338,7 @@
       explore: ["LITTLE ADVENTURES", "探索生活"],
       ledger: ["LIFE LEDGER", "生活账本"],
       subscriptions: ["RECURRING DETAILS", "订阅管家"],
+      meals: ["EVERYDAY KITCHEN", "今天吃什么"],
       inventory: ["EVERYDAY COLLECTION", "物品管家"],
       bookmarks: ["LINK LIBRARY", "随手收藏"],
       toolkit: ["EVERYDAY ESSENTIALS", "随身工具"],
