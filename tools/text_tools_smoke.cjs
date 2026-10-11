@@ -29,8 +29,14 @@ const click=id=>E(id).listeners.click();
   click('clear');assert.equal(E('input').value,'');click('undo');assert.equal(E('input').value,'apples\n\npears');
   mode('unique');input('input','apple\napple\npear');assert.match(E('summary').textContent,/去掉 1 行/);assert.equal(E('output').value,'apple\npear');
   mode('replace');assert(E('copy').disabled);assert(!E('replace-fields').hidden);input('find','apple');input('replacement','<script>$&');assert.equal(E('output').value,'<script>$&\n<script>$&\npear');assert.equal(E('input').value,'apple\napple\npear');
+  input('find','');assert.equal(E('characters').textContent,'16','invalid replacement still shows source counts');input('find','apple');
   await click('copy');assert.equal(copied,E('output').value);rejectCopy=true;await click('copy');assert(E('output').selected);assert.match(E('status').textContent,/Ctrl/);rejectCopy=false;
   click('download');assert.equal(downloads[0],'整理后的文字.txt');timers.forEach(fn=>fn());assert.equal(urls.size,0);
+  E('input').listeners.compositionstart();E('input').value='正在输入';E('input').listeners.input({isComposing:true});
+  const oldCopied=copied,oldDownloads=downloads.length;
+  for(const id of ['apply','copy','download','clear','undo','redo']){assert(E(id).disabled,id+' disabled during IME');await click(id);}
+  assert.equal(E('input').value,'正在输入');assert.equal(copied,oldCopied);assert.equal(downloads.length,oldDownloads);assert.equal(E('output').value,'');
+  E('input').listeners.compositionend();assert.equal(E('output').value,'正在输入');
   E('find').value='中文';E('find').listeners.compositionend();assert.match(E('summary').textContent,/匹配 0 处/);
   input('input','x'.repeat(50001));assert(E('apply').disabled);assert.equal(E('characters').textContent,'—');
   mode('clean');input('input','hello');delayedCopy=true;const pending=click('copy');account='two';events.storage({key:'studyflow.token'});const cleared=E('status').textContent;finishCopy();await pending;assert.equal(E('status').textContent,cleared);assert.equal(E('input').value,'');assert.equal(E('output').value,'');assert(E('undo').disabled);assert(E('redo').disabled);

@@ -6,10 +6,20 @@
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const state = { token:'', rows:[], loaded:false, loading:false, busy:false, pending:null, edit:null, view:'all', folder:'', page:1, generation:0 };
   const token = () => localStorage.getItem('studyflow.token') || '';
+  const controllers=new Set();
+  let dirty=false;
+  function canClose(){return !state.busy&&(!dirty||!!state.pending||confirm('尚有未保存的修改，确定关闭并放弃吗？'));}
+  function newID(){
+    if(typeof crypto!=='undefined'&&typeof crypto.randomUUID==='function')return crypto.randomUUID();
+    if(typeof crypto!=='undefined'&&typeof crypto.getRandomValues==='function')return 'bookmark-'+Array.from(crypto.getRandomValues(new Uint8Array(16)),byte=>byte.toString(16).padStart(2,'0')).join('');
+    throw new Error('浏览器无法生成收藏标识，请更换浏览器重试。');
+  }
+  function validRow(row){return !!row&&typeof row.id==='string'&&!!row.id&&['url','title','folder','note'].every(key=>typeof row[key]==='string')&&['pinned','read','deleted'].every(key=>typeof row[key]==='boolean')&&Number.isInteger(row.revision)&&row.revision>0&&typeof row.created_at==='string'&&Number.isFinite(Date.parse(row.created_at));}
   function message(text, error=false, target='status') { $(target).textContent=text; $(target).classList.toggle('bookmark-error',error); }
   function sync() {
     const current=token();
     if(current!==state.token){
+      controllers.forEach(controller=>controller.abort());controllers.clear();dirty=false;
       state.token=current;state.rows=[];state.loaded=false;state.loading=false;state.busy=false;state.pending=null;state.edit=null;state.view='all';state.folder='';state.page=1;state.generation++;
       $('dialog').close();$('form').reset();$('search').value='';message('');message('',false,'form-status');render();
     }
@@ -18,14 +28,15 @@
   function safeURL(value) { try { const url=new URL(value);return ['http:','https:'].includes(url.protocol)&&!url.username&&!url.password?url.href:''; } catch { return ''; } }
   async function api(path='', body) {
     const owner=token(), controller=new AbortController(), timeout=setTimeout(()=>controller.abort(),15000);
+    controllers.add(controller);
     try{
       const response=await fetch('/api/v1/bookmarks'+path,{method:body?'PUT':'GET',headers:{Authorization:`Bearer ${owner}`,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:controller.signal,cache:'no-store'});
       const payload=await response.json().catch(()=>null);
       if(owner!==token()) throw new Error('账号已切换');
-      if(!response.ok){const error=new Error(payload?.error?.message||(response.status===404?'接口不存在，请重启新版 Go 服务。':`请求失败（${response.status}）`));error.definite=response.status>=400&&response.status<500;throw error;}
+      if(!response.ok){const error=new Error(payload?.error?.message||(response.status===404?'接口不存在，请重启新版 Go 服务。':`请求失败（${response.status}）`));error.definite=response.status>=400&&response.status<500&&response.status!==409;throw error;}
       if(!payload || !('data' in payload)) throw new Error('服务响应异常，请确认后端版本');
       return payload.data;
-    } finally { clearTimeout(timeout); }
+    } finally { clearTimeout(timeout);controllers.delete(controller); }
   }
   function controls(){
     const locked=state.busy||!!state.pending;
@@ -40,7 +51,7 @@
     if(!sync()){message('请先登录。',true);return;}
     if(state.loading||state.busy||state.pending)return;
     const generation=++state.generation,owner=state.token;state.loading=true;controls();message('正在整理收藏架…');
-    try{const rows=await api();if(generation!==state.generation||owner!==token())return;if(!Array.isArray(rows))throw new Error('收藏数据格式异常');state.rows=rows;state.loaded=true;render();message(`已同步 ${rows.filter(r=>!r.deleted).length} 条收藏。`);}
+    try{const rows=await api();if(generation!==state.generation||owner!==token())return;if(!Array.isArray(rows)||!rows.every(validRow)||new Set(rows.map(row=>row.id)).size!==rows.length)throw new Error('收藏数据格式异常');state.rows=rows;state.loaded=true;render();message(`已同步 ${rows.filter(r=>!r.deleted).length} 条收藏。`);}
     catch(error){if(generation===state.generation&&owner===token())message(error.name==='AbortError'?'加载超时，请重试。':error.message,true);}
     finally{if(generation===state.generation){state.loading=false;controls();}}
   }
@@ -70,7 +81,7 @@
   }
   function edit(row=null){
     if(!sync()||state.busy||state.pending||!state.loaded)return;
-    state.edit=row;$('form').reset();$('url').value=row?.url||'';$('title').value=row?.title||'';$('folder').value=row?.folder||state.folder||'';$('note').value=row?.note||'';$('pinned').checked=!!row?.pinned;$('read').checked=!!row?.read;
+    state.edit=row;dirty=false;$('form').reset();$('url').value=row?.url||'';$('title').value=row?.title||'';$('folder').value=row?.folder||state.folder||'';$('note').value=row?.note||'';$('pinned').checked=!!row?.pinned;$('read').checked=!!row?.read;
     $('editor-title').textContent=row?'编辑收藏':'收藏一个链接';message('',false,'form-status');controls();$('dialog').showModal();$('url').focus();
   }
   function bodyOf(row){return {url:row.url,title:row.title,folder:row.folder,note:row.note,pinned:row.pinned,read:row.read,deleted:row.deleted,revision:row.revision};}
@@ -83,7 +94,8 @@
     try{
       const row=await api('/'+encodeURIComponent(pending.id),pending.body);
       if(owner!==token()||generation!==state.generation)return;
-      if(!row?.id||!Number.isInteger(row.revision))throw new Error('保存响应异常');
+      if(row?.id!==pending.id||!validRow(row))throw new Error('保存响应异常');
+      dirty=false;
       state.rows=state.rows.filter(r=>r.id!==row.id).concat(row);state.pending=null;$('dialog').close();render();message(row.deleted?'已移入回收站，可随时恢复。':'已保存收藏。');
     }catch(error){
       if(owner!==token()||generation!==state.generation)return;
@@ -105,14 +117,17 @@
     if(!state.token||state.token!==token()){sync();message('账号已变化，请重新添加。',true);return;}
     let url=$('url').value.trim();if(!url.includes('://'))url='https://'+url;
     if(!safeURL(url)){message('请填写 HTTP/HTTPS 网址，且不要包含用户名或密码。',true,'form-status');return;}
-    persist({id:state.edit?.id||crypto.randomUUID(),body:{url,title:$('title').value,folder:$('folder').value,note:$('note').value,pinned:$('pinned').checked,read:$('read').checked,deleted:false,revision:state.edit?.revision||0}});
+    try{persist({id:state.edit?.id||newID(),body:{url,title:$('title').value,folder:$('folder').value,note:$('note').value,pinned:$('pinned').checked,read:$('read').checked,deleted:false,revision:state.edit?.revision||0}});}catch(error){message(error.message,true,'form-status');}
   });
-  $('new').addEventListener('click',()=>edit());$('close').addEventListener('click',()=>$('dialog').close());
-  $('dialog').addEventListener('cancel',event=>{if(state.busy)event.preventDefault();});
+  $('form').addEventListener('input',()=>{dirty=true;});
+  $('form').addEventListener('change',()=>{dirty=true;});
+  $('new').addEventListener('click',()=>edit());$('close').addEventListener('click',()=>{if(canClose())$('dialog').close();});
+  $('dialog').addEventListener('cancel',event=>{if(!canClose())event.preventDefault();});
+  window.addEventListener('beforeunload',event=>{if(state.pending||dirty&&$('dialog').open){event.preventDefault();event.returnValue='';}});
   $('refresh').addEventListener('click',load);$('export').addEventListener('click',exportHTML);
   $('retry').addEventListener('click',()=>persist(null));
   $('draft').addEventListener('click',()=>{if(sync()&&state.pending)download('收藏草稿.json',JSON.stringify(state.pending,null,2),'application/json');});
-  $('reconcile').addEventListener('click',()=>{if(state.busy)return;if(confirm('请先导出需要保留的草稿。重新核对将放弃本地待确认请求，并加载服务器记录。')){state.pending=null;$('dialog').close();load();}});
+  $('reconcile').addEventListener('click',()=>{if(!sync()||state.busy)return;if(confirm('请先导出需要保留的草稿。重新核对将放弃本地待确认请求，并加载服务器记录。')){state.pending=null;dirty=false;$('dialog').close();load();}});
   for(const id of ['search','sort'])$(id).addEventListener(id==='search'?'input':'change',()=>{state.page=1;render();});
   $('views').addEventListener('click',event=>{const button=event.target.closest('[data-view]');if(button){state.view=button.dataset.view;state.folder='';state.page=1;render();}});
   $('folders').addEventListener('click',event=>{const button=event.target.closest('[data-folder]');if(button){state.folder=button.dataset.folder;state.page=1;render();}});
@@ -122,12 +137,14 @@
     const row=state.rows.find(r=>r.id===button.dataset.id);if(!row)return;
     const action=button.dataset.action;
     if(action==='edit'){edit(row);return;}
-    if(action==='copy'){try{await navigator.clipboard.writeText(row.url);message('链接已复制。');}catch{message('复制失败，请在编辑窗口中选中网址手动复制。',true);}return;}
+    if(action==='copy'){const owner=state.token,generation=state.generation;try{await navigator.clipboard.writeText(row.url);if(owner===token()&&generation===state.generation)message('链接已复制。');}catch{if(owner===token()&&generation===state.generation)message('复制失败，请在编辑窗口中选中网址手动复制。',true);}return;}
     const body=bodyOf(row);if(action==='pin')body.pinned=!body.pinned;else if(action==='read')body.read=!body.read;else if(action==='trash')body.deleted=true;else if(action==='restore')body.deleted=false;else return;
     persist({id:row.id,body});
   });
   document.querySelector('[data-view="bookmarks"]')?.addEventListener('click',load);
   new MutationObserver(()=>{sync();if(panel.classList.contains('active')&&!state.loaded)load();}).observe(panel,{attributes:true,attributeFilter:['class']});
   window.addEventListener('storage',event=>{if(event.key==='studyflow.token'){sync();if(panel.classList.contains('active'))load();}});
+  new MutationObserver(sync).observe(document.getElementById('app-view'),{attributes:true,attributeFilter:['class']});
+  document.getElementById('logout')?.addEventListener('click',()=>{controllers.forEach(controller=>controller.abort());state.token='';state.rows=[];state.loaded=false;state.pending=null;state.edit=null;state.busy=false;state.loading=false;state.generation++;dirty=false;$('dialog').close();$('form').reset();message('');message('',false,'form-status');render();});
   render();if(panel.classList.contains('active'))load();
 })();
