@@ -6,11 +6,12 @@
   const token=()=>localStorage.getItem('studyflow.token')||'',slots={breakfast:'早餐',lunch:'午餐',dinner:'晚餐'};
   const state={owner:'',rows:[],loaded:false,loading:false,busy:false,pending:null,seq:0,page:1,view:'recipes',week:C.today(),have:[],editing:null,baseline:'',detail:null,shopIDs:[],lastPick:'',steps:new Set(),timer:{remaining:300000,deadline:0}};
   const controllers=new Set();
+  const discoveryImports=new Map();
   function uid(){if(typeof crypto.randomUUID==='function')return crypto.randomUUID();return 'meal-'+Array.from(crypto.getRandomValues(new Uint8Array(16)),b=>b.toString(16).padStart(2,'0')).join('');}
   function message(text,error=false,target='status'){$(target).textContent=text;$(target).classList.toggle('meal-error',error);}
   function valid(row){return row&&typeof row.id==='string'&&typeof row.title==='string'&&Number.isInteger(row.revision)&&row.revision>0&&typeof row.deleted==='boolean'&&(row.kind==='recipe'?typeof row.category==='string'&&Number.isInteger(row.minutes)&&Array.isArray(row.ingredients)&&row.ingredients.every(i=>typeof i?.name==='string'&&typeof i.quantity==='string')&&Array.isArray(row.steps)&&row.steps.every(s=>typeof s==='string'):row.kind==='plan'&&/^\d{4}-\d{2}-\d{2}$/.test(row.date)&&!!slots[row.slot]&&typeof row.recipe_id==='string');}
   function reset(){controllers.forEach(c=>c.abort());controllers.clear();Object.assign(state,{owner:token(),rows:[],loaded:false,loading:false,busy:false,pending:null,seq:state.seq+1,page:1,view:'recipes',week:C.today(),have:[],editing:null,baseline:'',detail:null,shopIDs:[],lastPick:'',steps:new Set(),timer:{remaining:300000,deadline:0}});for(const id of ['editor','detail','plan-dialog','shop-dialog'])$(id).close();$('form').reset();$('plan-form').reset();$('have').value='';$('search').value='';$('category').value='';$('minutes').value='0';$('favorites').checked=false;$('ready').checked=false;for(const id of ['status','form-status','plan-status','detail-status','shop-status'])message('',false,id);render();}
-  function sync(){if(state.owner!==token())reset();return !!state.owner;}
+  function sync(){if(state.owner!==token()){discoveryImports.clear();reset();}return !!state.owner;}
   async function api(path='',method='GET',body){
     const owner=state.owner,controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);controllers.add(controller);
     try{const response=await fetch('/api/v1/meals'+path,{method,headers:{Authorization:'Bearer '+owner,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:controller.signal,cache:'no-store'});const payload=await response.json().catch(()=>null);if(owner!==token())throw Error('账号已切换');if(!response.ok){const error=Error(payload?.error?.message||([404,405].includes(response.status)?'接口不可用，请重启新版 Go 服务后刷新。':`请求失败（${response.status}）`));error.definite=response.status>=400&&response.status<500&&response.status!==409;throw error;}if(!payload||!('data'in payload))throw Error('响应格式异常，请确认后端版本。');return payload.data;}
@@ -84,8 +85,25 @@
   new MutationObserver(()=>{sync();if(panel.classList.contains('active'))load();}).observe(panel,{attributes:true,attributeFilter:['class']});
   new MutationObserver(sync).observe(document.getElementById('app-view'),{attributes:true,attributeFilter:['class']});
   document.addEventListener('daynest:account-ready',()=>{sync();if(panel.classList.contains('active'))load();});
-  document.getElementById('logout').addEventListener('click',reset);window.addEventListener('storage',e=>{if(e.key==='studyflow.token'){sync();if(panel.classList.contains('active'))load();}});
+  document.getElementById('logout').addEventListener('click',()=>{discoveryImports.clear();reset();});window.addEventListener('storage',e=>{if(e.key==='studyflow.token'){sync();if(panel.classList.contains('active'))load();}});
   window.addEventListener('beforeunload',e=>{if(state.pending||$('editor').open&&draft()!==state.baseline){e.preventDefault();e.returnValue='';}});
   document.addEventListener('visibilitychange',()=>{sync();if(panel.classList.contains('active'))render();});
+  function recipeSignature(row){return JSON.stringify(['title','category','minutes','servings','ingredients','steps','note'].map(key=>row[key]));}
+  async function importDiscovery(row){
+    if(!sync()||locked())return null;const owner=state.owner,signature=recipeSignature(row),base=row.id+'-p'+row.servings;let id=discoveryImports.get(signature)||base;
+    const matching=state.rows.find(r=>r.kind==='recipe'&&!r.deleted&&recipeSignature(r)===signature);if(matching){discoveryImports.set(signature,matching.id);return matching;}
+    const existing=state.rows.find(r=>r.id===id);if(existing&&!existing.deleted&&recipeSignature(existing)===signature)return existing;
+    if(existing){id=uid();}discoveryImports.set(signature,id);
+    if(!await save({...row,id,revision:0}, {},'discover-status'))return null;
+    if(owner!==token())return null;return state.rows.find(r=>r.id===id);
+  }
+  window.DaynestMealActions=Object.freeze({
+    ready:()=>sync()&&!locked(),
+    have:()=>sync()?[...state.have]:[],
+    async prepare(rows){const owner=token(),saved=[];for(const row of rows){if(owner!==token())return null;const item=await importDiscovery(row);if(!item)return null;saved.push(item);}return saved;},
+    async arrange(rows,date,slot){const owner=token();for(const row of rows){if(owner!==token()||locked())return false;if(plans().some(p=>p.date===date&&p.slot===slot&&p.recipe_id===row.id))continue;const id='meal-auto-'+date+'-'+slot+'-'+row.id,old=state.rows.find(r=>r.id===id);if(!await save({id,kind:'plan',recipe_id:row.id,date,slot,revision:old?.revision||0,cooked:false,deleted:false}, {},'discover-status'))return false;}state.week=date;setView('week');return true;},
+    shop:rows=>openShop(rows.map(r=>r.id)),
+    detail:id=>showDetail(id)
+  });
   window.setInterval(tick,500);reset();if(panel.classList.contains('active'))load();
 })();
