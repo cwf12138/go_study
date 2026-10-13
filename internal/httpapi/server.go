@@ -1,9 +1,12 @@
 package httpapi
 
 import (
+	"github.com/example/studyflow/internal/chatgpt"
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/example/studyflow/internal/event"
@@ -17,6 +20,7 @@ type Server struct {
 	logger  *slog.Logger
 	started time.Time
 	assets  fs.FS
+	chatGPT *chatgpt.Manager
 }
 
 func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.Bus, logger *slog.Logger) http.Handler {
@@ -25,6 +29,12 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 		panic("frontend assets are unavailable: " + err.Error())
 	}
 	s := &Server{service: svc, bus: bus, logger: logger, started: time.Now(), assets: assets}
+	// Registration metadata is independent of user snapshots; credentials stay in RAM.
+	dataFile := os.Getenv("DATA_FILE")
+	if dataFile == "" {
+		dataFile = "data/studyflow.json"
+	}
+	s.chatGPT = chatgpt.New(filepath.Join(filepath.Dir(dataFile), "chatgpt-registration.json"))
 	root := http.NewServeMux()
 	staticFiles := http.StripPrefix("/static/", http.FileServer(http.FS(assets)))
 	root.Handle("GET /static/", revalidateAssets(staticFiles))
@@ -35,6 +45,11 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 	root.HandleFunc("POST /api/v1/auth/login", s.login)
 
 	private := http.NewServeMux()
+	private.Handle("GET /api/v1/ai/chatgpt", s.localAI(http.HandlerFunc(s.chatGPTStatus)))
+	private.Handle("POST /api/v1/ai/chatgpt/connect", s.localAI(http.HandlerFunc(s.chatGPTConnect)))
+	private.Handle("POST /api/v1/ai/chatgpt/disconnect", s.localAI(http.HandlerFunc(s.chatGPTDisconnect)))
+	private.Handle("GET /api/v1/ai/chatgpt/models", s.localAI(http.HandlerFunc(s.chatGPTModels)))
+	private.Handle("POST /api/v1/ai/meals/recommend", s.localAI(http.HandlerFunc(s.aiMealRecommend)))
 	private.HandleFunc("GET /api/v1/habits", s.listHabits)
 	private.HandleFunc("GET /api/v1/explore", s.listExplorations)
 	private.HandleFunc("GET /api/v1/keepsakes", s.listKeepsakes)

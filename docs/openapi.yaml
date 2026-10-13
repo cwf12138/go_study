@@ -6,6 +6,7 @@ info:
 servers:
   - url: http://localhost:8080
 tags:
+  - name: AI
   - name: Meals
   - name: Subscriptions
   - name: Auth
@@ -28,6 +29,116 @@ tags:
   - name: Shopping
   - name: Bookmarks
 paths:
+  /api/v1/ai/chatgpt:
+    get:
+      tags: [AI]
+      security: [{ bearerAuth: [] }]
+      summary: 本机 ChatGPT 授权状态（不返回任何令牌）
+      responses:
+        "200":
+          description: 当前本地账号的连接状态
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      connected: { type: boolean }
+                      signed_in: { type: boolean }
+                      pending: { type: boolean }
+                      busy: { type: boolean }
+                      email: { type: string }
+                      message: { type: string }
+        "401": { description: Authentication required }
+        "403": { description: Loopback and same-origin access required }
+  /api/v1/ai/chatgpt/connect:
+    post:
+      tags: [AI]
+      security: [{ bearerAuth: [] }]
+      summary: 创建一次性 PKCE 登录事务与临时 loopback 回调，返回官方授权 URL
+      responses:
+        "200":
+          description: data.authorization_url，用户须亲自在浏览器登录授权
+        "401": { description: Authentication required }
+        "403": { description: Loopback and same-origin access required }
+        "502": { description: 登录已在进行或本地注册存储失败 }
+  /api/v1/ai/chatgpt/disconnect:
+    post:
+      tags: [AI]
+      security: [{ bearerAuth: [] }]
+      summary: 取消在途请求，清除本地令牌，尝试撤销远程会话（保留注册映射）
+      responses:
+        "200": { description: data.message 包含远程撤销是否已确认 }
+        "401": { description: Authentication required }
+        "403": { description: Loopback and same-origin access required }
+  /api/v1/ai/chatgpt/models:
+    get:
+      tags: [AI]
+      security: [{ bearerAuth: [] }]
+      summary: 获取已授权 ChatGPT 账号实时可用模型
+      responses:
+        "200":
+          description: data 数组，每项含 slug、display_name、visibility
+        "401": { description: Authentication required }
+        "403": { description: Loopback and same-origin access required }
+        "502": { description: 未授权、权限/网络/额度错误或有在途请求 }
+  /api/v1/ai/meals/recommend:
+    post:
+      tags: [AI, Meals]
+      security: [{ bearerAuth: [] }]
+      summary: 用 ChatGPT plan usage 推荐菜谱，仅返回结果，不自动保存
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [model, prompt, people, minutes]
+              properties:
+                model: { type: string, minLength: 1, maxLength: 100 }
+                prompt: { type: string, minLength: 1, maxLength: 1200 }
+                people: { type: integer, minimum: 1, maximum: 6 }
+                minutes: { type: integer, minimum: 10, maximum: 150 }
+      responses:
+        "200":
+          description: data.summary 与 data.recipes（0–5 道，人数一致且总耗时不超过上限；格式校验不保证忌口安全）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      summary: { type: string, maxLength: 500 }
+                      recipes:
+                        type: array
+                        maxItems: 5
+                        items:
+                          type: object
+                          properties:
+                            id: { type: string }
+                            kind: { const: recipe }
+                            title: { type: string, maxLength: 80 }
+                            category: { type: string, maxLength: 20 }
+                            minutes: { type: integer }
+                            servings: { type: integer }
+                            ingredients:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  name: { type: string }
+                                  quantity: { type: string }
+                            steps: { type: array, items: { type: string } }
+                            note: { type: string, maxLength: 500 }
+        "400": { description: Invalid request JSON or input bounds }
+        "401": { description: Authentication required }
+        "403": { description: Loopback and same-origin access required }
+        "502": { description: 模型不可用、未授权、额度不足、超时、未完成或菜谱未通过校验 }
   /api/v1/meals:
     get:
       tags: [Meals]
