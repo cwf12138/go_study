@@ -182,31 +182,43 @@ func TestCompletionStream(t *testing.T) {
 	}
 }
 func TestRecommendationValidation(t *testing.T) {
-	in := MealRequest{Model: "test", Prompt: "晚餐", People: 2, Minutes: 30}
+	in := MealRequest{Model: "test", Prompt: "晚餐", Meal: "dinner", Channel: "delivery", Budget: 35, Flavor: "mild", Hunger: "hearty"}
 	if ValidateRequest(in) != nil {
 		t.Fatal("valid request")
 	}
-	raw := `{"summary":"简单晚饭，请核对忌口","recipes":[{"title":"番茄炒蛋","category":"家常菜","minutes":15,"servings":2,"ingredients":[{"name":"鸡蛋","quantity":"2个"}],"steps":["炒熟"],"note":"确保充分加热"}]}`
+	raw := `{"summary":"鸡腿饭比较直接，请确认忌口和实际价格","choices":[{"title":"鸡腿饭","order":"鸡腿饭套餐，不加辣","reason":"适合吃饱的晚餐","budget_low":20,"budget_high":35,"channel":"delivery","flavor":"mild","portion":"hearty","vegetarian":false}]}`
 	var out Recommendation
 	json.Unmarshal([]byte(raw), &out)
 	if err := validateRecommendation(&out, in); err != nil {
 		t.Fatal(err)
 	}
-	id := out.Recipes[0].ID
-	if !strings.HasPrefix(id, "meal-ai-") {
+	id := out.Choices[0].ID
+	if !strings.HasPrefix(id, "food-ai-") {
 		t.Fatal(id)
 	}
-	if err := validateRecommendation(&out, in); err != nil || out.Recipes[0].ID != id {
+	if err := validateRecommendation(&out, in); err != nil || out.Choices[0].ID != id {
 		t.Fatal("unstable IDs", err)
 	}
-	for _, change := range []func(*Recommendation){func(o *Recommendation) { o.Recipes[0].Minutes = 31 }, func(o *Recommendation) { o.Recipes[0].Servings = 1 }, func(o *Recommendation) {
-		o.Recipes[0].Ingredients = append(o.Recipes[0].Ingredients, o.Recipes[0].Ingredients[0])
-	}, func(o *Recommendation) { o.Recipes[0].Steps = []string{""} }, func(o *Recommendation) { o.Recipes[0].Title = "x\ny" }} {
+	for _, change := range []func(*Recommendation){func(o *Recommendation) { o.Choices[0].BudgetHigh = 36 }, func(o *Recommendation) { o.Choices[0].BudgetLow = 40 }, func(o *Recommendation) { o.Choices[0].Channel = "ready" }, func(o *Recommendation) { o.Choices[0].Flavor = "spicy" }, func(o *Recommendation) { o.Choices[0].Portion = "light" }, func(o *Recommendation) { o.Choices[0].Order = "" }, func(o *Recommendation) { o.Choices = append(o.Choices, o.Choices[0]) }, func(o *Recommendation) { o.Choices[0].Title = "x\ny" }} {
 		json.Unmarshal([]byte(raw), &out)
 		change(&out)
 		if validateRecommendation(&out, in) == nil {
-			t.Fatal("invalid recipe accepted")
+			t.Fatal("invalid choice accepted")
 		}
+	}
+	json.Unmarshal([]byte(raw), &out)
+	in.Exclude = []string{"鸡腿"}
+	if validateRecommendation(&out, in) == nil {
+		t.Fatal("excluded food accepted")
+	}
+	in.Exclude = nil
+	in.Vegetarian = true
+	json.Unmarshal([]byte(raw), &out)
+	if validateRecommendation(&out, in) == nil {
+		t.Fatal("nonvegetarian accepted")
+	}
+	if err := validateRecommendation(&Recommendation{Summary: "没有符合条件的食物"}, in); err != nil {
+		t.Fatal(err)
 	}
 }
 func TestRefreshPermissionAndCancellation(t *testing.T) {
@@ -298,15 +310,18 @@ func TestRecommendRequestContract(t *testing.T) {
 				t.Errorf("unsupported field %s", field)
 			}
 		}
-		text := `{"summary":"推荐炒蛋，请检查忌口","recipes":[{"title":"炒蛋","category":"家常菜","minutes":10,"servings":2,"ingredients":[{"name":"鸡蛋","quantity":"2个"}],"steps":["炒至熟透"],"note":"充分加热"}]}`
+		if !strings.Contains(body["instructions"].(string), "不要菜谱") && !strings.Contains(body["instructions"].(string), "不要菜谱、备料") {
+			t.Error("cooking instruction not removed")
+		}
+		text := `{"summary":"推荐鸡腿饭，核对忌口和实际价格","choices":[{"title":"鸡腿饭","order":"鸡腿饭套餐","reason":"不用自己做，适合吃饱","budget_low":20,"budget_high":30,"channel":"delivery","flavor":"mild","portion":"hearty","vegetarian":false}]}`
 		event, _ := json.Marshal(map[string]string{"type": "response.output_text.delta", "delta": text})
 		res := response("data: " + string(event) + "\n\ndata: {\"type\":\"response.completed\"}\n\n")
 		res.Header.Set("Content-Type", "text/event-stream")
 		return res, nil
 	})
-	in := MealRequest{Model: "eligible", Prompt: "晚餐", People: 2, Minutes: 30}
+	in := MealRequest{Model: "eligible", Prompt: "晚餐", Meal: "dinner", Channel: "delivery", Budget: 35, Flavor: "mild", Hunger: "hearty"}
 	out, err := m.Recommend(context.Background(), "alice", in)
-	if err != nil || len(out.Recipes) != 1 || out.Recipes[0].Kind != "recipe" {
+	if err != nil || len(out.Choices) != 1 || !strings.HasPrefix(out.Choices[0].ID, "food-ai-") {
 		t.Fatal(out, err)
 	}
 	in.Model = "not-eligible"

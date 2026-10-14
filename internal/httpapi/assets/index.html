@@ -45,8 +45,7 @@
     <link rel="stylesheet" href="/static/text-tools.css?v=20261009-1">
     <link rel="stylesheet" href="/static/subscriptions.css?v=20261011-1">
     <link rel="stylesheet" href="/static/meals.css?v=20261011-1">
-    <link rel="stylesheet" href="/static/meal-discovery.css?v=20261011-1">
-    <link rel="stylesheet" href="/static/meal-ai.css?v=20261013-1">
+    <link rel="stylesheet" href="/static/meal-choice.css?v=20261014-1">
     <link rel="stylesheet" href="/static/layout.css?v=20260922-1">
   </head>
   <body>
@@ -146,7 +145,17 @@
         </header>
 
         <div class="content">
-          <section id="panel-meals" class="panel meal-workspace" aria-label="今天吃什么">
+          <section id="panel-meals" class="panel meal-workspace food-workspace" aria-label="今天吃什么">
+            <header class="food-hero"><div><p class="meal-eyebrow">ONE LESS THING TO THINK ABOUT</p><h2>这顿吃什么？<br><span>给纠结，一个答案。</span></h2><p>外卖、下馆子、买点现成的。<br>说说现在的情况，剩下的交给这一餐。</p></div><div class="food-hero-art" aria-hidden="true"><span>🍜</span><i>不做饭，也要好好吃饭。</i></div></header>
+            <div class="food-toolbar"><span id="food-context"></span><button id="meal-ai-open" type="button">✦ AI 连接设置</button></div>
+            <div class="food-layout"><form id="food-form" class="food-question"><p class="meal-eyebrow">TELL ME A LITTLE</p><h3>你现在是什么状态？</h3><label for="food-prompt" class="meal-sr-only">用餐需求</label><textarea id="food-prompt" rows="4" maxlength="1200" placeholder="比如：刚下班很饿，想点外卖，不想吃面，也不吃辣。&#10;也可以什么都不填，直接给我推荐。"></textarea><div class="food-scenarios" aria-label="快捷用餐场景"><button type="button" data-food-scenario="刚下班很饿，想点外卖，不吃辣">刚下班，很饿</button><button type="button" data-food-scenario="不太饿，想在便利店买现成的吃一点">想随便吃一点</button><button type="button" data-food-scenario="想下馆子吃素食，不吃辣">想清淡一点</button></div>
+              <div class="food-fields"><label>这顿<select id="food-meal"><option value="breakfast">早餐</option><option value="lunch">午餐</option><option value="dinner">晚餐</option><option value="snack">加餐 / 夜宵</option></select></label><label>每人预算<select id="food-budget"><option value="0">先不限制</option><option value="15">15 元以内</option><option value="25">25 元以内</option><option value="40">40 元以内</option><option value="60">60 元以内</option><option value="100">100 元以内</option></select></label><label>怎么吃<select id="food-channel"><option value="any">都可以</option><option value="delivery">点外卖</option><option value="dinein">到店吃</option><option value="ready">买现成</option></select></label><label>口味<select id="food-flavor"><option value="any">都可以</option><option value="mild">不加辣</option><option value="spicy">想吃辣</option></select></label></div>
+              <details class="food-more"><summary>还有一点偏好 / 忌口</summary><label>现在的食量<select id="food-hunger"><option value="any">正常 / 都可以</option><option value="light">吃一点就好</option><option value="hearty">想吃饱一点</option></select></label><label class="food-check"><input id="food-vegetarian" type="checkbox"> 素食方向（可含蛋奶）</label><label>不想吃 / 需要排除<input id="food-exclude" maxlength="400" placeholder="例如：牛肉，面，花生"></label><small>食物和调味料因店而异，过敏需求务必向店家确认，不能保证无过敏原。</small></details>
+              <div class="food-engine"><label for="food-engine">推荐方式</label><select id="food-engine"><option value="local">直接推荐 · 无需联网</option><option id="food-ai-option" value="ai" disabled>AI 按情况推荐 · 需连接</option></select></div><p id="food-interpretation" class="food-subtle"></p><button id="food-draw" class="meal-primary food-submit" type="submit">帮我决定这顿吃什么 ↗</button><button id="food-local" type="button" hidden>先用本地推荐给我答案</button><button id="food-cancel" type="button" hidden>取消本次 AI 请求</button><p class="food-subtle">本地推荐识别部分关键词和上方条件，不会完整理解自由描述；更复杂的情况可选择 AI。条件不足时不会擅自取消忌口。</p>
+            </form><section class="food-answer" aria-label="吃什么推荐"><header><div><p class="meal-eyebrow">A GOOD ENOUGH ANSWER</p><h3 id="food-answer-title">今天这顿，不用再纠结。</h3></div><button id="food-again" type="button" disabled>↻ 换一批</button></header><p id="food-status" role="status" aria-live="polite"></p><div id="food-results"><div class="food-empty"><span aria-hidden="true">🍽️</span><h4>不需要先有想法。</h4><p>点一下“帮我决定”，<br>给你一个主推荐和几个备选。</p><div>不查菜谱 · 不备食材 · 不需要自己做</div></div></div><div id="food-picked" class="food-picked" hidden role="status"></div><div id="food-copy-box" hidden><label for="food-copy-text">点单关键词（可手动复制）</label><textarea id="food-copy-text" rows="2" readonly></textarea></div><p class="food-disclaimer">预算只是食品组合的粗略参考，可能受城市、门店、份量、配送费影响；未接入实时店铺与价格，点单前以商家页面为准。推荐是食物方向，不保证附近一定有售。</p></section></div>
+          </section>
+          <!-- Legacy cooking UI is inert; its stored records and API remain intact. -->
+          <template id="meal-legacy-template"><section id="meal-legacy-workspace" class="meal-workspace" aria-label="旧版厨房存档">
             <header class="meal-hero"><div><p class="meal-eyebrow">A LITTLE EVERYDAY DELIGHT</p><h2>好好吃饭，<br>也是生活的一部分。</h2><p>不用先想菜名。告诉我一点偏好，让今天的餐桌有答案。</p><div class="meal-hero-actions"><button id="meal-discover-open" type="button" class="meal-primary">♨ 给我推荐一顿饭</button><button id="meal-pick" type="button">从我的菜谱抽一道</button><button id="meal-new" type="button">＋ 记下我的菜谱</button></div></div><div class="meal-hero-art" aria-hidden="true"><span class="meal-art-orbit"></span><span class="meal-art-plate">🥗</span><span class="meal-art-note">一餐一味 · 好好生活</span></div></header>
             <div class="meal-summary"><span><b id="meal-recipe-count">0</b> 道私藏菜谱</span><span><b id="meal-plan-count">0</b> 道本周安排</span><span><b id="meal-cooked-count">0</b> 道本周已做</span><button id="meal-shopping" type="button">购物清单 ↗</button><button id="meal-refresh" type="button">↻ 同步</button></div>
             <p id="meal-status" role="status" aria-live="polite"></p>
@@ -165,6 +174,7 @@
             <dialog id="meal-plan-dialog" class="meal-dialog" aria-labelledby="meal-plan-title"><form id="meal-plan-form"><header><h3 id="meal-plan-title">安排一餐</h3><button id="meal-plan-close" type="button" aria-label="关闭菜单编辑">×</button></header><fieldset id="meal-plan-fields"><label>选一道菜<select id="meal-plan-recipe" required></select></label><div class="meal-form-row"><label>日期<input id="meal-plan-date" type="date" required min="2000-01-01" max="2100-12-31"></label><label>餐次<select id="meal-plan-slot"><option value="breakfast">早餐</option><option value="lunch">午餐</option><option value="dinner">晚餐</option></select></label></div></fieldset><p id="meal-plan-status" role="status"></p><button id="meal-plan-save" class="meal-primary" type="submit">加入菜单</button></form></dialog>
             <dialog id="meal-shop-dialog" class="meal-dialog" aria-labelledby="meal-shop-title"><header><div><p class="meal-eyebrow">A SMALL SHOPPING LIST</p><h3 id="meal-shop-title">买这些就够了</h3></div><button id="meal-shop-close" type="button" aria-label="关闭食材清单">×</button></header><p class="meal-muted">勾选要买的食材。已有食材默认不选；同名待购物品会跳过，不覆盖原数量。用量保存在备注中，不自动相加。</p><div id="meal-shop-items"></div><p id="meal-shop-status" role="status"></p><button id="meal-shop-confirm" class="meal-primary" type="button">加入购物清单</button></dialog>
           </section>
+          </template>
           <div class="app-sync-bar"><span id="app-sync-status" role="status" aria-live="polite">等待同步</span><button id="app-sync-retry" class="quiet" type="button">刷新数据</button></div>
           <div id="toolkit-running" class="toolkit-running" hidden><span id="toolkit-running-message" role="status"></span><button id="toolkit-running-open" type="button">查看计时器 <span id="toolkit-running-time"></span> →</button></div>
           <section id="panel-dashboard" class="panel active">
@@ -738,11 +748,9 @@
     <script src="/static/subscriptions.js?v=20261011-1" defer></script>
     <script src="/static/inventory.js?v=20261007-shopping" defer></script>
     <script src="/static/shopping.js?v=20261011-meals" defer></script>
-    <script src="/static/meals-core.js?v=20261011-1" defer></script>
-    <script src="/static/meal-discovery-core.js?v=20261011-1" defer></script>
-    <script src="/static/meals.js?v=20261011-discovery" defer></script>
-    <script src="/static/meal-discovery.js?v=20261011-1" defer></script>
-    <script src="/static/meal-ai.js?v=20261013-1" defer></script>
+    <script src="/static/meal-choice-core.js?v=20261014-1" defer></script>
+    <script src="/static/meal-ai.js?v=20261014-1" defer></script>
+    <script src="/static/meal-choice.js?v=20261014-1" defer></script>
     <script src="/static/bookmarks.js?v=20261011-2" defer></script>
     <script src="/static/toolkit-core.js?v=20261009-text" defer></script>
     <script src="/static/toolkit.js?v=20261009-text" defer></script>

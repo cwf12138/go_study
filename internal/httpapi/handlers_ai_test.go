@@ -1,9 +1,18 @@
 package httpapi
 
 import (
+	"bytes"
+	"github.com/example/studyflow/internal/event"
+	"github.com/example/studyflow/internal/security"
+	"github.com/example/studyflow/internal/service"
+	"github.com/example/studyflow/internal/store"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestAIRequiresLoopbackHostAndOrigin(t *testing.T) {
@@ -31,5 +40,43 @@ func TestAIRequiresLoopbackHostAndOrigin(t *testing.T) {
 		if w.Code != row.status || w.Header().Get("Access-Control-Allow-Origin") != "" || w.Header().Get("Cache-Control") != "no-store" {
 			t.Fatalf("%+v -> %d", row, w.Code)
 		}
+	}
+}
+
+func TestFoodDecisionHTTPContract(t *testing.T) {
+	tokens := security.NewTokenManager("food-decision-secret-long-enough", "test", time.Hour)
+	token, err := tokens.Issue("test-food-user", "user")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bus := event.NewBus()
+	handler := NewHandler(service.New(store.NewMemory(), tokens, bus), tokens, bus, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	send := func(body, auth string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest("POST", "http://localhost:8080/api/v1/ai/meals/recommend", bytes.NewBufferString(body))
+		r.RemoteAddr = "127.0.0.1:50000"
+		if auth != "" {
+			r.Header.Set("Authorization", "Bearer "+auth)
+		}
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, r)
+		return w
+	}
+	valid := `{"model":"test","prompt":"很饿想点外卖","meal":"dinner","channel":"delivery","budget":40,"flavor":"mild","hunger":"hearty","exclude":["牛肉"]}`
+	if w := send(valid, ""); w.Code != 401 {
+		t.Fatal("missing authentication", w.Code)
+	}
+	for _, body := range []string{`{"model":"test","prompt":"晚餐","people":2,"minutes":30}`, strings.Replace(valid, `"budget":40`, `"budget":501`, 1), strings.Replace(valid, `"channel":"delivery"`, `"channel":"cooking"`, 1), valid + ` {}`} {
+		if w := send(body, token); w.Code != 400 {
+			t.Fatalf("invalid request accepted: %d %s", w.Code, w.Body.String())
+		}
+	}
+	if w := send(valid, token); w.Code != 502 || !strings.Contains(w.Body.String(), "请先连接") {
+		t.Fatal("unconnected request should not infer", w.Code, w.Body.String())
+	}
+	r := httptest.NewRequest("GET", "http://localhost:8080/", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+	if !strings.Contains(w.Body.String(), "food-form") || !strings.Contains(w.Body.String(), "meal-legacy-template") {
+		t.Fatal("new page not embedded")
 	}
 }

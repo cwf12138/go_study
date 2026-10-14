@@ -2,7 +2,8 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const root='internal/httpapi/assets/',html=fs.readFileSync(root+'index.html','utf8'),core=fs.readFileSync(root+'meals-core.js','utf8'),script=fs.readFileSync(root+'meals.js','utf8'),css=fs.readFileSync(root+'meals.css','utf8');
 const ids=new Set([...html.matchAll(/id="([^"]+)"/g),...script.matchAll(/id="([^"]+)"/g)].map(m=>m[1]));
 for(const match of script.matchAll(/\$\('([^']+)'\)/g))assert(ids.has('meal-'+match[1]),'missing '+match[1]);
-for(const name of ['meals-core.js','meals.js','meals.css'])assert(html.includes('/static/'+name));assert(html.indexOf('/static/meals-core.js')<html.indexOf('/static/meals.js'));
+// Legacy compatibility checks: cooking data remains supported, UI no longer boots.
+assert(html.includes('id="meal-legacy-template"'));assert(html.includes('/static/meals.css'));for(const name of ['meals-core.js','meals.js'])assert(!html.includes('src="/static/'+name));
 for(const marker of ['data-theme="dark"','prefers-reduced-motion','max-width:480px','focus-visible'])assert(css.includes(marker));
 let owner='alice',status=200,offline=false,loadOverride,delayedLoad,release,clock=Date.parse('2026-10-11T08:00:00Z'),allowClose=true;
 class Clock extends Date{constructor(...args){super(...(args.length?args:[clock]));}static now(){return clock;}}

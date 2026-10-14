@@ -187,7 +187,7 @@ func (m *Manager) Begin(user string) (string, error) {
 	}
 	q := url.Values{"client_id": {clientID}, "ext_agent_host_id": {m.registry.Host}, "response_type": {"code"}, "redirect_uri": {callback}, "scope": {scopes}, "resource": {resource}, "state": {state}, "nonce": {nonce}, "code_challenge_method": {"S256"}, "code_challenge": {base64.RawURLEncoding.EncodeToString(hash[:])}}
 	if clientID == "dynamic_agent_client" {
-		q.Set("agent_name_hint", "Daynest 私人厨房")
+		q.Set("agent_name_hint", "Daynest")
 	}
 	if s.cred.Access != "" && !hasScope(s.cred.Scope, "chatgpt.tokens.use.direct") {
 		q.Set("prompt", "consent")
@@ -228,7 +228,7 @@ func (m *Manager) Begin(user string) (string, error) {
 				issued = clientID
 			}
 			if r.URL.Query().Get("error") != "" {
-				flowErr = errors.New("授权未完成或被拒绝，请返回厨房重新连接")
+				flowErr = errors.New("授权未完成或被拒绝，请返回 Daynest 重新连接")
 			}
 			if issued == "" || issued == "dynamic_agent_client" || r.URL.Query().Get("code") == "" {
 				flowErr = errors.New("授权回调缺少注册信息，请重新连接")
@@ -241,7 +241,7 @@ func (m *Manager) Begin(user string) (string, error) {
 			}
 			m.mu.Lock()
 			if s.generation != generation {
-				flowErr = errors.New("此登录已取消，请返回厨房重新连接")
+				flowErr = errors.New("此登录已取消，请返回 Daynest 重新连接")
 			}
 			if flowErr == nil && s.reg.Subject != "" && s.reg.Subject != identity.Subject {
 				flowErr = errors.New("请使用原先关联的 ChatGPT 账号登录")
@@ -269,7 +269,7 @@ func (m *Manager) Begin(user string) (string, error) {
 			m.mu.Unlock()
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			// All messages are application constants, never provider error descriptions or tokens.
-			fmt.Fprintf(w, "<!doctype html><meta charset=utf-8><title>Daynest · ChatGPT</title><main style='font:18px system-ui;max-width:560px;margin:15vh auto;padding:32px'><h1>Daynest 私人厨房</h1><p>%s</p><p>可关闭此页，返回原窗口查看连接状态。</p></main>", message)
+			fmt.Fprintf(w, "<!doctype html><meta charset=utf-8><title>Daynest · ChatGPT</title><main style='font:18px system-ui;max-width:560px;margin:15vh auto;padding:32px'><h1>Daynest · 今天吃什么</h1><p>%s</p><p>可关闭此页，返回原窗口查看连接状态。</p></main>", message)
 			cancel()
 		})
 		if !handled {

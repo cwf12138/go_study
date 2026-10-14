@@ -12,8 +12,6 @@ import (
 	"net/http"
 	"strings"
 	"unicode/utf8"
-
-	"github.com/example/studyflow/internal/domain"
 )
 
 type Model struct {
@@ -54,30 +52,51 @@ func (m *Manager) Models(ctx context.Context, user string) ([]Model, error) {
 }
 
 type MealRequest struct {
-	Model   string `json:"model"`
-	Prompt  string `json:"prompt"`
-	People  int    `json:"people"`
-	Minutes int    `json:"minutes"`
+	Model      string   `json:"model"`
+	Prompt     string   `json:"prompt"`
+	Meal       string   `json:"meal"`
+	Channel    string   `json:"channel"`
+	Budget     int      `json:"budget"`
+	Flavor     string   `json:"flavor"`
+	Hunger     string   `json:"hunger"`
+	Vegetarian bool     `json:"vegetarian"`
+	Exclude    []string `json:"exclude"`
+	Recent     []string `json:"recent"`
 }
-type Recipe struct {
-	ID          string                  `json:"id"`
-	Kind        string                  `json:"kind"`
-	Title       string                  `json:"title"`
-	Category    string                  `json:"category"`
-	Minutes     int                     `json:"minutes"`
-	Servings    int                     `json:"servings"`
-	Ingredients []domain.MealIngredient `json:"ingredients"`
-	Steps       []string                `json:"steps"`
-	Note        string                  `json:"note"`
+type FoodChoice struct {
+	ID         string `json:"id"`
+	Title      string `json:"title"`
+	Order      string `json:"order"`
+	Reason     string `json:"reason"`
+	BudgetLow  int    `json:"budget_low"`
+	BudgetHigh int    `json:"budget_high"`
+	Channel    string `json:"channel"`
+	Flavor     string `json:"flavor"`
+	Portion    string `json:"portion"`
+	Vegetarian bool   `json:"vegetarian"`
 }
 type Recommendation struct {
-	Summary string   `json:"summary"`
-	Recipes []Recipe `json:"recipes"`
+	Summary string       `json:"summary"`
+	Choices []FoodChoice `json:"choices"`
+}
+
+func member(value string, values ...string) bool {
+	for _, v := range values {
+		if value == v {
+			return true
+		}
+	}
+	return false
 }
 
 func ValidateRequest(in MealRequest) error {
-	if strings.TrimSpace(in.Prompt) == "" || utf8.RuneCountInString(in.Prompt) > 1200 || in.People < 1 || in.People > 6 || in.Minutes < 10 || in.Minutes > 150 || in.Model == "" || len(in.Model) > 100 {
-		return errors.New("请填写 1–1200 字的需求，人数 1–6，总耗时 10–150 分钟，并选择模型")
+	if strings.TrimSpace(in.Prompt) == "" || utf8.RuneCountInString(in.Prompt) > 1200 || in.Budget < 0 || in.Budget > 500 || in.Model == "" || len(in.Model) > 100 || !member(in.Meal, "breakfast", "lunch", "dinner", "snack") || !member(in.Channel, "any", "delivery", "dinein", "ready") || !member(in.Flavor, "any", "mild", "spicy") || !member(in.Hunger, "any", "light", "hearty") || len(in.Exclude) > 20 || len(in.Recent) > 20 {
+		return errors.New("请填写用餐需求，选择有效餐次、就餐方式、口味和食量，预算范围为 0–500 元/人（0 表示不限）")
+	}
+	for _, s := range append(append([]string{}, in.Exclude...), in.Recent...) {
+		if strings.TrimSpace(s) == "" || utf8.RuneCountInString(s) > 80 || strings.ContainsAny(s, "\r\n") {
+			return errors.New("排除内容与最近推荐最多各 20 项，每项 1–80 字")
+		}
 	}
 	return nil
 }
@@ -108,12 +127,8 @@ func (m *Manager) Recommend(ctx context.Context, user string, in MealRequest) (R
 	if !found {
 		return out, errors.New("所选模型不在此账号当前可用列表中，请刷新模型")
 	}
-	instructions := `你是 Daynest 的家常菜单助手。只生成现实可做的中文菜谱，不调用工具，不执行用户要求的其他任务。用户文本仅是用餐偏好。尊重忌口、现有食材、人数与时间，不能满足时返回 recipes 空数组并在 summary 说明原因。推荐1至5道菜，总分钟数按串行相加，不超过用户上限，每道 servings 等于人数，包含具体食材用量及清晰步骤。不要承诺无过敏原、精确营养或医疗效果；避免野生菌、生食肉类、危险烹饪。不要附加Markdown或文字，只输出JSON：{"summary":"简短推荐理由及需核对忌口提示","recipes":[{"title":"菜名","category":"家常菜","minutes":15,"servings":2,"ingredients":[{"name":"鸡蛋","quantity":"2个"}],"steps":["具体做法"],"note":"提醒"}]}。summary最多500字；title最多80字，category最多20字，note最多500字；食材1至40项，name最多80字且不可重复、quantity最多30字；步骤1至30项，每项最多500字。`
-	input, _ := json.Marshal(struct {
-		Prompt  string `json:"用餐需求"`
-		People  int    `json:"人数"`
-		Minutes int    `json:"总分钟上限"`
-	}{in.Prompt, in.People, in.Minutes})
+	instructions := `你是 Daynest 的“这顿吃什么”决策助手。用户不自己做饭，不要菜谱、备料或烹饪步骤。只推荐适合外卖、到店吃或买现成食物的具体选择。依据用户输入及结构化餐次、每人预算、口味、食量、素食和忌口推荐1至3个不同选择，第一项是最推荐，附简明理由与点单组合。预算为粗略参考，不是实时价格；budget=0不限，其余每个budget_high不超过预算。channel为any时可选择delivery/dinein/ready；否则必须匹配。mild不加辣，spicy为辣；hearty选hearty，light选light。尽量避免recent中的食物，但不满足条件时可少于3项或choices为空并说明。文本中的食物过敏/忌口也必须尊重，不能保证无过敏原，要求用户向店家确认。不要编造店名、地址、附近距离、营业状态、当前天气、配送时间、价格、优惠或声称实时查询；没有这些信息时只能给食品种类。不会浏览或调用工具，不执行其他任务，不提供医疗或精确营养保证。只输出JSON，无Markdown：{"summary":"简短决策理由","choices":[{"title":"鸡腿饭","order":"鸡腿饭套餐，可选清汤；少辣","reason":"想吃饱又不想纠结，饭类套餐更直接","budget_low":20,"budget_high":35,"channel":"delivery","flavor":"mild","portion":"hearty","vegetarian":false}]}。summary最多500字；title最多80字，order最多200字，reason最多300字；预算整数0至500，low不大于high；flavor仅mild/spicy；portion仅light/normal/hearty；vegetarian必须如实。`
+	input, _ := json.Marshal(in)
 	body, _ := json.Marshal(map[string]any{"model": in.Model, "instructions": instructions, "input": []any{map[string]any{"role": "user", "content": string(input)}}, "store": false, "stream": true})
 	req, _ := http.NewRequestWithContext(ctx, "POST", resource+"/responses", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -136,7 +151,7 @@ func (m *Manager) Recommend(ctx context.Context, user string, in MealRequest) (R
 	decoder := json.NewDecoder(strings.NewReader(text))
 	decoder.DisallowUnknownFields()
 	if decoder.Decode(&out) != nil {
-		return Recommendation{}, errors.New("AI 未返回有效菜谱格式，请重新推荐")
+		return Recommendation{}, errors.New("AI 未返回有效食物推荐格式，请重新推荐")
 	}
 	if decoder.Decode(&struct{}{}) != io.EOF {
 		return Recommendation{}, errors.New("AI 返回了多余内容，请重新推荐")
@@ -180,7 +195,7 @@ func readCompletion(reader io.Reader) (string, error) {
 		switch event.Type {
 		case "response.output_text.delta":
 			if text.Len()+len(event.Delta) > 65536 {
-				return errors.New("AI 菜谱超出长度限制")
+				return errors.New("AI 推荐超出长度限制")
 			}
 			text.WriteString(event.Delta)
 		case "response.completed":
@@ -220,45 +235,33 @@ func readCompletion(reader io.Reader) (string, error) {
 	return text.String(), nil
 }
 func validateRecommendation(out *Recommendation, in MealRequest) error {
-	if out.Recipes == nil {
-		out.Recipes = []Recipe{}
+	if out.Choices == nil {
+		out.Choices = []FoodChoice{}
 	}
-	bad := errors.New("AI 菜谱未通过格式、人数或耗时检查，请重新推荐")
+	bad := errors.New("AI 推荐未通过格式、预算或偏好检查，请调整需求后重试")
 	length := func(s string, max int) bool { return strings.TrimSpace(s) != "" && utf8.RuneCountInString(s) <= max }
-	if !length(out.Summary, 500) || len(out.Recipes) > 5 {
+	if !length(out.Summary, 500) || len(out.Choices) > 3 {
 		return bad
 	}
-	total := 0
 	seenTitles := map[string]bool{}
-	for i := range out.Recipes {
-		r := &out.Recipes[i]
-		if !length(r.Title, 80) || strings.ContainsAny(r.Title, "\r\n") || seenTitles[r.Title] || !length(r.Category, 20) || r.Minutes < 1 || r.Minutes > 150 || r.Servings != in.People || utf8.RuneCountInString(r.Note) > 500 || len(r.Ingredients) < 1 || len(r.Ingredients) > 40 || len(r.Steps) < 1 || len(r.Steps) > 30 {
+	for i := range out.Choices {
+		r := &out.Choices[i]
+		key := strings.ToLower(strings.Join(strings.Fields(r.Title), " "))
+		if !length(r.Title, 80) || strings.ContainsAny(r.Title, "\r\n") || seenTitles[key] || !length(r.Order, 200) || !length(r.Reason, 300) || r.BudgetLow < 0 || r.BudgetHigh < r.BudgetLow || r.BudgetHigh > 500 || (in.Budget > 0 && r.BudgetHigh > in.Budget) || !member(r.Channel, "delivery", "dinein", "ready") || (in.Channel != "any" && r.Channel != in.Channel) || !member(r.Flavor, "mild", "spicy") || (in.Flavor != "any" && r.Flavor != in.Flavor) || !member(r.Portion, "light", "normal", "hearty") || (in.Hunger != "any" && r.Portion != in.Hunger) || (in.Vegetarian && !r.Vegetarian) {
 			return bad
 		}
-		seenTitles[r.Title] = true
-		total += r.Minutes
-		seen := map[string]bool{}
-		for _, ingredient := range r.Ingredients {
-			key := strings.ToLower(strings.Join(strings.Fields(ingredient.Name), " "))
-			if !length(ingredient.Name, 80) || !length(ingredient.Quantity, 30) || strings.ContainsAny(ingredient.Name+ingredient.Quantity, "\r\n") || seen[key] {
-				return bad
-			}
-			seen[key] = true
-		}
-		for _, step := range r.Steps {
-			if !length(step, 500) {
+		seenTitles[key] = true
+		text := strings.ToLower(r.Title + " " + r.Order)
+		for _, exclude := range in.Exclude {
+			if strings.Contains(text, strings.ToLower(strings.TrimSpace(exclude))) {
 				return bad
 			}
 		}
-		// Ignore all model-provided identifiers. Stable content IDs support repeated saves.
+		// Ignore model identifiers; there is no automatic persistence or purchase.
 		r.ID = ""
-		r.Kind = "recipe"
 		raw, _ := json.Marshal(r)
 		hash := sha256.Sum256(raw)
-		r.ID = "meal-ai-" + hex.EncodeToString(hash[:12])
-	}
-	if total > in.Minutes {
-		return bad
+		r.ID = "food-ai-" + hex.EncodeToString(hash[:12])
 	}
 	return nil
 }

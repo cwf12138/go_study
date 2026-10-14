@@ -88,7 +88,7 @@ paths:
     post:
       tags: [AI, Meals]
       security: [{ bearerAuth: [] }]
-      summary: 用 ChatGPT plan usage 推荐菜谱，仅返回结果，不自动保存
+      summary: 用 ChatGPT plan usage 决定吃什么，不返回菜谱，不自动保存或下单
       requestBody:
         required: true
         content:
@@ -96,15 +96,21 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [model, prompt, people, minutes]
+              required: [model, prompt, meal, channel, flavor, hunger]
               properties:
                 model: { type: string, minLength: 1, maxLength: 100 }
                 prompt: { type: string, minLength: 1, maxLength: 1200 }
-                people: { type: integer, minimum: 1, maximum: 6 }
-                minutes: { type: integer, minimum: 10, maximum: 150 }
+                meal: { type: string, enum: [breakfast, lunch, dinner, snack] }
+                channel: { type: string, enum: [any, delivery, dinein, ready] }
+                budget: { type: integer, minimum: 0, maximum: 500, description: 每人参考预算上限，0 表示不限 }
+                flavor: { type: string, enum: [any, mild, spicy] }
+                hunger: { type: string, enum: [any, light, hearty] }
+                vegetarian: { type: boolean }
+                exclude: { type: array, maxItems: 20, items: { type: string, minLength: 1, maxLength: 80 } }
+                recent: { type: array, maxItems: 20, items: { type: string, minLength: 1, maxLength: 80 } }
       responses:
         "200":
-          description: data.summary 与 data.recipes（0–5 道，人数一致且总耗时不超过上限；格式校验不保证忌口安全）
+          description: data.summary 与 data.choices（0–3 个选择，参考预算及结构化偏好校验；不是实时商家价格，不保证忌口安全）
           content:
             application/json:
               schema:
@@ -114,31 +120,26 @@ paths:
                     type: object
                     properties:
                       summary: { type: string, maxLength: 500 }
-                      recipes:
+                      choices:
                         type: array
-                        maxItems: 5
+                        maxItems: 3
                         items:
                           type: object
                           properties:
                             id: { type: string }
-                            kind: { const: recipe }
                             title: { type: string, maxLength: 80 }
-                            category: { type: string, maxLength: 20 }
-                            minutes: { type: integer }
-                            servings: { type: integer }
-                            ingredients:
-                              type: array
-                              items:
-                                type: object
-                                properties:
-                                  name: { type: string }
-                                  quantity: { type: string }
-                            steps: { type: array, items: { type: string } }
-                            note: { type: string, maxLength: 500 }
+                            order: { type: string, maxLength: 200 }
+                            reason: { type: string, maxLength: 300 }
+                            budget_low: { type: integer, minimum: 0, maximum: 500 }
+                            budget_high: { type: integer, minimum: 0, maximum: 500 }
+                            channel: { type: string, enum: [delivery, dinein, ready] }
+                            flavor: { type: string, enum: [mild, spicy] }
+                            portion: { type: string, enum: [light, normal, hearty] }
+                            vegetarian: { type: boolean }
         "400": { description: Invalid request JSON or input bounds }
         "401": { description: Authentication required }
         "403": { description: Loopback and same-origin access required }
-        "502": { description: 模型不可用、未授权、额度不足、超时、未完成或菜谱未通过校验 }
+        "502": { description: 模型不可用、未授权、额度不足、超时、未完成或食物推荐未通过校验 }
   /api/v1/meals:
     get:
       tags: [Meals]
