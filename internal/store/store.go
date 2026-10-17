@@ -23,6 +23,9 @@ type TodoFilter struct {
 type Repository interface {
 	ListMeals(context.Context, string) ([]domain.MealEntry, error)
 	ListFitness(context.Context, string) ([]domain.FitnessEntry, error)
+	ListNutrition(context.Context, string) ([]domain.NutritionEntry, error)
+	NutritionByID(context.Context, string, string) (domain.NutritionEntry, error)
+	SaveNutrition(context.Context, domain.NutritionEntry, int) (domain.NutritionEntry, error)
 	FitnessByID(context.Context, string, string) (domain.FitnessEntry, error)
 	SaveFitness(context.Context, domain.FitnessEntry, int) (domain.FitnessEntry, error)
 	SaveMeal(context.Context, domain.MealEntry, int) (domain.MealEntry, error)

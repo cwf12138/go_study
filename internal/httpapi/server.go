@@ -46,6 +46,8 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 
 	private := http.NewServeMux()
 	private.HandleFunc("GET /api/v1/fitness", s.listFitness)
+	private.HandleFunc("GET /api/v1/fitness/nutrition", s.listNutrition)
+	private.HandleFunc("PUT /api/v1/fitness/nutrition/{id}", s.saveNutrition)
 	private.HandleFunc("PUT /api/v1/fitness/{id}", s.saveFitness)
 	private.HandleFunc("POST /api/v1/fitness/sessions/{id}/start", s.startFitness)
 	private.HandleFunc("POST /api/v1/fitness/sessions/{id}/actions", s.fitnessAction)

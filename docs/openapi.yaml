@@ -30,6 +30,58 @@ tags:
   - name: Shopping
   - name: Bookmarks
 paths:
+  /api/v1/fitness/nutrition:
+    get:
+      tags: [Fitness]
+      security: [{ bearerAuth: [] }]
+      summary: List original meal combinations and current account nutrition entries
+      description: Local curated suggestions, not live restaurant data or nutrient analysis. Entries include preferences, favorites and dated plans, including soft-deleted rows.
+      responses:
+        "200":
+          description: Catalog, account-scoped entries and UTC server time
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  server_time: { type: string, format: date-time }
+                  data:
+                    type: object
+                    properties:
+                      catalog:
+                        type: array
+                        items: { $ref: "#/components/schemas/NutritionCard" }
+                      entries:
+                        type: array
+                        items: { $ref: "#/components/schemas/NutritionEntry" }
+        "401": { description: Authentication required }
+  /api/v1/fitness/nutrition/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, pattern: "^[A-Za-z0-9_-]{8,80}$" } }
+    put:
+      tags: [Fitness]
+      security: [{ bearerAuth: [] }]
+      summary: Save preferences, a favorite or a dated meal plan with optimistic revision
+      description: New entries use revision 0. Preferences use id nutrition-preferences. Favorites use nutrition-favorite-{card_id}. Plans receive server-owned meal snapshots; clients cannot supply card contents. Future plans cannot be marked eaten. Active plans cannot duplicate the same card/date/slot, including restore operations. Kinds and card IDs are immutable. Per-account limit is 5000 rows including soft deletion. Identical immediate retries do not increment revision again.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveNutritionInput" }
+      responses:
+        "200":
+          description: Saved entry and UTC server time
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/NutritionEntry" }
+                  server_time: { type: string, format: date-time }
+        "400": { description: Invalid input, unknown meal, unsupported slot or invalid date/state }
+        "401": { description: Authentication required }
+        "404": { description: Revision refers to an entry not found in current account }
+        "409": { description: Version, immutable-field or duplicate-plan conflict; reconcile server state }
   /api/v1/fitness:
     get:
       tags: [Fitness]
@@ -2933,6 +2985,79 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
   schemas:
+    NutritionCard:
+      type: object
+      description: Original food-group example, not a personalized diet prescription. Missing allergen labels never guarantee safety or absence of cross-contact.
+      properties:
+        id: { type: string }
+        title: { type: string }
+        slots:
+          type: array
+          items: { type: string, enum: [breakfast, lunch, dinner, snack] }
+        channels:
+          type: array
+          items: { type: string, enum: [canteen, delivery, convenience, home] }
+        goals:
+          type: array
+          items: { type: string, enum: [balanced, training, lighter] }
+        plant_only: { type: boolean }
+        allergens:
+          type: array
+          items: { type: string, enum: [milk, egg, soy, wheat, peanut, nuts, fish, shellfish, sesame] }
+        parts:
+          type: array
+          items:
+            type: object
+            properties:
+              role: { type: string, enum: [staple, protein, produce] }
+              text: { type: string }
+        reason: { type: string }
+        tip: { type: string }
+    NutritionPreferences:
+      type: object
+      additionalProperties: false
+      required: [goal, slot, channel]
+      properties:
+        goal: { type: string, enum: [balanced, training, lighter], description: Ranking preference, not a weight-loss guarantee }
+        slot: { type: string, enum: [breakfast, lunch, dinner, snack] }
+        channel: { type: string, enum: [any, canteen, delivery, convenience, home] }
+        plant_only: { type: boolean }
+        avoid:
+          type: array
+          maxItems: 9
+          items: { type: string, enum: [milk, egg, soy, wheat, peanut, nuts, fish, shellfish, sesame] }
+        exclude: { type: string, maxLength: 120, description: Comma-separated keywords; local matching is not natural-language understanding }
+    NutritionEntry:
+      type: object
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        kind: { type: string, enum: [preference, favorite, plan] }
+        card_id: { type: string }
+        card: { $ref: "#/components/schemas/NutritionCard" }
+        preferences: { $ref: "#/components/schemas/NutritionPreferences" }
+        date: { type: string, description: China-standard-time YYYY-MM-DD for plans; empty otherwise }
+        slot: { type: string, description: breakfast/lunch/dinner/snack for plans; empty otherwise }
+        state: { type: string, description: planned/eaten for plans; empty otherwise }
+        note: { type: string }
+        deleted: { type: boolean }
+        revision: { type: integer, minimum: 1 }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    SaveNutritionInput:
+      type: object
+      additionalProperties: false
+      required: [kind, revision]
+      properties:
+        kind: { type: string, enum: [preference, favorite, plan] }
+        card_id: { type: string, description: Required for favorite/plan; server validates against catalogue on creation }
+        preferences: { $ref: "#/components/schemas/NutritionPreferences" }
+        date: { type: string, description: Plans require a valid date in 2000-2100 }
+        slot: { type: string, description: Plans require a slot supported by the chosen card }
+        state: { type: string, description: Plans use planned/eaten }
+        note: { type: string, maxLength: 500 }
+        deleted: { type: boolean }
+        revision: { type: integer, minimum: 0, maximum: 1000000 }
     FitnessMove:
       type: object
       required: [name, mode, target, sets, rest_seconds]
