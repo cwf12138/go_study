@@ -43,6 +43,12 @@ AI 失败时明确提示，可点击“先用本地推荐给我答案”；不�
 
 Go 标准 HTTP 客户端读取 `HTTPS_PROXY` 环境变量，并不自动继承 Windows 系统代理。如已有合规可用代理，请在启动服务的同一终端设置正确地址后重启；不要重放旧授权回调。不要跳过 TLS、PKCE 或身份令牌验证来绕过访问错误。公开认证端点能访问不等于账号已获准推理。
 
+Windows 可停止旧服务后，从项目目录运行 `./scripts/run-local.ps1 -UseSystemProxy`，显式读取已经配置的系统代理。也可以使用 `-Proxy http://127.0.0.1:你的实际端口`；不传参数则保持现有环境设置。脚本只设置当前终端环境，不更改 Windows 代理、不保存凭据、不自动结束旧进程。
+
+认证失败不再统一翻译成“账号无权限”：回调页、账号状态与错误响应保留阶段（`token_exchange` / `identity_keys` / `models` / `inference` 等）、上游 HTTP 状态、响应类型以及安全的错误代码与请求 ID。`proxy_planned` 表示 Go 环境代理的计划结果，不证明请求实际到达了哪个网络出口。
+
+显示 HTML/text 错误页只说明返回的响应形态，不能单独证明是地区、Cloudflare、代理或账号资格问题。只有可识别的官方错误代码才能据此判断具体分支。原始错误正文、错误描述、任意 detail、未知 code、授权码及令牌不返回、不记录。没有错误代码或请求 ID 时显示已有证据，不猜测原因。
+
 ## 官方文档与测试
 
 - [注册和登录](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"errors"
 	"github.com/example/studyflow/internal/chatgpt"
 	"net"
 	"net/http"
@@ -37,7 +38,12 @@ func (s *Server) localAI(next http.Handler) http.Handler {
 	})
 }
 func aiError(w http.ResponseWriter, err error) {
-	writeJSON(w, http.StatusBadGateway, envelope{"error": envelope{"code": "ai_unavailable", "message": err.Error()}})
+	value := envelope{"code": "ai_unavailable", "message": err.Error()}
+	var diagnostic *chatgpt.RequestFailure
+	if errors.As(err, &diagnostic) {
+		value["diagnostic"] = diagnostic
+	}
+	writeJSON(w, http.StatusBadGateway, envelope{"error": value})
 }
 func (s *Server) chatGPTStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, envelope{"data": s.chatGPT.Status(claimsFromContext(r.Context()).Subject)})

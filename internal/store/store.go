@@ -22,6 +22,9 @@ type TodoFilter struct {
 // implementation can replace Memory without changing the service layer.
 type Repository interface {
 	ListMeals(context.Context, string) ([]domain.MealEntry, error)
+	ListFitness(context.Context, string) ([]domain.FitnessEntry, error)
+	FitnessByID(context.Context, string, string) (domain.FitnessEntry, error)
+	SaveFitness(context.Context, domain.FitnessEntry, int) (domain.FitnessEntry, error)
 	SaveMeal(context.Context, domain.MealEntry, int) (domain.MealEntry, error)
 	CollectMealShopping(context.Context, string, []string, []string, time.Time) (domain.MealShoppingResult, error)
 	ListSubscriptions(context.Context, string) ([]domain.Subscription, error)

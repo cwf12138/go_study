@@ -6,6 +6,7 @@ info:
 servers:
   - url: http://localhost:8080
 tags:
+  - name: Fitness
   - name: AI
   - name: Meals
   - name: Subscriptions
@@ -29,6 +30,92 @@ tags:
   - name: Shopping
   - name: Bookmarks
 paths:
+  /api/v1/fitness:
+    get:
+      tags: [Fitness]
+      security: [{ bearerAuth: [] }]
+      summary: List current account fitness entries, including trash and running sessions
+      responses:
+        "200":
+          description: Account-scoped records and UTC server time for timer synchronization
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/FitnessEntry" }
+                  server_time: { type: string, format: date-time }
+        "401": { description: Authentication required }
+  /api/v1/fitness/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, pattern: "^[A-Za-z0-9_-]{8,80}$" } }
+    put:
+      tags: [Fitness]
+      security: [{ bearerAuth: [] }]
+      summary: Save a routine, plan, manual log or personal goals using optimistic revision
+      description: New entries use revision 0. Sessions cannot be saved here. Plans snapshot an owned routine; editing that routine later does not alter the plan. Settings use id fitness-settings. Each account has a 5000-entry limit including soft-deleted entries.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveFitnessInput" }
+      responses:
+        "200":
+          description: Saved entry; an identical immediate retry does not increment revision twice
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FitnessResult" }
+        "400": { description: Invalid JSON, fields, date, limits or state }
+        "401": { description: Authentication required }
+        "404": { description: Entry not found in current account }
+        "409": { description: Revision conflict or modification of a plan linked to an active session }
+  /api/v1/fitness/sessions/{id}/start:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, pattern: "^[A-Za-z0-9_-]{8,80}$" } }
+    post:
+      tags: [Fitness]
+      security: [{ bearerAuth: [] }]
+      summary: Start an owned routine or plan, or an unsaved template
+      description: Supply source_id OR title/category/equipment/moves. A session stores its own snapshot. Only one active or paused session is allowed per account. Use one fixed id and identical body for retries; reconcile a conflict after later commands have advanced the session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StartFitnessInput" }
+      responses:
+        "200":
+          description: Started session or identical immediate retry
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FitnessResult" }
+        "400": { description: Invalid source or training input }
+        "401": { description: Authentication required }
+        "409": { description: An unfinished session exists, source plan changed or identifier already used }
+  /api/v1/fitness/sessions/{id}/actions:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, pattern: "^[A-Za-z0-9_-]{8,80}$" } }
+    post:
+      tags: [Fitness]
+      security: [{ bearerAuth: [] }]
+      summary: Execute a validated training state transition
+      description: Keep command_id, revision and body unchanged when retrying. complete_set explicitly confirms one set, next exits rest, skip skips all remaining sets of the current move. Countdown expiry does not auto-complete. finish requires phase done and at least one completed set; stop preserves partial work. Completion atomically updates a linked plan. archive/restore/annotate apply only to terminal sessions. Pauses do not count toward elapsed time; rest and active waiting do, capped at 24 hours.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FitnessActionInput" }
+      responses:
+        "200":
+          description: Updated session, server time and current linked plan if present
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FitnessResult" }
+        "400": { description: Invalid JSON, command or state transition }
+        "401": { description: Authentication required }
+        "404": { description: Session not found in current account }
+        "409": { description: Stale revision; reconcile current server state }
   /api/v1/ai/chatgpt:
     get:
       tags: [AI]
@@ -51,6 +138,18 @@ paths:
                       busy: { type: boolean }
                       email: { type: string }
                       message: { type: string }
+                      diagnostic:
+                        type: object
+                        description: 安全的上游错误诊断，不包含原始正文或凭据，仅失败时出现
+                        properties:
+                          stage: { type: string }
+                          http_status: { type: integer }
+                          response_format: { type: string }
+                          provider_code: { type: string }
+                          provider_request_id: { type: string }
+                          edge_request_id: { type: string }
+                          proxy_planned: { type: boolean }
+                          hint: { type: string }
         "401": { description: Authentication required }
         "403": { description: Loopback and same-origin access required }
   /api/v1/ai/chatgpt/connect:
@@ -2834,6 +2933,103 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
   schemas:
+    FitnessMove:
+      type: object
+      required: [name, mode, target, sets, rest_seconds]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        mode: { type: string, enum: [reps, time] }
+        target: { type: integer, minimum: 1, maximum: 3600, description: Seconds for time; reps are limited to 100 }
+        sets: { type: integer, minimum: 1, maximum: 8 }
+        rest_seconds: { type: integer, minimum: 0, maximum: 300 }
+        instruction: { type: string, maxLength: 1000 }
+        done: { type: integer, minimum: 0, description: Must be zero when creating moves }
+        skipped: { type: integer, minimum: 0, description: Must be zero when creating moves }
+    FitnessEntry:
+      type: object
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        kind: { type: string, enum: [routine, plan, log, settings, session] }
+        title: { type: string }
+        category: { type: string, description: strength / cardio / mobility for training and logs }
+        equipment: { type: string, description: none / chair / dumbbell for training }
+        note: { type: string }
+        date: { type: string, description: China-standard-time date; empty for routine/settings }
+        state: { type: string, description: scheduled/skipped/completed for plans; active/paused/completed/stopped for sessions; completed for logs }
+        routine_id: { type: string }
+        plan_id: { type: string }
+        moves:
+          type: array
+          items: { $ref: "#/components/schemas/FitnessMove" }
+        elapsed_seconds: { type: integer, minimum: 0, maximum: 86400 }
+        remaining_seconds: { type: integer, minimum: 0 }
+        running_since: { type: string, format: date-time, description: Active timer anchor; zero Go timestamp when not running }
+        current_move: { type: integer, minimum: 0, description: Zero-based index; equals move count when done }
+        phase: { type: string, description: work / rest / done for sessions }
+        effort: { type: integer, minimum: 0, maximum: 5 }
+        weekly_minutes: { type: integer }
+        weekly_sessions: { type: integer }
+        deleted: { type: boolean }
+        revision: { type: integer, minimum: 1 }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        last_command_id: { type: string }
+        last_command_hash: { type: string }
+    FitnessResult:
+      type: object
+      required: [data, server_time]
+      properties:
+        data: { $ref: "#/components/schemas/FitnessEntry" }
+        server_time: { type: string, format: date-time }
+        related_plan: { $ref: "#/components/schemas/FitnessEntry" }
+    SaveFitnessInput:
+      type: object
+      additionalProperties: false
+      required: [kind, revision]
+      properties:
+        kind: { type: string, enum: [routine, plan, log, settings] }
+        revision: { type: integer, minimum: 0, maximum: 1000000 }
+        title: { type: string, maxLength: 80 }
+        category: { type: string }
+        equipment: { type: string }
+        note: { type: string, maxLength: 2000 }
+        date: { type: string, format: date, description: Valid dates in 2000-2100; logs must not be in the future }
+        state: { type: string, description: Plans use scheduled/skipped/completed; other kinds may omit or send an empty string }
+        routine_id: { type: string }
+        moves:
+          type: array
+          maxItems: 16
+          description: Routines require 1-16 moves and a maximum of 64 total sets; other kinds may omit or send an empty array
+          items: { $ref: "#/components/schemas/FitnessMove" }
+        elapsed_seconds: { type: integer, minimum: 0, maximum: 86400, description: Manual logs require 60-86400 seconds; other kinds may send zero }
+        effort: { type: integer, minimum: 0, maximum: 5 }
+        weekly_minutes: { type: integer, minimum: 0, maximum: 1200, description: Settings require 10-1200; other kinds may send zero }
+        weekly_sessions: { type: integer, minimum: 0, maximum: 14, description: Settings require 1-14; other kinds may send zero }
+        deleted: { type: boolean }
+    StartFitnessInput:
+      type: object
+      additionalProperties: false
+      properties:
+        source_id: { type: string, description: Owned nondeleted routine or scheduled plan }
+        title: { type: string, maxLength: 80 }
+        category: { type: string, enum: [strength, cardio, mobility] }
+        equipment: { type: string, enum: [none, chair, dumbbell] }
+        moves:
+          type: array
+          minItems: 1
+          maxItems: 16
+          items: { $ref: "#/components/schemas/FitnessMove" }
+    FitnessActionInput:
+      type: object
+      additionalProperties: false
+      required: [action, command_id, revision]
+      properties:
+        action: { type: string, enum: [pause, resume, complete_set, next, skip, finish, stop, archive, restore, annotate] }
+        command_id: { type: string, pattern: "^[A-Za-z0-9_-]{8,80}$" }
+        revision: { type: integer, minimum: 1, maximum: 1000000 }
+        note: { type: string, maxLength: 2000, description: Saved by finish/stop/annotate }
+        effort: { type: integer, minimum: 0, maximum: 5, description: Zero means not supplied }
     MealInput:
       type: object
       required: [kind, revision]

@@ -139,7 +139,7 @@ func (m *Manager) Recommend(ctx context.Context, user string, in MealRequest) (R
 	}
 	defer response.Body.Close()
 	if response.StatusCode != 200 {
-		return out, providerError(response.StatusCode)
+		return out, responseFailure(response, "inference")
 	}
 	if !strings.HasPrefix(response.Header.Get("Content-Type"), "text/event-stream") {
 		return out, errors.New("AI 响应不是预期的事件流")

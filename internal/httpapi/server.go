@@ -45,6 +45,10 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 	root.HandleFunc("POST /api/v1/auth/login", s.login)
 
 	private := http.NewServeMux()
+	private.HandleFunc("GET /api/v1/fitness", s.listFitness)
+	private.HandleFunc("PUT /api/v1/fitness/{id}", s.saveFitness)
+	private.HandleFunc("POST /api/v1/fitness/sessions/{id}/start", s.startFitness)
+	private.HandleFunc("POST /api/v1/fitness/sessions/{id}/actions", s.fitnessAction)
 	private.Handle("GET /api/v1/ai/chatgpt", s.localAI(http.HandlerFunc(s.chatGPTStatus)))
 	private.Handle("POST /api/v1/ai/chatgpt/connect", s.localAI(http.HandlerFunc(s.chatGPTConnect)))
 	private.Handle("POST /api/v1/ai/chatgpt/disconnect", s.localAI(http.HandlerFunc(s.chatGPTDisconnect)))

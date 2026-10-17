@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"bytes"
+	"github.com/example/studyflow/internal/chatgpt"
 	"github.com/example/studyflow/internal/event"
 	"github.com/example/studyflow/internal/security"
 	"github.com/example/studyflow/internal/service"
@@ -40,6 +41,14 @@ func TestAIRequiresLoopbackHostAndOrigin(t *testing.T) {
 		if w.Code != row.status || w.Header().Get("Access-Control-Allow-Origin") != "" || w.Header().Get("Cache-Control") != "no-store" {
 			t.Fatalf("%+v -> %d", row, w.Code)
 		}
+	}
+}
+
+func TestAIErrorExposesSafeDiagnostic(t *testing.T) {
+	w := httptest.NewRecorder()
+	aiError(w, &chatgpt.RequestFailure{Stage: "token_exchange", HTTPStatus: 403, Format: "json_error", Code: "invalid_scope", RequestID: "req_test-123", Hint: "需要核对授权范围"})
+	if w.Code != 502 || !strings.Contains(w.Body.String(), `"http_status":403`) || !strings.Contains(w.Body.String(), `"stage":"token_exchange"`) || !strings.Contains(w.Body.String(), `"provider_request_id":"req_test-123"`) {
+		t.Fatal(w.Code, w.Body.String())
 	}
 }
 

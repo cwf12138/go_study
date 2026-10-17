@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"net"
 	"net/http"
@@ -50,14 +51,16 @@ type session struct {
 	pending, busy  bool
 	generation     uint64
 	cancel         context.CancelFunc
+	diagnostic     *RequestFailure
 }
 type Status struct {
-	Connected bool   `json:"connected"`
-	SignedIn  bool   `json:"signed_in"`
-	Pending   bool   `json:"pending"`
-	Busy      bool   `json:"busy"`
-	Email     string `json:"email"`
-	Message   string `json:"message"`
+	Connected  bool            `json:"connected"`
+	SignedIn   bool            `json:"signed_in"`
+	Pending    bool            `json:"pending"`
+	Busy       bool            `json:"busy"`
+	Email      string          `json:"email"`
+	Message    string          `json:"message"`
+	Diagnostic *RequestFailure `json:"diagnostic,omitempty"`
 }
 type Manager struct {
 	mu       sync.Mutex
@@ -101,7 +104,7 @@ func (m *Manager) Status(user string) Status {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	s := m.get(user)
-	return Status{Connected: s.cred.Access != "" && hasScope(s.cred.Scope, "chatgpt.tokens.use.direct"), SignedIn: s.cred.ID != "", Pending: s.pending, Busy: s.busy, Email: s.email, Message: s.message}
+	return Status{Connected: s.cred.Access != "" && hasScope(s.cred.Scope, "chatgpt.tokens.use.direct"), SignedIn: s.cred.ID != "", Pending: s.pending, Busy: s.busy, Email: s.email, Message: s.message, Diagnostic: s.diagnostic}
 }
 
 // Only non-secret registration metadata is persisted. Tokens never reach this file.
@@ -195,6 +198,7 @@ func (m *Manager) Begin(user string) (string, error) {
 	s.generation++
 	generation := s.generation
 	s.pending = true
+	s.diagnostic = nil
 	s.message = "请在打开的浏览器中完成 ChatGPT 授权"
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	s.cancel = cancel
@@ -265,11 +269,15 @@ func (m *Manager) Begin(user string) (string, error) {
 			if s.generation == generation {
 				s.pending = false
 				s.message = message
+				var diagnostic *RequestFailure
+				if errors.As(flowErr, &diagnostic) {
+					s.diagnostic = diagnostic
+				}
 			}
 			m.mu.Unlock()
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			// All messages are application constants, never provider error descriptions or tokens.
-			fmt.Fprintf(w, "<!doctype html><meta charset=utf-8><title>Daynest · ChatGPT</title><main style='font:18px system-ui;max-width:560px;margin:15vh auto;padding:32px'><h1>Daynest · 今天吃什么</h1><p>%s</p><p>可关闭此页，返回原窗口查看连接状态。</p></main>", message)
+			// Only safe diagnostics are shown; still HTML-escape as defense in depth.
+			fmt.Fprintf(w, "<!doctype html><meta charset=utf-8><title>Daynest · ChatGPT</title><main style='font:18px system-ui;max-width:640px;margin:12vh auto;padding:32px'><h1>Daynest · 今天吃什么</h1><p style='white-space:pre-wrap;overflow-wrap:anywhere'>%s</p><p>可关闭此页，返回原窗口查看连接状态。</p></main>", html.EscapeString(message))
 			cancel()
 		})
 		if !handled {
@@ -321,11 +329,12 @@ func (m *Manager) jsonRequest(ctx context.Context, method, endpoint, token strin
 	}
 	res, err := m.client.Do(req)
 	if err != nil {
-		return errors.New("无法连接 OpenAI，请检查网络后重试")
+		proxy, _ := http.ProxyFromEnvironment(req)
+		return &RequestFailure{Stage: requestStage(endpoint, form), Format: "network_error", ProxyPlanned: proxy != nil, Hint: "连接中断、超时或无法建立。请核对启动 Go 服务的终端网络/代理设置；不会输出包含凭据的网络错误原文。"}
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		return providerError(res.StatusCode)
+		return responseFailure(res, requestStage(endpoint, form))
 	}
 	if target == nil {
 		return nil
@@ -341,17 +350,6 @@ func decodeBounded(r io.Reader, target any, limit int64) error {
 		return errors.New("服务响应格式异常")
 	}
 	return nil
-}
-func providerError(status int) error {
-	switch status {
-	case 401:
-		return errors.New("ChatGPT 授权已失效，请断开后重新连接")
-	case 403:
-		return errors.New("当前账号或应用暂不具备此调用权限")
-	case 429:
-		return errors.New("Plus 额度或请求频率受限，请稍后再试")
-	}
-	return fmt.Errorf("OpenAI 请求未成功（%d），请稍后重试", status)
 }
 
 // acquire serializes refresh/inference and makes disconnect cancel outstanding work.
@@ -419,6 +417,7 @@ func (m *Manager) Disconnect(ctx context.Context, user string) string {
 	s.busy = false
 	s.email = ""
 	s.message = "已断开本地连接"
+	s.diagnostic = nil
 	m.mu.Unlock()
 	if c.Refresh == "" {
 		return "已清除本地授权。"

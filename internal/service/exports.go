@@ -32,6 +32,7 @@ type UserDataExport struct {
 	Bookmarks          []domain.Bookmark         `json:"bookmarks"`
 	Subscriptions      []domain.Subscription     `json:"subscriptions"`
 	Meals              []domain.MealEntry        `json:"meals"`
+	Fitness            []domain.FitnessEntry     `json:"fitness"`
 	Projects           []domain.Project          `json:"projects"`
 	TravelPlans        []domain.TravelPlan       `json:"travel_plans"`
 	Moods              []domain.MoodEntry        `json:"moods"`
@@ -91,6 +92,9 @@ func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataEx
 		return UserDataExport{}, err
 	}
 	if bundle.Meals, err = s.repo.ListMeals(ctx, userID); err != nil {
+		return UserDataExport{}, err
+	}
+	if bundle.Fitness, err = s.repo.ListFitness(ctx, userID); err != nil {
 		return UserDataExport{}, err
 	}
 	if bundle.Projects, err = s.repo.ListProjects(ctx, userID); err != nil {
@@ -160,6 +164,7 @@ func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataEx
 		"bookmarks":     len(bundle.Bookmarks),
 		"subscriptions": len(bundle.Subscriptions),
 		"meals":         len(bundle.Meals),
+		"fitness":       len(bundle.Fitness),
 		"projects":      len(bundle.Projects),
 		"travel_plans":  len(bundle.TravelPlans),
 		"goals":         len(bundle.Goals), "moods": len(bundle.Moods), "tasks": len(bundle.Tasks), "todo_lists": len(bundle.TodoLists),
