@@ -33,6 +33,7 @@ type UserDataExport struct {
 	Subscriptions      []domain.Subscription     `json:"subscriptions"`
 	Meals              []domain.MealEntry        `json:"meals"`
 	Fitness            []domain.FitnessEntry     `json:"fitness"`
+	Care               []domain.CareItem         `json:"care"`
 	Nutrition          []domain.NutritionEntry   `json:"nutrition"`
 	Projects           []domain.Project          `json:"projects"`
 	TravelPlans        []domain.TravelPlan       `json:"travel_plans"`
@@ -96,6 +97,9 @@ func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataEx
 		return UserDataExport{}, err
 	}
 	if bundle.Fitness, err = s.repo.ListFitness(ctx, userID); err != nil {
+		return UserDataExport{}, err
+	}
+	if bundle.Care, err = s.repo.ListCare(ctx, userID); err != nil {
 		return UserDataExport{}, err
 	}
 	if bundle.Nutrition, err = s.repo.ListNutrition(ctx, userID); err != nil {
@@ -169,6 +173,7 @@ func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataEx
 		"subscriptions": len(bundle.Subscriptions),
 		"meals":         len(bundle.Meals),
 		"fitness":       len(bundle.Fitness),
+		"care":          len(bundle.Care),
 		"nutrition":     len(bundle.Nutrition),
 		"projects":      len(bundle.Projects),
 		"travel_plans":  len(bundle.TravelPlans),

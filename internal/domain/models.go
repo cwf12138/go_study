@@ -254,6 +254,7 @@ type CalendarOverview struct {
 	Todos       []TodoItem           `json:"todos"`
 	MoodEntries []MoodEntry          `json:"mood_entries"`
 	FitnessDays []FitnessDay         `json:"fitness_days"`
+	CareEntries []CareCalendarEntry  `json:"care_entries"`
 }
 
 type VocabularyStage string

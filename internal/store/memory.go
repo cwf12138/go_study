@@ -29,6 +29,7 @@ type Memory struct {
 	subscriptions           map[string]domain.Subscription
 	meals                   map[string]domain.MealEntry
 	fitness                 map[string]domain.FitnessEntry
+	care                    map[string]domain.CareItem
 	nutrition               map[string]domain.NutritionEntry
 	ledger                  map[string]domain.LedgerEntry
 	projects                map[string]domain.Project
@@ -69,6 +70,7 @@ func NewMemory() *Memory {
 		subscriptions:           make(map[string]domain.Subscription),
 		meals:                   make(map[string]domain.MealEntry),
 		fitness:                 make(map[string]domain.FitnessEntry),
+		care:                    make(map[string]domain.CareItem),
 		nutrition:               make(map[string]domain.NutritionEntry),
 		ledger:                  make(map[string]domain.LedgerEntry),
 		projects:                make(map[string]domain.Project),
@@ -1154,6 +1156,7 @@ type snapshot struct {
 	Subscriptions           []domain.Subscription       `json:"subscriptions,omitempty"`
 	Meals                   []domain.MealEntry          `json:"meals,omitempty"`
 	Fitness                 []domain.FitnessEntry       `json:"fitness,omitempty"`
+	Care                    []domain.CareItem           `json:"care,omitempty"`
 	Nutrition               []domain.NutritionEntry     `json:"nutrition,omitempty"`
 	Ledger                  []domain.LedgerEntry        `json:"ledger"`
 	Projects                []domain.Project            `json:"projects"`
@@ -1236,6 +1239,9 @@ func (m *Memory) SaveJSON(path string) error {
 	}
 	for _, item := range m.fitness {
 		s.Fitness = append(s.Fitness, cloneFitness(item))
+	}
+	for _, item := range m.care {
+		s.Care = append(s.Care, cloneCare(item))
 	}
 	for _, item := range m.nutrition {
 		s.Nutrition = append(s.Nutrition, cloneNutrition(item))
@@ -1394,6 +1400,10 @@ func (m *Memory) LoadJSON(path string) error {
 	m.subscriptions = make(map[string]domain.Subscription, len(s.Subscriptions))
 	m.meals = make(map[string]domain.MealEntry, len(s.Meals))
 	m.fitness = make(map[string]domain.FitnessEntry, len(s.Fitness))
+	m.care = make(map[string]domain.CareItem, len(s.Care))
+	for _, item := range s.Care {
+		m.care[item.UserID+":"+item.ID] = cloneCare(item)
+	}
 	m.nutrition = make(map[string]domain.NutritionEntry, len(s.Nutrition))
 	for _, item := range s.Nutrition {
 		m.nutrition[item.UserID+":"+item.ID] = cloneNutrition(item)

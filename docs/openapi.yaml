@@ -6,6 +6,7 @@ info:
 servers:
   - url: http://localhost:8080
 tags:
+  - name: Care
   - name: Fitness
   - name: AI
   - name: Meals
@@ -30,6 +31,60 @@ tags:
   - name: Shopping
   - name: Bookmarks
 paths:
+  /api/v1/care-items:
+    get:
+      tags: [Care]
+      security: [{ bearerAuth: [] }]
+      summary: List current account recurring life-care items including trash
+      responses:
+        "200":
+          description: Account-scoped items and server time
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/CareItem" } }
+                  server_time: { type: string, format: date-time }
+        "401": { description: Authentication required }
+  /api/v1/care-items/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, pattern: "^[A-Za-z0-9_-]{8,80}$" } }
+    put:
+      tags: [Care]
+      security: [{ bearerAuth: [] }]
+      summary: Create or edit life-care metadata with optimistic revision
+      description: New entries use revision 0. History, state and counters are server-owned. Changing first_due, interval, unit or rhythm resets the schedule anchor; other edits preserve it. Editing clears completion undo. Identical immediate retry is idempotent. Max 500 items per account including soft deletion.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveCareInput" }
+      responses:
+        "200": { description: data is a CareItem; server_time is UTC date-time }
+        "400": { description: Invalid JSON, fields, cycle or date }
+        "401": { description: Authentication required }
+        "404": { description: Entry not found in current account }
+        "409": { description: Version conflict; preserve request before reconciliation }
+  /api/v1/care-items/{id}/actions:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, pattern: "^[A-Za-z0-9_-]{8,80}$" } }
+    post:
+      tags: [Care]
+      security: [{ bearerAuth: [] }]
+      summary: Complete, undo, postpone, pause or archive a life-care item
+      description: Retries must keep command_id, revision and the exact body. Rolling schedules advance from actual completion; fixed schedules retain original anchor and skip missed periods without inventing completions. Only the latest completion can be undone before intervening edits/actions. History retains the last 100 entries. Snoozing is not completion. Archived items only accept restore.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CareActionInput" }
+      responses:
+        "200": { description: data is the updated CareItem; server_time is UTC date-time }
+        "400": { description: Invalid input, date or undo unavailable }
+        "401": { description: Authentication required }
+        "404": { description: Item not found in current account }
+        "409": { description: Version conflict or invalid state transition }
   /api/v1/fitness/nutrition:
     get:
       tags: [Fitness]
@@ -2985,6 +3040,75 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
   schemas:
+    SaveCareInput:
+      type: object
+      additionalProperties: false
+      required: [title, category, interval, unit, rhythm, first_due, importance, revision]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 80 }
+        category: { type: string, enum: [home, digital, personal, other] }
+        interval: { type: integer, minimum: 1, maximum: 365, description: Up to 365 days, 52 weeks or 24 months }
+        unit: { type: string, enum: [days, weeks, months] }
+        rhythm: { type: string, enum: [rolling, fixed] }
+        first_due: { type: string, format: date, description: Valid date in 2000-2100; existing next_date when keeping schedule unchanged }
+        estimate_minutes: { type: integer, minimum: 0, maximum: 480 }
+        importance: { type: string, enum: [normal, high] }
+        note: { type: string, maxLength: 1000 }
+        revision: { type: integer, minimum: 0, maximum: 1000000 }
+    CareActionInput:
+      type: object
+      additionalProperties: false
+      required: [action, command_id, revision]
+      properties:
+        action: { type: string, enum: [complete, undo, snooze, unsnooze, pause, resume, archive, restore] }
+        command_id: { type: string, pattern: "^[A-Za-z0-9_-]{8,80}$" }
+        revision: { type: integer, minimum: 1, maximum: 1000000 }
+        date: { type: string, description: Complete requires a valid date not after today or before last_done_date; snooze requires a date after today and next_date within 90 calendar days }
+        note: { type: string, maxLength: 500 }
+    CareItem:
+      type: object
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        title: { type: string }
+        category: { type: string }
+        interval: { type: integer }
+        unit: { type: string }
+        rhythm: { type: string }
+        anchor_date: { type: string, format: date }
+        index: { type: integer, minimum: 0 }
+        next_date: { type: string, format: date }
+        snoozed_until: { type: string, description: Empty or a postponed date }
+        estimate_minutes: { type: integer }
+        importance: { type: string }
+        note: { type: string }
+        state: { type: string, enum: [active, paused] }
+        deleted: { type: boolean }
+        last_done_date: { type: string }
+        total_completions: { type: integer, minimum: 0 }
+        history:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              date: { type: string, format: date }
+              note: { type: string }
+              created_at: { type: string, format: date-time }
+        undo: { type: object, description: Present only while the most recent completion remains undoable }
+        last_command_id: { type: string }
+        last_command_hash: { type: string }
+        revision: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    CareCalendarEntry:
+      type: object
+      properties:
+        item_id: { type: string }
+        date: { type: string, format: date }
+        title: { type: string }
+        kind: { type: string, enum: [due, done] }
     NutritionCard:
       type: object
       description: Original food-group example, not a personalized diet prescription. Missing allergen labels never guarantee safety or absence of cross-contact.
@@ -3407,6 +3531,7 @@ components:
         todos: { type: array, items: { $ref: "#/components/schemas/TodoItem" } }
         mood_entries: { type: array, items: { $ref: "#/components/schemas/MoodEntry" } }
         fitness_days: { type: array, items: { $ref: "#/components/schemas/FitnessDay" } }
+        care_entries: { type: array, items: { $ref: "#/components/schemas/CareCalendarEntry" } }
     FitnessDay:
       type: object
       description: One aggregated exercise marker per date; read-only projection from non-deleted manual check-ins, completed sessions and manual logs. Not an independent calendar event. Active, paused and stopped sessions do not automatically mark a date.

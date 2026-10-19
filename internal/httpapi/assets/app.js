@@ -340,6 +340,7 @@
       subscriptions: ["RECURRING DETAILS", "订阅管家"],
       meals: ["WHAT SOUNDS GOOD", "今天吃什么"],
       fitness: ["MOVE AT YOUR OWN PACE", "运动日常"],
+      care: ["SMALL CARE, BETTER DAYS", "生活保养站"],
       inventory: ["EVERYDAY COLLECTION", "物品管家"],
       bookmarks: ["LINK LIBRARY", "随手收藏"],
       toolkit: ["EVERYDAY ESSENTIALS", "随身工具"],
