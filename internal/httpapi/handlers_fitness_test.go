@@ -34,6 +34,35 @@ func TestFitnessHTTP(t *testing.T) {
 		return auth.Data.Token
 	}
 	alice, bob := register("fitness-alice@example.com"), register("fitness-bob@example.com")
+	checkInPath := "/api/v1/fitness/fitness-checkin-2000-01-02"
+	for i := 0; i < 2; i++ {
+		r := performJSON(t, handler, "PUT", checkInPath, alice, map[string]any{"kind": "checkin", "date": "2000-01-02", "revision": 0})
+		if r.Code != 200 {
+			t.Fatal("check-in route/retry", r.Code, r.Body.String())
+		}
+	}
+	calendarPath := "/api/v1/calendar?start=2000-01-01&end=2000-01-03"
+	for _, user := range []string{alice, bob} {
+		r := performJSON(t, handler, "GET", calendarPath, user, nil)
+		var body struct{ Data domain.CalendarOverview }
+		if r.Code != 200 || json.Unmarshal(r.Body.Bytes(), &body) != nil {
+			t.Fatal(r.Body.String())
+		}
+		if user == alice && (len(body.Data.FitnessDays) != 1 || !body.Data.FitnessDays[0].ManualCheckIn) {
+			t.Fatal("calendar did not project check-in", r.Body.String())
+		}
+		if user == bob && len(body.Data.FitnessDays) != 0 {
+			t.Fatal("calendar account isolation", r.Body.String())
+		}
+	}
+	if r := performJSON(t, handler, "PUT", checkInPath, alice, map[string]any{"kind": "checkin", "date": "2000-01-02", "revision": 1, "deleted": true}); r.Code != 200 {
+		t.Fatal("undo check-in", r.Body.String())
+	}
+	rCalendar := performJSON(t, handler, "GET", calendarPath, alice, nil)
+	var calendarBody struct{ Data domain.CalendarOverview }
+	if json.Unmarshal(rCalendar.Body.Bytes(), &calendarBody) != nil || len(calendarBody.Data.FitnessDays) != 0 {
+		t.Fatal("undo left calendar item", rCalendar.Body.String())
+	}
 	read := func(r *httptest.ResponseRecorder, code int) domain.FitnessEntry {
 		t.Helper()
 		var body struct {

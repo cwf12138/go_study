@@ -106,7 +106,7 @@ paths:
     put:
       tags: [Fitness]
       security: [{ bearerAuth: [] }]
-      summary: Save a routine, plan, manual log or personal goals using optimistic revision
+      summary: Save a routine, plan, manual log, daily check-in or personal goals using optimistic revision
       description: New entries use revision 0. Sessions cannot be saved here. Plans snapshot an owned routine; editing that routine later does not alter the plan. Settings use id fitness-settings. Each account has a 5000-entry limit including soft-deleted entries.
       requestBody:
         required: true
@@ -3075,7 +3075,7 @@ components:
       properties:
         id: { type: string }
         user_id: { type: string }
-        kind: { type: string, enum: [routine, plan, log, settings, session] }
+        kind: { type: string, enum: [routine, plan, log, settings, session, checkin] }
         title: { type: string }
         category: { type: string, description: strength / cardio / mobility for training and logs }
         equipment: { type: string, description: none / chair / dumbbell for training }
@@ -3113,13 +3113,13 @@ components:
       additionalProperties: false
       required: [kind, revision]
       properties:
-        kind: { type: string, enum: [routine, plan, log, settings] }
+        kind: { type: string, enum: [routine, plan, log, settings, checkin] }
         revision: { type: integer, minimum: 0, maximum: 1000000 }
         title: { type: string, maxLength: 80 }
         category: { type: string }
         equipment: { type: string }
         note: { type: string, maxLength: 2000 }
-        date: { type: string, format: date, description: Valid dates in 2000-2100; logs must not be in the future }
+        date: { type: string, format: date, description: Valid dates in 2000-2100; logs and check-ins must not be in the future. A check-in must use id fitness-checkin-YYYY-MM-DD; its state and zero duration are server-owned. }
         state: { type: string, description: Plans use scheduled/skipped/completed; other kinds may omit or send an empty string }
         routine_id: { type: string }
         moves:
@@ -3406,6 +3406,15 @@ components:
         tasks: { type: array, items: { $ref: "#/components/schemas/StudyTask" } }
         todos: { type: array, items: { $ref: "#/components/schemas/TodoItem" } }
         mood_entries: { type: array, items: { $ref: "#/components/schemas/MoodEntry" } }
+        fitness_days: { type: array, items: { $ref: "#/components/schemas/FitnessDay" } }
+    FitnessDay:
+      type: object
+      description: One aggregated exercise marker per date; read-only projection from non-deleted manual check-ins, completed sessions and manual logs. Not an independent calendar event. Active, paused and stopped sessions do not automatically mark a date.
+      properties:
+        date: { type: string, format: date }
+        manual_check_in: { type: boolean }
+        completed_sessions: { type: integer, minimum: 0, description: Completed sessions plus manual logs; manual check-ins do not add a session }
+        recorded_seconds: { type: integer, minimum: 0, description: Sum of completed-session and manual-log durations, including session rest; a check-in does not add duration }
     RegisterRequest:
       type: object
       required: [name, email, password]

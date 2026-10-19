@@ -94,6 +94,14 @@ func (s *Service) SaveFitness(ctx context.Context, user, id string, in SaveFitne
 	now := s.now().UTC()
 	row := domain.FitnessEntry{ID: id, UserID: user, Kind: in.Kind, Title: in.Title, Category: in.Category, Equipment: in.Equipment, Note: in.Note, Date: in.Date, State: in.State, Effort: in.Effort, Deleted: in.Deleted, CreatedAt: now, UpdatedAt: now}
 	switch in.Kind {
+	case "checkin":
+		if _, err := subscriptionDate(in.Date); err != nil || in.Date > now.In(calendarLocation).Format("2006-01-02") || id != "fitness-checkin-"+in.Date {
+			return zero, fitnessBad("锻炼打卡须使用对应日期标识，日期有效且不晚于今天")
+		}
+		row.Title = "已锻炼"
+		row.Category, row.Equipment, row.Note = "", "", ""
+		row.State = "completed"
+		row.Effort = 0
 	case "routine":
 		if !fitnessText(in.Title, 80, true) || strings.ContainsAny(in.Title, "\r\n") || !fitnessCategory(in.Category) || !fitnessEquipment(in.Equipment) {
 			return zero, fitnessBad("请填写训练名称并选择有效类型与器械")

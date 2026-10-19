@@ -19,7 +19,7 @@
   const state = {
     view: localStorage.getItem("studyflow.calendar.view") || "month",
     anchor: new Date(), selected: dateKey(new Date()), overview: null, detail: null,
-    saving: false, requestID: 0, detailRequestID: 0, query: '', source: 'all', owner: token(), loading: false, initialized: false, direction: 1, historyRequestID: 0, historyCache: new Map(),
+    saving: false, requestID: 0, detailRequestID: 0, query: '', source: 'all', owner: token(), loading: false, fitnessDirty: false, initialized: false, direction: 1, historyRequestID: 0, historyCache: new Map(),
   };
 
   async function api(path, options = {}) {
@@ -63,7 +63,7 @@
     const requestID = ++state.requestID, owner = token();
     const canvas = $("#calendar-canvas");
     if (!owner) { renderCalendar(); showCalendarError("请先登录后查看个人日程。"); return; }
-    state.loading = true;
+    state.loading = true; state.fitnessDirty = false;
     const [start, end] = rangeForView();
     state.overview = null;
     state.detail = null;
@@ -87,7 +87,7 @@
     } finally {
       if (requestID === state.requestID) {
         state.loading = false;
-        requestAnimationFrame(() => canvas.classList.remove("transitioning"));
+        requestAnimationFrame(() => canvas.classList.remove("transitioning")); if(state.fitnessDirty && owner===token() && $("#panel-calendar").classList.contains("active")) loadCalendar();
       }
     }
   }
@@ -151,6 +151,7 @@
     (state.overview?.tasks || []).forEach((item) => add(dateKey(new Date(item.due_at)), { type: "task", id: item.id, title: `任务 · ${item.title}`, time: clock(new Date(item.due_at)), color: "#e5963e", raw: item }));
     (state.overview?.todos || []).forEach((item) => add(dateKey(new Date(item.due_at)), { type: "todo", id: item.id, title: `待办 · ${item.title}`, time: clock(new Date(item.due_at)), color: "#e5963e", raw: item }));
     (state.overview?.mood_entries || []).forEach((item) => add(item.date, { type: "mood", id: item.id, title: `心情 · ${calendarMood(item.mood).label}`, time: "记录", color: "#25ae85", raw: item }));
+    (state.overview?.fitness_days || []).forEach((item) => add(item.date, { type: "fitness", id: 'fitness-day-'+item.date, title: '运动 · 已锻炼', time: '打卡', color: '#718b5d', raw: item }));
     map.forEach((items) => items.sort((a, b) => a.time.localeCompare(b.time)));
     return map;
   }
@@ -174,13 +175,14 @@
 
   function renderYear() {
     const year = state.anchor.getFullYear();
+    const fitnessDates = new Set([...itemsByDate()].filter(([,items])=>items.some(item=>item.type==='fitness')).map(([date])=>date));
     let html = '<div class="calendar-year-grid">';
     for (let month = 0; month < 12; month += 1) {
       const first = new Date(year, month, 1), start = startOfWeek(first), total = new Date(year, month + 1, 0).getDate();
       html += `<section class="calendar-mini-month"><h4><button type="button" data-calendar-month="${month}">${month + 1} 月</button></h4><div class="calendar-mini-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div><div class="calendar-mini-days">`;
       for (let index = 0; index < 42; index += 1) {
         const date = addDays(start, index), key = dateKey(date), outside = date.getMonth() !== month;
-        html += `<button type="button" class="calendar-mini-day ${outside ? "outside" : ""} ${isToday(key) ? "today" : ""} ${state.selected === key ? "selected" : ""}" data-calendar-date="${key}" ${outside ? "tabindex=\"-1\"" : ""}>${outside ? "" : date.getDate()}</button>`;
+        html += `<button type="button" class="calendar-mini-day ${fitnessDates.has(key) ? "has-fitness" : ""} ${outside ? "outside" : ""} ${isToday(key) ? "today" : ""} ${state.selected === key ? "selected" : ""}" aria-label="${key}${fitnessDates.has(key)?'，已锻炼':''}" data-calendar-date="${key}" ${outside ? "tabindex=\"-1\"" : ""}>${outside ? "" : date.getDate()}</button>`;
       }
       html += `</div><small>${total} 天</small></section>`;
     }
@@ -200,7 +202,9 @@
       const currentLine = isToday(key) ? `<i class="calendar-current-line" style="top:${(new Date().getHours() * 60 + new Date().getMinutes()) * .8}px"></i>` : "";
       columns += `<div class="calendar-time-column" data-calendar-date="${key}">${currentLine}${(events.get(key) || []).filter((item) => item.type === "event" || item.type === "plan").map(timedEventHTML).join("")}</div>`;
     }
-    $("#calendar-canvas").innerHTML = `<div class="calendar-time-view" style="--day-count:${count}"><div class="calendar-time-head">${heads}</div><div class="calendar-time-grid">${columns}</div></div>`;
+    const fitnessDays=Array.from({length:count},(_,i)=>dateKey(addDays(start,i)));
+    const fitnessStrip=fitnessDays.some(day=>(events.get(day)||[]).some(item=>item.type==='fitness'))?`<div class="calendar-fitness-strip"><span>运动</span>${fitnessDays.map(day=>{const item=(events.get(day)||[]).find(item=>item.type==='fitness');return `<div>${item?`<button type="button" data-calendar-fitness="${day}" title="${escapeHTML(fitnessDescription(item.raw))}">✓ 已锻炼</button>`:''}</div>`;}).join('')}</div>`:'';
+    $("#calendar-canvas").innerHTML = `<div class="calendar-time-view" style="--day-count:${count}"><div class="calendar-time-head">${heads}</div>${fitnessStrip}<div class="calendar-time-grid">${columns}</div></div>`;
   }
 
   function timedEventHTML(item) {
@@ -361,7 +365,7 @@
     const items = itemsByDate().get(state.selected) || [];
     const agenda = $("#calendar-day-agenda");
     agenda.classList.toggle("empty-state", !items.length);
-    agenda.innerHTML = items.length ? items.map((item) => `<div class="calendar-agenda-item" ${item.type === "event" ? `role="button" tabindex="0" aria-label="编辑 ${escapeHTML(item.title)}" data-calendar-event="${escapeHTML(item.id)}"` : ""}><span class="calendar-agenda-time">${escapeHTML(item.time)}</span><i class="calendar-agenda-color" style="--item-color:${item.color}"></i><span><b>${calendarItemTitle(item)}</b><small>${escapeHTML(item.type === "event" ? item.raw.category : typeLabel(item.type))}</small></span></div>`).join("") : "这一天还没有安排。";
+    agenda.innerHTML = items.length ? items.map((item) => `<div class="calendar-agenda-item" ${item.type === "event" ? `role="button" tabindex="0" aria-label="编辑 ${escapeHTML(item.title)}" data-calendar-event="${escapeHTML(item.id)}"` : ""}><span class="calendar-agenda-time">${escapeHTML(item.time)}</span><i class="calendar-agenda-color" style="--item-color:${item.color}"></i><span><b>${calendarItemTitle(item)}</b><small>${escapeHTML(item.type === "event" ? item.raw.category : item.type === "fitness" ? fitnessDescription(item.raw) : typeLabel(item.type))}</small>${item.type === "fitness" ? `<button type="button" class="calendar-fitness-link" data-calendar-fitness="${escapeHTML(item.raw.date)}">查看运动记录 ↗</button>` : ""}</span></div>`).join("") : "这一天还没有安排。";
   }
 
   function navigate(direction) {
@@ -447,6 +451,8 @@
   }
 
   function bind() {
+    window.addEventListener('daynest:fitness-changed',fitnessChanged);
+    window.addEventListener('daynest:calendar-date',event=>{const day=event.detail?.date;if(!token()||typeof day!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(day)||day<'2000-01-01'||day>'2100-12-31'||dateKey(fromDateKey(day))!==day)return;state.selected=day;state.anchor=fromDateKey(day);if($('#panel-calendar').classList.contains('active'))loadCalendar();});
     const tools = $("#calendar-tools-dialog");
     let toolsTrigger = null;
     function openTools(mode) {
@@ -505,7 +511,7 @@
       if (state.owner && $("#panel-calendar").classList.contains("active")) loadCalendar();
     };
     if (typeof MutationObserver !== "undefined") new MutationObserver(resetOwner).observe($("#app-view"), {attributes:true,attributeFilter:["class"]});
-    window.addEventListener("storage", e => { if (e.key === "studyflow.token") resetOwner(); });
+    window.addEventListener("storage", e => { if (e.key === "studyflow.token") resetOwner(); else if(e.key==="daynest.fitness.changed")fitnessChanged(); });
 
     $("[data-view=calendar]")?.addEventListener("click", () => {
 	  activateCalendarPanel();
@@ -525,11 +531,12 @@
     $("#calendar-event-form").addEventListener("submit", saveEvent);
     $("#calendar-canvas").addEventListener("click", async (event) => {
 	  if (event.target.closest("[data-calendar-retry]")) { await loadCalendar(); return; }
+      const fitnessButton=event.target.closest("[data-calendar-fitness]");if(fitnessButton){openFitness(fitnessButton.dataset.calendarFitness);return;}
       const eventButton = event.target.closest("[data-calendar-event]"); if (eventButton) { event.stopPropagation(); openEventDialog(eventButton.dataset.calendarEvent); return; }
       const month = event.target.closest("[data-calendar-month]"); if (month) { state.anchor = new Date(state.anchor.getFullYear(), Number(month.dataset.calendarMonth), 1); state.selected = dateKey(state.anchor); setView("month"); return; }
       const day = event.target.closest("[data-calendar-date]"); if (day) { await selectDay(day.dataset.calendarDate, state.view === "day"); }
     });
-    $("#calendar-day-agenda").addEventListener("click", (event) => { const target = event.target.closest("[data-calendar-event]"); if (target) openEventDialog(target.dataset.calendarEvent); });
+    $("#calendar-day-agenda").addEventListener("click", (event) => { const fitness=event.target.closest("[data-calendar-fitness]");if(fitness){openFitness(fitness.dataset.calendarFitness);return;}const target = event.target.closest("[data-calendar-event]"); if (target) openEventDialog(target.dataset.calendarEvent); });
 	$("#calendar-history").addEventListener("click", (event) => { if (event.target.closest("[data-history-retry]")) loadHistory(state.selected); });
     window.addEventListener("keydown", (event) => {
       if (!$("#panel-calendar").classList.contains("active") || $("#calendar-event-dialog").open || tools.open || /INPUT|TEXTAREA|SELECT|BUTTON/.test(event.target.tagName) || event.target.isContentEditable || event.ctrlKey || event.metaKey || event.altKey) return;
@@ -569,6 +576,9 @@
   }
 
   function shortDate(date) { return `${date.getMonth() + 1}月${date.getDate()}日`; }
+  function fitnessDescription(day){return day.completed_sessions>0?`完成 / 补记 ${day.completed_sessions} 次 · 记录 ${Math.floor(day.recorded_seconds/60)} 分钟（含休息）${day.manual_check_in?' · 另有手动打卡':''}`:'手动打卡 · 未填写运动时长';}
+  function openFitness(day){if(typeof window.dispatchEvent==='function'&&typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('daynest:fitness-date',{detail:{date:day}}));$('.nav-link[data-view="fitness"]')?.click();}
+  function fitnessChanged(){if(!token())return;state.fitnessDirty=true;if($('#panel-calendar').classList.contains('active')&&!state.loading)loadCalendar();}
   function clock(date) { return Number.isNaN(date.getTime()) ? "" : `${pad(date.getHours())}:${pad(date.getMinutes())}`; }
   function calendarMood(value) {
     return [
@@ -583,7 +593,7 @@
     const mood = calendarMood(item.raw?.mood);
     return `<img class="calendar-mood-icon" src="/static/mood-art/${mood.value}-flat-v2.png" width="20" height="20" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><span class="calendar-mood-label">${escapeHTML(item.title)}</span>`;
   }
-  function typeLabel(value) { return ({ plan: "学习计划", task: "学习任务", todo: "待办事项", mood: "心情日记" })[value] || value; }
+  function typeLabel(value) { return ({ plan: "学习计划", task: "学习任务", todo: "待办事项", mood: "心情日记", fitness: "运动日常" })[value] || value; }
 
   bind();
 })();

@@ -13,6 +13,15 @@ type FitnessMove struct {
 	Skipped     int    `json:"skipped"`
 }
 
+// FitnessDay projects account-owned records into one calendar item per date.
+// A check-in asserts activity only; it never supplies duration or extra sessions.
+type FitnessDay struct {
+	Date              string `json:"date"`
+	ManualCheckIn     bool   `json:"manual_check_in"`
+	CompletedSessions int    `json:"completed_sessions"`
+	RecordedSeconds   int    `json:"recorded_seconds"`
+}
+
 // FitnessEntry stores routines, dated plans, manual logs, session snapshots and
 // user-defined goals. Session timing/state can only be changed via service actions.
 type FitnessEntry struct {

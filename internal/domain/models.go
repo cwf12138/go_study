@@ -253,6 +253,7 @@ type CalendarOverview struct {
 	Tasks       []StudyTask          `json:"tasks"`
 	Todos       []TodoItem           `json:"todos"`
 	MoodEntries []MoodEntry          `json:"mood_entries"`
+	FitnessDays []FitnessDay         `json:"fitness_days"`
 }
 
 type VocabularyStage string

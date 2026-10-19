@@ -214,7 +214,11 @@ func (s *Service) CalendarOverview(ctx context.Context, userID, startValue, endV
 	if err != nil {
 		return domain.CalendarOverview{}, err
 	}
-	overview := domain.CalendarOverview{Start: startValue, End: endValue, PlanBlocks: blocks}
+	fitness, err := s.repo.ListFitness(ctx, userID)
+	if err != nil {
+		return domain.CalendarOverview{}, err
+	}
+	overview := domain.CalendarOverview{Start: startValue, End: endValue, PlanBlocks: blocks, FitnessDays: fitnessCalendarDays(fitness, startValue, endValue)}
 	for day := start; day.Before(end); day = day.AddDate(0, 0, 1) {
 		overview.Days = append(overview.Days, calendarDaySummary(day))
 	}
