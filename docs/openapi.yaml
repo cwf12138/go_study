@@ -6,6 +6,7 @@ info:
 servers:
   - url: http://localhost:8080
 tags:
+  - name: Search
   - name: Care
   - name: Fitness
   - name: AI
@@ -31,6 +32,33 @@ tags:
   - name: Shopping
   - name: Bookmarks
 paths:
+  /api/v1/search:
+    post:
+      tags: [Search]
+      security: [{ bearerAuth: [] }]
+      summary: Search saved content in the current account
+      description: Read-only POST keeps keywords out of the URL; no-store response. Literal case-insensitive AND matching across title, content and tags. Up to four source workers, three-second deadline, best 500 retained results. Recycle-bin content and all time-capsule letters are excluded. Dates filter updated_at inclusively in China Standard Time. Calendar recurrence is not expanded. Partial failures appear as source keys in warnings; all sources failing returns 503.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SearchInput" }
+      responses:
+        "200":
+          description: Matching excerpts, total counts and pagination capped to the best 500 results
+          headers:
+            Cache-Control: { schema: { type: string, const: no-store } }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: "#/components/schemas/SearchResult" }
+        "400": { description: Invalid query, fields, filters or strict JSON }
+        "401": { description: Authentication required }
+        "503": { description: All requested sources unavailable }
+        "504": { description: Search deadline exceeded }
   /api/v1/care-items:
     get:
       tags: [Care]
@@ -3040,6 +3068,54 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
   schemas:
+    SearchSource:
+      type: string
+      enum: [memos, todos, tasks, calendar, moods, inventory, bookmarks, care, fitness, goals]
+    SearchInput:
+      type: object
+      additionalProperties: false
+      required: [query]
+      properties:
+        query: { type: string, minLength: 1, maxLength: 80, description: Trimmed nonblank query; at most eight whitespace-separated literal terms; no NUL }
+        sources:
+          type: array
+          maxItems: 10
+          description: Empty or omitted means all supported sources; duplicate keys are deduplicated
+          items: { $ref: "#/components/schemas/SearchSource" }
+        from: { type: string, default: "", description: Empty or inclusive updated-at start date YYYY-MM-DD, years 2000-2100 }
+        to: { type: string, default: "", description: Empty or inclusive updated-at end date YYYY-MM-DD, years 2000-2100 }
+        include_archived: { type: boolean, default: false }
+        sort: { type: string, enum: [relevance, newest], default: relevance }
+        page: { type: integer, minimum: 1, maximum: 1000, default: 1 }
+        page_size: { type: integer, minimum: 1, maximum: 30, default: 20 }
+    SearchHit:
+      type: object
+      required: [source, id, title, snippet, tags, state, date, archived, updated_at, match_field, score]
+      properties:
+        source: { $ref: "#/components/schemas/SearchSource" }
+        id: { type: string }
+        title: { type: string }
+        snippet: { type: string, description: Whitespace-normalized excerpt of up to 180 runes plus ellipses }
+        tags: { type: array, items: { type: string } }
+        state: { type: string }
+        date: { type: string, description: Associated date when available; not the updated-at filter }
+        archived: { type: boolean }
+        updated_at: { type: string, format: date-time }
+        match_field: { type: string, enum: [标题, 标签, 内容] }
+        score: { type: integer }
+    SearchResult:
+      type: object
+      required: [query, items, total, available, page, page_size, counts, warnings, truncated]
+      properties:
+        query: { type: string }
+        items: { type: array, maxItems: 30, items: { $ref: "#/components/schemas/SearchHit" } }
+        total: { type: integer, minimum: 0 }
+        available: { type: integer, minimum: 0, maximum: 500 }
+        page: { type: integer, minimum: 1, description: Clamped to the last available page }
+        page_size: { type: integer, minimum: 1, maximum: 30 }
+        counts: { type: object, additionalProperties: { type: integer, minimum: 0 }, description: Match counts for each requested source }
+        warnings: { type: array, items: { $ref: "#/components/schemas/SearchSource" } }
+        truncated: { type: boolean, description: Total matches exceed the retained 500-hit limit }
     SaveCareInput:
       type: object
       additionalProperties: false

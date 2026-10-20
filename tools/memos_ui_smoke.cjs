@@ -17,7 +17,7 @@ const selectors = [...script.matchAll(/\$\("#([^"]+)"\)/g)].map((match) => match
 const missing = [...new Set(selectors.filter((id) => !ids.has(id)))];
 if (missing.length) throw new Error(`memos.js references missing HTML ids: ${missing.join(", ")}`);
 
-for (const marker of ['data-view="memos"', 'id="panel-memos"', 'id="memo-editor"', '/static/memos.js?v=20260925-daynest', '/static/memos-refresh.css?v=20260909-1']) {
+for (const marker of ['data-view="memos"', 'id="panel-memos"', 'id="memo-editor"', '/static/memos.js?v=20261020-search', '/static/memos-refresh.css?v=20260909-1']) {
   if (!html.includes(marker)) throw new Error(`missing HTML marker: ${marker}`);
 }
 for (const marker of ["/api/v1/memo-folders", "/api/v1/memos/overview", "/restore", "/duplicate", "/permanent", "saveCurrent", "renderMarkdown"]) {
@@ -36,7 +36,8 @@ function element() {
 }
 const elements = new Map();
 const getElement = (selector) => { if (!elements.has(selector)) elements.set(selector, element()); return elements.get(selector); };
-const document = { querySelector: getElement, querySelectorAll() { return []; }, addEventListener() {}, createElement() { return element(); } };
+const documentEvents = {};
+const document = { querySelector: getElement, querySelectorAll() { return []; }, addEventListener(k, f) { documentEvents[k] = f; }, createElement() { return element(); } };
 const window = { setTimeout() {}, clearTimeout() {}, addEventListener() {}, confirm() { return false; }, prompt() { return null; } };
 class HeadersMock { set() {} }
 class BlobMock {}
@@ -97,6 +98,19 @@ async function checkSaving() {
   api.state.query='new';await api.loadMemos();releaseOld();await oldLoad;
   if(api.state.notes[0]?.title!=='new')throw new Error('new search was ignored or overwritten by old results');
   console.log('memo request regression passed: latest note selection and search win');
+  context.fetch = async url => response(url === '/api/v1/memos/exact-archived'
+    ? {id:'exact-archived',title:'同名记录',content:'requested body',archived:true}
+    : url.includes('overview') ? {} : []);
+  await documentEvents['daynest:open-search-memo']({detail:{id:'exact-archived',archived:true}});
+  if(api.state.current?.id !== 'exact-archived' || api.state.view !== 'archived' || getElement('#memo-content').value !== 'requested body') {
+    throw new Error('exact global search result was replaced by an empty/truncated list');
+  }
+  context.fetch=async()=>{throw new Error('offline');};
+  getElement('#memo-content').value='unsaved before search';api.markDirty();
+  await documentEvents['daynest:open-search-memo']({detail:{id:'another-record',archived:false}});
+  if(api.state.current?.id!=='exact-archived'||!api.state.dirty||getElement('#memo-content').value!=='unsaved before search')throw new Error('search navigation discarded failed-save edits');
+  api.state.dirty=false;
+  console.log('memo global search regression passed: exact archived ID survives empty list; failed saves preserve edits');
   const assert = require('node:assert/strict');
   context.fetch=async()=>({ok:false,status:404,json:async()=>({error:{code:'not_found'}})});
   await assert.rejects(api.memoAPI('/api/v1/memos/missing'),/已不存在/);

@@ -68,7 +68,7 @@
     return `/api/v1/memos?${query}`;
   }
 
-  async function loadMemos({ preserveSelection = true } = {}) {
+  async function loadMemos({ preserveSelection = true, preserveOpenedRecord = false } = {}) {
     if (!syncAccount()) return;
     const version = ++loadVersion, token = state.token;
     state.loading = false;
@@ -87,10 +87,10 @@
       renderMemos();
       // Fetching a list must not replace text typed while the request was running.
       if (state.dirty || selectedVersion !== selectionVersion) return;
-      const keep = previousID && state.notes.some((note) => note.id === previousID);
+      const keep = previousID && (state.notes.some((note) => note.id === previousID) || (preserveOpenedRecord && state.current?.id === previousID));
       if (keep && (!state.current || state.current.id !== previousID)) await selectMemo(previousID, { skipSave: true });
       else if (!keep && state.notes.length) await selectMemo(state.notes[0].id, { skipSave: true });
-      else if (!state.notes.length) clearEditor();
+      else if (!keep && !state.notes.length) clearEditor();
     } catch (error) {
       if (version !== loadVersion || token !== state.token) return;
       notify(error.message, "error");
@@ -362,6 +362,20 @@
   function folderColorValue(color) { return { yellow: "#e8b846", orange: "#e7924c", rose: "#de758c", violet: "#8d78d4", blue: "#6595df", mint: "#54b991", gray: "#929cab" }[color] || "#6595df"; }
 
   function bindEvents() {
+    document.addEventListener("daynest:open-search-memo", async event => {
+      const token = syncAccount(), id = event.detail?.id;
+      if (!token || typeof id !== "string" || !/^[a-zA-Z0-9_-]+$/.test(id)) return;
+      if (state.dirty && !(await saveCurrent({ quiet: true }))) return;
+      if (token !== (localStorage.getItem("studyflow.token") || "")) return;
+      window.clearTimeout(state.searchTimer);
+      loadVersion++; // Invalidate the navigation list request before opening an exact ID.
+      state.view = event.detail.archived ? "archived" : "all";
+      state.folderID = ""; state.tag = ""; state.query = "";
+      $("#memo-search").value = "";
+      await selectMemo(id);
+      if (token !== (localStorage.getItem("studyflow.token") || "") || state.dirty || state.current?.id !== id) return;
+      await loadMemos({ preserveSelection: true, preserveOpenedRecord: true });
+    });
     document.addEventListener("daynest:search-memos", async event => {
       const token = syncAccount();
       if (!token || typeof event.detail?.query !== "string") return;
