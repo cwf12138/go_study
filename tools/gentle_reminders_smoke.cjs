@@ -1,10 +1,11 @@
 /* No real notifications, user records or network: deterministic browser harness. */
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 process.env.TZ='Asia/Shanghai';
-const root='internal/httpapi/assets/',html=fs.readFileSync(root+'index.html','utf8'),core=fs.readFileSync(root+'gentle-reminders-core.js','utf8'),script=fs.readFileSync(root+'gentle-reminders.js','utf8'),css=fs.readFileSync(root+'gentle-reminders.css','utf8');
+const root='internal/httpapi/assets/',html=fs.readFileSync(root+'index.html','utf8'),core=fs.readFileSync(root+'gentle-reminders-core.js','utf8'),motion=fs.readFileSync(root+'gentle-reminders-motion.js','utf8'),script=fs.readFileSync(root+'gentle-reminders.js','utf8'),css=fs.readFileSync(root+'gentle-reminders.css','utf8');
 const ids=new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]));
 for(const [,id]of script.matchAll(/\$\('([^']+)'\)/g))assert(ids.has('gr-'+id),'missing DOM '+id);
-for(const f of ['gentle-reminders-core.js','gentle-reminders.js','gentle-reminders.css'])assert(html.includes('/static/'+f));
+for(const f of ['gentle-reminders-core.js','gentle-reminders-motion.js','gentle-reminders.js','gentle-reminders.css'])assert(html.includes('/static/'+f));
+assert(html.indexOf('/static/gentle-reminders-motion.js')<html.indexOf('/static/gentle-reminders.js'));
 assert(html.indexOf('/static/gentle-reminders-core.js')<html.indexOf('/static/gentle-reminders.js'));
 assert(!html.includes('data-view="gentle-reminders"'),'reminders should not add a sidebar page');
 for(const marker of ['prefers-reduced-motion','data-theme="dark"','max-width:760px','focus-visible','[hidden]'])assert(css.includes(marker));
@@ -18,23 +19,48 @@ class Clock extends Date{constructor(...a){super(...(a.length?a:[now]));}static 
 class Notice{static permission='granted';static async requestPermission(){permissionRequests++;return this.permission;}constructor(title,options){this.title=title;this.options=options;this.closed=false;sent.push(this);}close(){this.closed=true;}}
 const settle=async()=>{for(let i=0;i<8;i++)await new Promise(r=>setImmediate(r));};
 function browser({withLocks=true}={}){
-  const nodes=new Map(),events={},winEvents={},observers=[];let focused=true;
+  const nodes=new Map(),events={},winEvents={},observers=[];let focused=true,generated=0;
   const doc={hidden:false,activeElement:null,hasFocus:()=>focused,contains:()=>true,getElementById:node,addEventListener(k,f){(events[k]??=[]).push(f);}};
   function node(id){if(nodes.has(id))return nodes.get(id);const match=html.match(new RegExp('<[^>]*\\bid="'+id+'"[^>]*>')),tag=match?.[0]||'',classes=new Set((tag.match(/class="([^"]+)"/)?.[1]||'').split(/\s+/));
     const n={id,value:tag.match(/\bvalue="([^"]*)"/)?.[1]||'',checked:/\bchecked\b/.test(tag),hidden:/\bhidden\b/.test(tag),disabled:/\bdisabled\b/.test(tag),textContent:'',innerHTML:'',open:false,style:{},dataset:{},handlers:{},contains:()=>false,classList:{contains:c=>classes.has(c),add:c=>classes.add(c),remove:c=>classes.delete(c)},setAttribute(k,v){this[k]=v;},addEventListener(k,f){(this.handlers[k]??=[]).push(f);},close(){this.open=false;},showModal(){this.open=true;},focus(){doc.activeElement=this;}};
-    if(id==='gr-snooze-minutes')n.value='5';nodes.set(id,n);return n;}
+    if(id==='gr-snooze-minutes')n.value='5';nodes.set(id,n);
+    n.children=[];n.inert=false;n.scrollHeight=240;n.getBoundingClientRect=()=>({height:80});
+    n.append=child=>{child.parent=n;child.removed=false;n.children.push(child);};
+    n.close=()=>{const was=n.open;n.open=false;if(was)for(const f of n.handlers.close||[])f();};
+    n.remove=()=>{n.removed=true;if(n.parent)n.parent.children=n.parent.children.filter(c=>c!==n);n.parent=null;};
+    n.contains=child=>!!child&&(child===n||n.children.some(c=>c.contains(child)));
+    n.closest=selector=>selector==='.gr-nudge-item'?(n.className?.includes('gr-nudge-item')?n:n.parent?.closest(selector)):null;
+    function buttons(markup){return [...markup.matchAll(/<button\b[^>]*>/g)].map(([tag],i)=>{const b=node(id+'-button-'+i);b.dataset={};for(const [,key,value]of tag.matchAll(/data-gr-(action|preset|step)="([^"]*)"/g))b.dataset['gr'+key[0].toUpperCase()+key.slice(1)]=value;for(const field of ['kind','cycle']){const m=tag.match(new RegExp('data-'+field+'="([^"]*)"'));if(m)b.dataset[field]=m[1];}b.parent=n;return b;});}
+    let markup='';Object.defineProperty(n,'innerHTML',{get:()=>markup,set:value=>{markup=value;n.children=buttons(value);}});
+    n.querySelectorAll=selector=>{if(id==='gr-form'){const type=selector.includes('preset')?'preset':'step';if(!n._formButtons)n._formButtons=buttons(html.match(/<form id="gr-form">([\s\S]*?)<\/form>/)[1]);return n._formButtons.filter(b=>Object.hasOwn(b.dataset,type==='preset'?'grPreset':'grStep'));}return n.children;};
+    n.querySelector=selector=>selector==='summary'?node(id+'-summary'):selector==='.gr-disclosure-body'?node(id+'-body'):n.children.find(b=>selector.includes(b.dataset.grAction));
+    return n;}
+  doc.createElement=()=>node('generated-'+(++generated));
+  doc.contains=n=>!!n&&!n.removed;
   node('app-view').classList.remove('hidden');
   const localStorage={getItem:k=>store.get(k)??null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k)};
   const navigator={locks:withLocks?{request(name,fn){const result=(lockQueues.get(name)||Promise.resolve()).catch(()=>{}).then(fn);lockQueues.set(name,result);return result;}}:undefined};
   const win={isSecureContext:true,setInterval(){},focus(){focused=true;},addEventListener(k,f){(winEvents[k]??=[]).push(f);}};
   const ctx=vm.createContext({console,Date:Clock,Intl,Number,JSON,Math,window:win,document:doc,navigator,localStorage,Notification:Notice,atob:x=>Buffer.from(x,'base64').toString(),confirm:()=>true,MutationObserver:class{constructor(f){observers.push(f);}observe(){} }});
   vm.runInContext(core,ctx);
+  vm.runInContext(motion,ctx);
   vm.runInContext(script.replace('  formFromData(); sync(); render(); tick(); window.setInterval(tick,1000);','  window.testing={get data(){return data;},get owner(){return owner;},get dirty(){return dirty;},read,act,tick,sync,render,open,signedOut,transaction}; formFromData(); sync(); render(); tick(); window.setInterval(tick,1000);'),ctx);
   return {C:win.DaynestReminders,A:win.testing,node,doc,events,winEvents,ctx,focus:v=>{focused=v;},fire:async(id,event='click',arg={})=>{for(const f of node(id).handlers[event]||[])await f({preventDefault(){},target:{closest:()=>null},...arg});await settle();},storage:async k=>{for(const f of winEvents.storage||[])f({key:k});await settle();}};
 }
 (async()=>{
  const b=browser();await settle();const {C,A}=b,M=C.MINUTE,start=now;
  assert(!A.data.running);assert.equal(permissionRequests,0);assert.equal(store.get(key('alice')),undefined);
+ await b.fire('gr-trigger','click',{currentTarget:b.node('gr-trigger')});assert(b.node('gr-dialog').open);
+ await b.fire('gr-dialog','cancel');assert(!b.node('gr-dialog').open);assert.equal(b.doc.activeElement,b.node('gr-trigger'),'Esc should restore the actual opener');
+ await b.fire('gr-settings-summary');assert(b.node('gr-settings').open);assert.equal(b.node('gr-settings-summary')['aria-expanded'],'true');
+ const preset=b.node('gr-form').querySelectorAll('[data-gr-preset]').find(b=>b.dataset.grPreset==='water:30');
+ await b.fire('gr-form','click',{target:{closest:()=>preset}});assert.equal(b.node('gr-water-minutes').value,'30');assert.equal(preset['aria-pressed'],'true');assert(A.dirty);
+ const plus=b.node('gr-form').querySelectorAll('[data-gr-step]').find(b=>b.dataset.grStep==='water:5');
+ await b.fire('gr-form','click',{target:{closest:()=>plus}});assert.equal(b.node('gr-water-minutes').value,'35');
+ b.node('gr-water-minutes').value='180';await b.fire('gr-form','input');assert(plus.disabled);assert.equal(b.node('gr-water-minutes').value,'180');
+ b.node('gr-water-enabled').checked=false;b.node('gr-water-minutes').value='';b.node('gr-window-start').value='';await b.fire('gr-form','input');assert(b.node('gr-water-minutes').disabled);assert(b.node('gr-window-start').disabled);
+ await b.fire('gr-form','submit');assert(!A.dirty,'disabled incomplete inputs must not trap the user in an unsavable form');assert(!A.data.channels.water.enabled);
+ await b.fire('gr-reload');b.node('gr-water-enabled').checked=true;b.node('gr-water-minutes').value='45';await b.fire('gr-form','input');await b.fire('gr-form','submit');
  assert.throws(()=>C.parse('{broken'));
  assert.throws(()=>C.parse(JSON.stringify({...C.fresh(),history:[{kind:'x',at:now}]})));
  for(const minutes of [0,4,181,5.2,NaN,Infinity]){const s=C.fresh();s.channels.water.minutes=minutes;assert.throws(()=>C.validateSettings(s));}
@@ -64,7 +90,8 @@ function browser({withLocks=true}={}){
  // Both due after a long suspension: only one pending item per channel, never a backlog.
  now+=10*24*60*M;await A.tick();assert.equal(A.data.history.length,0);assert(A.data.channels.water.pendingAt&&A.data.channels.move.pendingAt);
  const pendingAt=A.data.channels.water.pendingAt;await A.tick();assert.equal(A.data.channels.water.pendingAt,pendingAt);assert.equal(sent.length,0);
- await A.act('skip','water',A.data.channels.water.cycle);assert.equal(A.data.history.length,0);assert(!A.data.channels.water.pendingAt);
+ const moveNode=b.node('gr-nudge-items').children.find(n=>n.className==='gr-nudge-item gr-move');assert(moveNode);
+ await A.act('skip','water',A.data.channels.water.cycle);assert.equal(A.data.history.length,0);assert(!A.data.channels.water.pendingAt);assert(b.node('gr-nudge-items').children.includes(moveNode),'unrelated reminder DOM must survive an acknowledgement');
  // Local quiet hours suppress, but don't fake a completion or silently lose a due reminder.
  let quiet=JSON.parse(JSON.stringify(A.data));quiet.window={enabled:true,start:'00:00',end:'00:01'};
  await A.transaction((s,t)=>C.change(s,{type:'settings',settings:quiet,configRevision:s.configRevision},t));await A.tick();assert(b.node('gr-nudge').hidden);assert(A.data.channels.move.pendingAt);

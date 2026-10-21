@@ -1,7 +1,7 @@
 (() => {
   'use strict';
-  const C = window.DaynestReminders, $ = id => document.getElementById('gr-' + id);
-  if (!C || !$('dialog')) return;
+  const C = window.DaynestReminders, M = window.DaynestReminderMotion, $ = id => document.getElementById('gr-' + id);
+  if (!C || !M || !$('dialog')) return;
   const app = document.getElementById('app-view'), locks = !!navigator.locks?.request;
   const icons = {
     water: '<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><path d="M24 5S11 20 11 29a13 13 0 0 0 26 0C37 20 24 5 24 5Z" fill="currentColor" opacity=".15"/><path d="M24 7S12 21 12 29a12 12 0 0 0 24 0C36 21 24 7 24 7Z" stroke="currentColor" stroke-width="2.2"/><path d="M18 29a6 6 0 0 0 6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
@@ -10,7 +10,8 @@
   const names = { water: '喝一点水', move: '起身活动' }, dones = { water: '喝过了', move: '活动过了' };
   let owner = '', epoch = 0, data = C.fresh(), dirty = false, editingRevision = 0, busy = false, working = false;
   let storageError = false, nudgeKey = '', historyKey = '', permissionBusy = false;
-  const notifications = new Map();
+  let dialogOpener = null, restoreFocus = false;
+  const notifications = new Map(), nudgeRows = new Map();
   function identity() {
     if (app.classList.contains('hidden')) return '';
     try {
@@ -41,11 +42,13 @@
     $('error').textContent = message; $('error').hidden = !message;
   }
   function clean() {
+    M.reset(); restoreFocus = false; dialogOpener = null; nudgeRows.clear();
     epoch++; closeNotifications(); $('dialog').close(); $('nudge').hidden = true;
     $('nudge-items').innerHTML = $('announcement').textContent = $('history-list').innerHTML = '';
     $('save-status').textContent = $('action-status').textContent = ''; owner = ''; dirty = false; working = false; busy = false;
     permissionBusy = false; storageError = false; nudgeKey = historyKey = ''; data = C.fresh(); error();
-    $('snooze-minutes').value = '5'; $('settings').open = false;
+    $('snooze-minutes').value = '5'; $('settings').open = $('history').open = false;
+    for (const id of ['settings','history']) $(id).querySelector('summary')?.setAttribute('aria-expanded','false');
     formFromData(); render();
   }
   function sync() {
@@ -97,13 +100,36 @@
     $('defer-focus').checked = data.deferFocus; $('window-enabled').checked = data.window.enabled;
     $('window-start').value = data.window.start; $('window-end').value = data.window.end;
     $('snooze-minutes').value = String(data.snoozeMinutes);
-    $('window-fields').hidden = !data.window.enabled; editingRevision = data.configRevision; dirty = false;
+    M.reveal($('window-fields'),data.window.enabled,true); editingRevision = data.configRevision; dirty = false;
+    draftControls();
+  }
+  function draftControls() {
+    for (const kind of C.KINDS) $(kind+'-minutes').disabled = !$(kind+'-enabled').checked;
+    $('window-start').disabled = $('window-end').disabled = !$('window-enabled').checked;
+    for (const b of $('form').querySelectorAll('[data-gr-preset]')) {
+      const [kind,value] = b.dataset.grPreset.split(':');
+      b.setAttribute('aria-pressed',String(Number($(kind+'-minutes').value) === Number(value)));
+      b.disabled = busy || !$(kind+'-enabled').checked;
+    }
+    for (const b of $('form').querySelectorAll('[data-gr-step]')) {
+      const [kind,step] = b.dataset.grStep.split(':'), value = Number($(kind+'-minutes').value);
+      b.disabled = busy || !$(kind+'-enabled').checked || (Number(step)<0 ? value<=5 : value>=180);
+    }
+  }
+  function draftChanged() {
+    dirty = true; $('save-status').textContent = '设置尚未保存。';
+    const fields = $('window-fields'), show = $('window-enabled').checked;
+    M.reveal(fields,show); draftControls();
   }
   function settings() {
     const channels = {};
-    for (const kind of C.KINDS) channels[kind] = { enabled: $(kind+'-enabled').checked, minutes: Number($(kind+'-minutes').value) };
+    for (const kind of C.KINDS) {
+      const enabled = $(kind+'-enabled').checked, minutes = Number($(kind+'-minutes').value);
+      channels[kind] = {enabled,minutes:!enabled && (!Number.isInteger(minutes) || minutes<5 || minutes>180) ? data.channels[kind].minutes : minutes};
+    }
+    const windowEnabled = $('window-enabled').checked;
     return { channels, deferFocus: $('defer-focus').checked, notifications: data.notifications, snoozeMinutes:Number($('snooze-minutes').value),
-      window: {enabled: $('window-enabled').checked, start: $('window-start').value, end: $('window-end').value} };
+      window: {enabled:windowEnabled,start:$('window-start').value || (!windowEnabled ? data.window.start : ''),end:$('window-end').value || (!windowEnabled ? data.window.end : '')} };
   }
   function notificationLabel() {
     const permission = typeof Notification === 'undefined' ? '' : Notification.permission;
@@ -124,6 +150,8 @@
       block === 'focus' ? '倒计时照常进行；到点后，等到专注暂停、休息或结束再提醒。' : '不抢焦点、不强制休息。完成后再开始下一轮。';
     $('state-dot').dataset.state = storageError || !data.running ? 'paused' : block ? 'quiet' : 'running';
     $('toggle').textContent = data.running ? '暂停全部' : '开始 / 继续';
+    $('toggle').setAttribute('aria-pressed',String(data.running));
+    $('toggle').dataset.playing = String(data.running);
     $('toggle').disabled = busy || storageError || !owner;
     $('trigger').dataset.state = storageError || !data.running ? 'paused' : due.length ? 'due' : 'running';
     const nearest = Math.min(...enabled.map(k => C.remaining(data,k,now)));
@@ -131,13 +159,14 @@
     $('dot').hidden = !due.length; $('trigger').setAttribute('aria-label', '轻提醒：'+$('caption').textContent);
     for (const kind of C.KINDS) {
       const c = data.channels[kind], remain = C.remaining(data,kind,now), isDue = due.includes(kind);
+      $(kind+'-card').dataset.state = storageError || !c.enabled ? 'off' : !data.running ? 'paused' : isDue ? 'due' : block ? 'quiet' : 'running';
       $(kind+'-interval').textContent = c.enabled ? `每 ${c.minutes} 分钟` : '已关闭这项提醒';
       $(kind+'-clock').textContent = storageError || !c.enabled ? '—' : C.duration(remain);
       $(kind+'-badge').textContent = storageError ? '已停止' : !c.enabled ? '已关闭' : !data.running ? '已暂停' : c.pendingAt ? (block ? '待提醒' : '到时间了') : block === 'quiet' ? '免打扰' : '计时中';
       $(kind+'-badge').dataset.due = String(isDue);
       $(kind+'-status').textContent = !c.enabled ? '可在下方设置中重新开启。' : c.pendingAt ? block === 'focus' ? '已到时间，等专注告一段落。' : block === 'quiet' ? '已到时间，等到可提醒时段。' : '现在、稍后，或跳过这一次，都可以。' :
         !data.running ? '已暂停，剩余时间会保留。' : kind === 'water' ? '按自己的需要，补充一点水。' : '离开椅子，换一个姿势。';
-      $(kind+'-bar').style.width = `${c.enabled ? Math.min(100,Math.max(0,100-remain/(c.minutes*C.MINUTE)*100)) : 0}%`;
+      $(kind+'-bar').style.transform = `scaleX(${c.enabled ? Math.min(1,Math.max(0,1-remain/(c.minutes*C.MINUTE))) : 0})`;
       const justDone = data.history.some(h=>h.kind===kind && now>=h.at && now-h.at<2000);
       $(kind+'-done').disabled = busy || storageError || !owner || !c.enabled || justDone;
       $(kind+'-done').textContent = justDone ? '✓ 已记录' : dones[kind];
@@ -157,17 +186,40 @@
     $('save').disabled = busy || storageError || !owner;
     $('reload').disabled = busy || storageError || !owner;
     $('reset').disabled = busy || !owner;
-    notificationLabel();
-    // Do not replace interactive reminder DOM every second (keyboard focus stays put).
+    notificationLabel(); draftControls();
     const visible = !!owner && !storageError && !document.hidden && (locks || document.hasFocus()) && !$('dialog').open;
-    const nk = visible ? due.map(k => `${k}:${data.channels[k].cycle}`).join('|') + ':' + $('snooze-minutes').value : '';
-    $('nudge').hidden = !visible || !due.length;
+    renderNudge(due,visible);
+    const nk = visible ? due.map(k => `${k}:${data.channels[k].cycle}`).join('|') : '';
     if (nk !== nudgeKey) {
       nudgeKey = nk;
-      $('nudge-items').innerHTML = visible ? due.map(k => `<div class="gr-nudge-item gr-${k}"><span class="gr-art" aria-hidden="true">${icons[k]}</span><div><strong>${names[k]}</strong><p>${k==='water'?'按需要补充一点水。':'起身走走，给身体一点空间。'}</p><div><button type="button" data-gr-action="done" data-kind="${k}" data-cycle="${data.channels[k].cycle}">${dones[k]}</button><button type="button" data-gr-action="snooze" data-kind="${k}" data-cycle="${data.channels[k].cycle}">${$('snooze-minutes').value} 分钟后</button><button type="button" class="gr-link" data-gr-action="skip" data-kind="${k}" data-cycle="${data.channels[k].cycle}">跳过</button></div></div></div>`).join('') : '';
       $('announcement').textContent = visible && due.length ? due.map(k=>names[k]).join('，')+'。可以完成、稍后提醒或跳过。' : '';
     }
     for (const [kind,n] of notifications) if (!due.includes(kind) || !data.notifications) { n.close(); notifications.delete(kind); }
+  }
+  function renderNudge(due, visible) {
+    const clear = () => { for (const row of nudgeRows.values()) M.cancel(row.node); nudgeRows.clear(); $('nudge-items').innerHTML = ''; };
+    // Account changes, hidden pages, errors and modal handoff are immediate.
+    if (!visible) { M.reveal($('nudge'),false,true,clear); return; }
+    if (!due.length) { M.reveal($('nudge'),false,false,clear); return; }
+    M.reveal($('nudge'),true);
+    const wanted = new Set(due.map(k=>`${k}:${data.channels[k].cycle}`));
+    for (const [id,row] of nudgeRows) if (!wanted.has(id) && !row.leaving) {
+      row.leaving = true; row.node.inert = true;
+      M.remove(row.node,() => { row.node.remove(); nudgeRows.delete(id); });
+      // Remaining rows retain their DOM identity and keyboard focus.
+    }
+    for (const kind of due) {
+      const id = `${kind}:${data.channels[kind].cycle}`;
+      let row = nudgeRows.get(id);
+      if (!row) {
+        const node = document.createElement('div'); node.className = `gr-nudge-item gr-${kind}`;
+        node.innerHTML = `<span class="gr-art" aria-hidden="true">${icons[kind]}</span><div><strong>${names[kind]}</strong><p>${kind==='water'?'按需要补充一点水。':'起身走走，给身体一点空间。'}</p><div><button type="button" data-gr-action="done" data-kind="${kind}" data-cycle="${data.channels[kind].cycle}">${dones[kind]}</button><button type="button" data-gr-action="snooze" data-kind="${kind}" data-cycle="${data.channels[kind].cycle}"></button><button type="button" class="gr-link" data-gr-action="skip" data-kind="${kind}" data-cycle="${data.channels[kind].cycle}">跳过</button></div></div>`;
+        row = {node,leaving:false}; nudgeRows.set(id,row); $('nudge-items').append(node);
+      }
+      if (row.leaving) { row.leaving = false; M.cancel(row.node); row.node.inert = false; M.pulse(row.node); }
+      for (const b of row.node.querySelectorAll('button')) b.disabled = busy;
+      row.node.querySelector('[data-gr-action="snooze"]').textContent = `${$('snooze-minutes').value} 分钟后`;
+    }
   }
   async function tick() {
     if (!sync() || storageError || working || (!locks && (document.hidden || !document.hasFocus()))) return;
@@ -195,8 +247,9 @@
   }
   async function act(type,kind,cycle) {
     if (busy || !sync()) return;
-    busy = true; render();
     const generation = epoch, previous = document.activeElement, fromNudge = $('nudge').contains(previous);
+    const fromCard = kind && $(kind+'-card').contains(previous);
+    busy = true; render();
     let applied = false;
     const ok = await transaction((s, now) => {
       const next = C.change(s,{type,kind,cycle,minutes:Number($('snooze-minutes').value)},now);
@@ -204,16 +257,40 @@
     }, {start:type==='start'});
     if (generation === epoch) {
       busy = false; render();
-      if (ok) $('action-status').textContent = !applied ? '已载入最新提醒状态。' : type === 'done' ? `${dones[kind]}，已记录。` : type === 'pause' ? '提醒已暂停，剩余时间已保留。' : type === 'start' ? '提醒已开始。' : type === 'snooze' ? `${$('snooze-minutes').value} 分钟后再提醒。` : '已跳过，本轮重新计时。';
-      if (fromNudge && !document.contains(previous)) ($('nudge').hidden ? $('trigger') : $('nudge-open')).focus();
+      if (ok) {
+        $('action-status').textContent = !applied ? '已载入最新提醒状态。' : type === 'done' ? `✓ ${dones[kind]}，下一轮已准备好。` : type === 'pause' ? 'Ⅱ 已暂停，剩余时间会为你保留。' : type === 'start' ? '▷ 提醒已开始，按自己的节奏就好。' : type === 'snooze' ? `◷ 好的，${$('snooze-minutes').value} 分钟后再提醒。` : '已跳过，下次再照顾自己。';
+        M.pulse($('action-status'));
+        if (applied && kind) {
+          M.pulse($(kind+'-'+(type==='done'?'icon':'clock')),type==='done'?'confirm':'settle');
+          if (type==='done') M.pulse($(kind+'-count'),'confirm');
+        }
+      }
+      if (fromNudge && (!document.contains(previous) || $('nudge').inert || previous?.closest?.('.gr-nudge-item')?.inert)) ($('nudge').inert ? $('trigger') : $('nudge-open')).focus();
+      else if (fromCard && (previous.hidden || previous.disabled)) $(kind+'-card').focus({preventScroll:true});
     }
   }
-  function open() { if (!sync()) return; if (!$('dialog').open) $('dialog').showModal(); render(); }
+  function open(event) {
+    if (!sync()) return;
+    if ($('dialog').open && $('dialog').dataset.motion !== 'closing') return;
+    if (!$('dialog').open) dialogOpener = event?.currentTarget || $('trigger');
+    restoreFocus = true; M.dialog($('dialog'),true); render();
+  }
+  function close() { M.dialog($('dialog'),false); }
   $('trigger').addEventListener('click', open); $('nudge-open').addEventListener('click', open);
-  $('close').addEventListener('click', () => $('dialog').close());
-  $('dialog').addEventListener('close', () => { render(); $('trigger').focus(); });
+  $('close').addEventListener('click',close);
+  $('dialog').addEventListener('cancel',event => { event.preventDefault(); close(); });
+  $('dialog').addEventListener('close', () => {
+    if ($('dialog').open) return;
+    M.cancel($('dialog')); render();
+    if (restoreFocus && owner && identity() === owner) {
+      const target = dialogOpener && document.contains(dialogOpener) && !dialogOpener.disabled && !dialogOpener.hidden ? dialogOpener : $('trigger');
+      target.focus({preventScroll:true});
+    }
+    restoreFocus = false;
+  });
   $('toggle').addEventListener('click', () => { if (dirty && !data.running) { error('先保存或重新载入正在编辑的设置，再开始提醒。'); return; } act(data.running?'pause':'start'); });
   for (const kind of C.KINDS) {
+    $(kind+'-card').tabIndex = -1;
     $(kind+'-icon').innerHTML = icons[kind];
     for (const type of ['done','snooze','skip']) $(kind+'-'+type).addEventListener('click', () => act(type,kind,data.channels[kind].cycle));
   }
@@ -221,11 +298,18 @@
     const b = e.target.closest('[data-gr-action]');
     if (b) act(b.dataset.grAction,b.dataset.kind,Number(b.dataset.cycle));
   });
-  $('form').addEventListener('input', () => { dirty = true; $('save-status').textContent = '设置尚未保存。'; $('window-fields').hidden = !$('window-enabled').checked; });
+  $('form').addEventListener('input',draftChanged);
   $('form').addEventListener('click', e => {
-    const b = e.target.closest('[data-gr-preset]'); if (!b) return;
-    const [kind,minutes] = b.dataset.grPreset.split(':'); $(kind+'-minutes').value = minutes;
-    dirty = true; $('save-status').textContent = '设置尚未保存。'; $(kind+'-minutes').focus();
+    const b = e.target.closest('[data-gr-preset],[data-gr-step]'); if (!b || b.disabled) return;
+    if (b.dataset.grPreset) {
+      const [kind,minutes] = b.dataset.grPreset.split(':'); $(kind+'-minutes').value = minutes;
+    } else {
+      const [kind,step] = b.dataset.grStep.split(':'), field = $(kind+'-minutes');
+      const value = field.value.trim() && Number.isFinite(Number(field.value)) ? Number(field.value) : data.channels[kind].minutes;
+      field.value = String(Math.max(5,Math.min(180,Math.round(value)+Number(step))));
+    }
+    draftChanged();
+    if (b.disabled && b.dataset.grStep) $(b.dataset.grStep.split(':')[0]+'-minutes').focus({preventScroll:true});
   });
   $('snooze-minutes').addEventListener('change', render);
   $('form').addEventListener('submit', async e => {
@@ -235,7 +319,7 @@
     const ok = await transaction((s,now)=>C.change(s,{type:'settings',settings:value,configRevision:revision},now));
     if (generation !== epoch) return;
     busy = false;
-    if (ok) { formFromData(); $('save-status').textContent = '已保存在本机。'+(data.running?'提醒继续运行。':'点击“开始 / 继续”启用。'); }
+    if (ok) { formFromData(); $('save-status').textContent = '✓ 已保存在本机。'+(data.running?'提醒继续运行。':'点击“开始 / 继续”启用。'); M.pulse($('save-status')); }
     render();
   });
   $('reload').addEventListener('click', () => {
@@ -278,5 +362,6 @@
   });
   new MutationObserver(() => { sync(); }).observe(app,{attributes:true,attributeFilter:['class']});
   $('capability').textContent = locks ? '支持多标签页串行更新：同一轮系统通知最多发出一次，重复确认不会重复计数。' : '此环境不支持跨标签页锁：仅前台窗口显示网页提醒，系统通知关闭。建议只打开一个日常页面。';
+  M.disclosure($('settings')); M.disclosure($('history'));
   formFromData(); sync(); render(); tick(); window.setInterval(tick,1000);
 })();

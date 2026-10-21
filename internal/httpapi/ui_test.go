@@ -45,6 +45,7 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 	}
 	for _, asset := range []struct{ name, marker, contentType string }{
 		{"gentle-reminders-core.js", "window.DaynestReminders", "javascript"},
+		{"gentle-reminders-motion.js", "window.DaynestReminderMotion", "javascript"},
 		{"gentle-reminders.js", "daynest:focus-changed", "javascript"},
 		{"gentle-reminders.css", ".gr-dialog", "text/css"},
 	} {

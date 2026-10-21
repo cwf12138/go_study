@@ -51,7 +51,7 @@
     <link rel="stylesheet" href="/static/care.css?v=20261020-1">
     <link rel="stylesheet" href="/static/content-search.css?v=20261020-1">
     <link rel="stylesheet" href="/static/transfers.css?v=20261021-1">
-    <link rel="stylesheet" href="/static/gentle-reminders.css?v=20261022-1">
+    <link rel="stylesheet" href="/static/gentle-reminders.css?v=20261022-motion-2">
     <link rel="stylesheet" href="/static/layout.css?v=20260922-1">
   </head>
   <body>
@@ -812,23 +812,23 @@
         <div class="gr-overview"><div><span id="gr-state-dot" aria-hidden="true"></span><div><strong id="gr-state">准备好，再开始</strong><p id="gr-state-help">默认不开启提醒，由你决定节奏。</p></div></div><button id="gr-toggle" class="gr-primary" type="button">开始提醒</button></div>
         <p id="gr-error" class="gr-error" role="alert" hidden></p>
         <div class="gr-cards">
-          <article class="gr-card gr-water"><div class="gr-card-title"><span id="gr-water-icon" class="gr-art" aria-hidden="true"></span><div><h3>喝一点水</h3><p id="gr-water-interval">每 45 分钟</p></div><span id="gr-water-badge" class="gr-badge">未开始</span></div><div class="gr-clock"><strong id="gr-water-clock">45:00</strong><span id="gr-water-status">按自己的需要，补充一点水。</span></div><div class="gr-meter" aria-hidden="true"><span id="gr-water-bar"></span></div><div class="gr-card-actions"><button id="gr-water-done" type="button">喝过了</button><button id="gr-water-snooze" type="button" hidden>稍后提醒</button><button id="gr-water-skip" class="gr-link" type="button" hidden>跳过</button></div></article>
-          <article class="gr-card gr-move"><div class="gr-card-title"><span id="gr-move-icon" class="gr-art" aria-hidden="true"></span><div><h3>起身活动</h3><p id="gr-move-interval">每 60 分钟</p></div><span id="gr-move-badge" class="gr-badge">未开始</span></div><div class="gr-clock"><strong id="gr-move-clock">60:00</strong><span id="gr-move-status">离开椅子，换一个姿势。</span></div><div class="gr-meter" aria-hidden="true"><span id="gr-move-bar"></span></div><div class="gr-card-actions"><button id="gr-move-done" type="button">活动过了</button><button id="gr-move-snooze" type="button" hidden>稍后提醒</button><button id="gr-move-skip" class="gr-link" type="button" hidden>跳过</button></div></article>
+          <article id="gr-water-card" class="gr-card gr-water"><div class="gr-card-title"><span id="gr-water-icon" class="gr-art" aria-hidden="true"></span><div><h3>喝一点水</h3><p id="gr-water-interval">每 45 分钟</p></div><span id="gr-water-badge" class="gr-badge">未开始</span></div><div class="gr-clock"><strong id="gr-water-clock">45:00</strong><span id="gr-water-status">按自己的需要，补充一点水。</span></div><div class="gr-meter" aria-hidden="true"><span id="gr-water-bar"></span></div><div class="gr-card-actions"><button id="gr-water-done" type="button">喝过了</button><button id="gr-water-snooze" type="button" hidden>稍后提醒</button><button id="gr-water-skip" class="gr-link" type="button" hidden>跳过</button></div></article>
+          <article id="gr-move-card" class="gr-card gr-move"><div class="gr-card-title"><span id="gr-move-icon" class="gr-art" aria-hidden="true"></span><div><h3>起身活动</h3><p id="gr-move-interval">每 60 分钟</p></div><span id="gr-move-badge" class="gr-badge">未开始</span></div><div class="gr-clock"><strong id="gr-move-clock">60:00</strong><span id="gr-move-status">离开椅子，换一个姿势。</span></div><div class="gr-meter" aria-hidden="true"><span id="gr-move-bar"></span></div><div class="gr-card-actions"><button id="gr-move-done" type="button">活动过了</button><button id="gr-move-snooze" type="button" hidden>稍后提醒</button><button id="gr-move-skip" class="gr-link" type="button" hidden>跳过</button></div></article>
         </div>
         <div class="gr-today"><div><span>今天的小停顿</span><strong><b id="gr-water-count">0</b> 次饮水 <i>·</i> <b id="gr-move-count">0</b> 次活动</strong></div><span>只记录你的确认，不自动打卡</span></div>
-        <p id="gr-action-status" class="gr-sr-only" role="status" aria-live="polite"></p>
+        <p id="gr-action-status" class="gr-feedback" role="status" aria-live="polite" aria-atomic="true"></p>
         <details class="gr-settings" id="gr-settings"><summary>调整提醒节奏 <span>间隔 · 专注联动 · 免打扰</span></summary>
-          <form id="gr-form">
-            <div class="gr-settings-grid"><div><label class="gr-check"><input id="gr-water-enabled" type="checkbox" checked>饮水提醒</label><label class="gr-interval-label" for="gr-water-minutes">间隔（分钟）</label><input id="gr-water-minutes" type="number" min="5" max="180" step="1" value="45" required><div class="gr-presets" role="group" aria-label="饮水间隔快捷选项"><button type="button" data-gr-preset="water:30">30 分钟</button><button type="button" data-gr-preset="water:45">45 分钟</button><button type="button" data-gr-preset="water:60">60 分钟</button></div></div><div><label class="gr-check"><input id="gr-move-enabled" type="checkbox" checked>活动提醒</label><label class="gr-interval-label" for="gr-move-minutes">间隔（分钟）</label><input id="gr-move-minutes" type="number" min="5" max="180" step="1" value="60" required><div class="gr-presets" role="group" aria-label="活动间隔快捷选项"><button type="button" data-gr-preset="move:30">30 分钟</button><button type="button" data-gr-preset="move:60">60 分钟</button><button type="button" data-gr-preset="move:90">90 分钟</button></div></div></div>
-            <label class="gr-option"><input id="gr-defer-focus" type="checkbox" checked><span><strong>专注时，先不打扰</strong><small>计时照常进行，到点后延至专注暂停、休息或结束；不打断专注会话。</small></span></label>
-            <label class="gr-option"><input id="gr-window-enabled" type="checkbox"><span><strong>只在指定时段提醒</strong><small>使用当前设备的当地时间，支持跨午夜；时段外不弹出提醒。</small></span></label>
+          <div class="gr-disclosure-body"><form id="gr-form">
+            <div class="gr-settings-grid"><div><label class="gr-check"><input id="gr-water-enabled" type="checkbox" role="switch" checked>饮水提醒</label><label class="gr-interval-label" for="gr-water-minutes">间隔（分钟）</label><div class="gr-stepper"><button type="button" data-gr-step="water:-5" aria-label="饮水间隔减少 5 分钟">−</button><input id="gr-water-minutes" type="number" min="5" max="180" step="1" inputmode="numeric" value="45" required><button type="button" data-gr-step="water:5" aria-label="饮水间隔增加 5 分钟">＋</button></div><div class="gr-presets" role="group" aria-label="饮水间隔快捷选项"><button type="button" data-gr-preset="water:30" aria-pressed="false">30 分钟</button><button type="button" data-gr-preset="water:45" aria-pressed="true">45 分钟</button><button type="button" data-gr-preset="water:60" aria-pressed="false">60 分钟</button></div></div><div><label class="gr-check"><input id="gr-move-enabled" type="checkbox" role="switch" checked>活动提醒</label><label class="gr-interval-label" for="gr-move-minutes">间隔（分钟）</label><div class="gr-stepper"><button type="button" data-gr-step="move:-5" aria-label="活动间隔减少 5 分钟">−</button><input id="gr-move-minutes" type="number" min="5" max="180" step="1" inputmode="numeric" value="60" required><button type="button" data-gr-step="move:5" aria-label="活动间隔增加 5 分钟">＋</button></div><div class="gr-presets" role="group" aria-label="活动间隔快捷选项"><button type="button" data-gr-preset="move:30" aria-pressed="false">30 分钟</button><button type="button" data-gr-preset="move:60" aria-pressed="true">60 分钟</button><button type="button" data-gr-preset="move:90" aria-pressed="false">90 分钟</button></div></div></div>
+            <label class="gr-option"><input id="gr-defer-focus" type="checkbox" role="switch" checked><span><strong>专注时，先不打扰</strong><small>计时照常进行，到点后延至专注暂停、休息或结束；不打断专注会话。</small></span></label>
+            <label class="gr-option"><input id="gr-window-enabled" type="checkbox" role="switch"><span><strong>只在指定时段提醒</strong><small>使用当前设备的当地时间，支持跨午夜；时段外不弹出提醒。</small></span></label>
             <div id="gr-window-fields" class="gr-time-fields" hidden><label>开始<input id="gr-window-start" type="time" value="09:00" required></label><span>至</span><label>结束<input id="gr-window-end" type="time" value="22:00" required></label></div>
             <div class="gr-snooze-field"><label for="gr-snooze-minutes">稍后提醒间隔</label><select id="gr-snooze-minutes"><option value="5">5 分钟后</option><option value="10">10 分钟后</option><option value="15">15 分钟后</option></select></div>
             <div class="gr-form-footer"><p>仅修改的间隔会重新计时；未修改的计时不受影响。</p><button id="gr-reload" type="button">重新载入设置</button><button id="gr-save" class="gr-primary" type="submit">保存设置</button></div><p id="gr-save-status" role="status" aria-live="polite"></p>
-          </form>
+          </form></div>
         </details>
         <div class="gr-notifications"><div><strong>想在切换标签页时也收到提示？</strong><p id="gr-notification-status">默认只在网页内提示，不请求系统权限。</p></div><button id="gr-notifications" type="button">开启系统通知</button></div>
-        <details class="gr-history"><summary>今天的记录 <span id="gr-history-count">0 次</span></summary><ol id="gr-history-list"></ol><p>展示今天最近 30 条，本机保留最近 7 天的确认记录；不是饮水量或运动量测量。</p></details>
+        <details id="gr-history" class="gr-history"><summary>今天的记录 <span id="gr-history-count">0 次</span></summary><div class="gr-disclosure-body"><ol id="gr-history-list"></ol><p>展示今天最近 30 条，本机保留最近 7 天的确认记录；不是饮水量或运动量测量。</p></div></details>
         <footer class="gr-footnote"><p>设置与记录仅保存在当前浏览器、当前账号下，不上传服务器、不跨设备同步。退出登录会暂停提醒，登录后需手动继续。</p><p id="gr-capability"></p><p>网页关闭、后台限流或电脑休眠时无法保证准时提醒；不是系统闹钟，也不检测坐姿。间隔仅为可调整示例，不是健康建议。</p><button id="gr-reset" class="gr-link" type="button">清除此账号的本机提醒数据</button></footer>
       </div>
     </dialog>
@@ -842,7 +842,8 @@
     </dialog>
     <script src="/static/app.js?v=20261022-reminders-1" defer></script>
     <script src="/static/gentle-reminders-core.js?v=20261022-1" defer></script>
-    <script src="/static/gentle-reminders.js?v=20261022-1" defer></script>
+    <script src="/static/gentle-reminders-motion.js?v=20261022-motion-2" defer></script>
+    <script src="/static/gentle-reminders.js?v=20261022-motion-2" defer></script>
     <script src="/static/subscriptions-core.js?v=20261011-1" defer></script>
     <script src="/static/subscriptions.js?v=20261011-1" defer></script>
     <script src="/static/inventory.js?v=20261007-shopping" defer></script>
