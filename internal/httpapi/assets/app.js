@@ -207,6 +207,7 @@
   function persistFocus() {
     if (state.focus) localStorage.setItem("studyflow.focus", JSON.stringify(state.focus));
     else localStorage.removeItem("studyflow.focus");
+    document.dispatchEvent(new CustomEvent("daynest:focus-changed"));
   }
 
   function loadDailyFocusGoal() {

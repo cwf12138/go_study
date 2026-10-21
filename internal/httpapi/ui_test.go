@@ -43,6 +43,22 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 	if cacheControl := javascript.Header().Get("Cache-Control"); !strings.Contains(cacheControl, "must-revalidate") {
 		t.Fatalf("javascript cache control = %q", cacheControl)
 	}
+	for _, asset := range []struct{ name, marker, contentType string }{
+		{"gentle-reminders-core.js", "window.DaynestReminders", "javascript"},
+		{"gentle-reminders.js", "daynest:focus-changed", "javascript"},
+		{"gentle-reminders.css", ".gr-dialog", "text/css"},
+	} {
+		t.Run(asset.name, func(t *testing.T) {
+			if !strings.Contains(home.Body.String(), "/static/"+asset.name+"?v=") {
+				t.Fatal("reminder asset is not linked in the app")
+			}
+			r := httptest.NewRecorder()
+			handler.ServeHTTP(r, httptest.NewRequest(http.MethodGet, "/static/"+asset.name+"?v=test", nil))
+			if r.Code != http.StatusOK || !strings.Contains(r.Body.String(), asset.marker) || !strings.Contains(r.Header().Get("Content-Type"), asset.contentType) {
+				t.Fatalf("embedded reminder asset status = %d, type = %q", r.Code, r.Header().Get("Content-Type"))
+			}
+		})
+	}
 
 	for _, mood := range []string{"awful", "low", "neutral", "good", "great"} {
 		t.Run("mood artwork "+mood, func(t *testing.T) {

@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const html = fs.readFileSync('internal/httpapi/assets/index.html', 'utf8');
 const source = fs.readFileSync('internal/httpapi/assets/app.js', 'utf8');
 const elements = new Map();
+const focusEvents = [];
 let clock = Date.parse('2026-09-11T08:00:00Z');
 class Clock extends Date { static now() { return clock; } }
 function element(selector) {
@@ -26,9 +27,10 @@ function element(selector) {
 const presets = [15, 25, 45, 60].map(minutes => { const node = element(`preset-${minutes}`); node.dataset.focusDuration = String(minutes); return node; });
 const context = {
   console, Date: Clock, Intl, URLSearchParams, AbortController,
+  CustomEvent: class { constructor(type) { this.type = type; } },
   Headers: class { set() {} has() { return false; } },
   localStorage: { getItem() { return ''; }, setItem() {}, removeItem() {} },
-  document: { querySelector: element, querySelectorAll: selector => selector === '[data-focus-duration]' ? presets : [] },
+  document: { dispatchEvent(event) { focusEvents.push(event.type); }, querySelector: element, querySelectorAll: selector => selector === '[data-focus-duration]' ? presets : [] },
   window: { setTimeout() {}, clearTimeout() {} },
 };
 const instrumented = source.replace('  bootstrap();', '  refresh=async()=>{}; window.testFocus={state,renderFocus,renderFocusPlan,renderFocusTaskPreview,focusPlanSegments,phaseRemainingSeconds,phaseTotalSeconds,updateFocusClock,startFocus,pauseFocus,resumeFocus,advanceFocus,finishFocus,retryFocusTransition,setFocusQuiet};');
@@ -86,6 +88,7 @@ async function test() {
   assert.equal(element('#focus-clock').textContent, '12:17');
   context.fetch = async () => response(session({ status: 'paused', phase_remaining_seconds: 737 }));
   await app.pauseFocus();
+  assert(focusEvents.includes('daynest:focus-changed'), 'reminders must learn about focus state changes');
   clock += 90000;
   app.updateFocusClock();
   assert.equal(element('#focus-clock').textContent, '12:17', 'paused clock must not advance');
