@@ -12,15 +12,18 @@ import (
 	"github.com/example/studyflow/internal/event"
 	"github.com/example/studyflow/internal/security"
 	"github.com/example/studyflow/internal/service"
+	"github.com/example/studyflow/internal/transfers"
 )
 
 type Server struct {
-	service *service.Service
-	bus     *event.Bus
-	logger  *slog.Logger
-	started time.Time
-	assets  fs.FS
-	chatGPT *chatgpt.Manager
+	service            *service.Service
+	bus                *event.Bus
+	logger             *slog.Logger
+	started            time.Time
+	assets             fs.FS
+	chatGPT            *chatgpt.Manager
+	transfers          *transfers.Store
+	localOnlyTransfers bool
 }
 
 func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.Bus, logger *slog.Logger) http.Handler {
@@ -35,6 +38,8 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 		dataFile = "data/studyflow.json"
 	}
 	s.chatGPT = chatgpt.New(filepath.Join(filepath.Dir(dataFile), "chatgpt-registration.json"))
+	s.transfers = transfers.New(filepath.Join(filepath.Dir(dataFile), "transfers"))
+	s.localOnlyTransfers = tokens.UsesDevelopmentSecret()
 	root := http.NewServeMux()
 	staticFiles := http.StripPrefix("/static/", http.FileServer(http.FS(assets)))
 	root.Handle("GET /static/", revalidateAssets(staticFiles))
@@ -45,6 +50,16 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 	root.HandleFunc("POST /api/v1/auth/login", s.login)
 
 	private := http.NewServeMux()
+	private.Handle("GET /api/v1/transfers", s.safeTransfer(http.HandlerFunc(s.listTransfers)))
+	private.Handle("GET /api/v1/transfers/info", s.safeTransfer(http.HandlerFunc(s.transferInfo)))
+	private.Handle("PUT /api/v1/transfers/{id}", s.safeTransfer(http.HandlerFunc(s.uploadTransfer)))
+	private.Handle("GET /api/v1/transfers/{id}/content", s.safeTransfer(http.HandlerFunc(s.downloadTransfer)))
+	private.Handle("POST /api/v1/transfers/{id}/actions", s.safeTransfer(http.HandlerFunc(s.transferAction)))
+	private.Handle("DELETE /api/v1/transfers/{id}", s.safeTransfer(http.HandlerFunc(s.purgeTransfer)))
+	private.HandleFunc("GET /api/v1/whiteboards", s.listWhiteboards)
+	private.HandleFunc("PUT /api/v1/whiteboards/{id}", s.saveWhiteboard)
+	private.HandleFunc("GET /api/v1/splits", s.listSplits)
+	private.HandleFunc("PUT /api/v1/splits/{id}", s.saveSplit)
 	private.HandleFunc("POST /api/v1/search", s.searchContent)
 	private.HandleFunc("GET /api/v1/fitness", s.listFitness)
 	private.HandleFunc("GET /api/v1/care-items", s.listCare)

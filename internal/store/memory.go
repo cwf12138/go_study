@@ -30,6 +30,8 @@ type Memory struct {
 	meals                   map[string]domain.MealEntry
 	fitness                 map[string]domain.FitnessEntry
 	care                    map[string]domain.CareItem
+	splits                  map[string]domain.SplitGroup
+	whiteboards             map[string]domain.Whiteboard
 	nutrition               map[string]domain.NutritionEntry
 	ledger                  map[string]domain.LedgerEntry
 	projects                map[string]domain.Project
@@ -71,6 +73,8 @@ func NewMemory() *Memory {
 		meals:                   make(map[string]domain.MealEntry),
 		fitness:                 make(map[string]domain.FitnessEntry),
 		care:                    make(map[string]domain.CareItem),
+		splits:                  make(map[string]domain.SplitGroup),
+		whiteboards:             make(map[string]domain.Whiteboard),
 		nutrition:               make(map[string]domain.NutritionEntry),
 		ledger:                  make(map[string]domain.LedgerEntry),
 		projects:                make(map[string]domain.Project),
@@ -1157,6 +1161,8 @@ type snapshot struct {
 	Meals                   []domain.MealEntry          `json:"meals,omitempty"`
 	Fitness                 []domain.FitnessEntry       `json:"fitness,omitempty"`
 	Care                    []domain.CareItem           `json:"care,omitempty"`
+	Splits                  []domain.SplitGroup         `json:"splits,omitempty"`
+	Whiteboards             []domain.Whiteboard         `json:"whiteboards,omitempty"`
 	Nutrition               []domain.NutritionEntry     `json:"nutrition,omitempty"`
 	Ledger                  []domain.LedgerEntry        `json:"ledger"`
 	Projects                []domain.Project            `json:"projects"`
@@ -1242,6 +1248,12 @@ func (m *Memory) SaveJSON(path string) error {
 	}
 	for _, item := range m.care {
 		s.Care = append(s.Care, cloneCare(item))
+	}
+	for _, item := range m.splits {
+		s.Splits = append(s.Splits, cloneSplit(item))
+	}
+	for _, item := range m.whiteboards {
+		s.Whiteboards = append(s.Whiteboards, cloneWhiteboard(item))
 	}
 	for _, item := range m.nutrition {
 		s.Nutrition = append(s.Nutrition, cloneNutrition(item))
@@ -1401,6 +1413,14 @@ func (m *Memory) LoadJSON(path string) error {
 	m.meals = make(map[string]domain.MealEntry, len(s.Meals))
 	m.fitness = make(map[string]domain.FitnessEntry, len(s.Fitness))
 	m.care = make(map[string]domain.CareItem, len(s.Care))
+	m.splits = make(map[string]domain.SplitGroup, len(s.Splits))
+	m.whiteboards = make(map[string]domain.Whiteboard, len(s.Whiteboards))
+	for _, item := range s.Whiteboards {
+		m.whiteboards[item.UserID+":"+item.ID] = cloneWhiteboard(item)
+	}
+	for _, item := range s.Splits {
+		m.splits[item.UserID+":"+item.ID] = cloneSplit(item)
+	}
 	for _, item := range s.Care {
 		m.care[item.UserID+":"+item.ID] = cloneCare(item)
 	}

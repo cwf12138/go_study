@@ -50,6 +50,7 @@
     <link rel="stylesheet" href="/static/fitness-nutrition.css?v=20261018-1">
     <link rel="stylesheet" href="/static/care.css?v=20261020-1">
     <link rel="stylesheet" href="/static/content-search.css?v=20261020-1">
+    <link rel="stylesheet" href="/static/transfers.css?v=20261021-1">
     <link rel="stylesheet" href="/static/layout.css?v=20260922-1">
   </head>
   <body>
@@ -115,6 +116,7 @@
           </div>
           <div class="nav-group" role="group" aria-label="记录"><p class="nav-group-label">记录</p>
             <button class="nav-link" type="button" data-view="memos"><span aria-hidden="true">▤</span>备忘录</button>
+            <button class="nav-link" type="button" data-view="transfers"><span aria-hidden="true">⇅</span>文件快传</button>
             <button class="nav-link" type="button" data-view="moods"><span aria-hidden="true">☺</span>心情日记</button>
             <button class="nav-link" type="button" data-view="ledger"><span aria-hidden="true">¥</span>生活账本</button>
             <button class="nav-link" type="button" data-view="subscriptions"><span aria-hidden="true">↻</span>订阅管家</button>
@@ -151,6 +153,13 @@
         </header>
 
         <div class="content">
+          <section id="panel-transfers" class="panel ft-space" aria-label="文件快传">
+            <header class="ft-hero"><div><p class="ft-eyebrow">A LITTLE CLOSER</p><h2>文件换个设备，<br>不用绕一大圈。</h2><p>照片、文档、临时要用的资料。<br>放在这里，在另一台设备登录同一账号拿走。</p><button id="ft-connect" type="button">在另一台设备打开 ↗</button></div><div class="ft-upload-card"><div id="ft-drop" class="ft-drop"><span class="ft-upload-icon" aria-hidden="true">⇧</span><h3>把文件放到这里</h3><p>拖入文件，或点击选择<br>支持多选，单个文件最多 32 MiB</p><button id="ft-choose" type="button" class="ft-primary">＋ 选择文件</button><input id="ft-input" type="file" multiple hidden></div><label class="ft-retention">文件有效期<select id="ft-ttl"><option value="24">24 小时</option><option value="168">7 天</option><option value="0">长期保留</option></select></label><small>过期后暂停下载，不会自动删除；可延长或手动清理。</small></div></header>
+            <div class="ft-overview"><article><span>随时可取</span><strong id="ft-active-count">0</strong><small>当前账号的有效文件</small></article><article><span>等待整理</span><strong id="ft-clean-count">0</strong><small>已过期 / 回收站</small></article><article class="ft-storage"><div><span>已用空间</span><b id="ft-storage-value">0 / 256 MiB</b></div><progress id="ft-storage-bar" value="0" max="268435456"></progress><small>过期和回收站文件仍占空间，永久清理后释放。</small></article></div>
+            <section id="ft-queue-section" class="ft-queue-section" hidden aria-label="上传任务"><header><div><p class="ft-eyebrow">ON ITS WAY</p><h3>正在传送的小东西</h3></div><button id="ft-clear-queue" type="button">移除已完成任务</button></header><div id="ft-queue"></div><p>取消或断网不一定代表服务端未收到。可刷新核对，重试会沿用原上传标识，不重复保存。</p></section>
+            <section class="ft-library"><div class="ft-library-head"><div><p class="ft-eyebrow">YOUR TRANSFER SHELF</p><h3>文件收纳架</h3></div><button id="ft-refresh" type="button">↻ 刷新</button></div><div class="ft-controls"><div id="ft-tabs" role="group" aria-label="文件状态"><button type="button" data-ft-tab="active" aria-pressed="true">可下载</button><button type="button" data-ft-tab="expired" aria-pressed="false">已过期</button><button type="button" data-ft-tab="trash" aria-pressed="false">回收站</button></div><label class="ft-search"><span aria-hidden="true">⌕</span><input id="ft-query" type="search" placeholder="搜索文件名" aria-label="搜索文件名" maxlength="180"></label><select id="ft-kind" aria-label="文件类型"><option value="">所有类型</option><option value="image">图片</option><option value="document">文档</option><option value="media">影音</option><option value="archive">压缩包</option><option value="other">其他</option></select><select id="ft-sort" aria-label="文件排序"><option value="newest">最新上传</option><option value="oldest">最早上传</option><option value="size">文件大小</option></select></div><p id="ft-status" class="ft-status" role="status" aria-live="polite"></p><div id="ft-list" class="ft-list"></div><div class="ft-pagination"><button id="ft-prev" type="button">上一页</button><span id="ft-page">1 / 1</span><button id="ft-next" type="button">下一页</button></div></section>
+            <p class="ft-footnote">仅当前账号可见 · 不创建公开下载链接 · 文件单独存放于本机 data/transfers（或 DATA_FILE 同级目录） · 不提供病毒扫描，请确认文件来源安全。</p>
+          </section>
           <section id="panel-care" class="panel care-space" aria-label="生活保养站">
             <header class="care-hero"><div><p class="care-eyebrow">SMALL CARE, BETTER DAYS</p><h2>让生活的小事，<br><em>按时被照顾。</em></h2><p>不是每天都要打卡。<br>把容易忘记的维护与整理，交给一个合适的周期。</p><div class="care-hero-actions"><button id="care-new" class="care-primary" type="button">＋ 添加保养事项</button><button id="care-presets-open" type="button">从生活灵感开始 ↗</button></div></div><aside><span class="care-orbit" aria-hidden="true">✳</span><small>下一件，值得照顾的小事</small><strong id="care-next-title">从一件小事开始</strong><span id="care-next-caption">你决定节奏，不必追求完美。</span></aside></header>
             <div class="care-stats"><button type="button" data-care-view="now"><span>已过计划日</span><b id="care-overdue">0</b><small>可以推迟，也可以现在开始</small></button><button type="button" data-care-view="now"><span>今天照顾</span><b id="care-today">0</b><small>把今天留给少数重要的事</small></button><button type="button" data-care-view="soon"><span>接下来 7 天</span><b id="care-soon">0</b><small>提前知道，不必提前焦虑</small></button><article><span>近 7 天完成记录</span><b id="care-done">0</b><small>每一次照顾，都有迹可循</small></article></div>
@@ -784,6 +793,8 @@
       <label>名称<input id="shopping-name" maxlength="80" required></label><label>数量（可选）<input id="shopping-quantity" maxlength="30" placeholder="2盒 / 一袋 / 按需"></label><label>备注（可选）<textarea id="shopping-note" rows="3" maxlength="500" placeholder="品牌、口味，或顺手记下的要求"></textarea></label>
       <label class="shopping-check-label"><input id="shopping-frequent" type="checkbox"> ★ 设为常买</label><p id="shopping-edit-status" role="status"></p><button id="shopping-save" class="primary" type="submit">保存修改</button></form>
     </dialog>
+    <dialog id="ft-connect-dialog" class="ft-dialog" aria-labelledby="ft-connect-title"><header><div><p class="ft-eyebrow">SAME NETWORK, SAME ACCOUNT</p><h2 id="ft-connect-title">让两个设备靠近一点</h2></div><button id="ft-connect-close" type="button" aria-label="关闭连接说明">×</button></header><ol><li>电脑与手机连接同一个可信 Wi-Fi / 局域网。</li><li>在手机浏览器中输入下面的候选地址。</li><li>登录同一账号，从侧栏进入「文件快传」。</li></ol><div id="ft-addresses"></div><p id="ft-connect-status" role="status"></p><p class="ft-security-note">普通 HTTP 不加密文件或登录信息。请勿在公共 Wi-Fi 使用或传送敏感资料；有 HTTPS 时应使用已正确配置的 HTTPS 地址。这里不会修改防火墙、监听地址或网络设置，也不保证候选地址可达。</p><button id="ft-connect-refresh" type="button">重新查找地址</button><label id="ft-manual-copy-box" hidden>手动复制地址<input id="ft-manual-copy" readonly></label></dialog>
+    <dialog id="ft-detail-dialog" class="ft-dialog" aria-labelledby="ft-detail-title"><header><div><p class="ft-eyebrow">THE LITTLE DETAILS</p><h2 id="ft-detail-title">文件详情</h2></div><button id="ft-detail-close" type="button" aria-label="关闭文件详情">×</button></header><div id="ft-detail-body"></div></dialog>
     <dialog id="content-search-dialog" class="content-search-dialog" aria-labelledby="content-search-title">
       <header><div><p class="content-search-eyebrow">FIND YOUR EVERYDAY</p><h2 id="content-search-title">让记过的事，找得到。</h2></div><button id="content-search-close" type="button" aria-label="关闭全局内容搜索">×</button></header>
       <form id="content-search-form" class="content-search-form"><label for="content-search-input" class="content-search-sr-only">搜索自己的记录</label><span aria-hidden="true">⌕</span><input id="content-search-input" type="search" maxlength="80" autocomplete="off" placeholder="搜索标题、正文、备注或标签…"><button type="submit">搜索</button></form>
@@ -800,7 +811,7 @@
         <div class="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 执行</span><span>全局快捷键 <kbd>Ctrl K</kbd></span></div>
       </div>
     </dialog>
-    <script src="/static/app.js?v=20261020-care-1" defer></script>
+    <script src="/static/app.js?v=20261021-transfers-1" defer></script>
     <script src="/static/subscriptions-core.js?v=20261011-1" defer></script>
     <script src="/static/subscriptions.js?v=20261011-1" defer></script>
     <script src="/static/inventory.js?v=20261007-shopping" defer></script>
@@ -829,6 +840,8 @@
     <script src="/static/calendar.js?v=20261020-care-1" defer></script>
     <script src="/static/commands.js?v=20260925-daynest" defer></script>
     <script src="/static/content-search.js?v=20261020-1" defer></script>
+    <script src="/static/transfers-core.js?v=20261021-1" defer></script>
+    <script src="/static/transfers.js?v=20261021-1" defer></script>
     <script src="/static/memos.js?v=20261020-search" defer></script>
     <script src="/static/english.js?v=20261007-2" defer></script>
     <script src="/static/english-reading.js?v=20260915-1" defer></script>

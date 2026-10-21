@@ -6,6 +6,9 @@ info:
 servers:
   - url: http://localhost:8080
 tags:
+  - name: Transfers
+  - name: Whiteboards
+  - name: Splits
   - name: Search
   - name: Care
   - name: Fitness
@@ -32,6 +35,198 @@ tags:
   - name: Shopping
   - name: Bookmarks
 paths:
+  /api/v1/transfers:
+    get:
+      tags: [Transfers]
+      security: [{ bearerAuth: [] }]
+      summary: List current-account files, expired/trash states and quota
+      description: Attachments are separate from JSON snapshots and personal JSON exports. No public links. Known development signing key restricts transfer endpoints to loopback clients; forwarded headers are not trusted for this check.
+      responses:
+        "200":
+          description: No-store account file listing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      items: { type: array, items: { $ref: "#/components/schemas/TransferFile" } }
+                      used_bytes: { type: integer, format: int64 }
+                      max_bytes: { type: integer, const: 268435456 }
+                      max_file_bytes: { type: integer, const: 33554432 }
+                      max_files: { type: integer, const: 100 }
+                      server_time: { type: string, format: date-time }
+        "401": { description: Authentication required }
+        "403": { description: Development default signing key is local-only }
+  /api/v1/transfers/info:
+    get:
+      tags: [Transfers]
+      security: [{ bearerAuth: [] }]
+      summary: Get private IPv4 candidate service addresses and setup warning
+      description: Addresses contain no tokens and are not verified reachable. Does not alter network or firewall settings. With the public development signing key, loopback receives no candidate addresses and a configuration warning.
+      responses:
+        "200": { description: data contains addresses array and warning string }
+        "401": { description: Authentication required }
+        "403": { description: Development default signing key is local-only }
+  /api/v1/transfers/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, pattern: "^[A-Za-z0-9_-]{8,80}$" } }
+    put:
+      tags: [Transfers]
+      security: [{ bearerAuth: [] }]
+      summary: Stream an immutable file upload using a client-generated retry ID
+      description: Max 32 MiB per file, 256 MiB and 100 records per account including expired/trash records, four simultaneous uploads globally. Known content length is reserved at actual size; unknown chunked length reserves 32 MiB. Same ID/name/content/initial TTL immediate retry returns original record without extending expiry. Files are always downloaded as attachments, not previewed or executed.
+      parameters:
+        - { in: header, name: X-File-Name, required: true, schema: { type: string }, description: UTF-8 original filename encoded with URL path percent encoding; no path separators/control characters; max 180 Unicode characters after decoding }
+        - { in: header, name: X-File-TTL, required: true, schema: { type: string, enum: ["0", "24", "168"] }, description: Hours; zero means no expiry }
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        "200": { description: data is the saved TransferFile, including size and upload-time SHA-256 }
+        "400": { description: Invalid filename, ID, TTL or size declaration }
+        "401": { description: Authentication required }
+        "403": { description: Development default signing key is local-only }
+        "409": { description: ID already committed with different content or properties }
+        "410": { description: An original upload has already expired }
+        "413": { description: File size, account bytes or record count exceeded }
+        "429": { description: Upload slots or same-file operation busy }
+    delete:
+      tags: [Transfers]
+      security: [{ bearerAuth: [] }]
+      summary: Permanently purge a trashed or expired file and metadata
+      responses:
+        "204": { description: Permanently removed; unrecoverable }
+        "400": { description: Active files must be trashed first }
+        "401": { description: Authentication required }
+        "403": { description: Development default signing key is local-only }
+        "404": { description: No record in this account; retries may treat as already purged }
+        "429": { description: Same file currently uploading }
+  /api/v1/transfers/{id}/content:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string } }
+    get:
+      tags: [Transfers]
+      security: [{ bearerAuth: [] }]
+      summary: Download file content with authorization, attachment disposition and Range support
+      responses:
+        "200": { description: application/octet-stream attachment; no-store and sandbox CSP }
+        "206": { description: Authorized partial file content }
+        "401": { description: Authentication required }
+        "403": { description: Development default signing key is local-only }
+        "404": { description: Missing file or not in current account }
+        "410": { description: Expired or trashed file }
+    head:
+      tags: [Transfers]
+      security: [{ bearerAuth: [] }]
+      summary: Read authorized attachment headers without file bytes
+      responses:
+        "200": { description: File headers }
+        "401": { description: Authentication required }
+        "403": { description: Development default signing key is local-only }
+        "404": { description: Missing file }
+        "410": { description: Expired or trashed file }
+  /api/v1/transfers/{id}/actions:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string } }
+    post:
+      tags: [Transfers]
+      security: [{ bearerAuth: [] }]
+      summary: Trash, restore or extend a file's expiry to seven days from now
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [action]
+              properties:
+                action: { type: string, enum: [trash, restore, extend] }
+      responses:
+        "200": { description: data is the updated TransferFile }
+        "400": { description: Invalid action; restore trashed file before extending }
+        "401": { description: Authentication required }
+        "403": { description: Development default signing key is local-only }
+        "404": { description: No file in this account }
+        "429": { description: File currently uploading }
+  /api/v1/whiteboards:
+    get:
+      tags: [Whiteboards]
+      security: [{ bearerAuth: [] }]
+      summary: List account-scoped saved vector whiteboards including trash
+      deprecated: true
+      responses:
+        "200": { description: data is an array of Whiteboard records; response is no-store }
+        "401": { description: Authentication required }
+  /api/v1/whiteboards/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, pattern: "^[A-Za-z0-9_-]{8,80}$" } }
+    put:
+      tags: [Whiteboards]
+      security: [{ bearerAuth: [] }]
+      summary: Atomically save a whiteboard using optimistic revision
+      deprecated: true
+      description: Fixed 1600x1000 canvas. Max 60 boards per account including trash, 250 nodes per board, 1000 points per path and 30000 points total. Shapes must stay within bounds. Trashed boards must first be restored before editing. Identical immediate retry returns the original result without incrementing revision. Max request body 1 MiB. No external images or executable SVG input accepted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveWhiteboardInput" }
+      responses:
+        "200": { description: data is the saved Whiteboard with revision and server-owned timestamps; response is no-store }
+        "400": { description: Invalid fields, geometry, limits or JSON }
+        "401": { description: Authentication required }
+        "404": { description: Missing board in current account }
+        "409": { description: Revision conflict; preserve/export draft before reload }
+  /api/v1/splits:
+    get:
+      tags: [Splits]
+      security: [{ bearerAuth: [] }]
+      summary: List current-account AA bills with computed netting reports
+      deprecated: true
+      description: Includes soft-deleted bills. No payments or invitations. Max 100 bills per account, including trash. Response is no-store.
+      responses:
+        "200":
+          description: Current-account bills and deterministic integer-cent settlement suggestions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/SplitView" } }
+        "401": { description: Authentication required }
+  /api/v1/splits/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, pattern: "^[A-Za-z0-9_-]{8,80}$" } }
+    put:
+      tags: [Splits]
+      security: [{ bearerAuth: [] }]
+      summary: Create or atomically replace an AA bill using optimistic revision
+      deprecated: true
+      description: New bills use revision zero and must be open and not deleted. Equal splitting distributes remainders in group member order. Exact shares must sum to amount_cents. The payer may be excluded from shares. Settled bills must first be reopened before changing members or expenses; trashed bills must first be restored before editing. An identical immediate retry returns the original result without incrementing revision. Reports are server-owned; this never transfers funds or tracks external payments.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveSplitInput" }
+      responses:
+        "200":
+          description: Saved bill and report, no-store response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/SplitView" }
+        "400": { description: Invalid fields, amounts, dates, membership or state }
+        "401": { description: Authentication required }
+        "404": { description: Missing bill in current account }
+        "409": { description: Revision conflict; reload to reconcile }
   /api/v1/search:
     post:
       tags: [Search]
@@ -3068,6 +3263,130 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
   schemas:
+    TransferFile:
+      type: object
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        name: { type: string, maxLength: 180 }
+        size: { type: integer, format: int64, minimum: 0, maximum: 33554432 }
+        sha256: { type: string, pattern: "^[a-f0-9]{64}$", description: Digest at upload time, not a download-time integrity guarantee }
+        ttl_hours: { type: integer, enum: [0, 24, 168] }
+        created_at: { type: string, format: date-time }
+        expires_at: { type: [string, "null"], format: date-time }
+        deleted_at: { type: [string, "null"], format: date-time }
+        expired: { type: boolean }
+        missing: { type: boolean, description: Missing, nonregular or size-mismatched server blob }
+    BoardNode:
+      type: object
+      additionalProperties: false
+      required: [id, kind, x, y, w, h, color, text, font_size, points]
+      properties:
+        id: { type: string, pattern: "^[A-Za-z0-9_-]{8,80}$" }
+        kind: { type: string, enum: [note, text, rect, ellipse, path, arrow] }
+        x: { type: number, minimum: 0, maximum: 1600 }
+        y: { type: number, minimum: 0, maximum: 1000 }
+        w: { type: number, minimum: 0, maximum: 1600 }
+        h: { type: number, minimum: 0, maximum: 1000 }
+        color: { type: string, enum: ["#344054", "#5578dd", "#438568", "#bf7053", "#f5dfa1", "#d8e7fa", "#ddd8f3", "#d5e9d9", "#efd6d6"] }
+        text: { type: string, maxLength: 1000 }
+        font_size: { type: integer, minimum: 14, maximum: 40 }
+        points:
+          type: array
+          maxItems: 1000
+          description: Empty for shapes; 2-1000 points for path; exactly two for arrow
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              x: { type: number, minimum: 0, maximum: 1600 }
+              y: { type: number, minimum: 0, maximum: 1000 }
+    SaveWhiteboardInput:
+      type: object
+      additionalProperties: false
+      required: [title]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 80 }
+        nodes: { type: array, maxItems: 250, items: { $ref: "#/components/schemas/BoardNode" } }
+        deleted: { type: boolean, default: false }
+        revision: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+    SplitMember:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id: { type: string, pattern: "^[A-Za-z0-9_-]{8,80}$" }
+        name: { type: string, minLength: 1, maxLength: 30, description: Unique trimmed name, case-insensitive }
+    SplitShare:
+      type: object
+      additionalProperties: false
+      required: [member_id, amount_cents]
+      properties:
+        member_id: { type: string }
+        amount_cents: { type: integer, format: int64, minimum: 0, maximum: 100000000 }
+    SplitExpense:
+      type: object
+      additionalProperties: false
+      required: [id, title, date, paid_by, amount_cents, mode, shares]
+      properties:
+        id: { type: string, pattern: "^[A-Za-z0-9_-]{8,80}$" }
+        title: { type: string, minLength: 1, maxLength: 80 }
+        date: { type: string, format: date, description: Years 2000-2100 }
+        paid_by: { type: string, description: Existing group member ID }
+        amount_cents: { type: integer, format: int64, minimum: 1, maximum: 100000000 }
+        mode: { type: string, enum: [equal, exact] }
+        shares: { type: array, minItems: 1, maxItems: 20, items: { $ref: "#/components/schemas/SplitShare" } }
+    SaveSplitInput:
+      type: object
+      additionalProperties: false
+      required: [title, date, members, state]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 80 }
+        date: { type: string, format: date, description: Years 2000-2100 }
+        note: { type: string, maxLength: 1000 }
+        members: { type: array, minItems: 2, maxItems: 20, items: { $ref: "#/components/schemas/SplitMember" } }
+        expenses: { type: array, maxItems: 100, items: { $ref: "#/components/schemas/SplitExpense" } }
+        state: { type: string, enum: [open, settled] }
+        deleted: { type: boolean, default: false }
+        revision: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+    SplitView:
+      type: object
+      description: Saved AA bill with canonical member-ordered shares and a server-computed netting report. All monetary values are integer CNY cents.
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        title: { type: string }
+        date: { type: string, format: date }
+        note: { type: string }
+        members: { type: array, items: { $ref: "#/components/schemas/SplitMember" } }
+        expenses: { type: array, items: { $ref: "#/components/schemas/SplitExpense" } }
+        state: { type: string, enum: [open, settled] }
+        deleted: { type: boolean }
+        revision: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        report:
+          type: object
+          properties:
+            total_cents: { type: integer, format: int64 }
+            balances:
+              type: array
+              items:
+                type: object
+                properties:
+                  member_id: { type: string }
+                  paid_cents: { type: integer, format: int64 }
+                  share_cents: { type: integer, format: int64 }
+                  net_cents: { type: integer, format: int64, description: Positive means receivable; negative means payable }
+            transfers:
+              type: array
+              description: Feasible greedy netting suggestions, not guaranteed globally minimum transfer count; not evidence of payment
+              items:
+                type: object
+                properties:
+                  from: { type: string }
+                  to: { type: string }
+                  amount_cents: { type: integer, format: int64, minimum: 1 }
     SearchSource:
       type: string
       enum: [memos, todos, tasks, calendar, moods, inventory, bookmarks, care, fitness, goals]

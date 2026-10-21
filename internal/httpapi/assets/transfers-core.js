@@ -1,0 +1,14 @@
+(() => {
+ 'use strict';
+ const MAX=32*1024*1024,QUOTA=256*1024*1024,esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const bytes=n=>n<1024?n+' B':n<1024*1024?(n/1024).toFixed(1)+' KiB':(n/1024/1024).toFixed(1)+' MiB';
+ function kind(name){const ext=name.toLowerCase().split('.').at(-1);if(['jpg','jpeg','png','gif','webp','heic','avif','svg','bmp'].includes(ext))return'image';if(['pdf','doc','docx','xls','xlsx','ppt','pptx','txt','md','csv','epub','rtf'].includes(ext))return'document';if(['mp3','m4a','wav','flac','ogg','mp4','mov','mkv','webm'].includes(ext))return'media';if(['zip','rar','7z','gz','tar'].includes(ext))return'archive';return'other';}
+ const categories={image:{label:'图片',icon:'▧'},document:{label:'文档',icon:'▤'},media:{label:'影音',icon:'▷'},archive:{label:'压缩包',icon:'▣'},other:{label:'文件',icon:'↧'}};
+ const valid=f=>!!f&&typeof f.id==='string'&&/^[A-Za-z0-9_-]{8,80}$/.test(f.id)&&typeof f.name==='string'&&f.name.trim()&&[...f.name].length<=180&&!/[\x00-\x1f\x7f/\\]/.test(f.name)&&Number.isSafeInteger(f.size)&&f.size>=0&&f.size<=MAX&&typeof f.sha256==='string'&&/^[a-f0-9]{64}$/.test(f.sha256)&&[0,24,168].includes(f.ttl_hours)&&typeof f.created_at==='string'&&Number.isFinite(Date.parse(f.created_at))&&[f.expires_at,f.deleted_at].every(d=>d===null||typeof d==='string'&&Number.isFinite(Date.parse(d)))&&typeof f.expired==='boolean'&&typeof f.missing==='boolean';
+ const expired=(f,now=Date.now())=>f.expired||f.expires_at!==null&&Date.parse(f.expires_at)<=now;
+ function filtered(rows,tab,query,category,sort,now){return rows.filter(f=>(tab==='trash'?!!f.deleted_at:!f.deleted_at&&(tab==='expired'?expired(f,now):!expired(f,now)))&&f.name.toLowerCase().includes(query.toLowerCase())&&(!category||kind(f.name)===category)).sort((a,b)=>sort==='size'?b.size-a.size||a.id.localeCompare(b.id):sort==='oldest'?a.created_at.localeCompare(b.created_at)||a.id.localeCompare(b.id):b.created_at.localeCompare(a.created_at)||a.id.localeCompare(b.id));}
+ const time=d=>new Date(d).toLocaleString('zh-CN',{hour12:false});
+ function expiry(f,now){if(!f.expires_at)return'长期保留';if(expired(f,now))return'已过期 · 可延长';const left=Date.parse(f.expires_at)-now;return left<3600000?'不足 1 小时后过期':left<86400000?Math.ceil(left/3600000)+' 小时后过期':Math.ceil(left/86400000)+' 天后过期';}
+ function address(value){try{const u=new URL(value),parts=u.hostname.split('.');return ['http:','https:'].includes(u.protocol)&&!u.username&&!u.password&&!u.search&&!u.hash&&u.pathname==='/'&&parts.length===4&&parts.every(p=>/^\d{1,3}$/.test(p)&&Number(p)<=255)&&(parts[0]==='10'||parts[0]==='192'&&parts[1]==='168'||parts[0]==='172'&&Number(parts[1])>=16&&Number(parts[1])<=31);}catch{return false;}}
+ window.DaynestTransfers={MAX,QUOTA,esc,bytes,kind,categories,valid,expired,filtered,time,expiry,address};
+})();

@@ -34,6 +34,8 @@ type UserDataExport struct {
 	Meals              []domain.MealEntry        `json:"meals"`
 	Fitness            []domain.FitnessEntry     `json:"fitness"`
 	Care               []domain.CareItem         `json:"care"`
+	Splits             []domain.SplitGroup       `json:"splits"`
+	Whiteboards        []domain.Whiteboard       `json:"whiteboards"`
 	Nutrition          []domain.NutritionEntry   `json:"nutrition"`
 	Projects           []domain.Project          `json:"projects"`
 	TravelPlans        []domain.TravelPlan       `json:"travel_plans"`
@@ -100,6 +102,12 @@ func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataEx
 		return UserDataExport{}, err
 	}
 	if bundle.Care, err = s.repo.ListCare(ctx, userID); err != nil {
+		return UserDataExport{}, err
+	}
+	if bundle.Splits, err = s.repo.ListSplits(ctx, userID); err != nil {
+		return UserDataExport{}, err
+	}
+	if bundle.Whiteboards, err = s.repo.ListWhiteboards(ctx, userID); err != nil {
 		return UserDataExport{}, err
 	}
 	if bundle.Nutrition, err = s.repo.ListNutrition(ctx, userID); err != nil {
@@ -174,6 +182,8 @@ func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataEx
 		"meals":         len(bundle.Meals),
 		"fitness":       len(bundle.Fitness),
 		"care":          len(bundle.Care),
+		"splits":        len(bundle.Splits),
+		"whiteboards":   len(bundle.Whiteboards),
 		"nutrition":     len(bundle.Nutrition),
 		"projects":      len(bundle.Projects),
 		"travel_plans":  len(bundle.TravelPlans),

@@ -31,6 +31,12 @@ func NewTokenManager(secret, issuer string, ttl time.Duration) *TokenManager {
 	return &TokenManager{secret: []byte(secret), issuer: issuer, ttl: ttl, now: time.Now}
 }
 
+// UsesDevelopmentSecret detects the public local-development default only;
+// it is not a general strength assessment for custom signing keys.
+func (m *TokenManager) UsesDevelopmentSecret() bool {
+	return string(m.secret) == "development-secret-change-me-please"
+}
+
 func (m *TokenManager) Issue(subject, role string) (string, error) {
 	now := m.now().UTC()
 	header, _ := json.Marshal(map[string]string{"alg": "HS256", "typ": "JWT"})
