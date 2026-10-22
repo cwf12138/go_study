@@ -3199,6 +3199,48 @@ paths:
           content:
             text/event-stream:
               schema: { type: string }
+  /api/v1/important-days:
+    get:
+      summary: 列出当前账号的重要日子（含回收站）
+      tags: [ImportantDays]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: 返回 data 数组；日期为公历原始日期，客户端按北京时间计算倒数或已过天数。
+        '401': { description: 需要登录 }
+  /api/v1/important-days/{id}:
+    put:
+      summary: 创建或完整更新重要日子，支持版本校验与原样重试
+      tags: [ImportantDays]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, description: 客户端生成的稳定标识 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [title, date, category, revision]
+              properties:
+                title: { type: string, minLength: 1, maxLength: 80 }
+                date: { type: string, format: date, description: 公历日期，1900–2200 年 }
+                category: { type: string, enum: [birthday, anniversary, plan, other] }
+                note: { type: string, maxLength: 1000 }
+                annual: { type: boolean, default: false }
+                pinned: { type: boolean, default: false }
+                deleted: { type: boolean, default: false, description: true 移入回收站，false 恢复 }
+                revision: { type: integer, minimum: 0, description: 创建为 0，更新为上次读取版本 }
+      responses:
+        '200': { description: data 为保存结果，包含 id、user_id、revision、created_at、updated_at 和请求字段 }
+        '400': { description: 输入或日期无效，或超过每账号 500 条限制（含回收站） }
+        '401': { description: 需要登录 }
+        '404': { description: 更新目标不存在或不属于当前账号 }
+        '409': { description: 版本冲突，请重新读取并核对，不可盲目覆盖 }
 components:
   securitySchemes:
     bearerAuth:

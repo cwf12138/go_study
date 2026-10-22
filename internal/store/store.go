@@ -21,6 +21,8 @@ type TodoFilter struct {
 // Repository is deliberately domain-oriented. A PostgreSQL, SQLite or remote
 // implementation can replace Memory without changing the service layer.
 type Repository interface {
+	ListImportantDays(context.Context, string) ([]domain.ImportantDay, error)
+	SaveImportantDay(context.Context, domain.ImportantDay, int) (domain.ImportantDay, error)
 	ListWhiteboards(context.Context, string) ([]domain.Whiteboard, error)
 	SaveWhiteboard(context.Context, domain.Whiteboard, int) (domain.Whiteboard, error)
 	ListSplits(context.Context, string) ([]domain.SplitGroup, error)

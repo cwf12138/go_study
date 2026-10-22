@@ -17,6 +17,7 @@ import (
 const exportSchemaVersion = 1
 
 type UserDataExport struct {
+	ImportantDays      []domain.ImportantDay     `json:"important_days"`
 	SchemaVersion      int                       `json:"schema_version"`
 	ExportedAt         time.Time                 `json:"exported_at"`
 	Application        string                    `json:"application"`
@@ -62,6 +63,9 @@ type UserDataExport struct {
 func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataExport, error) {
 	bundle := UserDataExport{SchemaVersion: exportSchemaVersion, ExportedAt: s.now().UTC(), Application: "StudyFlow", Counts: map[string]int{}}
 	var err error
+	if bundle.ImportantDays, err = s.repo.ListImportantDays(ctx, userID); err != nil {
+		return bundle, err
+	}
 	if bundle.User, err = s.repo.UserByID(ctx, userID); err != nil {
 		return UserDataExport{}, err
 	}
@@ -171,23 +175,24 @@ func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataEx
 		return UserDataExport{}, err
 	}
 	bundle.Counts = map[string]int{
-		"habits":        len(bundle.Habits),
-		"explorations":  len(bundle.Explorations),
-		"keepsakes":     len(bundle.Keepsakes),
-		"ledger":        len(bundle.Ledger),
-		"inventory":     len(bundle.Inventory),
-		"shopping":      len(bundle.Shopping),
-		"bookmarks":     len(bundle.Bookmarks),
-		"subscriptions": len(bundle.Subscriptions),
-		"meals":         len(bundle.Meals),
-		"fitness":       len(bundle.Fitness),
-		"care":          len(bundle.Care),
-		"splits":        len(bundle.Splits),
-		"whiteboards":   len(bundle.Whiteboards),
-		"nutrition":     len(bundle.Nutrition),
-		"projects":      len(bundle.Projects),
-		"travel_plans":  len(bundle.TravelPlans),
-		"goals":         len(bundle.Goals), "moods": len(bundle.Moods), "tasks": len(bundle.Tasks), "todo_lists": len(bundle.TodoLists),
+		"habits":         len(bundle.Habits),
+		"explorations":   len(bundle.Explorations),
+		"keepsakes":      len(bundle.Keepsakes),
+		"ledger":         len(bundle.Ledger),
+		"inventory":      len(bundle.Inventory),
+		"shopping":       len(bundle.Shopping),
+		"bookmarks":      len(bundle.Bookmarks),
+		"important_days": len(bundle.ImportantDays),
+		"subscriptions":  len(bundle.Subscriptions),
+		"meals":          len(bundle.Meals),
+		"fitness":        len(bundle.Fitness),
+		"care":           len(bundle.Care),
+		"splits":         len(bundle.Splits),
+		"whiteboards":    len(bundle.Whiteboards),
+		"nutrition":      len(bundle.Nutrition),
+		"projects":       len(bundle.Projects),
+		"travel_plans":   len(bundle.TravelPlans),
+		"goals":          len(bundle.Goals), "moods": len(bundle.Moods), "tasks": len(bundle.Tasks), "todo_lists": len(bundle.TodoLists),
 		"todos": len(bundle.Todos), "calendar_events": len(bundle.CalendarEvents), "word_books": len(bundle.WordBooks), "vocabulary_words": len(bundle.VocabularyWords),
 		"vocabulary_reviews": len(bundle.VocabularyReviews), "plan_blocks": len(bundle.PlanBlocks), "weekly_reflections": len(bundle.WeeklyReflections),
 		"memo_folders": len(bundle.MemoFolders), "memos": len(bundle.Memos),
