@@ -6,6 +6,7 @@ info:
 servers:
   - url: http://localhost:8080
 tags:
+  - name: Parcels
   - name: Transfers
   - name: Whiteboards
   - name: Splits
@@ -35,6 +36,52 @@ tags:
   - name: Shopping
   - name: Bookmarks
 paths:
+  /api/v1/parcels:
+    get:
+      tags: [Parcels]
+      security: [{ bearerAuth: [] }]
+      summary: 列出当前账号快递收件记录（含回收站）
+      description: 手动管理，不查询实时物流。响应 Cache-Control 为 no-store，取件码为明文，请保护登录令牌。
+      responses:
+        '200':
+          description: data 为记录数组，包含全部保存字段及 id、user_id、revision、created_at、updated_at、picked_at；未取件 picked_at 为零值时间。
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Parcel' }
+        '401': { description: 需要登录 }
+  /api/v1/parcels/{id}:
+    put:
+      tags: [Parcels]
+      security: [{ bearerAuth: [] }]
+      summary: 创建或完整更新收件记录，支持版本校验和原样重试
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,80}$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SaveParcelInput' }
+      responses:
+        '200':
+          description: 已保存到服务内存；相同旧版本且相同内容的直接重试返回原记录，不重复创建或更新时间。
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Parcel' }
+        '400': { description: 输入无效或达到每账号 2000 条上限（含回收站） }
+        '401': { description: 需要登录 }
+        '404': { description: 更新记录不存在或不属于当前账号 }
+        '409': { description: 版本冲突，须重新读取核对，不可盲目覆盖 }
   /api/v1/transfers:
     get:
       tags: [Transfers]
@@ -3305,6 +3352,40 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
   schemas:
+    SaveParcelInput:
+      type: object
+      additionalProperties: false
+      required: [status]
+      description: 完整替换可编辑字段，未传字段归零。名称、取件点、取件码或单号至少填写一项；单行字段禁止控制字符。原短信不应提交。
+      properties:
+        title: { type: string, maxLength: 80, description: 留空时保存为快递包裹 }
+        carrier: { type: string, maxLength: 30 }
+        location: { type: string, maxLength: 120 }
+        pickup_code: { type: string, maxLength: 40 }
+        tracking: { type: string, maxLength: 60 }
+        deadline: { type: string, description: 可为空，否则为 2000–2200 年内公历 YYYY-MM-DD 日期；由用户自定，并非快递公司的保管期限 }
+        note: { type: string, maxLength: 1000 }
+        status: { type: string, enum: [ready, transit, picked] }
+        deleted: { type: boolean, default: false }
+        revision: { type: integer, minimum: 0, maximum: 1000000, default: 0, description: 创建为 0，更新传上次读取版本 }
+    Parcel:
+      type: object
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        title: { type: string }
+        carrier: { type: string }
+        location: { type: string }
+        pickup_code: { type: string }
+        tracking: { type: string }
+        deadline: { type: string }
+        note: { type: string }
+        status: { type: string, enum: [ready, transit, picked] }
+        deleted: { type: boolean }
+        revision: { type: integer }
+        picked_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
     TransferFile:
       type: object
       properties:

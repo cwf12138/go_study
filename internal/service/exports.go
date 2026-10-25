@@ -17,6 +17,7 @@ import (
 const exportSchemaVersion = 1
 
 type UserDataExport struct {
+	Parcels            []domain.Parcel           `json:"parcels"`
 	ImportantDays      []domain.ImportantDay     `json:"important_days"`
 	SchemaVersion      int                       `json:"schema_version"`
 	ExportedAt         time.Time                 `json:"exported_at"`
@@ -63,6 +64,9 @@ type UserDataExport struct {
 func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataExport, error) {
 	bundle := UserDataExport{SchemaVersion: exportSchemaVersion, ExportedAt: s.now().UTC(), Application: "StudyFlow", Counts: map[string]int{}}
 	var err error
+	if bundle.Parcels, err = s.repo.ListParcels(ctx, userID); err != nil {
+		return bundle, err
+	}
 	if bundle.ImportantDays, err = s.repo.ListImportantDays(ctx, userID); err != nil {
 		return bundle, err
 	}
@@ -183,6 +187,7 @@ func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataEx
 		"shopping":       len(bundle.Shopping),
 		"bookmarks":      len(bundle.Bookmarks),
 		"important_days": len(bundle.ImportantDays),
+		"parcels":        len(bundle.Parcels),
 		"subscriptions":  len(bundle.Subscriptions),
 		"meals":          len(bundle.Meals),
 		"fitness":        len(bundle.Fitness),

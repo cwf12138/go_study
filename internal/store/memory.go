@@ -27,6 +27,7 @@ type Memory struct {
 	shopping                map[string]domain.ShoppingItem
 	bookmarks               map[string]domain.Bookmark
 	importantDays           map[string]domain.ImportantDay
+	parcels                 map[string]domain.Parcel
 	subscriptions           map[string]domain.Subscription
 	meals                   map[string]domain.MealEntry
 	fitness                 map[string]domain.FitnessEntry
@@ -71,6 +72,7 @@ func NewMemory() *Memory {
 		shopping:                make(map[string]domain.ShoppingItem),
 		bookmarks:               make(map[string]domain.Bookmark),
 		importantDays:           make(map[string]domain.ImportantDay),
+		parcels:                 make(map[string]domain.Parcel),
 		subscriptions:           make(map[string]domain.Subscription),
 		meals:                   make(map[string]domain.MealEntry),
 		fitness:                 make(map[string]domain.FitnessEntry),
@@ -1153,6 +1155,7 @@ type persistedUser struct {
 }
 
 type snapshot struct {
+	Parcels                 []domain.Parcel             `json:"parcels,omitempty"`
 	ImportantDays           []domain.ImportantDay       `json:"important_days,omitempty"`
 	Habits                  []domain.Habit              `json:"habits"`
 	Explorations            []domain.Exploration        `json:"explorations"`
@@ -1242,6 +1245,9 @@ func (m *Memory) SaveJSON(path string) error {
 	}
 	for _, item := range m.importantDays {
 		s.ImportantDays = append(s.ImportantDays, item)
+	}
+	for _, item := range m.parcels {
+		s.Parcels = append(s.Parcels, item)
 	}
 	for _, item := range m.subscriptions {
 		s.Subscriptions = append(s.Subscriptions, item)
@@ -1413,6 +1419,10 @@ func (m *Memory) LoadJSON(path string) error {
 	m.shopping = make(map[string]domain.ShoppingItem, len(s.Shopping))
 	m.bookmarks = make(map[string]domain.Bookmark, len(s.Bookmarks))
 	m.importantDays = make(map[string]domain.ImportantDay, len(s.ImportantDays))
+	m.parcels = make(map[string]domain.Parcel, len(s.Parcels))
+	for _, item := range s.Parcels {
+		m.parcels[item.UserID+":"+item.ID] = item
+	}
 	for _, item := range s.ImportantDays {
 		m.importantDays[item.UserID+":"+item.ID] = item
 	}

@@ -44,6 +44,9 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 		t.Fatalf("javascript cache control = %q", cacheControl)
 	}
 	for _, asset := range []struct{ name, marker, contentType string }{
+		{"parcels-core.js", "window.DaynestParcels", "javascript"},
+		{"parcels.js", "/api/v1/parcels", "javascript"},
+		{"parcels.css", ".parcel-dialog", "text/css"},
 		{"gentle-reminders-core.js", "window.DaynestReminders", "javascript"},
 		{"gentle-reminders-motion.js", "window.DaynestReminderMotion", "javascript"},
 		{"gentle-reminders.js", "daynest:focus-changed", "javascript"},
@@ -51,12 +54,12 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 	} {
 		t.Run(asset.name, func(t *testing.T) {
 			if !strings.Contains(home.Body.String(), "/static/"+asset.name+"?v=") {
-				t.Fatal("reminder asset is not linked in the app")
+				t.Fatal("UI asset is not linked in the app")
 			}
 			r := httptest.NewRecorder()
 			handler.ServeHTTP(r, httptest.NewRequest(http.MethodGet, "/static/"+asset.name+"?v=test", nil))
 			if r.Code != http.StatusOK || !strings.Contains(r.Body.String(), asset.marker) || !strings.Contains(r.Header().Get("Content-Type"), asset.contentType) {
-				t.Fatalf("embedded reminder asset status = %d, type = %q", r.Code, r.Header().Get("Content-Type"))
+				t.Fatalf("embedded UI asset status = %d, type = %q", r.Code, r.Header().Get("Content-Type"))
 			}
 		})
 	}

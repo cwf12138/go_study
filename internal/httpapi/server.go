@@ -50,6 +50,8 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 	root.HandleFunc("POST /api/v1/auth/login", s.login)
 
 	private := http.NewServeMux()
+	private.HandleFunc("GET /api/v1/parcels", s.listParcels)
+	private.HandleFunc("PUT /api/v1/parcels/{id}", s.saveParcel)
 	private.HandleFunc("GET /api/v1/important-days", s.listImportantDays)
 	private.HandleFunc("PUT /api/v1/important-days/{id}", s.saveImportantDay)
 	private.Handle("GET /api/v1/transfers", s.safeTransfer(http.HandlerFunc(s.listTransfers)))

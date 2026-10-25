@@ -53,6 +53,7 @@
     <link rel="stylesheet" href="/static/transfers.css?v=20261021-1">
     <link rel="stylesheet" href="/static/gentle-reminders.css?v=20261022-motion-2">
     <link rel="stylesheet" href="/static/important-days.css?v=20261022-1">
+    <link rel="stylesheet" href="/static/parcels.css?v=20261026-1">
     <link rel="stylesheet" href="/static/layout.css?v=20260922-1">
   </head>
   <body>
@@ -247,6 +248,7 @@
             </div>
             <aside class="shopping-home"><button id="shopping-home-open" type="button"><b>买点什么</b><span id="shopping-home-count">打开购物清单</span><span aria-hidden="true">↗</span></button><form id="shopping-home-form"><label class="shopping-sr-only" for="shopping-home-input">添加待购物品</label><input id="shopping-home-input" maxlength="120" placeholder="顺手记下要买的东西…" required><button id="shopping-home-add" type="submit" aria-label="加入购物清单">＋</button></form><p id="shopping-home-status" role="status"></p></aside>
             <div class="today-grid">
+              <article class="parcel-home"><div class="parcel-home-icon" aria-hidden="true">▱</div><div><p>出门前，顺手取一下。</p><strong id="parcel-home-count">快递收件</strong><span id="parcel-home-help">取件码与取件点，放在一处</span></div><button id="parcel-open" type="button" aria-haspopup="dialog" aria-controls="parcel-dialog">打开收件夹 ↗</button></article>
               <article class="id-home"><header><div><p>DATES TO KEEP CLOSE</p><h3>重要日子</h3><span id="id-count">留一点期待给未来。</span></div><button id="id-open" type="button" aria-haspopup="dialog" aria-controls="id-dialog">管理日子 ↗</button></header><div id="id-preview"></div></article>
               <article class="surface today-agenda"><div class="surface-head"><div><p class="eyebrow">TODAY</p><h3>今日安排</h3></div><button class="text-button" type="button" data-goto="calendar">打开日历 ↗</button></div><div id="today-agenda" role="status">正在整理今天的日程…</div></article>
               <article class="surface today-todos"><div class="surface-head"><div><p class="eyebrow">ONE THING AT A TIME</p><h3>今天要做</h3></div><button class="text-button" type="button" data-goto="todo">全部待办 ↗</button></div><div id="today-todos">正在整理待办…</div></article>
@@ -809,6 +811,20 @@
       <footer><p>仅检索当前账号已保存的 10 类记录，不搜索回收站、时光信件、词库或外部网页全文。空格分隔的词须全部命中；不支持语义搜索。按 Esc 关闭。</p><span>本机检索 · 不保存搜索历史 · Ctrl+K 仍为快捷导航</span></footer>
     </dialog>
     <dialog id="id-dialog" class="id-dialog" aria-labelledby="id-heading"><header class="id-heading"><div><p>MAKE EVERY DAY MEAN SOMETHING</p><h2 id="id-heading">把重要的日子，放在心上。</h2><span>生日、纪念日，或是下一段旅程。</span></div><button id="id-close" type="button" aria-label="关闭重要日子">×</button></header><div class="id-body"><div class="id-toolbar"><button id="id-new" class="id-primary" type="button">＋ 添加日子</button><button id="id-refresh" type="button">↻ 刷新</button><input id="id-query" type="search" maxlength="80" aria-label="搜索重要日子" placeholder="搜索名称或备注…"><select id="id-view" aria-label="日子视图"><option value="all">全部日子</option><option value="soon">未来 30 天</option><option value="trash">回收站</option></select><select id="id-category" aria-label="日子分类"><option value="">全部分类</option><option value="birthday">生日</option><option value="anniversary">纪念日</option><option value="plan">计划</option><option value="other">其他</option></select><select id="id-sort" aria-label="排序"><option value="nearest">最近日期优先</option><option value="created">最近创建优先</option></select></div><p id="id-status" role="status" aria-live="polite"></p><div class="id-retry-actions"><button id="id-retry" type="button" hidden>原样重试保存</button><button id="id-reconcile" type="button" hidden>重新载入并核对</button></div><section id="id-editor" class="id-editor" hidden><h3 id="id-editor-title">添加重要日子</h3><form id="id-form"><label>名称<input id="id-title" maxlength="80" required placeholder="例如：我们的纪念日"></label><div class="id-form-grid"><label>日期（公历）<input id="id-date" type="date" min="1900-01-01" max="2200-12-31" required></label><label>分类<select id="id-edit-category"><option value="anniversary">纪念日</option><option value="birthday">生日</option><option value="plan">计划</option><option value="other">其他</option></select></label></div><label>备注<textarea id="id-note" rows="2" maxlength="1000" placeholder="想为这一天做些什么？"></textarea></label><div class="id-checks"><label><input id="id-annual" type="checkbox">每年重复</label><label><input id="id-pinned" type="checkbox">置顶显示</label></div><p>按北京时间自然日计算，不包含今天。2 月 29 日每年重复时，等待下一个闰年；不显示农历、不提供系统通知。</p><div class="id-form-actions"><button id="id-cancel" type="button">收起表单</button><button id="id-save" class="id-primary" type="submit">保存日子</button></div></form></section><div id="id-list" class="id-list"></div><div class="id-pagination"><button id="id-prev" type="button">上一页</button><span id="id-page">1 / 1</span><button id="id-next" type="button">下一页</button></div><footer>置顶日子优先显示。过去的一次性日子会显示已过去天数；每年重复显示下一次日期。移入回收站后可恢复，不会自动清除。数据按账号保存在服务器并纳入个人导出。</footer></div></dialog>
+    <dialog id="parcel-dialog" class="parcel-dialog" aria-labelledby="parcel-heading">
+      <header class="parcel-heading"><div><p>ONE LESS THING TO REMEMBER</p><h2 id="parcel-heading">你的包裹，都在这里。</h2><span>把取件码收好，路过时顺手带回家。</span></div><button id="parcel-close" type="button" aria-label="关闭快递收件">×</button></header>
+      <div class="parcel-body"><div class="parcel-overview"><span id="parcel-summary">待取 0 · 运输中 0 · 已取 0</span><div><button id="parcel-refresh" type="button">↻ 同步</button><button id="parcel-new" class="parcel-primary" type="button">＋ 记个包裹</button></div></div>
+        <div class="parcel-toolbar"><label class="parcel-sr-only" for="parcel-view">包裹状态</label><select id="parcel-view"><option value="ready">待取件</option><option value="transit">运输中</option><option value="picked">已取件</option><option value="all">全部包裹</option><option value="trash">回收站</option></select><input id="parcel-query" type="search" maxlength="100" placeholder="搜索名称、取件点或单号…" aria-label="搜索包裹"><select id="parcel-place" aria-label="筛选取件点"><option value="">全部取件点</option></select><label class="parcel-large-toggle"><input id="parcel-large" type="checkbox">取件大字模式 · 显示全部码</label></div>
+        <p id="parcel-status" class="parcel-status" role="status" aria-live="polite"></p><div class="parcel-recovery"><button id="parcel-retry" type="button" hidden>原样重试保存</button><button id="parcel-reconcile" type="button" hidden>重新读取并核对</button></div>
+        <section id="parcel-editor" class="parcel-editor" hidden><h3 id="parcel-editor-title">收好一条取件通知</h3><form id="parcel-form"><fieldset id="parcel-fields"><div class="parcel-form-grid"><label>取件点<input id="parcel-location" maxlength="120" placeholder="例如：小区北门驿站"></label><label>取件码<input id="parcel-code" maxlength="40" autocomplete="off" placeholder="例如：8-2-1234"></label></div>
+          <details class="parcel-sms"><summary>从取件短信中提取取件码</summary><p>仅在本机识别“取件码 / 取货码 / 提货码”后的常见格式，不读取手机短信，也不保存原短信。</p><textarea id="parcel-sms" rows="2" maxlength="1500" placeholder="主动粘贴取件通知，不需要身份证或验证码。"></textarea><button id="parcel-sms-apply" type="button">填入取件码</button><p id="parcel-sms-status" role="status"></p></details>
+          <details class="parcel-more"><summary>状态、名称与最晚取件日（可选）</summary><div class="parcel-form-grid"><label>包裹名称（可选）<input id="parcel-title" maxlength="80" placeholder="不填则显示“快递包裹”"></label><label>状态<select id="parcel-edit-status"><option value="ready">待取件</option><option value="transit">运输中</option><option value="picked">已取件</option></select></label><label>快递公司（可选）<input id="parcel-carrier" maxlength="30" placeholder="例如：顺丰 / 中通"></label><label>自定最晚取件日（可选）<input id="parcel-deadline" type="date" min="2000-01-01" max="2200-12-31"></label></div></details>
+          <details class="parcel-more"><summary>单号与备注（可选）</summary><label>运单号<input id="parcel-tracking" maxlength="60" autocomplete="off"></label><label>备注<textarea id="parcel-note" maxlength="1000" rows="2" placeholder="例如：晚上 8 点前经过时取走。"></textarea></label></details></fieldset><div class="parcel-form-actions"><button id="parcel-cancel" type="button">收起并清空表单</button><button id="parcel-save" class="parcel-primary" type="submit">保存包裹</button></div></form></section>
+        <div id="parcel-list" class="parcel-list"></div><div class="parcel-pagination"><button id="parcel-prev" type="button">上一页</button><span id="parcel-page">1 / 1</span><button id="parcel-next" type="button">下一页</button></div>
+        <div id="parcel-manual-box" class="parcel-manual" hidden><label for="parcel-manual">手动复制取件码，请勿向陌生人展示</label><textarea id="parcel-manual" rows="2" readonly></textarea></div>
+        <footer>取件码默认遮住；关闭窗口或改变筛选后重新隐藏。包裹状态和最晚取件日由你手动记录，不是实时物流、不读取短信、不发送系统通知。取件码与地址按账号保存在服务器快照中，未加密，个人数据导出也会包含这些内容，请妥善保管。</footer>
+      </div>
+    </dialog>
     <dialog id="gr-dialog" class="gr-dialog" aria-labelledby="gr-title" aria-describedby="gr-intro">
       <header class="gr-head"><div><p class="gr-eyebrow">A LITTLE CARE, EVERY DAY</p><h2 id="gr-title">忙碌之间，照顾一下自己。</h2><p id="gr-intro">喝一点水，起身活动。让小小的停顿，自然发生。</p></div><button id="gr-close" class="gr-icon-button" type="button" aria-label="关闭轻提醒">×</button></header>
       <div class="gr-body">
@@ -847,6 +863,8 @@
     <script src="/static/gentle-reminders-core.js?v=20261022-1" defer></script>
     <script src="/static/important-days-core.js?v=20261022-1" defer></script>
     <script src="/static/important-days.js?v=20261022-1" defer></script>
+    <script src="/static/parcels-core.js?v=20261026-1" defer></script>
+    <script src="/static/parcels.js?v=20261026-1" defer></script>
     <script src="/static/gentle-reminders-motion.js?v=20261022-motion-2" defer></script>
     <script src="/static/gentle-reminders.js?v=20261022-motion-2" defer></script>
     <script src="/static/subscriptions-core.js?v=20261011-1" defer></script>
@@ -864,7 +882,7 @@
     <script src="/static/fitness-nutrition.js?v=20261018-1" defer></script>
     <script src="/static/bookmarks.js?v=20261011-2" defer></script>
     <script src="/static/toolkit-core.js?v=20261009-text" defer></script>
-    <script src="/static/toolkit.js?v=20261009-text" defer></script>
+    <script src="/static/toolkit.js?v=20261026-tools" defer></script>
     <script src="/static/toolkit-pocket-core.js?v=20261009-text" defer></script>
     <script src="/static/toolkit-pocket.js?v=20261009-text" defer></script>
     <script src="/static/text-tools-core.js?v=20261009-1" defer></script>
