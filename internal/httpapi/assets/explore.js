@@ -47,7 +47,7 @@
  $('#explore-list').addEventListener('submit',e=>{const form=e.target.closest('[data-explore-complete]');if(!form)return;e.preventDefault();const id=form.dataset.exploreComplete;run(async()=>{const item=await request('/'+encodeURIComponent(id)+'/completion',{method:'PUT',body:JSON.stringify({reflection:state.drafts[id]||''})});upsert(item);delete state.drafts[id];status('已记下这次体验。');});});
  new MutationObserver(()=>{sync();if(panel.classList.contains('active')&&state.token)load();}).observe(panel,{attributes:true,attributeFilter:['class']});
  new MutationObserver(sync).observe($('#app-view'),{attributes:true,attributeFilter:['class']});window.addEventListener('storage',e=>{if(e.key==='studyflow.token'){sync();if(panel.classList.contains('active')&&state.token)load();}});
- window.addEventListener('beforeunload',e=>{if($('#explore-body').value||Object.values(state.drafts).some(Boolean)||Object.keys(state.pending).length){e.preventDefault();e.returnValue='';}});
+ window.DaynestUI?.registerGuard?.('explore', () => $('#explore-body').value||Object.values(state.drafts).some(Boolean)||Object.keys(state.pending).length);window.addEventListener('beforeunload',e=>{if($('#explore-body').value||Object.values(state.drafts).some(Boolean)||Object.keys(state.pending).length){e.preventDefault();e.returnValue='';}});
  window.setInterval(()=>{if(!document.hidden&&panel.classList.contains('active')&&!state.busy&&state.items.some(e=>e.locked&&new Date(e.unlock_at)<=new Date()))load();},60000);
  sync();render();if(panel.classList.contains('active')&&state.token)load();
 })();

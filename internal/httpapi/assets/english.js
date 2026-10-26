@@ -20,6 +20,7 @@
       if (token !== (localStorage.getItem("studyflow.token") || "")) throw new Error("账号已切换，请重新加载。");
       if (response.status === 204) return null;
       const payload = await response.json().catch(() => null);
+      if (token !== (localStorage.getItem("studyflow.token") || "")) throw new Error("账号已切换，已忽略旧响应。");
       if (!response.ok) throw new Error(payload?.error?.message || `请求失败（${response.status}），请检查后端版本与登录状态。`);
       if (!payload || !("data" in payload)) throw new Error("服务返回格式异常，请确认访问的是当前版本后端。");
       return payload.data;
@@ -30,6 +31,7 @@
   }
 
   function notify(message, type = "success") {
+    if (window.DaynestUI) return window.DaynestUI.notify(message, type);
     const toast = $("#toast"); if (!toast) return;
     toast.textContent = message; toast.className = `toast visible ${type === "error" ? "error" : ""}`;
     window.setTimeout(() => { if (toast.textContent === message) toast.className = "toast"; }, 3200);

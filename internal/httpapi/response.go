@@ -12,6 +12,16 @@ import (
 type envelope map[string]any
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
+	if body, ok := value.(envelope); ok && status >= http.StatusBadRequest {
+		copy := make(envelope, len(body)+1)
+		for key, item := range body {
+			copy[key] = item
+		}
+		if requestID := w.Header().Get("X-Request-ID"); requestID != "" {
+			copy["request_id"] = requestID
+		}
+		value = copy
+	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(value); err != nil {

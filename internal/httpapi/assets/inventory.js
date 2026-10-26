@@ -144,7 +144,7 @@
     $('draft-export').addEventListener('click',()=>{if(state.editing&&state.token===token())download(rawDraft(),'application/json',`Daynest-物品草稿-${day()}.json`);});
     document.getElementById('logout')?.addEventListener('click',()=>{state.token='invalidated';syncAccount();lockForm(false);});
     window.addEventListener('storage',event=>{if(event.key==='studyflow.token'){syncAccount();lockForm(false);}});
-    window.addEventListener('beforeunload',event=>{if(state.editing&&rawDraft()!==state.baseline){event.preventDefault();event.returnValue='';}});
+    window.DaynestUI?.registerGuard?.('inventory', () => state.editing&&rawDraft()!==state.baseline);window.addEventListener('beforeunload',event=>{if(state.editing&&rawDraft()!==state.baseline){event.preventDefault();event.returnValue='';}});
     setInterval(()=>{if(state.token!==token()){syncAccount();lockForm(false);}else if(state.loaded&&!document.hidden&&state.today!==day())render();},60000);
   }
   bind();

@@ -30,6 +30,7 @@ const instrumented = source.replace('  bootstrap();', '  refresh=async()=>{}; re
 assert.notEqual(instrumented, source);
 vm.runInNewContext(instrumented, context);
 const app = context.window.tasksTest;
+context.localStorage.getItem = key => key === 'studyflow.token' ? app.state.token : '';
 const base = { text: '', status: '', priority: '', deadline: '', sort: 'smart', page: 1, pageSize: 8 };
 const task = (id, extras = {}) => ({ id, title: id, status: 'todo', priority: 'medium', estimated_minutes: 30, created_at: '2026-09-01T00:00:00Z', tags: [], ...extras });
 const tasks = [

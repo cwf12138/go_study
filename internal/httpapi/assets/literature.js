@@ -22,11 +22,11 @@
     const headers=new Headers(options.headers||{}),token=localStorage.getItem("studyflow.token")||"";
     if(token)headers.set("Authorization",`Bearer ${token}`);if(options.body)headers.set("Content-Type","application/json");
     const controller=new AbortController(),timer=window.setTimeout(()=>controller.abort(),25000);
-    try{const response=await fetch(path,{...options,headers,signal:controller.signal});if(response.status===204)return null;const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(response.status===401?'登录已过期，请重新登录':payload?.error?.message||`请求失败（${response.status}）`);return payload.data}
+    try{const response=await fetch(path,{...options,headers,signal:controller.signal});if(response.status===204)return null;const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(response.status===401?'登录已过期，请重新登录':payload?.error?.message||`请求失败（${response.status}）`);if(!payload||typeof payload!=="object"||!Object.hasOwn(payload,"data"))throw new Error("阅读服务返回格式不完整，请保留笔记后重试。");return payload.data}
     catch(error){if(error.name==='AbortError')throw new Error('请求超时，请检查网络后重试');throw error}
     finally{window.clearTimeout(timer)}
   }
-  function notify(message,type="success"){const toast=$("#toast");if(!toast)return;toast.textContent=message;toast.className=`toast visible ${type==="error"?"error":""}`;window.setTimeout(()=>{if(toast.textContent===message)toast.className="toast"},3300)}
+  function notify(message,type="success"){if(window.DaynestUI)return window.DaynestUI.notify(message,type);const toast=$("#toast");if(!toast)return;toast.textContent=message;toast.className=`toast visible ${type==="error"?"error":""}`;window.setTimeout(()=>{if(toast.textContent===message)toast.className="toast"},3300)}
   function syncAccount(){const token=localStorage.getItem("studyflow.token")||"";if(token===state.token)return token;state.token=token;state.initialized=false;state.catalog=[];state.shelf=[];state.classics=[];state.studies=[];state.overview={};state.currentReading=null;state.content=null;return token}
   const authorLabel=(book)=>(book.authors||[]).join(" · ")||"Unknown author";
   const shelfReading=(bookID)=>state.shelf.find((item)=>item.book?.id===bookID);
@@ -219,7 +219,7 @@ function renderEBookTools(){const reading=state.currentReading;if(!reading)retur
     $("#ebook-finish-reading").addEventListener('click',async event=>{event.stopImmediatePropagation();if(state.content&&await saveProgress('completed'))notify('这本书已标记为读完。')},true);
     document.addEventListener('visibilitychange',()=>{if(!$("#ebook-reader-dialog").open)return;if(document.hidden){saveProgress();state.readerStarted=0;window.speechSynthesis?.cancel()}else if(state.content)state.readerStarted=Date.now()});
     window.setInterval(()=>{if(!document.hidden&&$("#ebook-reader-dialog").open&&state.content)saveProgress()},60000);
-    window.addEventListener('beforeunload',event=>{if(progressPromise||progressFailed||($("#ebook-reader-dialog").open&&state.content)){event.preventDefault();event.returnValue=''}});
+    window.DaynestUI?.registerGuard?.('literature', () => progressPromise||progressFailed||($("#ebook-reader-dialog").open&&state.content));window.addEventListener('beforeunload',event=>{if(progressPromise||progressFailed||($("#ebook-reader-dialog").open&&state.content)){event.preventDefault();event.returnValue=''}});
   }
   bind();
   setupProduct();

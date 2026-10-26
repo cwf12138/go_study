@@ -28,6 +28,7 @@ const context={console,Date,Intl,URLSearchParams,AbortController,Headers:class{s
 const testSource=source.replace('  bootstrap();','  window.moodTest={state,renderMoods,renderMoodTrend,markMoodDraft,canLeaveMoodDraft,saveMoodEntry,moodAvatar};');
 assert.notEqual(source,testSource);vm.runInNewContext(testSource,context);
 const api=context.window.moodTest;
+context.localStorage.getItem=key=>key==='studyflow.token'?api.state.token:'';
 api.state.moodMonth='2026-09';api.state.moodSelectedDate='2026-09-01';
 api.state.moodEntries=[{date:'2026-09-04',mood:'great'},{date:'2026-09-01',mood:'low',note:'saved'},{date:'2026-09-03',mood:'good'}];
 api.renderMoods();

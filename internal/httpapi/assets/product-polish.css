@@ -1,0 +1,32 @@
+/* Shared interaction layer; feature palettes and calendar geometry stay intact. */
+.skip-to-content{position:fixed;top:10px;left:15px;z-index:2000;padding:12px 18px;border-radius:10px;background:var(--paper);color:var(--ink);border:2px solid var(--blue);transform:translateY(-180%)}
+.skip-to-content:focus{transform:none}
+.product-sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+:is(.workspace,dialog,.auth-card) :is(button,a,summary):focus-visible{outline:3px solid var(--blue);outline-offset:3px}
+:is(.workspace,dialog,.auth-card) :is(label,[role=status],.hint){line-height:1.7}
+:is(.workspace,dialog,.auth-card) :is(label,[role=status],.hint,.primary,.quiet,.text-button){font-size:14px}
+:is(.workspace,dialog,.auth-card) :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select,textarea){font-size:max(14px,1em);min-width:0;max-width:100%;scroll-margin-block:100px}
+:is(.workspace,dialog,.auth-card) [aria-invalid=true]{border-color:var(--danger);box-shadow:0 0 0 2px color-mix(in srgb,var(--danger) 16%,transparent)}
+.product-field-error{display:block;font-size:13px;font-weight:500;line-height:1.6;color:var(--danger);margin-top:5px;overflow-wrap:anywhere}
+.product-toast{display:flex;align-items:flex-start;gap:16px;max-width:min(560px,calc(100vw - 30px));padding:16px 18px;font-size:15px;line-height:1.7;border-radius:15px;box-shadow:0 14px 50px #15223d2b;pointer-events:auto;overflow-wrap:anywhere;z-index:2100}
+.product-toast[hidden]{display:none!important}.product-toast #toast-message{flex:1;min-width:0}
+.product-toast button{flex-shrink:0;border:1px solid currentColor;background:transparent;color:inherit;border-radius:8px;font-size:13px;padding:5px 10px;min-height:34px;cursor:pointer}
+.product-toast button:focus-visible{outline:2px solid currentColor;outline-offset:3px}
+.auth-connection{padding:16px;margin-bottom:18px;border:1px solid var(--line);border-radius:12px;background:var(--canvas);color:var(--ink);font-size:14px;line-height:1.8}
+.auth-connection p{margin:0 0 10px}.auth-connection>div{display:flex;flex-wrap:wrap;gap:8px}.auth-connection[hidden]{display:none!important}
+.sidebar-footer[data-state=error] .status-dot{background:var(--orange)}
+.sidebar-footer[data-state=loading] .status-dot{background:#aab6cf}
+.navigation-backdrop{display:none}
+@media(max-width:900px){
+ .navigation-open{overflow:hidden}.navigation-backdrop:not([hidden]){display:block;position:fixed;inset:0;border:0;background:#101b3666;backdrop-filter:blur(3px);z-index:49;cursor:pointer}
+ .sidebar.open{z-index:50;max-width:calc(100vw - 56px);overflow-y:auto;max-height:100dvh}
+ .sidebar.open .daynest-nav{padding-bottom:30px}.sidebar .nav-link{min-height:44px}
+ .product-toast{left:15px;right:15px;bottom:max(18px,env(safe-area-inset-bottom));width:auto;transform:translateY(20px)}
+ .product-toast.visible{transform:translateY(0)}
+}
+@media(max-width:560px){
+ :is(.workspace,dialog,.auth-card) :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select,textarea){font-size:16px!important}
+ .product-toast{font-size:14px}.product-toast button{min-height:40px}.command-trigger kbd{font-size:12px}
+}
+@media(pointer:coarse){:is(.workspace,dialog,.auth-card) :is(.primary,.quiet,.text-button,.icon-button){min-height:44px;touch-action:manipulation}}
+@media(prefers-reduced-motion:reduce){.product-toast,.skip-to-content,.navigation-backdrop,.sidebar{transition:none!important;animation:none!important}}

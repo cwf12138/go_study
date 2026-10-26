@@ -115,7 +115,7 @@
     document.addEventListener('daynest:shopping-changed',()=>{if(state.busy){message('菜谱食材已加入购物清单，当前操作完成后请刷新查看。');return;}load();});
     document.addEventListener('daynest:open-shopping',()=>{showTab(true);load();});
     window.addEventListener('storage',e=>{if(e.key==='studyflow.token'){sync();if(token())load();}});
-    window.addEventListener('beforeunload',e=>{if($('input').value.trim()||$('home-input').value.trim()||(state.editing&&draft()!==state.baseline)){e.preventDefault();e.returnValue='';}});
+    window.DaynestUI?.registerGuard?.('shopping', () => $('input').value.trim()||$('home-input').value.trim()||(state.editing&&draft()!==state.baseline));window.addEventListener('beforeunload',e=>{if($('input').value.trim()||$('home-input').value.trim()||(state.editing&&draft()!==state.baseline)){e.preventDefault();e.returnValue='';}});
     if(token())load();else render();
   }
   bind();

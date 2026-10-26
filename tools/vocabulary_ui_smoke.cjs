@@ -6,6 +6,7 @@ const elements=new Map();function el(selector){if(!elements.has(selector))elemen
 const context={Date,Intl,URLSearchParams,AbortController,console,Headers:class{set(){}has(){return false}},localStorage:{getItem(){return ''},setItem(){}},document:{querySelector:el,querySelectorAll(){return []}},window:{setTimeout(){},clearTimeout(){}}};
 vm.runInNewContext(source.replace('  bootstrap();','  window.test={state,renderVocabulary,refreshVocabulary,reviewVocabularyWord,selectVocabularyBook,importVocabularyCatalog};'),context);
 const app=context.window.test;
+context.localStorage.getItem=key=>key==='studyflow.token'?app.state.token:'';
 const word=(id,book='a')=>({id,book_id:book,term:'word-'+id,definition:'释义',stage:'new'});
 const response=(data)=>({ok:true,status:200,json:async()=>({data,meta:{total:1,page:1,total_pages:1}})});
 async function run(){

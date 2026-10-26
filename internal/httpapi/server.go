@@ -215,7 +215,7 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 	private.HandleFunc("GET /api/v1/exports/learning.csv", s.exportLearningCSV)
 	private.HandleFunc("GET /api/v1/exports/planner.ics", s.exportPlanCalendar)
 	private.HandleFunc("GET /api/v1/events/stream", s.events)
-	root.Handle("/api/v1/", authenticate(tokens, private))
+	root.Handle("/api/v1/", authenticate(tokens, jsonRoutes(private)))
 
 	var handler http.Handler = root
 	handler = accessLog(logger, handler)

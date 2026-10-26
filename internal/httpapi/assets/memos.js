@@ -42,6 +42,7 @@
   }
 
   function notify(message, type = "success") {
+    if (window.DaynestUI) return window.DaynestUI.notify(message, type);
     const toast = $("#toast");
     if (!toast) return;
     toast.textContent = message;
@@ -445,7 +446,7 @@
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "n") { event.preventDefault(); createMemo(); }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); saveCurrent(); }
     });
-    window.addEventListener("beforeunload", (event) => { if (state.dirty || state.saving) { event.preventDefault(); event.returnValue = ""; } });
+    window.DaynestUI?.registerGuard?.('memos', () => state.dirty || state.saving);window.addEventListener("beforeunload", (event) => { if (state.dirty || state.saving) { event.preventDefault(); event.returnValue = ""; } });
   }
 
   bindEvents();

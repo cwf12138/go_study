@@ -2,7 +2,7 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert'),path=require('p
 const root=path.join(__dirname,'../internal/httpapi/assets'),nodes=new Map();
 function node(id){if(!nodes.has(id))nodes.set(id,{value:'',textContent:'',innerHTML:'',dataset:{},style:{setProperty(){}},handlers:{},classList:{add(){},remove(){},toggle(){},contains:()=>false},addEventListener(n,f){this.handlers[n]=f;},setAttribute(){},insertAdjacentHTML(){},querySelectorAll:()=>[],querySelector:()=>null,focus(){this.focused=true;},showModal(){this.open=true;},close(){this.open=false;this.handlers.close?.();},reset(){}});return nodes.get(id);}
 let token='alice',respond;const winEvents={};
-const ctx={document:{querySelector:node,querySelectorAll:()=>[]},localStorage:{getItem:k=>k==='studyflow.token'?token:null,setItem(){}},window:{setTimeout,clearTimeout,setInterval(){},addEventListener(k,f){winEvents[k]=f;}},location:{hash:''},Headers:class{set(){}},Intl,URLSearchParams,requestAnimationFrame:f=>f(),fetch:(...a)=>respond(...a)};
+const ctx={document:{querySelector:node,querySelectorAll:()=>[]},localStorage:{getItem:k=>k==='studyflow.token'?token:null,setItem(){}},window:{setTimeout,clearTimeout,setInterval(){},addEventListener(k,f){winEvents[k]=f;}},location:{hash:''},Headers:class{set(){}},AbortController,Intl,URLSearchParams,requestAnimationFrame:f=>f(),fetch:(...a)=>respond(...a)};
 vm.createContext(ctx);
 let source=fs.readFileSync(path.join(root,'calendar.js'),'utf8').replace('      loadHistory(value);','      /* External history excluded from this interaction test. */');
 source=source.replace('  bind();','  window.test={state,loadCalendar,loadDayDetail,itemsByDate,renderCalendar};\n  bind();');

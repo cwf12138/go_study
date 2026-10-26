@@ -21,27 +21,41 @@
     anchor: new Date(), selected: dateKey(new Date()), overview: null, detail: null,
     saving: false, requestID: 0, detailRequestID: 0, query: '', source: 'all', owner: token(), loading: false, fitnessDirty: false, initialized: false, direction: 1, historyRequestID: 0, historyCache: new Map(),
   };
+  let eventDirty = false;
 
   async function api(path, options = {}) {
     const owner = token();
     const headers = new Headers(options.headers || {});
     if (token()) headers.set("Authorization", `Bearer ${token()}`);
     if (options.body) headers.set("Content-Type", "application/json");
-    const response = await fetch(path, { ...options, headers });
-    if (owner !== token()) throw new Error('账号已切换，请重新加载日历。');
-    if (response.status === 204) return null;
-    const payload = await response.json().catch(() => ({}));
-    if (owner !== token()) throw new Error('账号已切换，请重新加载日历。');
-    if (!response.ok) {
-      if (response.status === 404 && path.startsWith("/api/v1/calendar")) {
-        throw new Error("当前运行的 Go 服务不包含日历 API，请停止旧进程并重新执行 go run ./cmd/api。");
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    if (options.signal?.aborted) abort(); else options.signal?.addEventListener('abort', abort, { once: true });
+    let timedOut = false;
+    const timer = window.setTimeout(() => { timedOut = true; controller.abort(); }, 25000);
+    try {
+      const response = await fetch(path, { ...options, headers, signal: controller.signal, cache: 'no-store' });
+      if (owner !== token()) throw new Error('账号已切换，请重新加载日历。');
+      if (response.status === 204) return null;
+      const payload = await response.json().catch(() => ({}));
+      if (owner !== token()) throw new Error('账号已切换，请重新加载日历。');
+      if (!response.ok) {
+        if (response.status === 404 && path.startsWith("/api/v1/calendar")) {
+          if (payload?.error?.code === 'not_found') throw new Error('该日程已不存在，请刷新日历后核对。');
+          throw new Error("当前运行的 Go 服务不包含日历 API，请停止旧进程并重新执行 go run ./cmd/api。");
+        }
+        throw new Error(payload?.error?.message || `日历请求失败（${response.status}）`);
       }
-      throw new Error(payload?.error?.message || `日历请求失败（${response.status}）`);
-    }
-    return payload.data;
+      if (!payload || typeof payload !== 'object' || !Object.hasOwn(payload, 'data')) throw new Error('日历响应不完整，请保留表单后重试。');
+      return payload.data;
+    } catch (error) {
+      if (error.name === 'AbortError') throw new Error(timedOut ? '日历请求超时。保存日程时请先核对结果，再决定是否重试。' : '日历请求已取消。');
+      throw error;
+    } finally { window.clearTimeout(timer); options.signal?.removeEventListener('abort', abort); }
   }
 
   function notify(message, error = false) {
+    if (window.DaynestUI) return window.DaynestUI.notify(message, error ? 'error' : 'success');
     const toast = $("#toast");
     if (!toast) return;
     toast.textContent = message;
@@ -390,6 +404,8 @@
   }
 
   function openEventDialog(eventID = "", selectedDate = state.selected) {
+    if (state.saving) return;
+    eventDirty = false;
     const occurrence = (state.overview?.events || []).find((item) => item.id === eventID);
     const start = occurrence ? new Date(occurrence.start_at) : fromDateKey(selectedDate);
     if (!occurrence) start.setHours(9, 0, 0, 0);
@@ -432,7 +448,8 @@
     $("#calendar-event-form").querySelectorAll("button,input,select,textarea").forEach(node => node.disabled = true);
     try {
       await api(id ? `/api/v1/calendar/events/${id}` : "/api/v1/calendar/events", { method: id ? "PATCH" : "POST", body: JSON.stringify(body) });
-	  if (body.reminder_minutes > 0 && "Notification" in window && Notification.permission === "default") Notification.requestPermission().catch(() => undefined);
+      // Notification permission is requested only through an explicit reminder action.
+      eventDirty = false;
       $("#calendar-event-dialog").close();
       await loadCalendar();
       notify(id ? "日程已更新。" : "日程已创建。持续安排，也给自己留出余量。");
@@ -502,8 +519,10 @@
     const resetOwner = () => {
       if (state.owner === token()) return;
       state.owner = token(); state.requestID++; state.detailRequestID++; state.historyRequestID++;
+      state.initialized = false;
       state.overview = null; state.detail = null; state.loading = false;
       state.selected = dateKey(new Date()); state.anchor = new Date();
+      eventDirty = false;
       $("#calendar-event-dialog").close(); $("#calendar-event-form").reset();
       tools.close();
       state.query = ""; state.source = "all";
@@ -513,6 +532,9 @@
       if (state.owner && $("#panel-calendar").classList.contains("active")) loadCalendar();
     };
     if (typeof MutationObserver !== "undefined") new MutationObserver(resetOwner).observe($("#app-view"), {attributes:true,attributeFilter:["class"]});
+    if (typeof MutationObserver !== 'undefined') new MutationObserver(() => {
+      if (token() && $('#panel-calendar').classList.contains('active') && !state.initialized) { state.initialized = true; loadCalendar(); }
+    }).observe($('#panel-calendar'), { attributes: true, attributeFilter: ['class'] });
     window.addEventListener("storage", e => { if (e.key === "studyflow.token") resetOwner(); else if(["daynest.fitness.changed","daynest.care.changed"].includes(e.key))fitnessChanged(); });
 
     $("[data-view=calendar]")?.addEventListener("click", () => {
@@ -520,17 +542,26 @@
 	  state.initialized = true;
 	  loadCalendar();
 	});
-    $("#calendar-event-dialog").addEventListener("cancel", event => { if (state.saving) event.preventDefault(); });
+    const canCloseEvent = () => !state.saving && (!eventDirty || window.confirm('日程尚未保存，确定放弃修改吗？'));
+    $("#calendar-event-form").addEventListener('input', () => { eventDirty = true; });
+    $("#calendar-event-form").addEventListener('change', () => { eventDirty = true; });
+    $("#calendar-event-dialog").addEventListener("cancel", event => { if (!canCloseEvent()) event.preventDefault(); });
+    window.DaynestUI?.registerGuard?.('calendar', () => eventDirty && $('#calendar-event-dialog').open || state.saving);window.addEventListener('beforeunload', event => { if (eventDirty && $('#calendar-event-dialog').open || state.saving) { event.preventDefault(); event.returnValue = ''; } });
     $("#calendar-prev").addEventListener("click", () => navigate(-1));
     $("#calendar-next").addEventListener("click", () => navigate(1));
     $("#calendar-today").addEventListener("click", () => { state.anchor = new Date(); state.selected = dateKey(new Date()); state.direction = 0; loadCalendar(true); });
     document.querySelectorAll("[data-calendar-view]").forEach((button) => button.addEventListener("click", () => setView(button.dataset.calendarView)));
     $("#calendar-create").addEventListener("click", () => openEventDialog());
     $("#calendar-quick-create").addEventListener("click", () => openEventDialog());
-    $("#calendar-dialog-close").addEventListener("click", () => $("#calendar-event-dialog").close());
-    $("#calendar-event-cancel").addEventListener("click", () => $("#calendar-event-dialog").close());
+    $("#calendar-dialog-close").addEventListener("click", () => { if (canCloseEvent()) $("#calendar-event-dialog").close(); });
+    $("#calendar-event-cancel").addEventListener("click", () => { if (canCloseEvent()) $("#calendar-event-dialog").close(); });
     $("#calendar-event-delete").addEventListener("click", deleteEvent);
     $("#calendar-event-form").addEventListener("submit", saveEvent);
+    $("#calendar-notification-enable").addEventListener('click', async () => {
+      if (!("Notification" in window)) { notify('当前浏览器不支持系统通知；需要 HTTPS 或 localhost。', true); return; }
+      try { const permission = await Notification.requestPermission(); notify(permission === 'granted' ? '已允许提醒。网页关闭或设备休眠时不保证送达。' : '未开启浏览器提醒，仍可在日历中查看安排。', permission !== 'granted'); }
+      catch (_) { notify('浏览器未允许通知，请检查站点权限。', true); }
+    });
     $("#calendar-canvas").addEventListener("click", async (event) => {
 	  if (event.target.closest("[data-calendar-retry]")) { await loadCalendar(); return; }
       const fitnessButton=event.target.closest("[data-calendar-fitness]");if(fitnessButton){openFitness(fitnessButton.dataset.calendarFitness);return;}

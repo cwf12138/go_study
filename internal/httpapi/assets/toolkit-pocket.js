@@ -97,7 +97,7 @@
   new MutationObserver(()=>{sync();leave();}).observe(panel,{attributes:true,attributeFilter:['class']});new MutationObserver(leave).observe(recordPanel,{attributes:true,attributeFilter:['hidden']});
   new MutationObserver(sync).observe(document.getElementById('app-view'),{attributes:true,attributeFilter:['class']});
   document.getElementById('logout').addEventListener('click',()=>{cleanup();owner=token();});window.addEventListener('storage',e=>{if(e.key==='studyflow.token')sync();});document.addEventListener('visibilitychange',()=>{sync();leave();});
-  window.addEventListener('pagehide',cleanup);window.addEventListener('beforeunload',e=>{if(record||micPending||audioBlob){e.preventDefault();e.returnValue='';}});
+  window.addEventListener('pagehide',cleanup);window.DaynestUI?.registerGuard?.('toolkit-pocket', () => record||micPending||audioBlob);window.addEventListener('beforeunload',e=>{if(record||micPending||audioBlob){e.preventDefault();e.returnValue='';}});
   window.setInterval(()=>{sync();const r=record;if(!r)return;const ms=elapsed(r);showElapsed(ms);if(ms>=1800000)stopRecording('已达到 30 分钟上限，录音已结束。');},250);
   imageControls();recordControls();
 })();

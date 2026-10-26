@@ -57,6 +57,6 @@
  $('#ledger-trend').addEventListener('click',e=>{const b=e.target.closest('[data-ledger-day]');if(!b)return;const day=b.dataset.ledgerDay===state.day?'':b.dataset.ledgerDay;resetFilters();state.day=day;$('#ledger-kind').value='expense';render();});
  $('#ledger-list').addEventListener('click',e=>{const edit=e.target.closest('[data-ledger-edit]'),remove=e.target.closest('[data-ledger-archive]');if(edit)openEditor(state.items.find(v=>v.id===edit.dataset.ledgerEdit));if(remove)archive(remove.dataset.ledgerArchive);});$('#ledger-export').addEventListener('click',exportCSV);
  function enter(){sync();if(panel.classList.contains('active')&&state.token&&!state.loaded)load();}
- new MutationObserver(enter).observe(panel,{attributes:true,attributeFilter:['class']});new MutationObserver(sync).observe($('#app-view'),{attributes:true,attributeFilter:['class']});window.addEventListener('storage',e=>{if(e.key==='studyflow.token')enter();});window.addEventListener('beforeunload',e=>{if(state.dirty||state.pending){e.preventDefault();e.returnValue='';}});
+ new MutationObserver(enter).observe(panel,{attributes:true,attributeFilter:['class']});new MutationObserver(sync).observe($('#app-view'),{attributes:true,attributeFilter:['class']});window.addEventListener('storage',e=>{if(e.key==='studyflow.token')enter();});window.DaynestUI?.registerGuard?.('ledger', () => state.dirty||state.pending);window.addEventListener('beforeunload',e=>{if(state.dirty||state.pending){e.preventDefault();e.returnValue='';}});
  sync();render();enter();
 })();

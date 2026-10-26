@@ -67,6 +67,9 @@ type responseRecorder struct {
 func (r *responseRecorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
 
 func (r *responseRecorder) WriteHeader(status int) {
+	if r.status != 0 {
+		return
+	}
 	r.status = status
 	r.ResponseWriter.WriteHeader(status)
 }
@@ -81,6 +84,9 @@ func (r *responseRecorder) Write(value []byte) (int, error) {
 }
 
 func (r *responseRecorder) Flush() {
+	if r.status == 0 {
+		r.WriteHeader(http.StatusOK)
+	}
 	if flusher, ok := r.ResponseWriter.(http.Flusher); ok {
 		flusher.Flush()
 	}
@@ -120,6 +126,12 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Request-ID")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Expose-Headers", "X-Request-ID")
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			// Personal API responses, authentication failures and route errors must
+			// not be reused by a shared cache after an account change.
+			w.Header().Set("Cache-Control", "no-store")
+		}
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return

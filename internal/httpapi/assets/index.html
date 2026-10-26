@@ -54,6 +54,7 @@
     <link rel="stylesheet" href="/static/gentle-reminders.css?v=20261022-motion-2">
     <link rel="stylesheet" href="/static/important-days.css?v=20261022-1">
     <link rel="stylesheet" href="/static/parcels.css?v=20261026-1">
+    <link rel="stylesheet" href="/static/product-polish.css?v=20261026-1">
     <link rel="stylesheet" href="/static/layout.css?v=20260922-1">
   </head>
   <body>
@@ -70,7 +71,7 @@
               <small>每天一次 · 中国标准时间零点更新<br>仅供娱乐，不作运势预测</small>
             </div>
           </dialog>
-    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <div id="toast" class="toast product-toast" hidden><span id="toast-message" role="status" aria-live="polite" aria-atomic="true"></span><button id="toast-dismiss" type="button" aria-label="关闭提示">关闭</button></div>
 
     <main id="auth-view" class="auth-shell">
       <section class="hero">
@@ -88,6 +89,7 @@
           <button class="tab active" type="button" data-auth-tab="login">登录</button>
           <button class="tab" type="button" data-auth-tab="register">创建账号</button>
         </div>
+        <section id="auth-connection" class="auth-connection" hidden aria-label="恢复连接"><p id="auth-connection-status" role="status"></p><div><button id="auth-reconnect" class="primary" type="button">重试连接</button><button id="auth-reset" class="quiet" type="button">切换账号</button></div></section>
         <form id="login-form" class="auth-form">
           <label>邮箱<input id="login-email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
           <label>密码<input id="login-password" type="password" autocomplete="current-password" required minlength="8" placeholder="至少 8 位"></label>
@@ -104,7 +106,9 @@
     </main>
 
     <div id="app-view" class="app-shell hidden">
-      <aside class="sidebar">
+      <a class="skip-to-content" href="#main-content">跳转到主要内容</a>
+      <button id="navigation-backdrop" class="navigation-backdrop" type="button" hidden aria-label="关闭导航菜单" tabindex="-1"></button>
+      <aside id="app-sidebar" class="sidebar" aria-label="功能导航">
         <a class="brand" href="#dashboard" aria-label="日常 Daynest 首页" data-goto="dashboard"><span class="brand-mark">D</span><span>日常 <small>Daynest</small></span></a>
         <nav class="nav daynest-nav" aria-label="主导航">
           <div class="nav-group" role="group" aria-label="今天"><p class="nav-group-label">今天</p>
@@ -140,12 +144,12 @@
             <button class="nav-link" type="button" data-view="explore"><span aria-hidden="true">✉</span>探索生活</button>
           </div>
         </nav>
-        <div class="sidebar-footer"><span class="status-dot"></span>API 已连接</div>
+        <div class="sidebar-footer" data-state="loading"><span class="status-dot" aria-hidden="true"></span><span id="sidebar-connection">连接待检查</span></div>
       </aside>
 
       <section class="workspace">
         <header class="topbar">
-          <button id="mobile-menu" class="icon-button mobile-only" type="button" aria-label="打开菜单">☰</button>
+          <button id="mobile-menu" class="icon-button mobile-only" type="button" aria-label="打开菜单" aria-controls="app-sidebar" aria-expanded="false">☰</button>
           <div><p id="page-kicker" class="eyebrow">DAYNEST · YOUR EVERYDAY</p><h2 id="page-title">今天</h2></div>
             <div id="topbar-glance" class="topbar-glance user-actions" role="group" aria-label="天气、节假日、今日签与轻提醒">
             <button id="holiday-trigger" class="holiday-widget" type="button" aria-haspopup="dialog" aria-controls="holiday-dialog"><span class="holiday-icon" aria-hidden="true">▦</span><span class="holiday-copy"><strong id="holiday-name">下个节假日</strong><small id="holiday-caption">正在查看假期…</small></span><span class="holiday-count"><b id="holiday-days">—</b><small>天</small></span></button>
@@ -156,7 +160,8 @@
           <dialog id="holiday-dialog" aria-labelledby="holiday-title"><header><div><p class="eyebrow">A LITTLE BREAK AHEAD</p><h3 id="holiday-title">下个节假日</h3></div><button id="holiday-close" class="quiet" type="button" aria-label="关闭节假日详情">✕</button></header><div class="holiday-detail"><p id="holiday-detail-name">正在查看假期…</p><strong id="holiday-detail-days">—</strong><p id="holiday-detail-dates"></p></div><p id="holiday-current"></p><p id="holiday-status" role="status"></p><div class="holiday-dialog-actions"><a id="holiday-source" target="_blank" rel="noopener noreferrer" hidden>查看官方放假通知 ↗</a><button id="holiday-retry" class="quiet" type="button">刷新</button></div><p class="holiday-note">中国大陆节假日 · 按北京时间自然日计数。已核实安排按放假首日倒计时；未收录安排时仅显示节日日期，不推测放假天数或调休。普通周末不计入。</p></dialog>
         </header>
 
-        <div class="content">
+        <div id="main-content" class="content" tabindex="-1" role="main" aria-labelledby="page-title">
+          <span id="page-announcement" class="product-sr-only" role="status" aria-live="polite" aria-atomic="true"></span>
           <section id="panel-transfers" class="panel ft-space" aria-label="文件快传">
             <header class="ft-hero"><div><p class="ft-eyebrow">A LITTLE CLOSER</p><h2>文件换个设备，<br>不用绕一大圈。</h2><p>照片、文档、临时要用的资料。<br>放在这里，在另一台设备登录同一账号拿走。</p><button id="ft-connect" type="button">在另一台设备打开 ↗</button></div><div class="ft-upload-card"><div id="ft-drop" class="ft-drop"><span class="ft-upload-icon" aria-hidden="true">⇧</span><h3>把文件放到这里</h3><p>拖入文件，或点击选择<br>支持多选，单个文件最多 32 MiB</p><button id="ft-choose" type="button" class="ft-primary">＋ 选择文件</button><input id="ft-input" type="file" multiple hidden></div><label class="ft-retention">文件有效期<select id="ft-ttl"><option value="24">24 小时</option><option value="168">7 天</option><option value="0">长期保留</option></select></label><small>过期后暂停下载，不会自动删除；可延长或手动清理。</small></div></header>
             <div class="ft-overview"><article><span>随时可取</span><strong id="ft-active-count">0</strong><small>当前账号的有效文件</small></article><article><span>等待整理</span><strong id="ft-clean-count">0</strong><small>已过期 / 回收站</small></article><article class="ft-storage"><div><span>已用空间</span><b id="ft-storage-value">0 / 256 MiB</b></div><progress id="ft-storage-bar" value="0" max="268435456"></progress><small>过期和回收站文件仍占空间，永久清理后释放。</small></article></div>
@@ -252,7 +257,7 @@
               <article class="id-home"><header><div><p>DATES TO KEEP CLOSE</p><h3>重要日子</h3><span id="id-count">留一点期待给未来。</span></div><button id="id-open" type="button" aria-haspopup="dialog" aria-controls="id-dialog">管理日子 ↗</button></header><div id="id-preview"></div></article>
               <article class="surface today-agenda"><div class="surface-head"><div><p class="eyebrow">TODAY</p><h3>今日安排</h3></div><button class="text-button" type="button" data-goto="calendar">打开日历 ↗</button></div><div id="today-agenda" role="status">正在整理今天的日程…</div></article>
               <article class="surface today-todos"><div class="surface-head"><div><p class="eyebrow">ONE THING AT A TIME</p><h3>今天要做</h3></div><button class="text-button" type="button" data-goto="todo">全部待办 ↗</button></div><div id="today-todos">正在整理待办…</div></article>
-              <article class="surface today-capture"><div class="surface-head"><div><p class="eyebrow">A LITTLE NOTE</p><h3>随手记，不必整理</h3></div><button class="text-button" type="button" data-goto="memos">备忘录 ↗</button></div><form id="today-note-form"><label class="today-note-label" for="today-note">一个想法、一句话，或是一张临时清单</label><textarea id="today-note" rows="3" maxlength="2000" placeholder="先写下来，标题和分类以后再说。" required></textarea><div><span id="today-note-status" role="status" aria-live="polite">保存后可在备忘录继续编辑。</span><button class="primary" type="submit">存入备忘录</button></div></form></article>
+              <article class="surface today-capture"><div class="surface-head"><div><p class="eyebrow">A LITTLE NOTE</p><h3>随手记，不必整理</h3></div><button class="text-button" type="button" data-goto="memos">备忘录 ↗</button></div><form id="today-note-form" data-draft-guard><label class="today-note-label" for="today-note">一个想法、一句话，或是一张临时清单</label><textarea id="today-note" rows="3" maxlength="2000" placeholder="先写下来，标题和分类以后再说。" required></textarea><div><span id="today-note-status" role="status" aria-live="polite">保存后可在备忘录继续编辑。</span><button class="primary" type="submit">存入备忘录</button></div></form></article>
             </div>
             <details class="today-growth"><summary>成长概况 <span>目标、任务、单词与专注</span></summary>
             <div class="summary-grid">
@@ -418,6 +423,7 @@
                 <div class="calendar-form-row"><label>分类<select id="calendar-event-category"><option>学习</option><option>工作</option><option>生活</option><option>纪念日</option></select></label><label>颜色<input id="calendar-event-color" type="color" value="#5b81ff"></label></div>
                 <div class="calendar-form-row"><label>重复<select id="calendar-event-repeat"><option value="none">不重复</option><option value="daily">每天</option><option value="weekly">每周</option><option value="monthly">每月</option><option value="yearly">每年</option></select></label><label>重复截止<input id="calendar-event-repeat-until" type="date"></label></div>
                 <div class="calendar-form-row"><label>提醒<select id="calendar-event-reminder"><option value="0">不提醒</option><option value="10">提前 10 分钟</option><option value="30">提前 30 分钟</option><option value="60">提前 1 小时</option><option value="1440">提前 1 天</option></select></label><label>地点<input id="calendar-event-location" maxlength="240" placeholder="可选"></label></div>
+                <p class="hint">网页打开时检查提醒，关闭网页或设备休眠不保证送达。<button id="calendar-notification-enable" class="text-button" type="button">允许浏览器提醒</button></p>
                 <label>说明<textarea id="calendar-event-description" rows="3" maxlength="6000" placeholder="补充准备事项或链接"></textarea></label>
                 <div class="calendar-dialog-actions"><button id="calendar-event-delete" class="quiet danger-text hidden" type="button">删除日程</button><span></span><button id="calendar-event-cancel" class="quiet" type="button">取消</button><button class="primary" type="submit">保存日程</button></div>
               </form>
@@ -543,7 +549,7 @@
               <aside class="task-create-column">
                 <article class="surface form-surface task-create-card">
                   <div class="task-create-heading"><p class="eyebrow">MAKE IT HAPPEN</p><h3>写下一个下一步</h3><p>把大计划，拆成今天能动手的小事。</p></div>
-                  <form id="task-form" class="form-grid">
+                  <form id="task-form" data-draft-guard class="form-grid">
                     <label>任务名称<input id="task-title" required maxlength="200" placeholder="例如：实现一个 worker pool"></label>
                     <label>关联目标<select id="task-goal"><option value="">不关联目标</option></select></label>
                     <div class="task-form-pair"><label>优先级<select id="task-priority"><option value="high">高</option><option value="medium" selected>中</option><option value="low">低</option></select></label><label>预计分钟<input id="task-minutes" type="number" min="0" max="1440" value="30"></label></div>
@@ -579,7 +585,7 @@
                 <div id="todo-items" class="todo-items empty-state">正在加载待办…</div>
                 <section id="todo-suggestions" class="todo-suggestions hidden"><div class="todo-suggestions-head"><div><p class="eyebrow">SUGGESTIONS</p><h4>可加入今天</h4></div><span>从未完成事项中挑选</span></div><div id="todo-suggestion-items" class="todo-suggestion-items"></div></section>
               </article>
-              <article class="surface form-surface todo-create-card"><div><p class="eyebrow">QUICK CAPTURE</p><h3>收集一件待办</h3><p class="todo-form-intro">先写下它，再决定何时处理。</p></div><form id="todo-form" class="form-grid"><label>待办标题<input id="todo-title" required maxlength="200" placeholder="例如：预约牙医"></label><label>放入分类<select id="todo-list"></select></label><div class="todo-form-two"><label>优先级<select id="todo-priority"><option value="high">高</option><option value="medium" selected>中</option><option value="low">低</option></select></label><label>截止时间<input id="todo-due" type="datetime-local"></label></div><label>重复<select id="todo-repeat"><option value="none">不重复</option><option value="daily">每天</option><option value="weekly">每周</option><option value="monthly">每月</option></select></label><label class="check-label"><input id="todo-my-day" type="checkbox">加入今天的计划</label><label>标签（逗号分隔）<input id="todo-tags" maxlength="600" placeholder="生活, 电话"></label><label>子步骤（每行一项）<textarea id="todo-steps" rows="3" maxlength="6000" placeholder="准备问题&#10;拨打电话&#10;记录预约时间"></textarea></label><label>备注<textarea id="todo-notes" rows="3" maxlength="6000" placeholder="补充上下文、链接或完成标准"></textarea></label><button class="primary" type="submit">添加待办</button></form></article>
+              <article class="surface form-surface todo-create-card"><div><p class="eyebrow">QUICK CAPTURE</p><h3>收集一件待办</h3><p class="todo-form-intro">先写下它，再决定何时处理。</p></div><form id="todo-form" data-draft-guard class="form-grid"><label>待办标题<input id="todo-title" required maxlength="200" placeholder="例如：预约牙医"></label><label>放入分类<select id="todo-list"></select></label><div class="todo-form-two"><label>优先级<select id="todo-priority"><option value="high">高</option><option value="medium" selected>中</option><option value="low">低</option></select></label><label>截止时间<input id="todo-due" type="datetime-local"></label></div><label>重复<select id="todo-repeat"><option value="none">不重复</option><option value="daily">每天</option><option value="weekly">每周</option><option value="monthly">每月</option></select></label><label class="check-label"><input id="todo-my-day" type="checkbox">加入今天的计划</label><label>标签（逗号分隔）<input id="todo-tags" maxlength="600" placeholder="生活, 电话"></label><label>子步骤（每行一项）<textarea id="todo-steps" rows="3" maxlength="6000" placeholder="准备问题&#10;拨打电话&#10;记录预约时间"></textarea></label><label>备注<textarea id="todo-notes" rows="3" maxlength="6000" placeholder="补充上下文、链接或完成标准"></textarea></label><button class="primary" type="submit">添加待办</button></form></article>
             </div>
           </section>
 
@@ -593,7 +599,7 @@
             <div class="planner-lower-grid">
               <article class="surface planner-agenda-card"><div class="planner-card-head"><div><p class="eyebrow">AGENDA</p><h3>时间块详情</h3></div></div><div id="planner-block-detail" class="planner-block-detail empty-state">点击日历中的时间块查看详情，或从右侧手动添加一个安排。</div></article>
               <article class="surface planner-unscheduled-card"><div class="planner-card-head"><div><p class="eyebrow">CAPACITY CHECK</p><h3>未排程工作</h3></div><span id="planner-overdue-count" class="pill">0 个逾期来源</span></div><div id="planner-unscheduled-list" class="planner-unscheduled-list empty-state">智能排程后，这里会显示因容量或截止时间冲突而无法安排的工作。</div></article>
-              <article class="surface form-surface planner-create-card"><div><p class="eyebrow">MANUAL TIMEBOX</p><h3>添加时间块</h3></div><form id="planner-block-form" class="form-grid"><label>类型<select id="planner-block-kind"><option value="custom">自定义学习</option><option value="task">学习任务</option><option value="todo">待办事项</option><option value="vocabulary">单词学习</option></select></label><label id="planner-source-field" class="hidden">关联来源<select id="planner-block-source"></select></label><label>标题<input id="planner-block-title" required maxlength="200" placeholder="例如：阅读 Go 调度器源码"></label><div class="planner-form-row"><label>日期<input id="planner-block-date" type="date" required></label><label>开始<input id="planner-block-start" type="time" required value="19:00"></label><label>结束<input id="planner-block-end" type="time" required value="19:50"></label></div><label>优先级<select id="planner-block-priority"><option value="high">高</option><option value="medium" selected>中</option><option value="low">低</option></select></label><label>备注<textarea id="planner-block-notes" rows="2" maxlength="4000" placeholder="完成标准、材料链接或需要注意的问题"></textarea></label><label class="check-label"><input id="planner-block-locked" type="checkbox" checked>锁定时间，重新排程时保持不动</label><button class="primary" type="submit">加入周计划</button></form></article>
+              <article class="surface form-surface planner-create-card"><div><p class="eyebrow">MANUAL TIMEBOX</p><h3>添加时间块</h3></div><form id="planner-block-form" data-draft-guard class="form-grid"><label>类型<select id="planner-block-kind"><option value="custom">自定义学习</option><option value="task">学习任务</option><option value="todo">待办事项</option><option value="vocabulary">单词学习</option></select></label><label id="planner-source-field" class="hidden">关联来源<select id="planner-block-source"></select></label><label>标题<input id="planner-block-title" required maxlength="200" placeholder="例如：阅读 Go 调度器源码"></label><div class="planner-form-row"><label>日期<input id="planner-block-date" type="date" required></label><label>开始<input id="planner-block-start" type="time" required value="19:00"></label><label>结束<input id="planner-block-end" type="time" required value="19:50"></label></div><label>优先级<select id="planner-block-priority"><option value="high">高</option><option value="medium" selected>中</option><option value="low">低</option></select></label><label>备注<textarea id="planner-block-notes" rows="2" maxlength="4000" placeholder="完成标准、材料链接或需要注意的问题"></textarea></label><label class="check-label"><input id="planner-block-locked" type="checkbox" checked>锁定时间，重新排程时保持不动</label><button class="primary" type="submit">加入周计划</button></form></article>
             </div>
 <article id="planner-settings" class="surface planner-settings-card hidden"><div class="planner-card-head"><div><p class="eyebrow">AVAILABILITY</p><h3>自动排程偏好</h3><p>只有这些可用时段会被自动规划；手动时间块仍可放在其他时间。</p></div><button id="planner-add-window" class="quiet" type="button">添加时段</button></div><form id="planner-preferences-form" class="planner-preferences-form"><div class="planner-preference-numbers"><label>时区<input id="planner-time-zone" required value="Asia/Shanghai"></label><label>单次专注<input id="planner-session-minutes" type="number" min="15" max="180" required></label><label>间隔休息<input id="planner-break-minutes" type="number" min="0" max="60" required></label><label>每日上限<input id="planner-daily-max" type="number" min="30" max="720" required></label></div><div id="planner-window-list" class="planner-window-list"></div><p id="planner-draft-status" class="hint" role="status" aria-live="polite">设置已同步 · 修改后需保存</p><div class="planner-settings-actions"><button id="planner-discard-draft" class="quiet" type="button" disabled>放弃修改</button><button id="planner-reset-preferences" class="quiet" type="button">恢复推荐设置</button><button class="primary" type="submit">保存并重新排程</button></div></form></article>
           </section>
@@ -859,7 +865,8 @@
         <div class="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 执行</span><span>全局快捷键 <kbd>Ctrl K</kbd></span></div>
       </div>
     </dialog>
-    <script src="/static/app.js?v=20261022-reminders-1" defer></script>
+    <script src="/static/product-shell.js?v=20261026-1" defer></script>
+    <script src="/static/app.js?v=20261026-product-1" defer></script>
     <script src="/static/gentle-reminders-core.js?v=20261022-1" defer></script>
     <script src="/static/important-days-core.js?v=20261022-1" defer></script>
     <script src="/static/important-days.js?v=20261022-1" defer></script>

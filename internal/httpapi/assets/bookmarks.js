@@ -123,7 +123,7 @@
   $('form').addEventListener('change',()=>{dirty=true;});
   $('new').addEventListener('click',()=>edit());$('close').addEventListener('click',()=>{if(canClose())$('dialog').close();});
   $('dialog').addEventListener('cancel',event=>{if(!canClose())event.preventDefault();});
-  window.addEventListener('beforeunload',event=>{if(state.pending||dirty&&$('dialog').open){event.preventDefault();event.returnValue='';}});
+  window.DaynestUI?.registerGuard?.('bookmarks', () => state.pending||dirty&&$('dialog').open);window.addEventListener('beforeunload',event=>{if(state.pending||dirty&&$('dialog').open){event.preventDefault();event.returnValue='';}});
   $('refresh').addEventListener('click',load);$('export').addEventListener('click',exportHTML);
   $('retry').addEventListener('click',()=>persist(null));
   $('draft').addEventListener('click',()=>{if(sync()&&state.pending)download('收藏草稿.json',JSON.stringify(state.pending,null,2),'application/json');});

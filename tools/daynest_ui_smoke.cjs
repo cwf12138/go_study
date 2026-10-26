@@ -14,6 +14,7 @@ const context = {Date,Intl,URLSearchParams,AbortController,Headers:class{set(){}
 const source=fs.readFileSync(root+'app.js','utf8');
 vm.runInNewContext(source.replace('  bootstrap();','  window.test={state,renderToday,saveTodayNote,localDateKey,showView};'),context);
 const app=context.window.test, today=app.localDateKey(new Date());
+context.localStorage.getItem=key=>key==='studyflow.token'?app.state.token:'';
 app.state.token='one';app.state.todos=[
   {id:'1',title:'today',status:'pending',my_day_date:today},
   {id:'2',title:'finished',status:'completed',my_day_date:today},

@@ -31,6 +31,7 @@
   }
 
   function notify(message, type = "success") {
+    if (window.DaynestUI) return window.DaynestUI.notify(message, type);
     const toast = $("#toast");
     if (!toast) return;
     toast.textContent = message;

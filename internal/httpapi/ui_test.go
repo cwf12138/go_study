@@ -44,6 +44,8 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 		t.Fatalf("javascript cache control = %q", cacheControl)
 	}
 	for _, asset := range []struct{ name, marker, contentType string }{
+		{"product-shell.js", "window.DaynestUI", "javascript"},
+		{"product-polish.css", ".product-field-error", "text/css"},
 		{"parcels-core.js", "window.DaynestParcels", "javascript"},
 		{"parcels.js", "/api/v1/parcels", "javascript"},
 		{"parcels.css", ".parcel-dialog", "text/css"},

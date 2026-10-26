@@ -37,6 +37,7 @@ const instrumented = source.replace('  bootstrap();', '  refresh=async()=>{}; wi
 assert.notEqual(source, instrumented);
 vm.runInNewContext(instrumented, context);
 const app = context.window.testFocus;
+context.localStorage.getItem = key => key === 'studyflow.token' ? app.state.token : '';
 app.state.user = { id: 'test-user' };
 app.state.token = 'test-token';
 app.state.currentView = 'focus';

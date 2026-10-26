@@ -93,6 +93,8 @@
 
   async function api(path, options = {}) {
     const requestToken = state.token;
+    const storedToken = localStorage.getItem("studyflow.token") || "";
+    if (requestToken !== storedToken) throw new Error("账号已切换，请等待重新连接或刷新页面。");
     const { returnEnvelope = false, ...requestOptions } = options;
     const headers = new Headers(requestOptions.headers || {});
     if (state.token) headers.set("Authorization", `Bearer ${state.token}`);
@@ -100,44 +102,66 @@
 
     let response;
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 25000);
+    let timedOut = false;
+    const abort = () => controller.abort();
+    if (requestOptions.signal?.aborted) abort();
+    else requestOptions.signal?.addEventListener("abort", abort, { once: true });
+    const timeout = window.setTimeout(() => { timedOut = true; controller.abort(); }, 25000);
     try {
-      response = await fetch(path, { ...requestOptions, headers, signal: requestOptions.signal || controller.signal });
-      const payload = response.status === 204 ? {} : await response.json();
-      if (state.token !== requestToken) throw new Error("账号已切换，已忽略旧请求结果。");
-    if (!response.ok) {
-      if (response.status === 401 && state.token) leaveApp();
-      throw new Error(payload?.error?.message || `请求失败（${response.status}）`);
-    }
-    return returnEnvelope ? payload : payload.data;
+      response = await fetch(path, { ...requestOptions, headers, signal: controller.signal, cache: "no-store" });
+      const payload = response.status === 204 ? null : await response.json().catch(error => { if (response.ok) throw error; return null; });
+      if (state.token !== requestToken || (localStorage.getItem("studyflow.token") || "") !== storedToken) throw new Error("账号已切换，已忽略旧请求结果。");
+      if (!response.ok) {
+        if (response.status === 401 && state.token) leaveApp();
+        const error = new Error(payload?.error?.message || `请求失败（${response.status}）`);
+        error.status = response.status;
+        throw error;
+      }
+      if (response.status === 204) return null;
+      if (!payload || typeof payload !== "object" || !Object.hasOwn(payload, "data")) throw new Error("服务返回格式不完整，请确认已重启当前版本的 Go 服务。");
+      return returnEnvelope ? payload : payload.data;
     } catch (error) {
-      if (error.name === "AbortError") throw new Error("请求超时，请稍后重试。");
+      if (error.name === "AbortError") throw new Error(timedOut ? "请求超时；保存类操作请先核对结果，不要重复新建。" : "请求已取消。");
       if (error instanceof SyntaxError) throw new Error("服务返回了无效数据，请重试或检查服务日志。");
       if (error instanceof TypeError) throw new Error("无法连接到服务，请确认 Go API 正在运行。");
       throw error;
-    } finally { window.clearTimeout(timeout); }
+    } finally { window.clearTimeout(timeout); requestOptions.signal?.removeEventListener("abort", abort); }
   }
 
+  const activeDownloads = new Map();
   async function downloadAuthenticated(path, fallbackFilename) {
-    const response = await fetch(path, { headers: { Authorization: `Bearer ${state.token}` } });
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      throw new Error(payload?.error?.message || `导出失败（${response.status}）`);
-    }
-    const disposition = response.headers.get("Content-Disposition") || "";
-    const match = disposition.match(/filename="?([^";]+)"?/i);
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = match?.[1] || fallbackFilename;
-    document.body.append(anchor);
-    anchor.click();
-    anchor.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    if (activeDownloads.has(path)) throw new Error("这份文件正在导出，请稍候。");
+    const owner = state.token, stored = localStorage.getItem("studyflow.token") || "", controller = new AbortController();
+    if (!owner || owner !== stored) throw new Error("账号已切换，请重新连接后导出。");
+    const current = () => owner === state.token && stored === (localStorage.getItem("studyflow.token") || "");
+    const timeout = window.setTimeout(() => controller.abort(), 30000);
+    activeDownloads.set(path, controller);
+    try {
+      const response = await fetch(path, { headers: { Authorization: `Bearer ${owner}` }, signal: controller.signal, cache: "no-store" });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.error?.message || `导出失败（${response.status}）`);
+      }
+      const disposition = response.headers.get("Content-Disposition") || "";
+      const match = disposition.match(/filename="?([^";]+)"?/i);
+      const blob = await response.blob();
+      if (!current()) throw new Error("账号已切换，已取消旧账号的导出。");
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = match?.[1] || fallbackFilename;
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      if (error.name === "AbortError") throw new Error("导出超时，请稍后重试。");
+      throw error;
+    } finally { if (activeDownloads.get(path) === controller) activeDownloads.delete(path); window.clearTimeout(timeout); }
   }
 
   function notify(message, type = "success") {
+    if (window.DaynestUI) return window.DaynestUI.notify(message, type);
     const toast = $("#toast");
     toast.textContent = message;
     toast.className = `toast visible ${type === "error" ? "error" : ""}`;
@@ -211,8 +235,9 @@
   }
 
   function loadDailyFocusGoal() {
-    const value = Number(localStorage.getItem(`studyflow.dailyFocusGoal.${state.user?.id || "default"}`));
-    return Number.isFinite(value) ? clampDailyFocusGoal(value) : 60;
+    const raw = localStorage.getItem(`studyflow.dailyFocusGoal.${state.user?.id || "default"}`);
+    const value = Number(raw);
+    return raw != null && raw !== "" && Number.isFinite(value) && value > 0 ? clampDailyFocusGoal(value) : 60;
   }
 
   function persistDailyFocusGoal() {
@@ -258,11 +283,18 @@
     $("#app-view").classList.remove("hidden");
     $("#user-name").textContent = user.name;
     document.dispatchEvent(new CustomEvent("daynest:account-ready"));
-    showView(state.currentView);
+    showView(viewFromURL() || state.currentView, { history: "replace" });
     refresh().catch((error) => notify(error.message, "error"));
   }
 
-  function leaveApp() {
+  function leaveApp({ keepStoredSession = false } = {}) {
+    restoringSession = "";
+    $("#auth-reconnect").disabled = false;
+    activeDownloads.forEach(controller => controller.abort()); activeDownloads.clear();
+    window.DaynestUI?.reset();
+    document.querySelectorAll("form[data-draft-guard]").forEach(form => form.reset());
+    const connection = document.getElementById("auth-connection");
+    if (connection) connection.hidden = true;
     state.token = "";
     state.user = null;
     state.dashboard = null;
@@ -314,14 +346,30 @@
     state.focus = null;
     state.dailyFocusGoalMinutes = 60;
     setFocusFeedback();
-    localStorage.removeItem("studyflow.token");
-    persistFocus();
+    if (!keepStoredSession) { localStorage.removeItem("studyflow.token"); persistFocus(); }
     $("#app-view").classList.add("hidden");
     $("#auth-view").classList.remove("hidden");
     authTab("login");
   }
 
-  function showView(view) {
+  async function handleAccountStorage(event) {
+    if (event.key !== "studyflow.token" && event.key !== null) return;
+    const next = localStorage.getItem("studyflow.token") || "";
+    if (next === state.token) return;
+    // Clearing this tab must not erase the new account's shared token or timer.
+    leaveApp({ keepStoredSession: true });
+    state.token = next;
+    state.focus = loadFocus();
+    if (next) await restoreSession();
+  }
+
+  function viewFromURL() {
+    const hash = window.location?.hash || "";
+    return /^#[a-z-]+$/.test(hash) ? hash.slice(1) : "dashboard";
+  }
+
+  const viewScrollPositions = new Map();
+  function showView(view, { history = "push" } = {}) {
     if (view === "daily") { document.getElementById("daily-trigger")?.click(); return; }
     const legacyIdeas = view === "lab";
     const legacyKnowledge = view === "knowledge";
@@ -355,19 +403,32 @@
       vocabulary: ["VOCABULARY", "单词学习"],
       focus: ["FOCUS", "专注会话"],
     };
+    if (!Object.hasOwn(labels, view)) view = "dashboard";
     const targetPanel = $(`#panel-${view}`);
     if (!targetPanel) {
       notify("该功能页面尚未加载，请刷新页面后重试。", "error");
       return;
     }
     const label = labels[view] || [String(view).toUpperCase(), "功能页面"];
+    const previousView = state.currentView;
+    if (previousView !== view) viewScrollPositions.set(previousView, window.scrollY || 0);
     state.currentView = view;
     if (view !== "focus") setFocusQuiet(false);
     $("#page-kicker").textContent = label[0];
     $("#page-title").textContent = label[1];
     $$(".panel").forEach((panel) => panel.classList.toggle("active", panel.id === `panel-${view}`));
-    $$(".nav-link").forEach((button) => button.classList.toggle("active", button.dataset.view === view));
+    $$(".nav-link").forEach((button) => { const active = button.dataset.view === view; button.classList.toggle("active", active); if (active) button.setAttribute("aria-current", "page"); else button.removeAttribute("aria-current"); });
+    document.title = `${label[1]} · 日常 Daynest`;
+    if (window.history && window.location?.hash !== `#${view}`) {
+      window.history[history === "push" ? "pushState" : "replaceState"](null, "", `#${view}`);
+    }
+    const menuWasOpen = $(".sidebar").classList.contains("open");
     $(".sidebar").classList.remove("open");
+    window.DaynestUI?.setMenu(false, false);
+    if (menuWasOpen && window.DaynestUI) $("#main-content")?.focus({ preventScroll: true });
+    if (previousView !== view && typeof window.scrollTo === "function") window.scrollTo({ top: viewScrollPositions.get(view) || 0, behavior: "instant" });
+    const announcement = $("#page-announcement");
+    if (announcement) announcement.textContent = `已打开${label[1]}`;
     if (legacyIdeas) document.dispatchEvent(new CustomEvent("studyflow:legacy-ideas"));
     if (legacyKnowledge) document.dispatchEvent(new CustomEvent("daynest:legacy-knowledge"));
   }
@@ -462,6 +523,8 @@
   }
 
   function setSyncStatus(message, busy=false, failed=false) {
+    const connection = $("#sidebar-connection");
+    if (connection) { connection.textContent = busy ? "正在同步" : failed ? "部分数据待同步" : "数据已同步"; connection.parentElement?.setAttribute?.("data-state", busy ? "loading" : failed ? "error" : "ready"); }
     const text = $("#app-sync-status"), button = $("#app-sync-retry");
     if (!text || !button) return;
     text.textContent = message; text.parentElement.classList.toggle("sync-warning", failed);
@@ -2093,24 +2156,35 @@
   const goalStatusLabel = (status) => ({ active: "进行中", completed: "已完成", archived: "已归档" }[status] || status);
   const priorityLabel = (priority) => ({ high: "高", medium: "中", low: "低" }[priority] || priority);
 
+  const savingForms = new Set();
   async function submitForm(event, action, success) {
     event.preventDefault();
     const form = event.currentTarget;
+    if (savingForms.has(form) || form.reportValidity?.() === false) return;
     const button = form.querySelector("button[type=submit]");
-    button.disabled = true;
+    const owner = state.token;
+    const snapshot = () => JSON.stringify([...form.elements].map(field => [field.id, field.value, field.checked]));
+    const before = snapshot();
+    savingForms.add(form);
+    if (button) button.disabled = true;
     try {
       await action();
-      form.reset();
-      await refresh();
-      notify(success);
+      if (state.token !== owner) return;
+      const changed = snapshot() !== before;
+      if (!changed) form.reset();
+      try { await refresh(); }
+      catch (_) { notify(`${success} 页面同步暂未完成，请刷新核对。`, "error"); return; }
+      if (state.token === owner) notify(changed ? `${success} 你刚输入的新内容已保留。` : success);
     } catch (error) {
-      notify(error.message, "error");
+      if (state.token === owner) notify(error.message, "error");
     } finally {
-      button.disabled = false;
+      savingForms.delete(form);
+      if (button) button.disabled = false;
     }
   }
 
   function bindEvents() {
+    window.DaynestUI?.registerGuard?.('main', () => savingForms.size || state.moodDraftRevision || state.moodSaving || state.plannerDraftRevision || state.isStartingFocus || state.isUpdatingFocus || state.isFinishingFocus);
     $("#today-note-form").addEventListener("submit", saveTodayNote);
     $("#planner-preferences-form").addEventListener("input", markPlannerDraft);
     $("#planner-preferences-form").addEventListener("change", markPlannerDraft);
@@ -2125,7 +2199,12 @@
     $$("[data-auth-tab]").forEach((button) => button.addEventListener("click", () => authTab(button.dataset.authTab)));
     $("#theme-toggle").addEventListener("click", toggleTheme);
     $("#logout").addEventListener("click", () => { leaveApp(); notify("已退出登录"); });
-    $("#mobile-menu").addEventListener("click", () => $(".sidebar").classList.toggle("open"));
+    $("#mobile-menu").addEventListener("click", () => { if (window.DaynestUI) window.DaynestUI.setMenu(!$(".sidebar").classList.contains("open")); else $(".sidebar").classList.toggle("open"); });
+    window.addEventListener("popstate", () => { if (state.user) showView(viewFromURL(), { history: "replace" }); });
+    window.addEventListener("hashchange", () => { if (state.user && viewFromURL() !== state.currentView) showView(viewFromURL(), { history: "replace" }); });
+    $("#auth-reconnect").addEventListener("click", restoreSession);
+    $("#auth-reset").addEventListener("click", () => leaveApp());
+    window.addEventListener("storage", handleAccountStorage);
     $$("[data-view]").forEach((button) => button.addEventListener("click", () => {
       showView(button.dataset.view);
       if (button.dataset.view === "dashboard" && state.user) refresh().catch(error => setSyncStatus(error.message, false, true));
@@ -2340,22 +2419,25 @@
     $("#weekly-review-next").addEventListener("click", () => shiftWeeklyReview(7));
     $("#weekly-reflection-form").addEventListener("submit", saveWeeklyReflection);
     $("#export-learning-csv").addEventListener("click", async () => {
+      const owner = state.token;
       try {
         await downloadAuthenticated(`/api/v1/exports/learning.csv?days=${state.insightsDays}`, `studyflow-learning-${state.insightsDays}d.csv`);
-        notify("学习统计 CSV 已导出。");
-      } catch (error) { notify(error.message, "error"); }
+        if (owner === state.token) notify("学习统计 CSV 已导出。");
+      } catch (error) { if (owner === state.token) notify(error.message, "error"); }
     });
     $("#export-plan-ics").addEventListener("click", async () => {
+      const owner = state.token;
       try {
         await downloadAuthenticated(`/api/v1/exports/planner.ics?week_start=${encodeURIComponent(state.plannerWeekStart)}`, `studyflow-plan-${state.plannerWeekStart}.ics`);
-        notify("周计划日历文件已导出，可导入系统日历。");
-      } catch (error) { notify(error.message, "error"); }
+        if (owner === state.token) notify("周计划日历文件已导出，可导入系统日历。");
+      } catch (error) { if (owner === state.token) notify(error.message, "error"); }
     });
     $("#export-backup-json").addEventListener("click", async () => {
+      const owner = state.token;
       try {
         await downloadAuthenticated("/api/v1/exports/data", `studyflow-backup-${localDateKey(new Date())}.json`);
-        notify("不含密码的完整个人数据备份已导出。");
-      } catch (error) { notify(error.message, "error"); }
+        if (owner === state.token) notify("不含密码的完整个人数据备份已导出。");
+      } catch (error) { if (owner === state.token) notify(error.message, "error"); }
     });
     $("#vocab-spelling-mode").addEventListener("submit", (event) => {
       event.preventDefault();
@@ -2448,23 +2530,33 @@
 
     $("#login-form").addEventListener("submit", async (event) => {
       event.preventDefault();
+      const form = event.currentTarget, button = form.querySelector("button[type=submit]");
+      if (savingForms.has(form) || restoringSession) return;
+      savingForms.add(form); button.disabled = true;
       try {
         const result = await api("/api/v1/auth/login", { method: "POST", body: JSON.stringify({ email: $("#login-email").value, password: $("#login-password").value }) });
         state.token = result.token;
         localStorage.setItem("studyflow.token", state.token);
+        $("#login-password").value = "";
         enterApp(result.user);
         notify(`欢迎回来，${result.user.name}`);
       } catch (error) { notify(error.message, "error"); }
+      finally { savingForms.delete(form); button.disabled = false; }
     });
     $("#register-form").addEventListener("submit", async (event) => {
       event.preventDefault();
+      const form = event.currentTarget, button = form.querySelector("button[type=submit]");
+      if (savingForms.has(form) || restoringSession) return;
+      savingForms.add(form); button.disabled = true;
       try {
         const result = await api("/api/v1/auth/register", { method: "POST", body: JSON.stringify({ name: $("#register-name").value, email: $("#register-email").value, password: $("#register-password").value }) });
         state.token = result.token;
         localStorage.setItem("studyflow.token", state.token);
+        $("#register-password").value = "";
         enterApp(result.user);
         notify("账号创建成功，开始你的学习计划吧。");
       } catch (error) { notify(error.message, "error"); }
+      finally { savingForms.delete(form); button.disabled = false; }
     });
 
     $("#goal-form").addEventListener("submit", (event) => {
@@ -2751,6 +2843,25 @@
     }
   }
 
+  let restoringSession = "";
+  async function restoreSession() {
+    if (!state.token || restoringSession === state.token) return;
+    const owner = state.token;
+    const button = $("#auth-reconnect");
+    restoringSession = owner; button.disabled = true;
+    try {
+      const user = await api("/api/v1/me");
+      if (owner !== state.token) return;
+      if (!user || typeof user.id !== 'string' || !user.id || typeof user.name !== 'string') throw new Error('服务返回的账号信息不完整，请检查后端版本。');
+      $("#auth-connection").hidden = true;
+      enterApp(user);
+    } catch (error) {
+      if (owner !== state.token) return;
+      $("#auth-connection").hidden = false;
+      $("#auth-connection-status").textContent = `连接尚未完成：${error.message} 登录状态已保留，可重试连接或切换账号。`;
+    } finally { if (restoringSession === owner) { restoringSession = ""; button.disabled = false; } }
+  }
+
   async function bootstrap() {
     applyTheme(state.theme);
     bindEvents();
@@ -2760,13 +2871,7 @@
     }, 60_000);
     renderReadyCountdown();
     renderFocusPlan();
-    if (!state.token) return;
-    try {
-      const user = await api("/api/v1/me");
-      enterApp(user);
-    } catch {
-      leaveApp();
-    }
+    await restoreSession();
   }
 
   bootstrap();

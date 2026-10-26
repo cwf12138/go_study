@@ -6,6 +6,7 @@ const context={console,Date,Intl,URLSearchParams,Headers:class{set(){}has(){retu
 const instrumented=source.replace('  bootstrap();','  render=()=>{}; renderPlannerCalendar=()=>{}; renderPlannerDetail=()=>{}; renderPlannerUnscheduled=()=>{}; window.testApp={state,refresh,api,renderPlanner,markPlannerDraft};');
 assert.notEqual(instrumented,source);vm.runInNewContext(instrumented,context);
 const app=context.window.testApp;
+context.localStorage.getItem=key=>key==='studyflow.token'?app.state.token:'';
 app.state.user={id:'user'};app.state.token='first';app.state.tasks=[{id:'old-task'}];app.state.focus={id:'existing-focus'};
 const response=(data,status=200)=>({ok:status===200,status,json:async()=>({data})});
 async function test(){
