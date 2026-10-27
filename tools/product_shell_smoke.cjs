@@ -23,7 +23,8 @@ class Node{
 const nodes=new Map(),get=id=>{if(!nodes.has(id))nodes.set(id,new Node(id));return nodes.get(id);};
 const doc=new Node(),body=new Node(),workspace=new Node(),skip=new Node(),nav=new Node(),last=new Node();doc.body=body;doc.activeElement=null;doc.getElementById=get;doc.createElement=()=>new Node();let dialogs=[];
 doc.querySelector=s=>s==='.workspace'?workspace:s==='.skip-to-content'?skip:null;doc.querySelectorAll=s=>s==='dialog[open]'?dialogs:[];
-get('app-sidebar').controls=[nav,last];get('app-sidebar').append(nav);get('app-sidebar').append(last);get('toast').append(get('toast-message'));get('toast').append(get('toast-dismiss'));body.append(get('toast'));
+const folded=new Node();folded.getClientRects=()=>[];
+get('app-sidebar').controls=[nav,last,folded];get('app-sidebar').append(nav);get('app-sidebar').append(last);get('toast').append(get('toast-message'));get('toast').append(get('toast-dismiss'));body.append(get('toast'));
 let nextTimer=1,confirmed=false;const timers=new Map(),win=new Node(),media=new Node();media.matches=true;
 win.matchMedia=()=>media;win.confirm=()=>confirmed;win.setTimeout=(fn,delay)=>{const id=nextTimer++;timers.set(id,{fn,delay});return id;};win.clearTimeout=id=>timers.delete(id);
 vm.runInNewContext(script,{window:win,document:doc,MutationObserver:class{observe(){}},queueMicrotask});

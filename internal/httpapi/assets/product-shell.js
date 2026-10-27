@@ -53,7 +53,7 @@
     if (!menuOpen) return;
     if (event.key === 'Escape') { event.preventDefault(); setMenu(false); }
     if (event.key !== 'Tab') return;
-    const controls = [...sidebar.querySelectorAll('a[href],button:not(:disabled)')];
+    const controls = [...sidebar.querySelectorAll('a[href],button:not(:disabled)')].filter(node => !node.hidden && (typeof node.getClientRects !== 'function' || node.getClientRects().length > 0));
     if (!controls.length) return;
     const first = controls[0], last = controls.at(-1);
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }

@@ -55,6 +55,7 @@
     <link rel="stylesheet" href="/static/important-days.css?v=20261022-1">
     <link rel="stylesheet" href="/static/parcels.css?v=20261026-1">
     <link rel="stylesheet" href="/static/product-polish.css?v=20261026-1">
+    <link rel="stylesheet" href="/static/navigation.css?v=20261027-1">
     <link rel="stylesheet" href="/static/layout.css?v=20260922-1">
   </head>
   <body>
@@ -110,6 +111,7 @@
       <button id="navigation-backdrop" class="navigation-backdrop" type="button" hidden aria-label="关闭导航菜单" tabindex="-1"></button>
       <aside id="app-sidebar" class="sidebar" aria-label="功能导航">
         <a class="brand" href="#dashboard" aria-label="日常 Daynest 首页" data-goto="dashboard"><span class="brand-mark">D</span><span>日常 <small>Daynest</small></span></a>
+        <button id="navigation-manage" class="navigation-manage" type="button" aria-haspopup="dialog" aria-controls="navigation-settings">整理导航<span>常用优先 ⌘</span></button>
         <nav class="nav daynest-nav" aria-label="主导航">
           <div class="nav-group" role="group" aria-label="今天"><p class="nav-group-label">今天</p>
             <button class="nav-link active" type="button" data-view="dashboard"><span aria-hidden="true">◫</span>今天</button>
@@ -622,7 +624,7 @@
                 <form id="weekly-reflection-form" class="weekly-reflection-form">
                   <div class="weekly-reflection-title"><div><span>PERSONAL NOTES</span><h4>把数据变成下一步行动</h4></div><label>本周满意度<select id="weekly-satisfaction" required><option value="">请选择</option><option value="1">1 · 很不满意</option><option value="2">2 · 需要调整</option><option value="3">3 · 基本符合预期</option><option value="4">4 · 很有收获</option><option value="5">5 · 超出预期</option></select></label></div>
                   <div class="weekly-reflection-fields"><label>本周做得好的事<textarea id="weekly-wins" rows="3" maxlength="4000" placeholder="哪些行动真正推动了目标？"></textarea></label><label>遇到的困难<textarea id="weekly-challenges" rows="3" maxlength="4000" placeholder="什么在消耗时间、注意力或精力？"></textarea></label><label>得到的经验<textarea id="weekly-lessons" rows="3" maxlength="4000" placeholder="下次会保留或改变什么？"></textarea></label></div>
-                  <label>下周最重要的 1–5 件事<textarea id="weekly-priorities" rows="3" maxlength="1000" placeholder="每行一项，例如：完成 Go 并发练习"></textarea></label><div class="weekly-reflection-actions"><span id="weekly-reflection-status">尚未保存本周复盘</span><button class="primary" type="submit">保存复盘</button></div>
+                  <label>下周最重要的 1–5 件事<textarea id="weekly-priorities" rows="3" maxlength="1000" placeholder="每行一项，例如：完成 Go 并发练习"></textarea></label><div class="weekly-reflection-actions"><span id="weekly-reflection-status" role="status" aria-live="polite">尚未保存本周复盘</span><button id="weekly-discard" class="quiet" type="button" disabled>放弃修改</button><button class="primary" type="submit">保存复盘</button></div>
                 </form>
               </div>
             </article>
@@ -865,8 +867,11 @@
         <div class="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 执行</span><span>全局快捷键 <kbd>Ctrl K</kbd></span></div>
       </div>
     </dialog>
-    <script src="/static/product-shell.js?v=20261026-1" defer></script>
-    <script src="/static/app.js?v=20261026-product-1" defer></script>
+    <dialog id="navigation-settings" class="navigation-dialog" aria-labelledby="navigation-title"><header><div><p>LESS TO FIND. MORE TO LIVE.</p><h2 id="navigation-title">让常用的，离你近一点。</h2><span>选择常用入口，其他功能按需展开。</span></div><button id="navigation-close" type="button" aria-label="关闭导航整理">×</button></header><div class="navigation-body"><label class="navigation-mode"><input id="navigation-compact" type="checkbox"><span><b>精简导航</b><small>取消勾选可直接显示全部功能。</small></span></label><p class="navigation-description">下方勾选的是“常用入口”，不是功能开关。未勾选的页面仍能从分组的“其他”或 Ctrl K 快捷导航进入，历史数据不会删除。</p><p id="navigation-count"></p><div id="navigation-options" class="navigation-options"></div><p id="navigation-settings-status" role="status" aria-live="polite"></p><div class="navigation-actions"><button id="navigation-recommended" class="quiet" type="button">恢复推荐选择</button><button id="navigation-save" class="primary" type="button">保存导航</button></div></div></dialog>
+    <script src="/static/product-shell.js?v=20261027-nav" defer></script>
+    <script src="/static/navigation-core.js?v=20261027-1" defer></script>
+    <script src="/static/navigation.js?v=20261027-1" defer></script>
+    <script src="/static/app.js?v=20261027-curation-1" defer></script>
     <script src="/static/gentle-reminders-core.js?v=20261022-1" defer></script>
     <script src="/static/important-days-core.js?v=20261022-1" defer></script>
     <script src="/static/important-days.js?v=20261022-1" defer></script>

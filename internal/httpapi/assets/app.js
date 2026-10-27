@@ -56,6 +56,11 @@
     learningInsights: null,
     weeklyReviewWeekStart: mondayKey(new Date()),
     weeklyReview: null,
+    weeklyDraftRevision: 0,
+    weeklyDraftSequence: 0,
+    weeklySaving: false,
+    weeklyLoading: false,
+    weeklyLoadError: "",
     currentView: "dashboard",
     focus: loadFocus(),
     dailyFocusGoalMinutes: 60,
@@ -282,12 +287,14 @@
     $("#auth-view").classList.add("hidden");
     $("#app-view").classList.remove("hidden");
     $("#user-name").textContent = user.name;
-    document.dispatchEvent(new CustomEvent("daynest:account-ready"));
+    document.dispatchEvent(new CustomEvent("daynest:account-ready", { detail: { userID: user.id } }));
     showView(viewFromURL() || state.currentView, { history: "replace" });
+    updateWeeklyDraftStatus();
     refresh().catch((error) => notify(error.message, "error"));
   }
 
   function leaveApp({ keepStoredSession = false } = {}) {
+    coreReadyToken = "";
     restoringSession = "";
     $("#auth-reconnect").disabled = false;
     activeDownloads.forEach(controller => controller.abort()); activeDownloads.clear();
@@ -343,6 +350,10 @@
     state.learningInsights = null;
     state.weeklyReviewWeekStart = mondayKey(new Date());
     state.weeklyReview = null;
+    state.weeklyDraftRevision = 0;
+    state.weeklySaving = false;
+    state.weeklyLoading = false;
+    state.weeklyLoadError = "";
     state.focus = null;
     state.dailyFocusGoalMinutes = 60;
     setFocusFeedback();
@@ -429,6 +440,7 @@
     if (previousView !== view && typeof window.scrollTo === "function") window.scrollTo({ top: viewScrollPositions.get(view) || 0, behavior: "instant" });
     const announcement = $("#page-announcement");
     if (announcement) announcement.textContent = `已打开${label[1]}`;
+    if (previousView !== view && state.user && coreReadyToken === state.token) refresh({ background: true }).catch(() => undefined);
     if (legacyIdeas) document.dispatchEvent(new CustomEvent("studyflow:legacy-ideas"));
     if (legacyKnowledge) document.dispatchEvent(new CustomEvent("daynest:legacy-knowledge"));
   }
@@ -444,17 +456,42 @@
     return `/api/v1/goals?${query.toString()}`;
   }
 
-  let refreshVersion = 0;
-  async function refresh() {
+  let refreshVersion = 0, backgroundRefresh = null, foregroundRefreshes = 0, backgroundPage = "", backgroundOwner = "", coreReadyToken = "";
+  let insightRequestVersion = 0, weeklyRequestVersion = 0, plannerRequestVersion = 0;
+  async function refresh({ background = false } = {}) {
+    if (!state.user || !state.token) return;
+    if (background && foregroundRefreshes) return;
+    if (background && backgroundRefresh && backgroundOwner === state.token) {
+      if (backgroundPage === state.currentView) return backgroundRefresh;
+      const owner = state.token, page = state.currentView;
+      return backgroundRefresh.then(() => { if (owner === state.token && page === state.currentView) return refresh({ background: true }); });
+    }
+    if (!background) foregroundRefreshes++;
+    const promise = refreshCore(background);
+    if (background) { backgroundRefresh = promise; backgroundPage = state.currentView; backgroundOwner = state.token; }
+    try { return await promise; }
+    finally { if (background) { if (backgroundRefresh === promise) backgroundRefresh = null; } else foregroundRefreshes--; }
+  }
+
+  async function refreshCore(background = false) {
     const version = ++refreshVersion, token = state.token;
     const moodMonth = state.moodMonth, moodVersion = moodLoadVersion;
     const vocabVersion = vocabularyVersion, vocabLibraryVersion = vocabularyLibraryVersion;
+    const plannerStart = state.plannerWeekStart, insightDays = state.insightsDays, weeklyStart = state.weeklyReviewWeekStart;
+    const plannerVersion = plannerRequestVersion, insightVersion = insightRequestVersion, weeklyVersion = weeklyRequestVersion;
+    const visible = {
+      dashboard: [6,7,14], focus: [5], goals: [1,2], tasks: [2,5], todo: [6,7],
+      moods: [3,4], vocabulary: [8], planner: [2,5,6,7,10], insights: [11,12],
+    };
+    const needed = new Set([0,13,...(visible[state.currentView] || [])]), skipped = Symbol('not-requested');
+    const wants = index => !background || needed.has(index);
+    const request = (index, path, options) => wants(index) ? api(path, options) : Promise.resolve(skipped);
     const today = localDateKey(new Date());
     const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
-    setSyncStatus("正在同步核心模块…", true);
-    const todoListsRequest = api("/api/v1/todo-lists");
-    const todosRequest = todoListsRequest.then(() => api(`/api/v1/todos?view=all&date=${localDateKey(new Date())}`));
-    const vocabularyRequest = api("/api/v1/word-books").then(async (books = []) => {
+    setSyncStatus(background ? "正在同步当前页面…" : "正在同步核心模块…", true);
+    const todoListsRequest = request(6, "/api/v1/todo-lists");
+    const todosRequest = wants(7) ? todoListsRequest.then(() => api(`/api/v1/todos?view=all&date=${localDateKey(new Date())}`)) : Promise.resolve(skipped);
+    const vocabularyRequest = wants(8) ? api("/api/v1/word-books").then(async (books = []) => {
       const selectedBookID = books.some((book) => book.id === state.vocabularyBookID)
         ? state.vocabularyBookID
         : (books.find(book=>book.source_id)?.id || books[0]?.id || "");
@@ -466,31 +503,34 @@
         api(`/api/v1/vocabulary/overview?${bookQuery}`),
       ]);
       return { books, selectedBookID, words: wordPage.data || [], wordMeta: wordPage.meta || {}, queue, overview };
-    });
+    }) : Promise.resolve(skipped);
     const results = await Promise.allSettled([
-      api("/api/v1/dashboard"),
-      api(goalListURL(), { returnEnvelope: true }),
-      api("/api/v1/goals?status=active&sort=title&order=asc&page=1&page_size=50", { returnEnvelope: true }),
-      api(`/api/v1/moods?month=${state.moodMonth}`),
-      api(`/api/v1/moods/insights?month=${state.moodMonth}`),
-      api("/api/v1/tasks"),
+      request(0, "/api/v1/dashboard"),
+      request(1, goalListURL(), { returnEnvelope: true }),
+      request(2, "/api/v1/goals?status=active&sort=title&order=asc&page=1&page_size=50", { returnEnvelope: true }),
+      request(3, `/api/v1/moods?month=${state.moodMonth}`),
+      request(4, `/api/v1/moods/insights?month=${state.moodMonth}`),
+      request(5, "/api/v1/tasks"),
       todoListsRequest,
       todosRequest,
       vocabularyRequest,
-      api("/api/v1/vocabulary/catalogs"),
-      api(`/api/v1/planner/week?week_start=${encodeURIComponent(state.plannerWeekStart)}`),
-      api(`/api/v1/analytics/learning?days=${state.insightsDays}`),
-      api(`/api/v1/reviews/weekly?week_start=${encodeURIComponent(state.weeklyReviewWeekStart)}`),
-      api("/api/v1/focus-sessions/active"),
-      api(`/api/v1/calendar?start=${today}&end=${localDateKey(tomorrow)}`),
+      request(9, "/api/v1/vocabulary/catalogs"),
+      request(10, `/api/v1/planner/week?week_start=${encodeURIComponent(plannerStart)}`),
+      request(11, `/api/v1/analytics/learning?days=${insightDays}`),
+      request(12, `/api/v1/reviews/weekly?week_start=${encodeURIComponent(weeklyStart)}`),
+      request(13, "/api/v1/focus-sessions/active"),
+      request(14, `/api/v1/calendar?start=${today}&end=${localDateKey(tomorrow)}`),
     ]);
     if (version !== refreshVersion || token !== state.token || !state.user) return;
-    const fallback = [state.dashboard, {data:state.goalPage,meta:state.goalMeta}, {data:state.goals}, state.moodEntries, state.moodInsights, state.tasks, state.todoLists, state.todos, {books:state.wordBooks,selectedBookID:state.vocabularyBookID,words:state.vocabularyWords,wordMeta:state.vocabularyMeta,queue:state.vocabularyQueue,overview:state.vocabularyOverview}, state.vocabularyCatalogs, state.plannerWeek, state.learningInsights, state.weeklyReview, null];
-    const [dashboard, goalPageResponse, activeGoalsResponse, moods, moodInsights, tasks, todoLists, todos, vocabulary, vocabularyCatalogs, plannerWeek, learningInsights, weeklyReview, activeFocus] = results.map((result,index) => result.status === "fulfilled" ? result.value : fallback[index]);
+    if (!background) coreReadyToken = token;
+    const fallback = [state.dashboard, {data:state.goalPage,meta:state.goalMeta}, {data:state.goals}, state.moodEntries, state.moodInsights, state.tasks, state.todoLists, state.todos, {books:state.wordBooks,selectedBookID:state.vocabularyBookID,words:state.vocabularyWords,wordMeta:state.vocabularyMeta,queue:state.vocabularyQueue,overview:state.vocabularyOverview}, state.vocabularyCatalogs, state.plannerWeek, state.learningInsights, state.weeklyReview, null, state.todayCalendar];
+    const [dashboard, goalPageResponse, activeGoalsResponse, moods, moodInsights, tasks, todoLists, todos, vocabulary, vocabularyCatalogs, plannerWeek, learningInsights, weeklyReview, activeFocus] = results.map((result,index) => result.status === "fulfilled" && result.value !== skipped ? result.value : fallback[index]);
     state.dashboard = dashboard;
-    state.todayCalendarError = results[14].status === "rejected";
-    state.todayCalendar = state.todayCalendarError ? null : results[14].value;
-    state.todayCalendarDate = today;
+    if (wants(14)) {
+      state.todayCalendarError = results[14].status === "rejected";
+      state.todayCalendar = state.todayCalendarError ? null : results[14].value;
+      state.todayCalendarDate = today;
+    }
     state.goalPage = goalPageResponse.data || [];
     state.goalMeta = goalPageResponse.meta || state.goalMeta;
     state.goals = activeGoalsResponse.data || [];
@@ -501,7 +541,7 @@
     state.tasks = tasks;
     state.todoLists = todoLists || [];
     state.todos = todos || [];
-    state.todayTodosError = results[7].status === "rejected";
+    if (wants(7)) state.todayTodosError = results[7].status === "rejected";
     if (vocabVersion === vocabularyVersion && vocabLibraryVersion === vocabularyLibraryVersion && !state.vocabularyLoading && !state.vocabularyReviewing && !state.vocabularyInstalling) {
     state.wordBooks = vocabulary.books || [];
     state.vocabularyBookID = vocabulary.selectedBookID || "";
@@ -509,17 +549,20 @@
     state.vocabularyMeta = vocabulary.wordMeta || { total: state.vocabularyWords.length, page: 1, total_pages: 1 };
     state.vocabularyQueue = vocabulary.queue || [];
     state.vocabularyOverview = vocabulary.overview || null;
-    state.vocabularyError = results[8].status === "rejected";
+    if (wants(8)) state.vocabularyError = results[8].status === "rejected";
     }
     if (vocabVersion === vocabularyVersion && !state.vocabularyInstalling) state.vocabularyCatalogs = vocabularyCatalogs || [];
-    state.plannerWeek = plannerWeek || null;
-    state.learningInsights = learningInsights || null;
-    state.weeklyReview = weeklyReview || null;
-    if (results[13].status === "fulfilled") syncActiveFocus(activeFocus);
+    if (plannerStart === state.plannerWeekStart && plannerVersion === plannerRequestVersion) state.plannerWeek = plannerWeek || null;
+    if (insightDays === state.insightsDays && insightVersion === insightRequestVersion) state.learningInsights = learningInsights || null;
+    if (weeklyStart === state.weeklyReviewWeekStart && weeklyVersion === weeklyRequestVersion) {
+      state.weeklyReview = weeklyReview || null;
+      if (wants(12)) state.weeklyLoadError = results[12].status === 'rejected' ? results[12].reason?.message || '请重试读取这一周' : '';
+    }
+    if (wants(13) && results[13].status === "fulfilled") syncActiveFocus(activeFocus);
     render();
     const names = ["概览","目标","目标选项","心情记录","心情统计","任务","待办分类","待办事项","单词学习","词书目录","学习规划","学习分析","周回顾","专注会话","今日安排"];
     const failures = results.flatMap((result,index) => result.status === "rejected" ? [names[index]] : []);
-    setSyncStatus(failures.length ? `未更新：${failures.join("、")}。这些模块暂保留上次数据（首次加载可能为空）。` : `已同步 · ${new Date().toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})}`, false, failures.length > 0);
+    setSyncStatus(failures.length ? `未更新：${failures.join("、")}。这些模块暂保留上次数据（首次加载可能为空）。` : `${background ? '当前页面已同步' : '已同步'} · ${new Date().toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})}`, false, failures.length > 0);
   }
 
   function setSyncStatus(message, busy=false, failed=false) {
@@ -1356,7 +1399,10 @@
   }
 
   async function refreshPlannerWeek() {
-    state.plannerWeek = await api(`/api/v1/planner/week?week_start=${encodeURIComponent(state.plannerWeekStart)}`);
+    const owner = state.token, week = state.plannerWeekStart, version = ++plannerRequestVersion;
+    const result = await api(`/api/v1/planner/week?week_start=${encodeURIComponent(week)}`);
+    if (owner !== state.token || week !== state.plannerWeekStart || version !== plannerRequestVersion) return;
+    state.plannerWeek = result;
     if (state.plannerWeek?.week_start) state.plannerWeekStart = state.plannerWeek.week_start;
     renderPlanner();
     renderSelects();
@@ -1364,9 +1410,13 @@
 
   async function generatePlannerWeek() {
     const button = $("#planner-generate");
+    if (button.disabled) return;
+    const owner = state.token, week = state.plannerWeekStart, version = ++plannerRequestVersion;
     button.disabled = true;
     try {
-      state.plannerWeek = await api("/api/v1/planner/generate", { method: "POST", body: JSON.stringify({ week_start: state.plannerWeekStart }) });
+      const result = await api("/api/v1/planner/generate", { method: "POST", body: JSON.stringify({ week_start: week }) });
+      if (owner !== state.token || week !== state.plannerWeekStart || version !== plannerRequestVersion) return;
+      state.plannerWeek = result;
       state.plannerWeekStart = state.plannerWeek.week_start;
       state.plannerSelectedBlockID = "";
       renderPlanner();
@@ -1510,30 +1560,44 @@
   }
 
   function renderInsightCorrelation(kind, value) {
-    const numeric = Number(value || 0);
+    const field = kind === 'mood' ? 'mood_score' : 'stress';
+    const samples = (state.learningInsights?.daily || []).filter(day => Number.isFinite(day[field]) && day[field] >= 1 && day[field] <= 5 && Number.isFinite(day.focus_minutes) && day.focus_minutes >= 0);
+    const numeric = typeof value === 'number' && Number.isFinite(value) ? value : null;
     const valueElement = $(`#insights-${kind}-correlation`);
     const labelElement = $(`#insights-${kind}-correlation-label`);
-    valueElement.textContent = numeric ? numeric.toFixed(2) : "—";
-    if (!numeric) {
-      labelElement.textContent = "至少记录 3 天后分析";
+    valueElement.textContent = "—";
+    if (samples.length < 3) {
+      labelElement.textContent = `有效记录 ${samples.length} 天 · 至少需要 3 天`;
       return;
     }
+    if (new Set(samples.map(day => day[field])).size < 2 || new Set(samples.map(day => day.focus_minutes)).size < 2) { labelElement.textContent = '记录变化不足，暂不能计算'; return; }
+    if (numeric === null) { labelElement.textContent = '统计暂不可用，请刷新核对'; return; }
+    valueElement.textContent = numeric.toFixed(2);
+    if (numeric === 0) { labelElement.textContent = `${samples.length} 天样本 · 未见明显线性关联`; return; }
     const strength = Math.abs(numeric) >= .65 ? "较强" : Math.abs(numeric) >= .35 ? "中等" : "较弱";
-    labelElement.textContent = `${strength}${numeric > 0 ? "正相关" : "负相关"}`;
+    labelElement.textContent = `${samples.length} 天样本 · ${strength}${numeric > 0 ? "正相关" : "负相关"}`;
   }
 
   async function refreshLearningInsights() {
+    const owner = state.token, days = state.insightsDays, version = ++insightRequestVersion;
     try {
-      state.learningInsights = await api(`/api/v1/analytics/learning?days=${state.insightsDays}`);
+      const result = await api(`/api/v1/analytics/learning?days=${days}`);
+      if (owner !== state.token || days !== state.insightsDays || version !== insightRequestVersion) return;
+      state.learningInsights = result;
       renderLearningInsights();
     } catch (error) {
-      notify(error.message, "error");
+      if (owner === state.token && version === insightRequestVersion) notify(error.message, "error");
     }
   }
 
   function renderWeeklyReview() {
     const review = state.weeklyReview;
-    if (!review) return;
+    if (!review) {
+      $("#weekly-review-range").textContent = `${state.weeklyReviewWeekStart} 起的一周 · 尚未载入`;
+      $("#weekly-review-comparison").textContent = '载入这一周后展示汇总，不沿用其他周的数据。';
+      $("#weekly-review-highlights").textContent = '';
+      updateWeeklyDraftStatus(); return;
+    }
     const current = review.summary || {};
     const previous = review.previous || {};
     const comparison = review.comparison || {};
@@ -1559,17 +1623,49 @@
     $("#weekly-review-highlights").className = "weekly-highlights";
     $("#weekly-review-highlights").innerHTML = highlights.map((item) => `<article class="${item.kind}"><span>${highlightIcons[item.kind] || "i"}</span><div><h5>${escapeHTML(item.title)}</h5><p>${escapeHTML(item.description)}</p><small>${escapeHTML(item.evidence)}</small></div></article>`).join("");
     const reflection = review.reflection || {};
-    $("#weekly-satisfaction").value = reflection.satisfaction ? String(reflection.satisfaction) : "";
-    $("#weekly-wins").value = reflection.wins || "";
-    $("#weekly-challenges").value = reflection.challenges || "";
-    $("#weekly-lessons").value = reflection.lessons || "";
-    $("#weekly-priorities").value = (reflection.next_week_priorities || []).join("\n");
-    $("#weekly-reflection-status").textContent = review.reflection_saved ? `已保存 · ${formatDate(reflection.updated_at, true)}` : "尚未保存这一周的复盘";
+    if (!state.weeklyDraftRevision && !state.weeklySaving) {
+      $("#weekly-satisfaction").value = reflection.satisfaction ? String(reflection.satisfaction) : "";
+      $("#weekly-wins").value = reflection.wins || "";
+      $("#weekly-challenges").value = reflection.challenges || "";
+      $("#weekly-lessons").value = reflection.lessons || "";
+      $("#weekly-priorities").value = (reflection.next_week_priorities || []).join("\n");
+    }
+    updateWeeklyDraftStatus();
+  }
+
+  function updateWeeklyDraftStatus() {
+    const review = state.weeklyReview, reflection = review?.reflection || {};
+    $("#weekly-reflection-form").querySelectorAll('input,select,textarea').forEach(field => { field.disabled = !review; });
+    $("#weekly-reflection-status").textContent = state.weeklySaving ? '正在保存本次提交，新输入会保留…' : state.weeklyDraftRevision ? '有未保存修改 · 自动刷新不会覆盖' : state.weeklyLoadError ? `汇总加载失败：${state.weeklyLoadError}` : state.weeklyLoading ? '正在读取这一周…' : !review ? '请先载入这一周，再填写并保存' : review.reflection_saved ? `已保存 · ${formatDate(reflection.updated_at, true)}` : '尚未保存这一周的复盘';
+    $("#weekly-discard").disabled = state.weeklySaving || !state.weeklyDraftRevision;
+    const button = $("#weekly-reflection-form").querySelector('button[type=submit]');
+    if (button) { button.disabled = state.weeklySaving || state.weeklyLoading || !review; button.textContent = state.weeklySaving ? '保存中…' : '保存复盘'; }
+  }
+
+  function markWeeklyDraft() {
+    state.weeklyDraftRevision = ++state.weeklyDraftSequence;
+    updateWeeklyDraftStatus();
   }
 
   async function refreshWeeklyReview() {
-    state.weeklyReview = await api(`/api/v1/reviews/weekly?week_start=${encodeURIComponent(state.weeklyReviewWeekStart)}`);
-    renderWeeklyReview();
+    const owner = state.token, week = state.weeklyReviewWeekStart, version = ++weeklyRequestVersion;
+    state.weeklyLoading = true; state.weeklyLoadError = ''; updateWeeklyDraftStatus();
+    try {
+      const result = await api(`/api/v1/reviews/weekly?week_start=${encodeURIComponent(week)}`);
+      if (owner !== state.token || week !== state.weeklyReviewWeekStart || version !== weeklyRequestVersion) return;
+      state.weeklyReview = result;
+    } catch (error) { if (owner === state.token && version === weeklyRequestVersion) state.weeklyLoadError = error.message; throw error; }
+    finally { if (owner === state.token && version === weeklyRequestVersion) { state.weeklyLoading = false; renderWeeklyReview(); } }
+  }
+
+  async function selectWeeklyWeek(next) {
+    const owner = state.token;
+    if (state.weeklySaving) { notify('正在保存复盘，请稍候再切换周次。', 'error'); return; }
+    if (next !== state.weeklyReviewWeekStart && state.weeklyDraftRevision && !window.confirm('本周复盘尚未保存，放弃修改并切换周次吗？')) return;
+    if (next !== state.weeklyReviewWeekStart) { state.weeklyDraftRevision = 0; state.weeklyReview = null; $("#weekly-reflection-form").reset(); }
+    state.weeklyReviewWeekStart = next;
+    try { await refreshWeeklyReview(); }
+    catch (error) { if (owner === state.token && next === state.weeklyReviewWeekStart) notify(error.message, 'error'); }
   }
 
   async function shiftWeeklyReview(days) {
@@ -1577,35 +1673,39 @@
     date.setDate(date.getDate() + days);
     const next = mondayKey(date);
     if (next > mondayKey(new Date())) return;
-    state.weeklyReviewWeekStart = next;
-    try {
-      await refreshWeeklyReview();
-    } catch (error) {
-      notify(error.message, "error");
-    }
+    await selectWeeklyWeek(next);
   }
 
   async function saveWeeklyReflection(event) {
     event.preventDefault();
+    if (state.weeklySaving || state.weeklyLoading || !state.weeklyReview || $("#weekly-reflection-form").reportValidity?.() === false) return;
     const priorities = $("#weekly-priorities").value.split(/\r?\n/).map((value) => value.trim()).filter(Boolean);
     if (priorities.length > 5) {
       notify("下周优先事项最多填写 5 项，请每行填写一项。", "error");
       return;
     }
-    try {
-      await api("/api/v1/reviews/weekly/reflection", { method: "PUT", body: JSON.stringify({
-        week_start: state.weeklyReviewWeekStart,
+    const owner = state.token, week = state.weeklyReviewWeekStart, revision = state.weeklyDraftRevision;
+    const payload = {
+        week_start: week,
         satisfaction: Number($("#weekly-satisfaction").value),
         wins: $("#weekly-wins").value,
         challenges: $("#weekly-challenges").value,
         lessons: $("#weekly-lessons").value,
         next_week_priorities: priorities,
-      }) });
-      await refreshWeeklyReview();
-      notify("每周复盘已保存，可以随时返回这一周继续修改。");
+      };
+    state.weeklySaving = true; weeklyRequestVersion++; updateWeeklyDraftStatus();
+    try {
+      const reflection = await api("/api/v1/reviews/weekly/reflection", { method: "PUT", body: JSON.stringify(payload) });
+      if (owner !== state.token || week !== state.weeklyReviewWeekStart) return;
+      if (!reflection || reflection.week_start !== week) throw new Error('复盘保存响应不完整，请先核对记录。');
+      state.weeklyReview = { ...(state.weeklyReview || {}), week_start: week, reflection, reflection_saved: true };
+      if (state.weeklyDraftRevision === revision) state.weeklyDraftRevision = 0;
+      try { await refreshWeeklyReview(); }
+      catch (_) { notify('复盘已保存，但汇总暂未更新；本次保存内容仍保留。', 'error'); return; }
+      notify(state.weeklyDraftRevision ? "已保存提交的复盘，新输入仍保留，需再次保存。" : "每周复盘已保存，可以随时返回这一周继续修改。");
     } catch (error) {
-      notify(error.message, "error");
-    }
+      if (owner === state.token) { if (!state.weeklyDraftRevision) state.weeklyDraftRevision = ++state.weeklyDraftSequence; notify(error.message, "error"); }
+    } finally { if (owner === state.token) { state.weeklySaving = false; renderWeeklyReview(); updateWeeklyDraftStatus(); } }
   }
 
   let vocabularyVersion = 0, vocabularyLibraryVersion = 0;
@@ -2184,7 +2284,7 @@
   }
 
   function bindEvents() {
-    window.DaynestUI?.registerGuard?.('main', () => savingForms.size || state.moodDraftRevision || state.moodSaving || state.plannerDraftRevision || state.isStartingFocus || state.isUpdatingFocus || state.isFinishingFocus);
+    window.DaynestUI?.registerGuard?.('main', () => savingForms.size || state.moodDraftRevision || state.moodSaving || state.plannerDraftRevision || state.weeklyDraftRevision || state.weeklySaving || state.isStartingFocus || state.isUpdatingFocus || state.isFinishingFocus);
     $("#today-note-form").addEventListener("submit", saveTodayNote);
     $("#planner-preferences-form").addEventListener("input", markPlannerDraft);
     $("#planner-preferences-form").addEventListener("change", markPlannerDraft);
@@ -2207,7 +2307,7 @@
     window.addEventListener("storage", handleAccountStorage);
     $$("[data-view]").forEach((button) => button.addEventListener("click", () => {
       showView(button.dataset.view);
-      if (button.dataset.view === "dashboard" && state.user) refresh().catch(error => setSyncStatus(error.message, false, true));
+      if (button.dataset.view === "dashboard" && state.user) refresh({ background: true }).catch(error => setSyncStatus(error.message, false, true));
     }));
     document.addEventListener("click", async (event) => {
       const goto = event.target.closest("[data-goto]");
@@ -2413,11 +2513,14 @@
     });
     $("#weekly-review-prev").addEventListener("click", () => shiftWeeklyReview(-7));
     $("#weekly-review-current").addEventListener("click", () => {
-      state.weeklyReviewWeekStart = mondayKey(new Date());
-      refreshWeeklyReview().catch((error) => notify(error.message, "error"));
+      selectWeeklyWeek(mondayKey(new Date()));
     });
     $("#weekly-review-next").addEventListener("click", () => shiftWeeklyReview(7));
     $("#weekly-reflection-form").addEventListener("submit", saveWeeklyReflection);
+    $("#weekly-reflection-form").addEventListener('input', markWeeklyDraft);
+    $("#weekly-reflection-form").addEventListener('change', markWeeklyDraft);
+    $("#weekly-discard").addEventListener('click', () => { if (!state.weeklySaving && (!state.weeklyDraftRevision || window.confirm('放弃尚未保存的复盘修改吗？'))) { state.weeklyDraftRevision = 0; renderWeeklyReview(); } });
+    window.addEventListener('beforeunload', event => { if (state.weeklyDraftRevision || state.weeklySaving) { event.preventDefault(); event.returnValue = ''; } });
     $("#export-learning-csv").addEventListener("click", async () => {
       const owner = state.token;
       try {
@@ -2867,7 +2970,7 @@
     bindEvents();
     window.setInterval(updateFocusClock, 250);
     window.setInterval(() => {
-      if (state.user && !document.hidden) refresh().catch(() => undefined);
+      if (state.user && !document.hidden) refresh({ background: true }).catch(() => undefined);
     }, 60_000);
     renderReadyCountdown();
     renderFocusPlan();
