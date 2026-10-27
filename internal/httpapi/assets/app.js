@@ -135,6 +135,7 @@
 
   const activeDownloads = new Map();
   async function downloadAuthenticated(path, fallbackFilename) {
+    if (window.DaynestMobile?.native) return window.DaynestMobile.downloadServer(path, fallbackFilename);
     if (activeDownloads.has(path)) throw new Error("这份文件正在导出，请稍候。");
     const owner = state.token, stored = localStorage.getItem("studyflow.token") || "", controller = new AbortController();
     if (!owner || owner !== stored) throw new Error("账号已切换，请重新连接后导出。");

@@ -46,6 +46,7 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 	root.HandleFunc("/", s.home)
 	root.HandleFunc("GET /healthz", s.health)
 	root.HandleFunc("GET /readyz", s.ready)
+	root.HandleFunc("GET /api/v1/mobile-info", s.mobileInfo)
 	root.HandleFunc("POST /api/v1/auth/register", s.register)
 	root.HandleFunc("POST /api/v1/auth/login", s.login)
 

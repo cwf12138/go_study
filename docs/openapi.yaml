@@ -6,6 +6,7 @@ info:
 servers:
   - url: http://localhost:8080
 tags:
+  - name: Mobile
   - name: Parcels
   - name: Transfers
   - name: Whiteboards
@@ -36,6 +37,29 @@ tags:
   - name: Shopping
   - name: Bookmarks
 paths:
+  /api/v1/mobile-info:
+    get:
+      tags: [Mobile]
+      security: []
+      summary: Android 客户端连接兼容性检查，无需登录
+      description: 不返回用户数据、密钥或本机路径。requires_secure_secret 为 true 表示服务使用已知公开开发密钥，Android 客户端必须拒绝继续登录；设置专用 JWT_SECRET 并重启。AI 授权接口仍仅限电脑回环访问。本接口不授予访问权限，业务接口仍需 Bearer 令牌。响应 Cache-Control 为 no-store。
+      responses:
+        '200':
+          description: 当前服务兼容协议信息
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [application, mobile_protocol, requires_secure_secret, ai_requires_loopback]
+                    properties:
+                      application: { type: string, const: daynest }
+                      mobile_protocol: { type: integer, const: 1 }
+                      requires_secure_secret: { type: boolean }
+                      ai_requires_loopback: { type: boolean, const: true }
   /api/v1/parcels:
     get:
       tags: [Parcels]

@@ -1,0 +1,22 @@
+{
+  "name": "daynest-android",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Android companion for the existing Daynest Go server",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "node scripts/build.cjs",
+    "android:init": "node scripts/build.cjs && cap add android && node scripts/configure-android.cjs && cap sync android",
+    "android:sync": "node scripts/build.cjs && node scripts/configure-android.cjs && cap sync android",
+    "android:open": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3",
+    "esbuild": "0.25.12"
+  }
+}

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">日常 Daynest</string>
+    <string name="title_activity_main">日常 Daynest</string>
+    <string name="package_name">app.daynest.personal</string>
+    <string name="custom_url_scheme">app.daynest.personal</string>
+</resources>

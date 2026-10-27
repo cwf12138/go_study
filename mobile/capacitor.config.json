@@ -1,0 +1,8 @@
+{
+  "appId": "app.daynest.personal",
+  "appName": "日常 Daynest",
+  "webDir": "www",
+  "server": { "hostname": "localhost", "androidScheme": "https" },
+  "android": { "allowMixedContent": false, "webContentsDebuggingEnabled": false },
+  "plugins": { "CapacitorHttp": { "enabled": false } }
+}

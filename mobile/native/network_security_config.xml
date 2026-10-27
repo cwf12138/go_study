@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Local personal client: only the selected private HTTP origin is accepted
+     by the app adapter/native file plugin. WebView mixed content stays disabled.
+     Do not use this configuration for an arbitrary public HTTP service. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors><certificates src="system" /></trust-anchors>
+    </base-config>
+</network-security-config>

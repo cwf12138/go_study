@@ -7,9 +7,27 @@ coverage.out
 # Runtime data and local configuration
 data/
 .env
+.local/
 
 # Editors / operating systems
 .idea/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Android client generated files and local build caches
+mobile/node_modules/
+mobile/www/
+mobile/.pnpm-store/
+mobile/.npm-cache/
+mobile/.java-check/
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/local.properties
+mobile/android/app/src/main/assets/public/
+mobile/android/app/src/main/assets/capacitor.config.json
+mobile/android/app/src/main/assets/capacitor.plugins.json
+mobile/android/capacitor-cordova-android-plugins/
+*.jks
+*.keystore

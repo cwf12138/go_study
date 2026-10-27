@@ -86,6 +86,7 @@ function harness(){
   await h.click('record-start');h.leave();await settle();assert(!E('record-download').disabled);assert(h.streams.at(-1).track.stopped);
   h.enter();await h.click('record-start');h.account('user-three');await settle();assert(E('record-download').disabled);assert(h.streams.at(-1).track.stopped);assert.equal(h.urls.size,0);
   await h.click('record-start');h.hide();await settle();assert(h.streams.at(-1).track.stopped);assert(!E('record-download').disabled);
+  h.document.hidden=false;h.enter();await h.click('record-start');h.windowEvents['daynest:mobile-pause']();await settle();assert(h.streams.at(-1).track.stopped);assert(!E('record-download').disabled);assert.match(E('record-status').textContent,/App 已进入后台/);
   h.unload();assert.equal(h.urls.size,0);assert(E('record-download').disabled);
   const unsupported=harness();unsupported.window.isSecureContext=false;await unsupported.click('record-start');assert.match(unsupported.E('record-status').textContent,/HTTPS/);assert.equal(unsupported.streams.length,0);
   console.log('Pocket tools passed: image validation/encoding/cancellation/URLs, mic permissions/pause/resume/final chunks/limits/navigation/account cleanup (mocked browser APIs).');
