@@ -24,14 +24,19 @@ type Server struct {
 	chatGPT            *chatgpt.Manager
 	transfers          *transfers.Store
 	localOnlyTransfers bool
+	snapshotInterval   time.Duration
 }
 
-func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.Bus, logger *slog.Logger) http.Handler {
+func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.Bus, logger *slog.Logger, options ...RuntimeOptions) http.Handler {
 	assets, err := frontendFS()
 	if err != nil {
 		panic("frontend assets are unavailable: " + err.Error())
 	}
 	s := &Server{service: svc, bus: bus, logger: logger, started: time.Now(), assets: assets}
+	s.snapshotInterval = 15 * time.Second
+	if len(options) > 0 && options[0].SnapshotInterval > 0 {
+		s.snapshotInterval = options[0].SnapshotInterval
+	}
 	// Registration metadata is independent of user snapshots; credentials stay in RAM.
 	dataFile := os.Getenv("DATA_FILE")
 	if dataFile == "" {
@@ -51,6 +56,7 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 	root.HandleFunc("POST /api/v1/auth/login", s.login)
 
 	private := http.NewServeMux()
+	private.HandleFunc("GET /api/v1/system/diagnostics", s.diagnostics)
 	private.HandleFunc("GET /api/v1/text-clips", s.listTextClips)
 	private.HandleFunc("PUT /api/v1/text-clips/{id}", s.saveTextClip)
 	private.HandleFunc("DELETE /api/v1/text-clips/{id}", s.purgeTextClip)

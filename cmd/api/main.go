@@ -55,7 +55,7 @@ func main() {
 	bus := event.NewBus()
 	tokens := security.NewTokenManager(cfg.JWTSecret, cfg.JWTIssuer, cfg.TokenTTL)
 	services := service.New(repository, tokens, bus)
-	handler := httpapi.NewHandler(services, tokens, bus, logger)
+	handler := httpapi.NewHandler(services, tokens, bus, logger, httpapi.RuntimeOptions{SnapshotInterval: cfg.SnapshotInterval})
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,

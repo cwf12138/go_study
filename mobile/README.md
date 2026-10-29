@@ -20,6 +20,8 @@
 
 ## 2. 构建并安装 App
 
+可先在 `mobile/` 运行 `pnpm android:check` 只读检查环境。新版构建生成 `client-build.json`，包含版本、提交和资源摘要；同步后在根目录运行 `node tools/verify-mobile.cjs` 校验资源。顶部「设置与诊断」显示两端版本与快照观察，使用说明与 CI 签名边界见 [R0 交付说明](../docs/release-baseline.md)。
+
 需要：
 
 - Node.js 22 或更高版本、pnpm，以及现有 Go 环境。

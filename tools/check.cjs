@@ -1,0 +1,7 @@
+const fs=require('node:fs'),path=require('node:path'),{spawnSync}=require('node:child_process');
+const root=path.resolve(__dirname,'..'),names=fs.readdirSync(__dirname).filter(name=>/^[a-z0-9_]+_smoke\.cjs$/.test(name)).sort();
+if(process.argv.includes('--list')){console.log(names.join('\n'));process.exit(0);}
+const report={schema_version:1,started_at:new Date().toISOString(),runtime:process.versions.node,suites:[],passed:false};
+for(const name of names){const start=Date.now(),result=spawnSync(process.execPath,[path.join(__dirname,name)],{cwd:root,encoding:'utf8',timeout:120000,windowsHide:true});const executed=!result.error&&result.status!==null,passed=executed&&result.status===0;report.suites.push({name,executed,passed,duration_ms:Date.now()-start});console.log(`${passed?'PASS':executed?'FAIL':'BLOCKED'} ${name}`);if(!passed)console.error(String(result.error?.message||result.stderr||result.stdout||'检查失败').slice(-6000));}
+report.passed=report.suites.length>0&&report.suites.every(s=>s.passed);report.finished_at=new Date().toISOString();
+const dest=path.join(root,'.local','checks','frontend-report.json');fs.mkdirSync(path.dirname(dest),{recursive:true});fs.writeFileSync(dest,JSON.stringify(report,null,2)+'\n');console.log(`${report.suites.length} suites; ${report.suites.filter(s=>!s.passed).length} failed. Report: .local/checks/frontend-report.json`);process.exitCode=report.passed?0:1;

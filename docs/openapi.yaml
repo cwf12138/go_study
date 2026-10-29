@@ -6,6 +6,7 @@ info:
 servers:
   - url: http://localhost:8080
 tags:
+  - name: System
   - name: TextClips
   - name: Mobile
   - name: Parcels
@@ -38,6 +39,53 @@ tags:
   - name: Shopping
   - name: Bookmarks
 paths:
+  /api/v1/system/diagnostics:
+    get:
+      tags: [System]
+      security: [{ bearerAuth: [] }]
+      summary: 读取服务版本和本进程快照观察，供设置与脱敏诊断使用
+      description: 无原始异常、数据路径、账号内容或其他账号记录数量。Cache-Control 为 no-store。不写盘、不恢复、不检查所有外部来源；recent_write 不代表之后的每次修改均已落盘。所有观察都可能在返回后变化。
+      responses:
+        '200':
+          description: data 为系统诊断对象
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      application: { type: string, const: daynest }
+                      server_time: { type: string, format: date-time }
+                      mobile_protocol: { type: integer, const: 1 }
+                      build: { type: object, description: version、commit、dirty 和可选 built_at；源码运行允许 dev / unknown }
+                      runtime: { type: object, description: go、os、arch、uptime_seconds，不包含环境变量 }
+                      security: { type: object, description: development_key 仅识别已知开发值，非任意密钥强度评估；ai_requires_loopback 始终 true }
+                      persistence:
+                        type: object
+                        properties:
+                          mode: { type: string, const: periodic_json }
+                          observed: { type: boolean }
+                          interval_seconds: { type: number, exclusiveMinimum: 0 }
+                          state: { type: string, enum: [unobserved, write_failed, awaiting_first_write, overdue, recent_write] }
+                          response_means_immediate_disk_write: { type: boolean, const: false }
+                          observation:
+                            type: object
+                            description: 未发生过的时间为 Go 零值时间。loaded_snapshot_at 是文件记录时间，不是当前进程写盘确认。
+                            properties:
+                              last_attempt_at: { type: string, format: date-time }
+                              last_success_at: { type: string, format: date-time }
+                              last_failure_at: { type: string, format: date-time }
+                              loaded_at: { type: string, format: date-time }
+                              loaded_snapshot_at: { type: string, format: date-time }
+                              recovered_from_backup: { type: boolean }
+                              in_progress: { type: boolean }
+                              last_result: { type: string, enum: [not_attempted, success, failure] }
+                              last_duration_ms: { type: integer, minimum: 0 }
+                              consecutive_failures: { type: integer, minimum: 0 }
+                      backup: { type: object, description: JSON 不包含快传文件及元数据；完整备份需停服；restore_verified 目前固定 false }
+        '401': { description: 需要登录 }
   /api/v1/text-clips:
     get:
       tags: [TextClips]

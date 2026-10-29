@@ -85,6 +85,8 @@ export function boot({ Http, App, Files }) {
     document.querySelector('.workspace').prepend(bar);
     function controls() { $('connect').disabled = busy; $('connect').textContent = fatal ? '重载界面' : busy ? '正在检查…' : '检查并连接'; $('server').disabled = busy; $('consent').disabled = busy; $('close').hidden = !loaded || fatal; }
     function openSettings() { if (!setup.open) setup.showModal(); controls(); }
+    window.DaynestMobile.openConnectionSettings=openSettings;
+    window.DaynestMobile.getConnectionInfo=()=>({server:connection?.server||''});
     async function activate() {
       if (loaded || loading) return; if (fatal) { location.reload(); return; }
       loading = true;

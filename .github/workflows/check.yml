@@ -1,0 +1,90 @@
+name: Daynest checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ['1.22.x', 'stable']
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ matrix.go }}
+      - run: go vet ./...
+      - run: go test ./...
+      - if: matrix.go == 'stable'
+        run: go test -race ./...
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - run: node tools/check.cjs
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: frontend-check-report
+          path: .local/checks/frontend-report.json
+          include-hidden-files: true
+          retention-days: 14
+  android:
+    needs: [go, frontend]
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm install --global pnpm@11.25.0 --registry=https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile --ignore-scripts --registry=https://registry.npmjs.org
+        working-directory: mobile
+      - run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;35.0.0' 'build-tools;36.0.0'
+      - run: node mobile/scripts/preflight.cjs
+      - run: pnpm android:sync
+        working-directory: mobile
+      - run: node tools/verify-mobile.cjs
+      - run: bash ./gradlew --no-daemon assembleDebug
+        working-directory: mobile/android
+      - name: Record APK checksums
+        run: |
+          mkdir -p .local/release
+          cp mobile/android/app/src/main/assets/public/client-build.json .local/release/client-build.json
+          sha256sum mobile/android/app/build/outputs/apk/debug/app-debug.apk > .local/release/apk.sha256
+      - uses: actions/upload-artifact@v7
+        with:
+          name: daynest-android-debug-${{ github.sha }}
+          path: |
+            mobile/android/app/build/outputs/apk/debug/app-debug.apk
+            .local/release/client-build.json
+            .local/release/apk.sha256
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14

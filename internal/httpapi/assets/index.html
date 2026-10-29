@@ -57,6 +57,7 @@
     <link rel="stylesheet" href="/static/parcels.css?v=20261026-1">
     <link rel="stylesheet" href="/static/product-polish.css?v=20261026-1">
     <link rel="stylesheet" href="/static/navigation.css?v=20261027-1">
+    <link rel="stylesheet" href="/static/diagnostics.css?v=20261030-1">
     <link rel="stylesheet" href="/static/layout.css?v=20260922-1">
   </head>
   <body>
@@ -159,7 +160,7 @@
             <button id="daily-trigger" class="daily-trigger" type="button" aria-haspopup="dialog" aria-controls="daily-dialog" aria-label="打开今日签"><span aria-hidden="true">签</span><b id="daily-trigger-label">今日签</b></button>
             <button id="gr-trigger" class="gr-trigger" type="button" aria-haspopup="dialog" aria-controls="gr-dialog" disabled><span class="gr-trigger-icon" aria-hidden="true">◷</span><span class="gr-trigger-copy"><b>轻提醒</b><small id="gr-caption">照顾一下自己</small></span><i id="gr-dot" hidden></i></button>
           </div>
-          <div class="user-actions"><button id="content-search-trigger" class="content-search-trigger" type="button" aria-label="搜索全部内容" title="全局内容搜索 · Ctrl+Shift+F 或 /"><span aria-hidden="true">⌕</span><span>搜索内容</span></button><button id="command-trigger" class="command-trigger" type="button" aria-label="打开快捷命令"><span>⌕</span><kbd>Ctrl K</kbd></button><button id="theme-toggle" class="theme-toggle" type="button" aria-label="切换至夜间模式" title="切换主题"><span aria-hidden="true">☾</span><span id="theme-toggle-label">夜间</span></button><span id="user-name"></span><button id="logout" class="quiet" type="button">退出</button></div>
+          <div class="user-actions"><button id="content-search-trigger" class="content-search-trigger" type="button" aria-label="搜索全部内容" title="全局内容搜索 · Ctrl+Shift+F 或 /"><span aria-hidden="true">⌕</span><span>搜索内容</span></button><button id="command-trigger" class="command-trigger" type="button" aria-label="打开快捷命令"><span>⌕</span><kbd>Ctrl K</kbd></button><button id="diagnostics-open" class="icon-button diagnostics-trigger" type="button" aria-label="设置与诊断" title="设置与诊断" aria-haspopup="dialog" aria-controls="dg-dialog"><span aria-hidden="true">⚙</span></button><button id="theme-toggle" class="theme-toggle" type="button" aria-label="切换至夜间模式" title="切换主题"><span aria-hidden="true">☾</span><span id="theme-toggle-label">夜间</span></button><span id="user-name"></span><button id="logout" class="quiet" type="button">退出</button></div>
           <dialog id="holiday-dialog" aria-labelledby="holiday-title"><header><div><p class="eyebrow">A LITTLE BREAK AHEAD</p><h3 id="holiday-title">下个节假日</h3></div><button id="holiday-close" class="quiet" type="button" aria-label="关闭节假日详情">✕</button></header><div class="holiday-detail"><p id="holiday-detail-name">正在查看假期…</p><strong id="holiday-detail-days">—</strong><p id="holiday-detail-dates"></p></div><p id="holiday-current"></p><p id="holiday-status" role="status"></p><div class="holiday-dialog-actions"><a id="holiday-source" target="_blank" rel="noopener noreferrer" hidden>查看官方放假通知 ↗</a><button id="holiday-retry" class="quiet" type="button">刷新</button></div><p class="holiday-note">中国大陆节假日 · 按北京时间自然日计数。已核实安排按放假首日倒计时；未收录安排时仅显示节日日期，不推测放假天数或调休。普通周末不计入。</p></dialog>
         </header>
 
@@ -892,7 +893,20 @@
       </div>
     </dialog>
     <dialog id="navigation-settings" class="navigation-dialog" aria-labelledby="navigation-title"><header><div><p>LESS TO FIND. MORE TO LIVE.</p><h2 id="navigation-title">让常用的，离你近一点。</h2><span>选择常用入口，其他功能按需展开。</span></div><button id="navigation-close" type="button" aria-label="关闭导航整理">×</button></header><div class="navigation-body"><label class="navigation-mode"><input id="navigation-compact" type="checkbox"><span><b>精简导航</b><small>取消勾选可直接显示全部功能。</small></span></label><p class="navigation-description">下方勾选的是“常用入口”，不是功能开关。未勾选的页面仍能从分组的“其他”或 Ctrl K 快捷导航进入，历史数据不会删除。</p><p id="navigation-count"></p><div id="navigation-options" class="navigation-options"></div><p id="navigation-settings-status" role="status" aria-live="polite"></p><div class="navigation-actions"><button id="navigation-recommended" class="quiet" type="button">恢复推荐选择</button><button id="navigation-save" class="primary" type="button">保存导航</button></div></div></dialog>
+    <dialog id="dg-dialog" class="dg-dialog" aria-labelledby="dg-title">
+      <header class="dg-header"><div><p>DAYNEST · A LITTLE PEACE OF MIND</p><h2 id="dg-title">设置与诊断</h2><span>看清当前连接，也看清记录如何保存。</span></div><button id="dg-close" type="button" aria-label="关闭设置与诊断">×</button></header>
+      <div class="dg-body"><div class="dg-toolbar"><span id="dg-status" role="status" aria-live="polite">点击检查，读取当前服务状态。</span><button id="dg-refresh" type="button">↻ 重新检查</button></div>
+        <div class="dg-grid">
+          <section class="dg-card"><div class="dg-card-heading"><span class="dg-icon" aria-hidden="true">↔</span><h3>电脑连接</h3><span id="dg-connection-badge" class="dg-badge">待检查</span></div><p id="dg-target" class="dg-target">—</p><dl><dt>当前客户端</dt><dd id="dg-client-kind">—</dd><dt>连接方式</dt><dd id="dg-transport">—</dd><dt>服务运行时间</dt><dd id="dg-uptime">—</dd><dt>开发密钥检查</dt><dd id="dg-key">—</dd></dl><button id="dg-connection" type="button" hidden>更换电脑连接</button><p class="dg-help">手机当前需要电脑服务在线。此检查不代表所有外部资讯来源均可用。</p></section>
+          <section class="dg-card dg-persistence"><div class="dg-card-heading"><span class="dg-icon" aria-hidden="true">◷</span><h3>数据快照</h3><span id="dg-snapshot-badge" class="dg-badge">待检查</span></div><p id="dg-snapshot-summary" class="dg-summary">尚未读取写盘状态。</p><dl><dt>当前进程最后确认写盘</dt><dd id="dg-last-success">—</dd><dt>载入文件记录的快照时间</dt><dd id="dg-loaded-snapshot">—</dd><dt>计划快照间隔</dt><dd id="dg-interval">—</dd><dt>上次尝试 / 连续失败</dt><dd id="dg-attempt">—</dd></dl><p class="dg-help">当前仍为周期性 JSON 快照。页面显示“保存成功”，不等于本次修改已立即写入磁盘；这里也不执行写盘或恢复。</p></section>
+          <section class="dg-card"><div class="dg-card-heading"><span class="dg-icon" aria-hidden="true">⌘</span><h3>版本与构建</h3></div><dl><dt>后端版本</dt><dd id="dg-server-version">—</dd><dt>后端提交</dt><dd id="dg-server-commit">—</dd><dt>客户端版本</dt><dd id="dg-client-version">—</dd><dt>客户端提交</dt><dd id="dg-client-commit">—</dd><dt>移动协议 / 运行环境</dt><dd id="dg-runtime">—</dd></dl><p class="dg-help">源码运行或缺少构建信息时会明确标注，不能用相同版本号推断两端完全兼容。</p></section>
+          <section class="dg-card dg-backup"><div class="dg-card-heading"><span class="dg-icon" aria-hidden="true">▤</span><h3>备份范围</h3><span class="dg-badge" data-tone="caution">需要两部分</span></div><p class="dg-summary">业务记录与快传文件，需要一起备份。</p><ol><li><b>个人 JSON 导出</b>保留业务记录；不含快传文件及其元数据。</li><li><b>完整服务备份</b>先停止 Go 服务，再一起复制 DATA_FILE 与同级 transfers 目录。</li><li><b>恢复演练</b>在独立目录核对数据与附件后，再考虑切换。</li></ol><p class="dg-help">滚动 .bak 不是永久历史备份；目前没有自动恢复按钮，也没有读取你的备份内容。</p></section>
+        </div><footer class="dg-footer"><p>诊断文件只导出版本、时间和状态，不包含账号、令牌、记录正文、本机路径或服务地址。</p><button id="dg-export" type="button" disabled>↓ 导出脱敏诊断</button></footer>
+      </div>
+    </dialog>
     <script src="/static/product-shell.js?v=20261027-nav" defer></script>
+    <script src="/static/diagnostics-core.js?v=20261030-1" defer></script>
+    <script src="/static/diagnostics.js?v=20261030-1" defer></script>
     <script src="/static/navigation-core.js?v=20261027-1" defer></script>
     <script src="/static/navigation.js?v=20261027-1" defer></script>
     <script src="/static/app.js?v=20261027-curation-1" defer></script>

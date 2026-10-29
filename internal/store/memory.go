@@ -19,6 +19,8 @@ type Memory struct {
 	// Lock order: snapshotMu, then mu. Disk I/O never holds mu.
 	// This serializes one repository's snapshots, not multiple processes.
 	snapshotMu              sync.Mutex
+	statusMu                sync.RWMutex
+	snapshotStatus          SnapshotStatus
 	mu                      sync.RWMutex
 	habits                  map[string]domain.Habit
 	explorations            map[string]domain.Exploration
@@ -1220,9 +1222,12 @@ func (e *SnapshotRecoveryError) Error() string {
 
 func (e *SnapshotRecoveryError) Unwrap() error { return e.Cause }
 
-func (m *Memory) SaveJSON(path string) error {
+func (m *Memory) SaveJSON(path string) (saveErr error) {
 	m.snapshotMu.Lock()
 	defer m.snapshotMu.Unlock()
+	started := time.Now()
+	m.snapshotStarted(started)
+	defer func() { m.snapshotFinished(started, saveErr) }()
 	m.mu.RLock()
 	s := snapshot{Version: 1, SavedAt: time.Now().UTC()}
 	for _, item := range m.textClips {
@@ -1380,6 +1385,7 @@ func (m *Memory) LoadJSON(path string) error {
 		} else if !errors.Is(backupErr, os.ErrNotExist) {
 			return fmt.Errorf("inspect snapshot backup: %w", backupErr)
 		}
+		m.snapshotLoaded(time.Time{}, false)
 		return nil
 	}
 	if err != nil {
@@ -1586,6 +1592,7 @@ func (m *Memory) LoadJSON(path string) error {
 	for _, item := range s.Sessions {
 		m.sessions[item.ID] = normalizeFocusSession(item)
 	}
+	m.snapshotLoaded(s.SavedAt, recoveryErr != nil)
 	if recoveryErr != nil {
 		return recoveryErr
 	}

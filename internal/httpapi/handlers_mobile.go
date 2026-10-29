@@ -1,6 +1,9 @@
 package httpapi
 
-import "net/http"
+import (
+	"github.com/example/studyflow/internal/buildinfo"
+	"net/http"
+)
 
 // Public compatibility metadata, never user data or configuration secrets.
 func (s *Server) mobileInfo(w http.ResponseWriter, r *http.Request) {
@@ -9,5 +12,6 @@ func (s *Server) mobileInfo(w http.ResponseWriter, r *http.Request) {
 		"application": "daynest", "mobile_protocol": 1,
 		"requires_secure_secret": s.localOnlyTransfers,
 		"ai_requires_loopback":   true,
+		"build":                  buildinfo.Current(),
 	}})
 }
