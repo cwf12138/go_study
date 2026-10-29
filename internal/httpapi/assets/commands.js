@@ -15,6 +15,7 @@
     const actions = [
       { title: "新建备忘录", hint: "随时记录想法", run: () => { navigate("memos"); document.getElementById("memo-new")?.click(); } },
       { title: "添加待办", hint: "写下下一件小事", run: () => { navigate("todo"); document.getElementById("todo-title")?.focus(); } },
+      { title: "文字快传", hint: "剪贴板 · 同账号跨设备文字中转", run: () => { navigate("transfers"); const button=document.getElementById("tc-toggle"); if(button?.getAttribute("aria-expanded")==="false")button.click(); document.getElementById("tc-heading")?.scrollIntoView({block:"start"}); } },
       { title: "开始专注", hint: "留一段自己的时间", run: () => { navigate("focus"); document.getElementById("focus-minutes")?.focus(); } },
     ];
     const matches = [...actions, ...pages].filter(item => `${item.title} ${item.hint}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()));

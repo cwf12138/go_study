@@ -2,6 +2,9 @@ package app.daynest.personal;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.net.Uri;
 import android.os.SystemClock;
 import android.util.Base64;
@@ -21,6 +24,29 @@ import org.json.JSONObject;
 
 @CapacitorPlugin(name = "DaynestFiles")
 public class DaynestFilesPlugin extends Plugin {
+    // Invoked only by an explicit copy/paste button, never by a background observer.
+    @PluginMethod public void writeClipboard(PluginCall call) {
+        String text = call.getString("text");
+        if (text == null || text.length() > 24000) { call.reject("文字最多 12000 字"); return; }
+        getActivity().runOnUiThread(() -> {
+            try {
+                ClipboardManager clipboard = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+                if (clipboard == null) throw new Exception("剪贴板暂不可用");
+                clipboard.setPrimaryClip(ClipData.newPlainText("Daynest 文字快传", text)); call.resolve();
+            } catch (Exception error) { call.reject("无法复制，请使用手动复制"); }
+        });
+    }
+    @PluginMethod public void readClipboard(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            try {
+                ClipboardManager clipboard = (ClipboardManager) getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+                ClipData clip = clipboard == null ? null : clipboard.getPrimaryClip();
+                CharSequence value = clip == null || clip.getItemCount() == 0 ? "" : clip.getItemAt(0).getText();
+                if (value == null || value.length() > 24000) throw new Exception("只支持不超过 12000 字的纯文字");
+                JSObject result = new JSObject(); result.put("text", value.toString()); call.resolve(result);
+            } catch (Exception error) { call.reject("无法读取纯文字，请在文本框长按粘贴"); }
+        });
+    }
     private static final int UPLOAD_MAX = 8 * 1024 * 1024, EXPORT_MAX = 64 * 1024 * 1024;
     private final ConcurrentHashMap<String, Task> tasks = new ConcurrentHashMap<>();
     private final AtomicReference<Task> chooser = new AtomicReference<>();

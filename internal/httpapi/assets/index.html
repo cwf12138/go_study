@@ -51,6 +51,7 @@
     <link rel="stylesheet" href="/static/care.css?v=20261020-1">
     <link rel="stylesheet" href="/static/content-search.css?v=20261020-1">
     <link rel="stylesheet" href="/static/transfers.css?v=20261021-1">
+    <link rel="stylesheet" href="/static/text-clips.css?v=20261029-1">
     <link rel="stylesheet" href="/static/gentle-reminders.css?v=20261022-motion-2">
     <link rel="stylesheet" href="/static/important-days.css?v=20261022-1">
     <link rel="stylesheet" href="/static/parcels.css?v=20261026-1">
@@ -165,6 +166,29 @@
         <div id="main-content" class="content" tabindex="-1" role="main" aria-labelledby="page-title">
           <span id="page-announcement" class="product-sr-only" role="status" aria-live="polite" aria-atomic="true"></span>
           <section id="panel-transfers" class="panel ft-space" aria-label="文件快传">
+            <section class="tc-space" aria-labelledby="tc-heading">
+              <header class="tc-heading"><div><p>WORDS, WITHIN REACH</p><h2 id="tc-heading">文字，换个设备继续。</h2><span>电脑发一段，手机复制。常用的，置顶留在手边。</span></div><button id="tc-toggle" type="button" aria-expanded="false" aria-controls="tc-board">打开文字快传 ↗</button></header>
+              <div id="tc-board" hidden>
+                <div class="tc-toolbar"><div id="tc-tabs" class="tc-tabs" role="group" aria-label="文字视图"><button type="button" data-tc-tab="active" aria-pressed="true">中转站</button><button type="button" data-tc-tab="pinned" aria-pressed="false">已置顶</button><button type="button" data-tc-tab="expired" aria-pressed="false">已过期</button><button type="button" data-tc-tab="trash" aria-pressed="false">回收站</button></div><div class="tc-toolbar-actions"><button id="tc-jump" type="button">＋ 发文字</button><button id="tc-refresh" type="button">↻ 同步</button></div></div>
+                <p id="tc-status" class="tc-status" role="status" aria-live="polite"></p>
+                <div id="tc-recovery" class="tc-recovery" hidden><strong>这次操作尚未确认</strong><p>文字已保留。先核对服务器，或用同一请求重试，避免重复发送。</p><div><button id="tc-retry" type="button">原样重试</button><button id="tc-reconcile" type="button">核对服务器</button><button id="tc-abandon" type="button">结束重试</button></div><div id="tc-conflict" hidden><p>服务器上的当前内容</p><pre id="tc-remote"></pre><button id="tc-rebase" type="button">基于此版本继续编辑我的草稿</button></div></div>
+                <div class="tc-workspace">
+                  <div class="tc-inbox"><label class="tc-search"><span aria-hidden="true">⌕</span><input id="tc-query" type="search" maxlength="100" aria-label="搜索文字或标题" placeholder="搜索文字或标题…"></label><div class="tc-list-caption"><span id="tc-count">展开后读取你的文字</span><label><span class="tc-sr">排序</span><select id="tc-sort"><option value="updated">最近更新</option><option value="created">最近发送</option></select></label></div><div id="tc-list" class="tc-list"></div><div class="tc-pagination"><button id="tc-prev" type="button">上一页</button><span id="tc-page">1 / 1</span><button id="tc-next" type="button">下一页</button></div></div>
+                  <section class="tc-composer" aria-labelledby="tc-editor-heading">
+                    <header><div><p>A LITTLE HANDOFF</p><h3 id="tc-editor-heading">发一段文字</h3></div><button id="tc-new" type="button">＋ 新建</button></header>
+                    <form id="tc-form">
+                      <label><span>标题 <small>选填</small></span><input id="tc-title" maxlength="80" placeholder="例如：收件地址、会议链接"></label>
+                      <label class="tc-text-label">文字内容<button id="tc-paste" type="button">从剪贴板粘贴</button><textarea id="tc-text" rows="7" maxlength="24000" required spellcheck="false" placeholder="粘贴或写下一段文字。&#10;在另一台设备登录同一账号，即可找到并复制。"></textarea></label>
+                      <p class="tc-editor-meta"><span id="tc-char-count">0 / 12000 字</span><span id="tc-draft-state">尚未发送</span></p>
+                      <div class="tc-options"><label>有效期<select id="tc-ttl"><option value="1">1 小时</option><option value="24" selected>1 天</option><option value="168">7 天</option><option value="0">一直保留</option></select></label><label class="tc-pin"><input id="tc-pinned" type="checkbox">置顶这段文字</label></div>
+                      <p id="tc-expiry-hint" class="tc-help">从发送成功时开始计时；到期移入“已过期”，可续期或清理。</p>
+                      <div class="tc-form-actions"><button id="tc-draft-copy" type="button">复制当前文字</button><button id="tc-save" class="tc-primary" type="submit">发送到中转站</button></div>
+                    </form>
+                  </section>
+                </div>
+                <footer class="tc-footer"><span>↔ 同账号跨设备 · 最多 100 条 · 每条 12000 字</span><p>只在你点击时读写剪贴板，不自动采集。记录以明文保存在电脑及备份中，请勿存放密码或验证码；过期不等于从备份中擦除。</p></footer>
+              </div>
+            </section>
             <header class="ft-hero"><div><p class="ft-eyebrow">A LITTLE CLOSER</p><h2>文件换个设备，<br>不用绕一大圈。</h2><p>照片、文档、临时要用的资料。<br>放在这里，在另一台设备登录同一账号拿走。</p><button id="ft-connect" type="button">在另一台设备打开 ↗</button></div><div class="ft-upload-card"><div id="ft-drop" class="ft-drop"><span class="ft-upload-icon" aria-hidden="true">⇧</span><h3>把文件放到这里</h3><p>拖入文件，或点击选择<br>支持多选，单个文件最多 32 MiB</p><button id="ft-choose" type="button" class="ft-primary">＋ 选择文件</button><input id="ft-input" type="file" multiple hidden></div><label class="ft-retention">文件有效期<select id="ft-ttl"><option value="24">24 小时</option><option value="168">7 天</option><option value="0">长期保留</option></select></label><small>过期后暂停下载，不会自动删除；可延长或手动清理。</small></div></header>
             <div class="ft-overview"><article><span>随时可取</span><strong id="ft-active-count">0</strong><small>当前账号的有效文件</small></article><article><span>等待整理</span><strong id="ft-clean-count">0</strong><small>已过期 / 回收站</small></article><article class="ft-storage"><div><span>已用空间</span><b id="ft-storage-value">0 / 256 MiB</b></div><progress id="ft-storage-bar" value="0" max="268435456"></progress><small>过期和回收站文件仍占空间，永久清理后释放。</small></article></div>
             <section id="ft-queue-section" class="ft-queue-section" hidden aria-label="上传任务"><header><div><p class="ft-eyebrow">ON ITS WAY</p><h3>正在传送的小东西</h3></div><button id="ft-clear-queue" type="button">移除已完成任务</button></header><div id="ft-queue"></div><p>取消或断网不一定代表服务端未收到。可刷新核对，重试会沿用原上传标识，不重复保存。</p></section>
@@ -909,6 +933,8 @@
     <script src="/static/content-search.js?v=20261020-1" defer></script>
     <script src="/static/transfers-core.js?v=20261021-1" defer></script>
     <script src="/static/transfers.js?v=20261021-1" defer></script>
+    <script src="/static/text-clips-core.js?v=20261029-1" defer></script>
+    <script src="/static/text-clips.js?v=20261029-1" defer></script>
     <script src="/static/memos.js?v=20261020-search" defer></script>
     <script src="/static/english.js?v=20261007-2" defer></script>
     <script src="/static/english-reading.js?v=20260915-1" defer></script>

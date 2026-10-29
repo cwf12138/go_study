@@ -28,6 +28,7 @@ type Memory struct {
 	bookmarks               map[string]domain.Bookmark
 	importantDays           map[string]domain.ImportantDay
 	parcels                 map[string]domain.Parcel
+	textClips               map[string]domain.TextClip
 	subscriptions           map[string]domain.Subscription
 	meals                   map[string]domain.MealEntry
 	fitness                 map[string]domain.FitnessEntry
@@ -73,6 +74,7 @@ func NewMemory() *Memory {
 		bookmarks:               make(map[string]domain.Bookmark),
 		importantDays:           make(map[string]domain.ImportantDay),
 		parcels:                 make(map[string]domain.Parcel),
+		textClips:               make(map[string]domain.TextClip),
 		subscriptions:           make(map[string]domain.Subscription),
 		meals:                   make(map[string]domain.MealEntry),
 		fitness:                 make(map[string]domain.FitnessEntry),
@@ -1155,6 +1157,7 @@ type persistedUser struct {
 }
 
 type snapshot struct {
+	TextClips               []domain.TextClip           `json:"text_clips,omitempty"`
 	Parcels                 []domain.Parcel             `json:"parcels,omitempty"`
 	ImportantDays           []domain.ImportantDay       `json:"important_days,omitempty"`
 	Habits                  []domain.Habit              `json:"habits"`
@@ -1222,6 +1225,9 @@ func (m *Memory) SaveJSON(path string) error {
 	defer m.snapshotMu.Unlock()
 	m.mu.RLock()
 	s := snapshot{Version: 1, SavedAt: time.Now().UTC()}
+	for _, item := range m.textClips {
+		s.TextClips = append(s.TextClips, item)
+	}
 	for _, item := range m.habits {
 		s.Habits = append(s.Habits, cloneHabit(item))
 	}
@@ -1420,6 +1426,10 @@ func (m *Memory) LoadJSON(path string) error {
 	m.bookmarks = make(map[string]domain.Bookmark, len(s.Bookmarks))
 	m.importantDays = make(map[string]domain.ImportantDay, len(s.ImportantDays))
 	m.parcels = make(map[string]domain.Parcel, len(s.Parcels))
+	m.textClips = make(map[string]domain.TextClip, len(s.TextClips))
+	for _, item := range s.TextClips {
+		m.textClips[item.UserID+":"+item.ID] = item
+	}
 	for _, item := range s.Parcels {
 		m.parcels[item.UserID+":"+item.ID] = item
 	}

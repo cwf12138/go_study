@@ -72,7 +72,8 @@ export function boot({ Http, App, Files }) {
       return await race(Files.upload({ id, path: '/api/v1/transfers/' + id, filename: item.name, ttl: item.ttl, token: owner, data }), signal);
     } finally { if (listener) await listener.remove(); pending.delete(id); signal?.removeEventListener('abort', cancel); }
   }
-  window.DaynestMobile = { native: true, saveBlob, downloadServer, uploadFile, maxUploadBytes: 8 * 1024 * 1024 };
+  window.DaynestMobile = { native: true, saveBlob, downloadServer, uploadFile, maxUploadBytes: 8 * 1024 * 1024,
+    copyText: text => Files.writeClipboard({ text }), readText: async () => (await Files.readClipboard()).text };
 
   document.addEventListener('DOMContentLoaded', async () => {
     document.body.classList.add('daynest-native');

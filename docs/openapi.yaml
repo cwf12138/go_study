@@ -6,6 +6,7 @@ info:
 servers:
   - url: http://localhost:8080
 tags:
+  - name: TextClips
   - name: Mobile
   - name: Parcels
   - name: Transfers
@@ -37,6 +38,59 @@ tags:
   - name: Shopping
   - name: Bookmarks
 paths:
+  /api/v1/text-clips:
+    get:
+      tags: [TextClips]
+      security: [{ bearerAuth: [] }]
+      summary: 同账号文字中转列表，包含过期与回收站
+      description: 最多 100 条；过期隐藏于活动视图，不自动删除。响应不缓存。server_time 为 UTC，客户端据此计算剩余时间。
+      responses:
+        '200':
+          description: 当前账号文字列表及服务端时间
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  server_time: { type: string, format: date-time }
+                  data: { type: array, items: { $ref: '#/components/schemas/TextClip' } }
+        '401': { description: 需要登录 }
+  /api/v1/text-clips/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,80}$' } }
+    put:
+      tags: [TextClips]
+      security: [{ bearerAuth: [] }]
+      summary: 创建或完整更新文字；版本为 0 创建，后续使用读取到的 revision
+      description: 相同旧版本和相同规范化内容的直接重试返回原结果，不重复创建或推迟到期。编辑和置顶不续期；改变 ttl_hours 或显式 renew 才从服务端当前时间计算到期。数据沿用周期性 JSON 快照持久化，非加密存储。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SaveTextClip' }
+      responses:
+        '200':
+          description: data 为保存后的 TextClip
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/TextClip' }
+        '400': { description: 内容、有效期、版本或配额无效 }
+        '404': { description: 当前账号中无该版本记录 }
+        '409': { description: 其他设备已修改，请核对后合并 }
+    delete:
+      tags: [TextClips]
+      security: [{ bearerAuth: [] }]
+      summary: 永久清理过期或回收站中的文字
+      parameters:
+        - { in: query, name: revision, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '204': { description: 已清理，不修改既有导出及备份 }
+        '400': { description: 活动文字必须先移入回收站 }
+        '404': { description: 当前账号中不存在，可视为已经清理 }
+        '409': { description: 版本变化，请刷新核对 }
   /api/v1/mobile-info:
     get:
       tags: [Mobile]
@@ -3376,6 +3430,27 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
   schemas:
+    SaveTextClip:
+      type: object
+      required: [text, ttl_hours, revision]
+      properties:
+        title: { type: string, maxLength: 80, default: '' }
+        text: { type: string, minLength: 1, maxLength: 12000, description: 保留空白与换行，CRLF 规范化为 LF，不接受全空白或非换行制表的控制字符 }
+        ttl_hours: { type: integer, enum: [0, 1, 24, 168], description: 0 表示一直保留 }
+        pinned: { type: boolean, default: false }
+        deleted: { type: boolean, default: false }
+        revision: { type: integer, minimum: 0, maximum: 1000000 }
+        renew: { type: boolean, default: false }
+    TextClip:
+      allOf:
+        - { $ref: '#/components/schemas/SaveTextClip' }
+        - type: object
+          properties:
+            id: { type: string }
+            user_id: { type: string }
+            expires_at: { type: string, format: date-time, description: 一直保留时为 Go 零值时间 0001-01-01T00:00:00Z }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
     SaveParcelInput:
       type: object
       additionalProperties: false
