@@ -15,9 +15,7 @@ import (
 func (s *Server) safeTransfer(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if s.localOnlyTransfers {
-			host, _, err := net.SplitHostPort(r.RemoteAddr)
-			ip := net.ParseIP(host)
-			if err != nil || ip == nil || !ip.IsLoopback() {
+			if !loopbackRequest(r) {
 				w.Header().Set("Cache-Control", "no-store")
 				writeJSON(w, 403, envelope{"error": envelope{"code": "development_key_local_only", "message": "仍在使用公开的开发默认 JWT_SECRET，文件快传仅允许本机访问。请设置足够强的专用秘钥并重启、重新登录后，再通过可信局域网访问。"}})
 				return
@@ -25,6 +23,12 @@ func (s *Server) safeTransfer(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func loopbackRequest(r *http.Request) bool {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	ip := net.ParseIP(host)
+	return err == nil && ip != nil && ip.IsLoopback()
 }
 
 func transferError(w http.ResponseWriter, e error) {

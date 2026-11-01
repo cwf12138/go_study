@@ -57,6 +57,8 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 
 	private := http.NewServeMux()
 	private.HandleFunc("GET /api/v1/system/diagnostics", s.diagnostics)
+	private.HandleFunc("GET /api/v1/data-center", s.dataCenter)
+	private.Handle("POST /api/v1/data-center/transfers/check", s.safeTransfer(http.HandlerFunc(s.checkTransferIntegrity)))
 	private.HandleFunc("GET /api/v1/text-clips", s.listTextClips)
 	private.HandleFunc("PUT /api/v1/text-clips/{id}", s.saveTextClip)
 	private.HandleFunc("DELETE /api/v1/text-clips/{id}", s.purgeTextClip)

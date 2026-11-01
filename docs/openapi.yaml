@@ -6,6 +6,7 @@ info:
 servers:
   - url: http://localhost:8080
 tags:
+  - name: DataCenter
   - name: System
   - name: TextClips
   - name: Mobile
@@ -39,6 +40,98 @@ tags:
   - name: Shopping
   - name: Bookmarks
 paths:
+  /api/v1/data-center:
+    get:
+      tags: [DataCenter]
+      security: [{ bearerAuth: [] }]
+      summary: 当前账号的数据与快传配额概览
+      description: 只读且不缓存。统计记录对象，含文件夹、配置、过期及回收站和保留历史项，不是任务完成数或整个磁盘占用。不返回正文、账号标识、其他账号数量或本机路径。记录与附件分别返回状态，单部分失败不会误报为正常。仅打开数据中心或主动刷新时读取。公开开发密钥下的局域网访问只能查看记录统计，附件状态为 local_only。
+      responses:
+        '200':
+          description: 当前账号概览，可能含不可用部分
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      schema_version: { type: integer, const: 1 }
+                      scope: { type: string, const: current_account }
+                      checked_at: { type: string, format: date-time }
+                      personal_json_includes_attachments: { type: boolean, const: false }
+                      full_backup_restore_verified: { type: boolean, const: false }
+                      records:
+                        type: object
+                        properties:
+                          state: { type: string, enum: [available, unavailable] }
+                          objects: { type: integer, minimum: 0 }
+                          collections:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                key: { type: string }
+                                count: { type: integer, minimum: 0 }
+                                personal_json: { type: boolean, description: false 表示只在完整服务备份保留，例如旧知识笔记原件 }
+                      attachments:
+                        type: object
+                        properties:
+                          state: { type: string, enum: [available, unavailable, local_only] }
+                          files: { type: integer, minimum: 0 }
+                          active: { type: integer, minimum: 0, description: 未删除且未过期的索引数，不保证文件存在或内容可读 }
+                          expired: { type: integer, minimum: 0 }
+                          trashed: { type: integer, minimum: 0 }
+                          missing: { type: integer, minimum: 0, description: 文件存在或大小状态异常的索引数，含非普通文件及无法读取状态，可能同时属于过期或回收站；不是全部内容读取结果 }
+                          accounted_bytes: { type: integer, minimum: 0, description: 按元数据累计的配额占用，含缺失项，不等于物理磁盘空间 }
+                          max_bytes: { type: integer, const: 268435456 }
+                          max_files: { type: integer, const: 100 }
+        '401': { description: 需要登录 }
+  /api/v1/data-center/transfers/check:
+    post:
+      tags: [DataCenter]
+      security: [{ bearerAuth: [] }]
+      summary: 主动只读检查当前账号已索引快传文件的大小与 SHA-256
+      description: 无需请求体。包含过期及回收站附件；不查孤立文件，不修复、续期或删除，不创建备份或验证恢复。每个服务 Store 同时最多一次检查，读取内容时不持有元数据锁。最多 100 个索引 / 256 MiB，支持请求上下文取消。检查期间发生上传或元数据变化的文件标记 changed，需要重查。结果只代表读取时点；不会持久化检查结果或进入脱敏诊断导出。
+      responses:
+        '200':
+          description: 本次范围内检查完成，但个别文件可能未通过或需要重查
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      scope: { type: string, const: indexed_transfer_files }
+                      started_at: { type: string, format: date-time }
+                      finished_at: { type: string, format: date-time }
+                      files: { type: integer, minimum: 0, maximum: 100 }
+                      verified: { type: integer, minimum: 0 }
+                      missing: { type: integer, minimum: 0 }
+                      mismatched: { type: integer, minimum: 0 }
+                      unreadable: { type: integer, minimum: 0 }
+                      changed: { type: integer, minimum: 0 }
+                      pending_uploads: { type: integer, minimum: 0, description: 开始读取索引时观察到的当前账号上传数 }
+                      unindexed_files_checked: { type: boolean, const: false }
+                      backup_restore_verified: { type: boolean, const: false }
+                      issues:
+                        type: array
+                        description: 仅当前账号的异常项；包含文件名，属于私人数据，不是脱敏诊断
+                        items:
+                          type: object
+                          properties:
+                            id: { type: string }
+                            name: { type: string }
+                            state: { type: string, enum: [missing, mismatched, unreadable, changed] }
+        '401': { description: 需要登录 }
+        '403': { description: 公开开发密钥下只允许回环访问快传详情 }
+        '408': { description: 检查已取消或超时，不返回部分通过结果 }
+        '422': { description: 索引超出在线检查范围，应使用电脑端离线校验 }
+        '429': { description: 已有检查进行中，Retry-After 为 5 秒 }
+        '500': { description: 元数据等暂不可读，不披露原始路径或异常 }
   /api/v1/system/diagnostics:
     get:
       tags: [System]

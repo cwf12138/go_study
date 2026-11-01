@@ -2540,7 +2540,7 @@
       const owner = state.token;
       try {
         await downloadAuthenticated("/api/v1/exports/data", `studyflow-backup-${localDateKey(new Date())}.json`);
-        if (owner === state.token) notify("不含密码的完整个人数据备份已导出。");
+        if (owner === state.token) notify("个人 JSON 已交给保存窗口或浏览器下载；不含快传附件，请确认保存位置。");
       } catch (error) { if (owner === state.token) notify(error.message, "error"); }
     });
     $("#vocab-spelling-mode").addEventListener("submit", (event) => {

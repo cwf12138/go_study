@@ -65,6 +65,7 @@ type Store struct {
 	root         string
 	mu           sync.Mutex
 	slots        chan struct{}
+	checks       chan struct{}
 	pending      map[string]bool
 	reserved     map[string]int64
 	pendingCount map[string]int
@@ -72,7 +73,7 @@ type Store struct {
 }
 
 func New(root string) *Store {
-	return &Store{root: root, slots: make(chan struct{}, 4), pending: map[string]bool{}, reserved: map[string]int64{}, pendingCount: map[string]int{}, now: time.Now}
+	return &Store{root: root, slots: make(chan struct{}, 4), checks: make(chan struct{}, 1), pending: map[string]bool{}, reserved: map[string]int64{}, pendingCount: map[string]int{}, now: time.Now}
 }
 func ValidName(name string) bool {
 	if strings.TrimSpace(name) == "" || name == "." || name == ".." || !utf8.ValidString(name) || utf8.RuneCountInString(name) > 180 || strings.ContainsAny(name, "/\\") {
@@ -138,6 +139,13 @@ func (s *Store) read(user, id string) (Record, error) {
 		return row, e
 	}
 	defer f.Close()
+	info, e := f.Stat()
+	if e != nil {
+		return row, e
+	}
+	if !info.Mode().IsRegular() || info.Size() > 8192 {
+		return row, fmt.Errorf("invalid attachment metadata size or file type")
+	}
 	d := json.NewDecoder(io.LimitReader(f, 8192))
 	d.DisallowUnknownFields()
 	if e = d.Decode(&row); e != nil {
