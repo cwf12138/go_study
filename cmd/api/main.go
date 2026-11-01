@@ -8,11 +8,13 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/example/studyflow/internal/config"
+	"github.com/example/studyflow/internal/datalock"
 	"github.com/example/studyflow/internal/event"
 	"github.com/example/studyflow/internal/httpapi"
 	"github.com/example/studyflow/internal/security"
@@ -35,6 +37,16 @@ func main() {
 		os.Exit(1)
 	}
 	defer listener.Close()
+	dataGuard, err := datalock.Acquire(filepath.Dir(cfg.DataFile))
+	if err != nil {
+		logger.Error("lock data directory; startup stopped", "error", err)
+		os.Exit(1)
+	}
+	defer dataGuard.Close()
+	if _, err := os.Lstat(filepath.Join(filepath.Dir(cfg.DataFile), ".daynest-incomplete")); !errors.Is(err, os.ErrNotExist) {
+		logger.Error("incomplete restore directory; startup stopped", "error", err)
+		os.Exit(1)
+	}
 	repository := store.NewMemory()
 	if err := repository.LoadJSON(cfg.DataFile); err != nil {
 		var recovery *store.SnapshotRecoveryError
