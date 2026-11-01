@@ -31,3 +31,6 @@ mobile/android/app/src/main/assets/capacitor.plugins.json
 mobile/android/capacitor-cordova-android-plugins/
 *.jks
 *.keystore
+
+# Isolated SQLite lab command (Unix build output)
+experiments/sqlite/sqlite-lab

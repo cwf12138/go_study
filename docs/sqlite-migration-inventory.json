@@ -1,0 +1,777 @@
+{
+  "data": {
+    "schema_version": 1,
+    "contract_methods": 138,
+    "implemented": 7,
+    "methods": [
+      {
+        "name": "ActiveFocusSession",
+        "status": "pending"
+      },
+      {
+        "name": "ApplyVocabularyReview",
+        "status": "pending"
+      },
+      {
+        "name": "CalendarEventByID",
+        "status": "pending"
+      },
+      {
+        "name": "CareByID",
+        "status": "pending"
+      },
+      {
+        "name": "ClassicalStudyByWork",
+        "status": "pending"
+      },
+      {
+        "name": "CollectMealShopping",
+        "status": "pending"
+      },
+      {
+        "name": "CompleteExploration",
+        "status": "pending"
+      },
+      {
+        "name": "CreateCalendarEvent",
+        "status": "pending"
+      },
+      {
+        "name": "CreateEBookReading",
+        "status": "pending"
+      },
+      {
+        "name": "CreateEnglishReading",
+        "status": "pending"
+      },
+      {
+        "name": "CreateExploration",
+        "status": "pending"
+      },
+      {
+        "name": "CreateFocusSession",
+        "status": "pending"
+      },
+      {
+        "name": "CreateGoal",
+        "status": "pending"
+      },
+      {
+        "name": "CreateHabit",
+        "status": "pending"
+      },
+      {
+        "name": "CreateKnowledgeNote",
+        "status": "pending"
+      },
+      {
+        "name": "CreateMemoFolder",
+        "status": "prototype_implemented"
+      },
+      {
+        "name": "CreateMemoNote",
+        "status": "prototype_implemented"
+      },
+      {
+        "name": "CreatePlanBlock",
+        "status": "pending"
+      },
+      {
+        "name": "CreateTask",
+        "status": "pending"
+      },
+      {
+        "name": "CreateTodo",
+        "status": "pending"
+      },
+      {
+        "name": "CreateTodoList",
+        "status": "pending"
+      },
+      {
+        "name": "CreateUser",
+        "status": "prototype_implemented"
+      },
+      {
+        "name": "CreateVocabularyWord",
+        "status": "pending"
+      },
+      {
+        "name": "CreateVocabularyWords",
+        "status": "pending"
+      },
+      {
+        "name": "CreateWordBook",
+        "status": "pending"
+      },
+      {
+        "name": "DeleteCalendarEvent",
+        "status": "pending"
+      },
+      {
+        "name": "DeleteEBookReading",
+        "status": "pending"
+      },
+      {
+        "name": "DeleteEnglishReading",
+        "status": "pending"
+      },
+      {
+        "name": "DeleteGoal",
+        "status": "pending"
+      },
+      {
+        "name": "DeleteKnowledgeNote",
+        "status": "pending"
+      },
+      {
+        "name": "DeleteMemoFolder",
+        "status": "pending"
+      },
+      {
+        "name": "DeleteMemoNote",
+        "status": "pending"
+      },
+      {
+        "name": "DeleteMoodEntry",
+        "status": "pending"
+      },
+      {
+        "name": "DeletePlanBlock",
+        "status": "pending"
+      },
+      {
+        "name": "DeleteTask",
+        "status": "pending"
+      },
+      {
+        "name": "DeleteTodo",
+        "status": "pending"
+      },
+      {
+        "name": "DeleteTodoList",
+        "status": "pending"
+      },
+      {
+        "name": "DeleteVocabularyWord",
+        "status": "pending"
+      },
+      {
+        "name": "EBookReadingByID",
+        "status": "pending"
+      },
+      {
+        "name": "EnglishReadingByID",
+        "status": "pending"
+      },
+      {
+        "name": "FitnessByID",
+        "status": "pending"
+      },
+      {
+        "name": "FocusSessionByID",
+        "status": "pending"
+      },
+      {
+        "name": "GoalByID",
+        "status": "pending"
+      },
+      {
+        "name": "HabitByID",
+        "status": "pending"
+      },
+      {
+        "name": "KnowledgeNoteByID",
+        "status": "pending"
+      },
+      {
+        "name": "ListAllMoodEntries",
+        "status": "pending"
+      },
+      {
+        "name": "ListBookmarks",
+        "status": "pending"
+      },
+      {
+        "name": "ListCalendarEvents",
+        "status": "pending"
+      },
+      {
+        "name": "ListCare",
+        "status": "pending"
+      },
+      {
+        "name": "ListClassicalStudies",
+        "status": "pending"
+      },
+      {
+        "name": "ListEBookReadings",
+        "status": "pending"
+      },
+      {
+        "name": "ListEnglishReadings",
+        "status": "pending"
+      },
+      {
+        "name": "ListExplorations",
+        "status": "pending"
+      },
+      {
+        "name": "ListFitness",
+        "status": "pending"
+      },
+      {
+        "name": "ListFocusSessions",
+        "status": "pending"
+      },
+      {
+        "name": "ListGoals",
+        "status": "pending"
+      },
+      {
+        "name": "ListHabits",
+        "status": "pending"
+      },
+      {
+        "name": "ListImportantDays",
+        "status": "pending"
+      },
+      {
+        "name": "ListInventory",
+        "status": "pending"
+      },
+      {
+        "name": "ListKeepsakes",
+        "status": "pending"
+      },
+      {
+        "name": "ListKnowledgeNotes",
+        "status": "pending"
+      },
+      {
+        "name": "ListLedger",
+        "status": "pending"
+      },
+      {
+        "name": "ListMeals",
+        "status": "pending"
+      },
+      {
+        "name": "ListMemoFolders",
+        "status": "pending"
+      },
+      {
+        "name": "ListMemoNotes",
+        "status": "prototype_implemented"
+      },
+      {
+        "name": "ListMoodEntries",
+        "status": "pending"
+      },
+      {
+        "name": "ListNutrition",
+        "status": "pending"
+      },
+      {
+        "name": "ListParcels",
+        "status": "pending"
+      },
+      {
+        "name": "ListPlanBlocks",
+        "status": "pending"
+      },
+      {
+        "name": "ListPlannerReports",
+        "status": "pending"
+      },
+      {
+        "name": "ListProjects",
+        "status": "pending"
+      },
+      {
+        "name": "ListShopping",
+        "status": "pending"
+      },
+      {
+        "name": "ListSplits",
+        "status": "pending"
+      },
+      {
+        "name": "ListSubscriptions",
+        "status": "pending"
+      },
+      {
+        "name": "ListTasks",
+        "status": "pending"
+      },
+      {
+        "name": "ListTextClips",
+        "status": "pending"
+      },
+      {
+        "name": "ListTodoLists",
+        "status": "pending"
+      },
+      {
+        "name": "ListTodos",
+        "status": "pending"
+      },
+      {
+        "name": "ListTravelPlans",
+        "status": "pending"
+      },
+      {
+        "name": "ListVocabularyReviews",
+        "status": "pending"
+      },
+      {
+        "name": "ListVocabularyWords",
+        "status": "pending"
+      },
+      {
+        "name": "ListWeeklyReflections",
+        "status": "pending"
+      },
+      {
+        "name": "ListWhiteboards",
+        "status": "pending"
+      },
+      {
+        "name": "ListWordBooks",
+        "status": "pending"
+      },
+      {
+        "name": "MemoFolderByID",
+        "status": "pending"
+      },
+      {
+        "name": "MemoNoteByID",
+        "status": "prototype_implemented"
+      },
+      {
+        "name": "MoodEntryByDate",
+        "status": "pending"
+      },
+      {
+        "name": "NutritionByID",
+        "status": "pending"
+      },
+      {
+        "name": "PlanBlockByID",
+        "status": "pending"
+      },
+      {
+        "name": "PlannerPreferences",
+        "status": "pending"
+      },
+      {
+        "name": "PlannerReport",
+        "status": "pending"
+      },
+      {
+        "name": "PurgeTextClip",
+        "status": "pending"
+      },
+      {
+        "name": "ReplaceGeneratedPlanBlocks",
+        "status": "pending"
+      },
+      {
+        "name": "SaveBookmark",
+        "status": "pending"
+      },
+      {
+        "name": "SaveCare",
+        "status": "pending"
+      },
+      {
+        "name": "SaveDailyCard",
+        "status": "pending"
+      },
+      {
+        "name": "SaveFitness",
+        "status": "pending"
+      },
+      {
+        "name": "SaveImportantDay",
+        "status": "pending"
+      },
+      {
+        "name": "SaveInventory",
+        "status": "pending"
+      },
+      {
+        "name": "SaveKeepsake",
+        "status": "pending"
+      },
+      {
+        "name": "SaveLedger",
+        "status": "pending"
+      },
+      {
+        "name": "SaveMeal",
+        "status": "pending"
+      },
+      {
+        "name": "SaveNutrition",
+        "status": "pending"
+      },
+      {
+        "name": "SaveParcel",
+        "status": "pending"
+      },
+      {
+        "name": "SaveProject",
+        "status": "pending"
+      },
+      {
+        "name": "SaveShopping",
+        "status": "pending"
+      },
+      {
+        "name": "SaveSplit",
+        "status": "pending"
+      },
+      {
+        "name": "SaveSubscription",
+        "status": "pending"
+      },
+      {
+        "name": "SaveTextClip",
+        "status": "pending"
+      },
+      {
+        "name": "SaveTravelPlan",
+        "status": "pending"
+      },
+      {
+        "name": "SaveWhiteboard",
+        "status": "pending"
+      },
+      {
+        "name": "SetHabitArchived",
+        "status": "pending"
+      },
+      {
+        "name": "SetHabitCheck",
+        "status": "pending"
+      },
+      {
+        "name": "SplitByID",
+        "status": "pending"
+      },
+      {
+        "name": "TaskByID",
+        "status": "pending"
+      },
+      {
+        "name": "TodoByID",
+        "status": "pending"
+      },
+      {
+        "name": "TodoListByID",
+        "status": "pending"
+      },
+      {
+        "name": "UpdateCalendarEvent",
+        "status": "pending"
+      },
+      {
+        "name": "UpdateEBookReading",
+        "status": "pending"
+      },
+      {
+        "name": "UpdateEnglishReading",
+        "status": "pending"
+      },
+      {
+        "name": "UpdateFocusSession",
+        "status": "pending"
+      },
+      {
+        "name": "UpdateGoal",
+        "status": "pending"
+      },
+      {
+        "name": "UpdateKnowledgeNote",
+        "status": "pending"
+      },
+      {
+        "name": "UpdateMemoFolder",
+        "status": "pending"
+      },
+      {
+        "name": "UpdateMemoNote",
+        "status": "pending"
+      },
+      {
+        "name": "UpdatePlanBlock",
+        "status": "pending"
+      },
+      {
+        "name": "UpdateTask",
+        "status": "pending"
+      },
+      {
+        "name": "UpdateTodo",
+        "status": "pending"
+      },
+      {
+        "name": "UpsertClassicalStudy",
+        "status": "pending"
+      },
+      {
+        "name": "UpsertMoodEntry",
+        "status": "pending"
+      },
+      {
+        "name": "UpsertPlannerPreferences",
+        "status": "pending"
+      },
+      {
+        "name": "UpsertPlannerReport",
+        "status": "pending"
+      },
+      {
+        "name": "UpsertWeeklyReflection",
+        "status": "pending"
+      },
+      {
+        "name": "UserByEmail",
+        "status": "prototype_implemented"
+      },
+      {
+        "name": "UserByID",
+        "status": "prototype_implemented"
+      },
+      {
+        "name": "VocabularyWordByID",
+        "status": "pending"
+      },
+      {
+        "name": "WeeklyReflection",
+        "status": "pending"
+      },
+      {
+        "name": "WordBookByID",
+        "status": "pending"
+      }
+    ],
+    "collections": [
+      {
+        "section": "bookmarks",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "calendar_events",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "care",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "classical_studies",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "ebook_readings",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "english_readings",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "explorations",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "fitness",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "focus_sessions",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "goals",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "habits",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "important_days",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "inventory",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "keepsakes",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "knowledge_memo_migrations",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "knowledge_notes",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "ledger",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "meals",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "memo_folders",
+        "records": 0,
+        "mode": "relational_and_archive",
+        "table": "memo_folders"
+      },
+      {
+        "section": "memo_notes",
+        "records": 0,
+        "mode": "relational_and_archive",
+        "table": "memos"
+      },
+      {
+        "section": "moods",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "nutrition",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "parcels",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "plan_blocks",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "planner_preferences",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "planner_reports",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "projects",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "shopping",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "splits",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "subscriptions",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "tasks",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "text_clips",
+        "records": 0,
+        "mode": "relational_and_archive",
+        "table": "text_clips"
+      },
+      {
+        "section": "todo_lists",
+        "records": 0,
+        "mode": "relational_and_archive",
+        "table": "todo_lists"
+      },
+      {
+        "section": "todos",
+        "records": 0,
+        "mode": "relational_and_archive",
+        "table": "todos"
+      },
+      {
+        "section": "travel_plans",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "users",
+        "records": 0,
+        "mode": "relational_and_archive",
+        "table": "users"
+      },
+      {
+        "section": "vocabulary_reviews",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "vocabulary_words",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "weekly_reflections",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "whiteboards",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
+        "section": "word_books",
+        "records": 0,
+        "mode": "archive_only"
+      }
+    ],
+    "all_modules_migrated": false
+  },
+  "ok": true,
+  "production_changed": false
+}

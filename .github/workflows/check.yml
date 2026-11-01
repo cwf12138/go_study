@@ -47,6 +47,42 @@ jobs:
           path: .local/checks/frontend-report.json
           include-hidden-files: true
           retention-days: 14
+  sqlite-lab:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        go: ['1.25.x', 'stable']
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ matrix.go }}
+          cache-dependency-path: |
+            go.sum
+            experiments/sqlite/go.sum
+      - name: Verify isolated SQLite lab without CGO
+        shell: pwsh
+        run: ./scripts/verify-sqlite-lab.ps1
+      - name: Build lab command without CGO
+        working-directory: experiments/sqlite
+        env:
+          CGO_ENABLED: '0'
+        run: go build ./cmd/sqlite-lab
+      - if: matrix.os == 'ubuntu-latest' && matrix.go == 'stable'
+        working-directory: experiments/sqlite
+        run: go test -race ./...
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: sqlite-lab-report-${{ matrix.os }}-${{ matrix.go }}
+          path: .local/checks/sqlite-lab-report.json
+          include-hidden-files: true
+          retention-days: 14
   android:
     needs: [go, frontend]
     runs-on: ubuntu-latest
