@@ -38,6 +38,7 @@ func (s *Server) weeklyReview(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) saveWeeklyReflection(w http.ResponseWriter, r *http.Request) {
 	var body struct {
+		ExpectedVersion    *string  `json:"expected_version"`
 		WeekStart          string   `json:"week_start"`
 		Satisfaction       int      `json:"satisfaction"`
 		Wins               string   `json:"wins"`
@@ -50,7 +51,7 @@ func (s *Server) saveWeeklyReflection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	reflection, err := s.service.SaveWeeklyReflection(r.Context(), claimsFromContext(r.Context()).Subject, service.SaveWeeklyReflectionInput{
-		WeekStart: body.WeekStart, Satisfaction: body.Satisfaction, Wins: body.Wins,
+		ExpectedVersion: body.ExpectedVersion, WeekStart: body.WeekStart, Satisfaction: body.Satisfaction, Wins: body.Wins,
 		Challenges: body.Challenges, Lessons: body.Lessons, NextWeekPriorities: body.NextWeekPriorities,
 	})
 	if err != nil {

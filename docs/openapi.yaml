@@ -1659,15 +1659,22 @@ paths:
                 properties:
                   data: { $ref: "#/components/schemas/MoodEntry" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { description: Version conflict; preserve local text and compare, never silently omit the condition }
     delete:
       tags: [Moods]
       security: [{ bearerAuth: [] }]
       summary: 删除某一天的心情日记
       parameters:
         - $ref: "#/components/parameters/MoodDate"
+        - name: expected_version
+          in: query
+          required: false
+          schema: { type: string, maxLength: 256 }
+          description: Last record ID@updated_at; compared atomically. Omit for legacy deletion.
       responses:
         "204": { description: Deleted }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: Record changed; deletion was not performed }
   /api/v1/tasks:
     post:
       tags: [Tasks]
@@ -2653,6 +2660,7 @@ paths:
                 properties:
                   data: { $ref: "#/components/schemas/WeeklyReflection" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { description: Reflection changed or already created; preserve draft and compare }
   /api/v1/reviews/weekly/reflections:
     get:
       tags: [Insights]
@@ -4360,6 +4368,10 @@ components:
       type: object
       required: [mood, stress, energy]
       properties:
+        expected_version:
+          type: string
+          maxLength: 256
+          description: Optional atomic condition. Empty requires absence; otherwise concatenate the last record id, @, and exact updated_at. Omit for legacy unconditional writes.
         mood: { type: string, enum: [awful, low, neutral, good, great] }
         note: { type: string, maxLength: 6000 }
         activities:
@@ -4787,6 +4799,10 @@ components:
       type: object
       required: [week_start, satisfaction]
       properties:
+        expected_version:
+          type: string
+          maxLength: 256
+          description: Optional atomic condition. Empty requires absence; otherwise concatenate the last record id, @, and exact updated_at. Omit for legacy unconditional writes.
         week_start: { type: string, format: date, description: Must be a Monday }
         satisfaction: { type: integer, minimum: 1, maximum: 5 }
         wins: { type: string, maxLength: 4000 }

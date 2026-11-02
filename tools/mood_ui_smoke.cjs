@@ -22,7 +22,7 @@ assert.equal((pickerHTML.match(/loading="lazy"/g)||[]).length,5,'hidden panel mu
 assert.doesNotMatch(pickerHTML,/😣|🙁|😐|🙂|😄/,'do not fall back to platform emoji');
 for(const id of ['mood-today','mood-draft-status','mood-note-count'])assert.ok(html.includes(`id="${id}"`));
 const elements=new Map();
-function element(key){if(!elements.has(key))elements.set(key,{value:'',innerHTML:'',textContent:'',className:'',disabled:false,attributes:{},classList:{toggle(){}},setAttribute(k,v){this.attributes[k]=v}});return elements.get(key)}
+function element(key){if(!elements.has(key))elements.set(key,{value:'',innerHTML:'',textContent:'',className:'',disabled:false,attributes:{},classList:{toggle(){}},querySelectorAll(){return []},querySelector(){return element('submit')},setAttribute(k,v){this.attributes[k]=v}});return elements.get(key)}
 const choices=moods.map(mood=>Object.assign(element(mood),{dataset:{moodChoice:mood}}));
 const context={console,Date,Intl,URLSearchParams,AbortController,Headers:class{set(){}has(){return false}},localStorage:{getItem(){return ''}},window:{setTimeout(){},clearTimeout(){},confirm(){return false}},document:{querySelector:element,querySelectorAll(selector){return selector==='[data-mood-choice]'?choices:[]}}};
 const testSource=source.replace('  bootstrap();','  window.moodTest={state,renderMoods,renderMoodTrend,markMoodDraft,canLeaveMoodDraft,saveMoodEntry,moodAvatar};');
@@ -30,6 +30,7 @@ assert.notEqual(source,testSource);vm.runInNewContext(testSource,context);
 const api=context.window.moodTest;
 context.localStorage.getItem=key=>key==='studyflow.token'?api.state.token:'';
 api.state.moodMonth='2026-09';api.state.moodSelectedDate='2026-09-01';
+api.state.moodLoadedMonth='2026-09';
 api.state.moodEntries=[{date:'2026-09-04',mood:'great'},{date:'2026-09-01',mood:'low',note:'saved'},{date:'2026-09-03',mood:'good'}];
 api.renderMoods();
 assert.equal(choices.filter(button=>button.attributes['aria-checked']==='true').length,1);
@@ -51,7 +52,7 @@ assert.equal(api.canLeaveMoodDraft(),false,'cancel must preserve draft');
 async function checkSave(){
   let release;
   context.fetch=async(path,options)=>{
-    if(options.method==='PUT')return new Promise(resolve=>{release=()=>resolve({ok:true,status:200,json:async()=>({data:{date:'2026-09-01',mood:'low',note:'unsaved draft'}})})});
+    if(options.method==='PUT')return new Promise(resolve=>{release=()=>resolve({ok:true,status:200,json:async()=>({data:{id:'mood-test',updated_at:'2026-09-01T01:00:00.000000001Z',date:'2026-09-01',mood:'low',note:'unsaved draft'}})})});
     return {ok:true,status:200,json:async()=>({data:path.includes('insights')?{}:[{date:'2026-09-01',mood:'low',note:'unsaved draft'}]})};
   };
   const saving=api.saveMoodEntry({preventDefault(){},currentTarget:{querySelector(){return element('submit')}}});

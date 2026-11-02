@@ -198,7 +198,7 @@ func (s *Service) UpdateMemoNote(ctx context.Context, userID, noteID string, inp
 	if input.Archived != nil {
 		note.Archived = *input.Archived
 	}
-	note.UpdatedAt = s.nextMemoTime(previous)
+	note.UpdatedAt = s.nextRecordTime(previous)
 	if input.ExpectedUpdatedAt != nil {
 		writer, ok := s.repo.(interface {
 			UpdateMemoNoteIfUnchanged(context.Context, domain.MemoNote, time.Time) error
@@ -225,7 +225,7 @@ func (s *Service) TrashMemoNote(ctx context.Context, userID, noteID string) erro
 	if note.DeletedAt != nil {
 		return nil
 	}
-	now := s.nextMemoTime(note.UpdatedAt)
+	now := s.nextRecordTime(note.UpdatedAt)
 	note.DeletedAt, note.UpdatedAt = &now, now
 	if err := s.repo.UpdateMemoNote(ctx, note); err != nil {
 		return err
@@ -241,7 +241,7 @@ func (s *Service) RestoreMemoNote(ctx context.Context, userID, noteID string) (d
 	}
 	note.DeletedAt = nil
 	note.Archived = false
-	note.UpdatedAt = s.nextMemoTime(note.UpdatedAt)
+	note.UpdatedAt = s.nextRecordTime(note.UpdatedAt)
 	if err := s.repo.UpdateMemoNote(ctx, note); err != nil {
 		return domain.MemoNote{}, err
 	}
@@ -262,14 +262,6 @@ func (s *Service) DeleteMemoNotePermanently(ctx context.Context, userID, noteID 
 	}
 	s.publish("memo_note.deleted", userID, noteID, map[string]any{"title": note.Title})
 	return nil
-}
-
-func (s *Service) nextMemoTime(previous time.Time) time.Time {
-	now := s.now().UTC()
-	if !now.After(previous) {
-		return previous.Add(time.Nanosecond)
-	}
-	return now
 }
 
 func (s *Service) DuplicateMemoNote(ctx context.Context, userID, noteID string) (domain.MemoNote, error) {

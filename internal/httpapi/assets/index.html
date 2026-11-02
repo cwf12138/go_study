@@ -23,6 +23,7 @@
     <link rel="stylesheet" href="/static/memos.css?v=20260904-1">
     <link rel="stylesheet" href="/static/memos-refresh.css?v=20260909-1">
     <link rel="stylesheet" href="/static/memo-drafts.css?v=20261102-1">
+    <link rel="stylesheet" href="/static/record-drafts.css?v=20261102-1">
     <link rel="stylesheet" href="/static/english.css?v=20261007-1">
     <link rel="stylesheet" href="/static/literature.css?v=20260902-1">
     <link rel="stylesheet" href="/static/literature-product.css?v=20260909-1">
@@ -402,6 +403,8 @@
               <div class="mood-side-column">
                 <article class="surface mood-entry-card">
                   <div class="mood-entry-head"><div><h3 id="mood-selected-date">选择一天</h3></div><button id="delete-mood-entry" class="text-button danger-text" type="button">删除记录</button></div>
+                  <div class="ld-inline"><span id="ld-mood-state" role="status">未提交的文字会保留在本机</span><button id="ld-mood-open" class="quiet" type="button" aria-haspopup="dialog" disabled>本机草稿</button></div>
+                  <button id="mood-reload" class="text-button" type="button" hidden>重新读取这一天</button>
                   <form id="mood-form" class="mood-form">
                     <input id="mood-value" type="hidden" value="neutral">
                     <div><span class="mood-field-label">此刻，感觉怎么样？</span><p class="mood-picker-hint">选一个最接近此刻的你，不必勉强开心。</p><div class="mood-picker" role="radiogroup" aria-label="选择心情"><button type="button" data-mood-choice="awful" aria-label="很糟"><img class="mood-avatar" src="/static/mood-art/awful-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><small>很糟</small></button><button type="button" data-mood-choice="low" aria-label="低落"><img class="mood-avatar" src="/static/mood-art/low-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><small>低落</small></button><button type="button" data-mood-choice="neutral" aria-label="平静"><img class="mood-avatar" src="/static/mood-art/neutral-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><small>平静</small></button><button type="button" data-mood-choice="good" aria-label="不错"><img class="mood-avatar" src="/static/mood-art/good-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><small>不错</small></button><button type="button" data-mood-choice="great" aria-label="很好"><img class="mood-avatar" src="/static/mood-art/great-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><small>很好</small></button></div></div>
@@ -658,6 +661,7 @@
             </div>
             <article class="surface weekly-review-card">
               <div class="weekly-review-head"><div><p class="eyebrow">WEEKLY RETROSPECTIVE</p><h3>每周复盘与下周承诺</h3><p id="weekly-review-range">用相同已过工作日与上周同期比较，避免在周中得出误导结论。</p></div><div class="weekly-review-nav"><button id="weekly-review-prev" class="icon-button" type="button" aria-label="上一周">←</button><button id="weekly-review-current" class="quiet" type="button">本周</button><button id="weekly-review-next" class="icon-button" type="button" aria-label="下一周">→</button></div></div>
+              <div class="ld-inline"><span id="ld-weekly-state" role="status">未提交的文字会保留在本机</span><button id="ld-weekly-open" class="quiet" type="button" aria-haspopup="dialog" disabled>本机草稿</button></div>
               <div class="weekly-review-layout">
                 <div class="weekly-review-report"><div id="weekly-review-comparison" class="weekly-comparison-grid"></div><div><h4>本周信号</h4><div id="weekly-review-highlights" class="weekly-highlights empty-state">正在形成复盘摘要…</div></div></div>
                 <form id="weekly-reflection-form" class="weekly-reflection-form">
@@ -932,6 +936,13 @@
         <details id="dc-guide-section" class="dc-guide" tabindex="-1"><summary><span aria-hidden="true">▤</span><span><b>完整备份与恢复</b><small>在电脑端停服后执行，覆盖快照与快传文件。</small></span><i aria-hidden="true">⌄</i></summary><div><div class="dc-scope-grid"><section><h4>个人 JSON</h4><p>当前账号的业务记录，适合留存和查看。不能直接作为完整服务快照启动。</p></section><section><h4>完整服务备份</h4><p>所有账号、密码哈希、快照与快传附件。先停止服务，用电脑端工具备份，再恢复到新目录验收。</p></section></div><p class="dc-caption">完整备份未加密，需要私密保存。当前页面没有读取你的备份包，无法判断它是否已创建或能够恢复。</p><button id="dc-guide" type="button">↓ 下载电脑端操作说明</button></div></details>
       </div>
     </dialog>
+    <dialog id="ld-dialog" class="ld-dialog" aria-labelledby="ld-heading" aria-describedby="ld-description">
+      <header><div><p class="eyebrow">KEEP YOUR WORDS · 继续未完成</p><h3 id="ld-heading">写到一半，也安心留下。</h3></div><button id="ld-close" class="quiet" type="button" aria-label="关闭长文草稿">×</button></header>
+      <p id="ld-description" class="ld-description">当前账号与服务地址的本机草稿。先核对，再回到原日期或周次继续写。</p>
+      <div class="ld-tabs" role="group" aria-label="草稿类型"><button type="button" data-ld-kind="mood" aria-pressed="true">心情日记</button><button type="button" data-ld-kind="weekly" aria-pressed="false">每周复盘</button></div>
+      <div class="ld-layout"><nav id="ld-list" aria-label="草稿列表"></nav><section id="ld-preview" hidden><h4 id="ld-title"></h4><p id="ld-status" role="status" aria-live="polite"></p><div class="ld-compare"><label>本机草稿<textarea id="ld-local" readonly spellcheck="false"></textarea></label><label>服务端记录<textarea id="ld-server" readonly spellcheck="false" placeholder="尚未读取或无法连接"></textarea></label></div><div class="ld-actions"><button id="ld-restore" class="primary" type="button" disabled>恢复到原编辑区</button><button id="ld-copy" class="quiet" type="button" disabled>另存备忘录</button><button id="ld-export" class="quiet" type="button">导出文字</button><button id="ld-discard" class="text-button" type="button">删除此草稿</button></div></section></div>
+      <footer><div><label class="ld-setting"><input id="ld-enabled" type="checkbox" checked>在此设备保留心情与复盘草稿</label><p id="ld-health" role="status">恢复后请手动点击保存。</p><p>文字以明文留在此浏览器 / App，不跨设备同步。退出账号后仍保留；共用设备请在离开前清理。</p></div><button id="ld-clear" class="quiet" type="button">清理本账号长文草稿</button></footer>
+    </dialog>
     <script src="/static/product-shell.js?v=20261027-nav" defer></script>
     <script src="/static/diagnostics-core.js?v=20261030-1" defer></script>
     <script src="/static/diagnostics.js?v=20261030-1" defer></script>
@@ -939,7 +950,10 @@
     <script src="/static/data-center.js?v=20261101-1" defer></script>
     <script src="/static/navigation-core.js?v=20261027-1" defer></script>
     <script src="/static/navigation.js?v=20261027-1" defer></script>
-    <script src="/static/app.js?v=20261102-account-ready" defer></script>
+    <script src="/static/draft-store.js?v=20261102-1" defer></script>
+    <script src="/static/record-drafts-core.js?v=20261102-1" defer></script>
+    <script src="/static/record-drafts.js?v=20261102-1" defer></script>
+    <script src="/static/app.js?v=20261102-record-drafts" defer></script>
     <script src="/static/gentle-reminders-core.js?v=20261022-1" defer></script>
     <script src="/static/important-days-core.js?v=20261022-1" defer></script>
     <script src="/static/important-days.js?v=20261022-1" defer></script>
@@ -979,7 +993,7 @@
     <script src="/static/transfers.js?v=20261021-1" defer></script>
     <script src="/static/text-clips-core.js?v=20261029-1" defer></script>
     <script src="/static/text-clips.js?v=20261029-1" defer></script>
-    <script src="/static/memo-drafts-core.js?v=20261102-1" defer></script>
+    <script src="/static/memo-drafts-core.js?v=20261102-2" defer></script>
     <script src="/static/memo-drafts.js?v=20261102-1" defer></script>
     <script src="/static/memos.js?v=20261102-drafts" defer></script>
     <script src="/static/english.js?v=20261007-2" defer></script>

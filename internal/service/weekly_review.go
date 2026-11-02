@@ -7,12 +7,14 @@ import (
 	"math"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/example/studyflow/internal/domain"
 	"github.com/example/studyflow/internal/platform"
 )
 
 type SaveWeeklyReflectionInput struct {
+	ExpectedVersion    *string
 	WeekStart          string
 	Satisfaction       int
 	Wins               string
@@ -83,6 +85,9 @@ func (s *Service) WeeklyReview(ctx context.Context, userID, weekStartValue, time
 }
 
 func (s *Service) SaveWeeklyReflection(ctx context.Context, userID string, input SaveWeeklyReflectionInput) (domain.WeeklyReflection, error) {
+	if err := validateRecordVersion(input.ExpectedVersion); err != nil {
+		return domain.WeeklyReflection{}, err
+	}
 	preferences, err := s.PlannerPreferences(ctx, userID)
 	if err != nil {
 		return domain.WeeklyReflection{}, err
@@ -100,7 +105,7 @@ func (s *Service) SaveWeeklyReflection(ctx context.Context, userID string, input
 		return domain.WeeklyReflection{}, fmt.Errorf("%w: satisfaction must be between 1 and 5", domain.ErrInvalidInput)
 	}
 	input.Wins, input.Challenges, input.Lessons = strings.TrimSpace(input.Wins), strings.TrimSpace(input.Challenges), strings.TrimSpace(input.Lessons)
-	if len(input.Wins) > 4000 || len(input.Challenges) > 4000 || len(input.Lessons) > 4000 {
+	if utf8.RuneCountInString(input.Wins) > 4000 || utf8.RuneCountInString(input.Challenges) > 4000 || utf8.RuneCountInString(input.Lessons) > 4000 {
 		return domain.WeeklyReflection{}, fmt.Errorf("%w: reflection fields must not exceed 4000 characters", domain.ErrInvalidInput)
 	}
 	priorities := make([]string, 0, len(input.NextWeekPriorities))
@@ -110,7 +115,7 @@ func (s *Service) SaveWeeklyReflection(ctx context.Context, userID string, input
 		if value == "" {
 			continue
 		}
-		if len(value) > 200 {
+		if utf8.RuneCountInString(value) > 200 {
 			return domain.WeeklyReflection{}, fmt.Errorf("%w: a priority must not exceed 200 characters", domain.ErrInvalidInput)
 		}
 		key := strings.ToLower(value)
@@ -133,9 +138,20 @@ func (s *Service) SaveWeeklyReflection(ctx context.Context, userID string, input
 	reflection.Satisfaction = input.Satisfaction
 	reflection.Wins, reflection.Challenges, reflection.Lessons = input.Wins, input.Challenges, input.Lessons
 	reflection.NextWeekPriorities = priorities
-	reflection.UpdatedAt = now
-	if err := s.repo.UpsertWeeklyReflection(ctx, reflection); err != nil {
-		return domain.WeeklyReflection{}, err
+	reflection.UpdatedAt = advanceRecordTime(reflection.UpdatedAt, now)
+	if input.ExpectedVersion != nil {
+		writer, ok := s.repo.(interface {
+			UpsertWeeklyReflectionIfUnchanged(context.Context, domain.WeeklyReflection, string) error
+		})
+		if !ok {
+			return domain.WeeklyReflection{}, fmt.Errorf("%w: repository cannot protect reflection versions", domain.ErrInvalidState)
+		}
+		loadErr = writer.UpsertWeeklyReflectionIfUnchanged(ctx, reflection, *input.ExpectedVersion)
+	} else {
+		loadErr = s.repo.UpsertWeeklyReflection(ctx, reflection)
+	}
+	if loadErr != nil {
+		return domain.WeeklyReflection{}, loadErr
 	}
 	s.publish("weekly_reflection.saved", userID, reflection.ID, map[string]any{"week_start": reflection.WeekStart, "satisfaction": reflection.Satisfaction})
 	return reflection, nil

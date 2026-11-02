@@ -20,6 +20,7 @@
     moodDraftRevision: 0,
     moodDraftSequence: 0,
     moodSaving: false,
+    moodBase: null, moodLoadedMonth: "", moodLoadError: "",
     theme: loadTheme(),
     tasks: [],
     taskQuery: { text: "", status: "", priority: "", deadline: "", sort: "smart", page: 1, pageSize: 8 },
@@ -59,6 +60,7 @@
     weeklyDraftRevision: 0,
     weeklyDraftSequence: 0,
     weeklySaving: false,
+    weeklyBase: null,
     weeklyLoading: false,
     weeklyLoadError: "",
     currentView: "dashboard",
@@ -89,6 +91,45 @@
     { value: "good", label: "不错" },
     { value: "great", label: "很好" },
   ];
+
+  let recordAccountEpoch = 0;
+  const recordVersion = record => record?.id && record.updated_at ? record.id + "@" + record.updated_at : "";
+  function readMoodEditor() {
+    return {mood:$("#mood-value").value,note:$("#mood-note").value,tags:$("#mood-tags").value,
+      activities:$$('[data-mood-activity].selected').map(b=>b.dataset.moodActivity),stress:Number($("#mood-stress").value),energy:Number($("#mood-energy").value)};
+  }
+  function readWeeklyEditor() {
+    return {satisfaction:Number($("#weekly-satisfaction").value),wins:$("#weekly-wins").value,challenges:$("#weekly-challenges").value,lessons:$("#weekly-lessons").value,priorities:$("#weekly-priorities").value};
+  }
+  const recordDrafts = window.DaynestRecordDrafts?.create({
+    token:()=>state.token,
+    read:kind=>kind==="mood"?{key:state.moodSelectedDate,known:state.moodLoadedMonth===state.moodMonth,base:state.moodBase,value:readMoodEditor(),dirty:!!state.moodDraftRevision}:{key:state.weeklyReviewWeekStart,known:!!state.weeklyReview,base:state.weeklyBase,value:readWeeklyEditor(),dirty:!!state.weeklyDraftRevision},
+    async load(kind,key) {
+      if(kind==="mood") {const entries=await api(`/api/v1/moods?month=${encodeURIComponent(key.slice(0,7))}`);if(!Array.isArray(entries))throw Error("日记数据格式异常，请重试。");return {record:entries.find(e=>e.date===key)||null,context:entries};}
+      const review=await api(`/api/v1/reviews/weekly?week_start=${encodeURIComponent(key)}`);
+      if(!review||review.week_start!==key)throw Error("复盘数据格式异常，请重试。");
+      return {record:review.reflection_saved?review.reflection:null,context:review};
+    },
+    prepare(kind,r) {
+      const dirty=kind==="mood"?state.moodDraftRevision:state.weeklyDraftRevision,saving=kind==="mood"?state.moodSaving:state.weeklySaving;
+      const key=kind==="mood"?state.moodSelectedDate:state.weeklyReviewWeekStart;
+      return !saving && (!dirty || (key===r.key && window.DaynestRecordDraftCore.equal(kind,kind==="mood"?readMoodEditor():readWeeklyEditor(),r.value)));
+    },
+    async apply(kind,r,result) {
+      if(kind==="mood") {
+        moodLoadVersion++;state.moodMonth=r.key.slice(0,7);state.moodSelectedDate=r.key;state.moodLoadedMonth=state.moodMonth;state.moodLoadError="";
+        state.moodEntries=result.context;state.moodInsights=null;state.moodDraftRevision=0;renderMoods();
+        renderMoodForm({...r.value,tags:r.value.tags.split(/[,，]/).map(t=>t.trim()).filter(Boolean)});
+        state.moodBase=result.record;state.moodDraftRevision=++state.moodDraftSequence;showView("moods");
+        updateMoodDraftStatus("草稿已恢复到原日期 · 请点击保存这一天");
+      } else {
+        weeklyRequestVersion++;state.weeklyReviewWeekStart=r.key;state.weeklyReview=result.context;state.weeklyLoading=false;state.weeklyLoadError="";state.weeklyDraftRevision=0;renderWeeklyReview();
+        $("#weekly-satisfaction").value=r.value.satisfaction?String(r.value.satisfaction):"";$("#weekly-wins").value=r.value.wins;$("#weekly-challenges").value=r.value.challenges;$("#weekly-lessons").value=r.value.lessons;$("#weekly-priorities").value=r.value.priorities;
+        state.weeklyBase=result.record;state.weeklyDraftRevision=++state.weeklyDraftSequence;updateWeeklyDraftStatus();showView("insights");
+      }
+    },
+    copy:(kind,key,content)=>api("/api/v1/memos",{method:"POST",body:JSON.stringify({title:`${key} ${kind==="mood"?"心情日记":"每周复盘"}（草稿保留）`,content,color:"default",tags:[kind==="mood"?"心情草稿":"复盘草稿"]})}),
+  });
 
   function moodAvatar(value) {
     const mood = moodOptions.find(option => option.value === value);
@@ -277,6 +318,7 @@
   }
 
   function enterApp(user) {
+    recordAccountEpoch++;
     state.user = user;
     try { state.vocabularyBookID = localStorage.getItem(`studyflow.vocabularyBook.${user.id}`) || ""; } catch (_) { /* Storage may be disabled. */ }
     setFocusFeedback();
@@ -303,6 +345,7 @@
   }
 
   function leaveApp({ keepStoredSession = false } = {}) {
+    recordDrafts?.capture("mood"); recordDrafts?.capture("weekly"); recordAccountEpoch++;
     coreReadyToken = "";
     restoringSession = "";
     $("#auth-reconnect").disabled = false;
@@ -329,6 +372,9 @@
     state.moodMonth = monthKey(new Date());
     state.moodSelectedDate = localDateKey(new Date());
     state.moodDraftRevision = 0;
+    state.moodSaving = false; state.moodBase = null; state.moodLoadedMonth = ""; state.moodLoadError = ""; moodLoadVersion++;
+    $("#mood-form").reset?.(); $("#mood-form").inert = false;
+    renderMoods();
     state.tasks = [];
     state.taskQuery = { text: "", status: "", priority: "", deadline: "", sort: "smart", page: 1, pageSize: 8 };
     state.taskSearchComposing = false;
@@ -363,12 +409,14 @@
     state.weeklySaving = false;
     state.weeklyLoading = false;
     state.weeklyLoadError = "";
+    state.weeklyBase = null; weeklyRequestVersion++; $("#weekly-reflection-form").reset?.();
     state.focus = null;
     state.dailyFocusGoalMinutes = 60;
     setFocusFeedback();
     if (!keepStoredSession) { localStorage.removeItem("studyflow.token"); persistFocus(); }
     $("#app-view").classList.add("hidden");
     $("#auth-view").classList.remove("hidden");
+    recordDrafts?.reset();
     authTab("login");
   }
 
@@ -546,6 +594,8 @@
     if (moodMonth === state.moodMonth && moodVersion === moodLoadVersion) {
       state.moodEntries = moods || [];
       state.moodInsights = moodInsights || null;
+      if (wants(3) && results[3].status === "fulfilled" && results[3].value !== skipped) {state.moodLoadedMonth=moodMonth;state.moodLoadError="";}
+      else if(wants(3) && results[3].status === "rejected") state.moodLoadError="日记读取失败，请重试；不会把未知记录当作空白覆盖。";
     }
     state.tasks = tasks;
     state.todoLists = todoLists || [];
@@ -756,11 +806,13 @@
     calendar.innerHTML = cells.join("");
     $("#mood-month-title").textContent = new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long" }).format(firstDay);
     if (!state.moodDraftRevision && !state.moodSaving) renderMoodForm(entryByDate.get(state.moodSelectedDate));
+    updateMoodAvailability();
     renderMoodInsights();
     renderMoodTrend();
   }
 
   function renderMoodForm(entry) {
+    state.moodBase = entry || null;
     const mood = entry?.mood || "neutral";
     $("#mood-selected-date").textContent = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", weekday: "long" }).format(new Date(`${state.moodSelectedDate}T12:00:00`));
     $("#mood-value").value = mood;
@@ -777,9 +829,23 @@
     $("#mood-stress-value").textContent = $("#mood-stress").value;
     $("#mood-energy-value").textContent = $("#mood-energy").value;
     const activities = new Set(entry?.activities || []);
+    $$('[data-mood-extra]').forEach(button=>button.remove());
+    const knownActivities = new Set($$('[data-mood-activity]').map(b=>b.dataset.moodActivity));
+    for (const value of activities) if (!knownActivities.has(value)) {
+      const button=document.createElement("button");button.type="button";button.dataset.moodActivity=value;button.dataset.moodExtra="true";button.textContent=value;$("#mood-activities").append(button);
+    }
     $$('[data-mood-activity]').forEach((button) => { button.classList.toggle("selected", activities.has(button.dataset.moodActivity)); button.setAttribute("aria-pressed", String(activities.has(button.dataset.moodActivity))); });
     $("#delete-mood-entry").disabled = !entry;
-    updateMoodDraftStatus(entry ? "这一天的记录已保存" : "还没有记录，慢慢写就好");
+    updateMoodDraftStatus(entry ? "这一天的记录已提交服务" : "还没有记录，慢慢写就好");
+  }
+
+  function updateMoodAvailability() {
+    const ready=state.moodLoadedMonth===state.moodMonth;
+    $("#mood-form").querySelectorAll("input,textarea,button").forEach(field=>{field.disabled=!ready;});
+    const submit=$("#mood-form").querySelector('button[type="submit"]');if(submit)submit.disabled=!ready||state.moodSaving;
+    $("#delete-mood-entry").disabled=!ready||state.moodSaving||!state.moodEntries.some(e=>e.date===state.moodSelectedDate);
+    $("#mood-reload").hidden=ready&&!state.moodLoadError;
+    if(!ready)updateMoodDraftStatus(state.moodLoadError||"正在读取这一天的记录，载入后即可填写…");
   }
 
   function renderMoodInsights() {
@@ -844,14 +910,15 @@
 
   let moodLoadVersion = 0;
   async function refreshMoods() {
-    const version = ++moodLoadVersion, month = state.moodMonth, token = state.token;
-    const [entries, insights] = await Promise.all([
+    const version = ++moodLoadVersion, month = state.moodMonth, token = state.token, epoch=recordAccountEpoch;
+    const [entries, insights] = await Promise.allSettled([
       api(`/api/v1/moods?month=${state.moodMonth}`),
       api(`/api/v1/moods/insights?month=${state.moodMonth}`),
     ]);
-    if (version !== moodLoadVersion || month !== state.moodMonth || token !== state.token) return;
-    state.moodEntries = entries || [];
-    state.moodInsights = insights || null;
+    if (version !== moodLoadVersion || month !== state.moodMonth || token !== state.token || epoch!==recordAccountEpoch) return;
+    if(entries.status!=="fulfilled"||!Array.isArray(entries.value)){state.moodLoadError="日记读取失败，请点击重新读取。编辑区不会覆盖未知的服务端记录。";updateMoodAvailability();throw entries.reason||Error("日记数据格式异常");}
+    state.moodEntries = entries.value; state.moodLoadedMonth=month;state.moodLoadError="";
+    state.moodInsights = insights.status==="fulfilled"?insights.value:null;
     renderMoods();
   }
 
@@ -860,6 +927,7 @@
     const [year, month] = state.moodMonth.split("-").map(Number);
     const next = new Date(year, month - 1 + offset, 1);
     state.moodMonth = monthKey(next);
+    state.moodLoadedMonth="";state.moodLoadError="";
     if (!state.moodSelectedDate.startsWith(state.moodMonth)) state.moodSelectedDate = `${state.moodMonth}-01`;
     state.moodEntries = []; state.moodInsights = null; renderMoods();
     try {
@@ -871,26 +939,33 @@
 
   async function saveMoodEntry(event) {
     event.preventDefault();
-    if (state.moodSaving) return;
-    const revision = state.moodDraftRevision, date = state.moodSelectedDate;
+    if (state.moodSaving || state.moodLoadedMonth!==state.moodMonth || $("#mood-form").reportValidity?.()===false) return;
+    const revision = state.moodDraftRevision, date = state.moodSelectedDate, owner=state.token, epoch=recordAccountEpoch;
+    const current=()=>owner===state.token&&epoch===recordAccountEpoch&&date===state.moodSelectedDate;
+    const value=readMoodEditor(),sent=recordDrafts?.capture("mood");
+    const payload={...value,tags:value.tags.split(/[,，]/).map(t=>t.trim()).filter(Boolean),expected_version:recordVersion(state.moodBase)};
     state.moodSaving = true; updateMoodDraftStatus("正在保存…");
+    moodLoadVersion++;
     const button = event.currentTarget.querySelector('button[type="submit"]');
     button.disabled = true;
     try {
-      const activities = $$('[data-mood-activity].selected').map((item) => item.dataset.moodActivity);
-      const tags = $("#mood-tags").value.split(/[,，]/).map((tag) => tag.trim()).filter(Boolean);
-      const saved = await api(`/api/v1/moods/${date}`, { method: "PUT", body: JSON.stringify({ mood: $("#mood-value").value, note: $("#mood-note").value, activities, tags, stress: Number($("#mood-stress").value), energy: Number($("#mood-energy").value) }) });
+      const saved = await api(`/api/v1/moods/${date}`, { method: "PUT", body: JSON.stringify(payload) });
+      if(!current())return;
+      if(!saved||saved.date!==date||!saved.id||!saved.updated_at)throw Error("日记保存响应不完整，请在本机草稿中核对。");
+      state.moodBase=saved;
       if (date === state.moodSelectedDate && revision === state.moodDraftRevision) state.moodDraftRevision = 0;
+      if(state.moodDraftRevision)recordDrafts?.capture("mood");
+      recordDrafts?.ack("mood",sent,!state.moodDraftRevision);
       state.moodEntries = state.moodEntries.filter(entry=>entry.date!==date); if(saved) state.moodEntries.push(saved);
-      try { await refreshMoods(); } catch (_) { notify("日记已保存，但月度统计暂未更新。", "error"); }
-      updateMoodDraftStatus(state.moodDraftRevision ? "已保存提交内容，仍有新修改未保存" : "这一天的记录已保存");
+      try { await refreshMoods(); } catch (_) { if(current())notify("日记已提交服务，但月度统计暂未更新。", "error"); }
+      if(current())updateMoodDraftStatus(state.moodDraftRevision ? "已提交本次内容，仍有新修改未保存" : "这一天的记录已提交服务");
     } catch (error) {
-      updateMoodDraftStatus("保存失败，输入内容仍在，请重试");
-      notify(error.message, "error");
+      if(!current())return;
+      const message=error.status===409?"服务端也有修改，请打开本机草稿对照；输入内容已保留。":"保存失败，输入内容仍在，请重试";
+      if(error.status===409){recordDrafts?.capture("mood");recordDrafts?.problem("mood",message);}
+      updateMoodDraftStatus(message); notify(error.status===409?message:error.message, "error");
     } finally {
-      state.moodSaving = false;
-      button.disabled = false;
-      $("#delete-mood-entry").disabled = !state.moodEntries.some(entry=>entry.date===state.moodSelectedDate);
+      if(current()){state.moodSaving = false;button.disabled = false;updateMoodAvailability();}
     }
   }
 
@@ -898,34 +973,40 @@
     $("#mood-draft-status").textContent = message || "有未保存修改 · 请点击保存这一天";
     $("#mood-note-count").textContent = `${$("#mood-note").value.length} / 6000`;
   }
-  function markMoodDraft() { state.moodDraftRevision = ++state.moodDraftSequence; updateMoodDraftStatus(); }
+  function markMoodDraft() { state.moodDraftRevision = ++state.moodDraftSequence; updateMoodDraftStatus();recordDrafts?.capture("mood"); }
   function canLeaveMoodDraft() {
     if (state.moodSaving) { notify("正在保存，请稍等片刻再切换日期。", "error"); return false; }
-    if (state.moodDraftRevision && !window.confirm("这一天的日记尚未保存，放弃修改并切换日期吗？")) return false;
-    state.moodDraftRevision = 0; return true;
+    if (state.moodDraftRevision) {
+      const retained=recordDrafts?.retained("mood");
+      if(!window.confirm(retained?"文字已保留在本机草稿，暂存并切换日期吗？":"本机草稿尚未确认保留。放弃编辑区修改并切换日期吗？重要文字请先导出。"))return false;
+    }
+    recordDrafts?.detach("mood");state.moodDraftRevision = 0; return true;
   }
 
   async function deleteMoodEntry() {
     const exists = state.moodEntries.some((entry) => entry.date === state.moodSelectedDate);
     if (!exists) return;
-    if (state.moodSaving || !window.confirm("删除这一天的心情记录和日记？尚未保存的修改也会丢弃，此操作无法撤销。")) return;
+    if (state.moodSaving || !window.confirm("删除这一天的服务端心情记录和日记？此操作无法撤销。本机草稿仍保留，可导出或另存备忘录。")) return;
+    recordDrafts?.capture("mood");
+    const date=state.moodSelectedDate,owner=state.token,epoch=recordAccountEpoch;
+    const current=()=>owner===state.token&&epoch===recordAccountEpoch&&date===state.moodSelectedDate;
     state.moodSaving = true;
     $("#mood-form").inert = true;
     const button = $("#delete-mood-entry");
     button.disabled = true;
     try {
-      await api(`/api/v1/moods/${state.moodSelectedDate}`, { method: "DELETE" });
+      await api(`/api/v1/moods/${date}?expected_version=${encodeURIComponent(recordVersion(state.moodBase))}`, { method: "DELETE" });
+      if(!current())return;
+      recordDrafts?.detach("mood");
       state.moodDraftRevision = 0;
       state.moodEntries = state.moodEntries.filter(entry=>entry.date!==state.moodSelectedDate);
       renderMoodForm();
-      try { await refreshMoods(); } catch (_) { notify("记录已删除，但统计暂未更新。", "error"); }
-      notify("当天的心情记录已删除。");
+      try { await refreshMoods(); } catch (_) { if(current())notify("记录已删除，但统计暂未更新。", "error"); }
+      if(current())notify("当天的心情记录已删除，本机草稿仍保留。");
     } catch (error) {
-      notify(error.message, "error");
+      if(current())notify(error.status===409?"记录已有更新，未执行删除。请重新读取后核对。":error.message, "error");
     } finally {
-      state.moodSaving = false;
-      $("#mood-form").inert = false;
-      button.disabled = !state.moodEntries.some(entry=>entry.date===state.moodSelectedDate);
+      if(current()){state.moodSaving = false;$("#mood-form").inert = false;button.disabled = !state.moodEntries.some(entry=>entry.date===date);}
     }
   }
 
@@ -1633,6 +1714,7 @@
     $("#weekly-review-highlights").innerHTML = highlights.map((item) => `<article class="${item.kind}"><span>${highlightIcons[item.kind] || "i"}</span><div><h5>${escapeHTML(item.title)}</h5><p>${escapeHTML(item.description)}</p><small>${escapeHTML(item.evidence)}</small></div></article>`).join("");
     const reflection = review.reflection || {};
     if (!state.weeklyDraftRevision && !state.weeklySaving) {
+      state.weeklyBase=review.reflection_saved?reflection:null;
       $("#weekly-satisfaction").value = reflection.satisfaction ? String(reflection.satisfaction) : "";
       $("#weekly-wins").value = reflection.wins || "";
       $("#weekly-challenges").value = reflection.challenges || "";
@@ -1645,7 +1727,7 @@
   function updateWeeklyDraftStatus() {
     const review = state.weeklyReview, reflection = review?.reflection || {};
     $("#weekly-reflection-form").querySelectorAll('input,select,textarea').forEach(field => { field.disabled = !review; });
-    $("#weekly-reflection-status").textContent = state.weeklySaving ? '正在保存本次提交，新输入会保留…' : state.weeklyDraftRevision ? '有未保存修改 · 自动刷新不会覆盖' : state.weeklyLoadError ? `汇总加载失败：${state.weeklyLoadError}` : state.weeklyLoading ? '正在读取这一周…' : !review ? '请先载入这一周，再填写并保存' : review.reflection_saved ? `已保存 · ${formatDate(reflection.updated_at, true)}` : '尚未保存这一周的复盘';
+    $("#weekly-reflection-status").textContent = state.weeklySaving ? '正在提交本次内容，新输入会保留…' : state.weeklyDraftRevision ? '有未保存修改 · 自动刷新不会覆盖' : state.weeklyLoadError ? `汇总加载失败：${state.weeklyLoadError}` : state.weeklyLoading ? '正在读取这一周…' : !review ? '请先载入这一周，再填写并保存' : review.reflection_saved ? `已提交服务 · ${formatDate(reflection.updated_at, true)}` : '尚未保存这一周的复盘';
     $("#weekly-discard").disabled = state.weeklySaving || !state.weeklyDraftRevision;
     const button = $("#weekly-reflection-form").querySelector('button[type=submit]');
     if (button) { button.disabled = state.weeklySaving || state.weeklyLoading || !review; button.textContent = state.weeklySaving ? '保存中…' : '保存复盘'; }
@@ -1653,6 +1735,7 @@
 
   function markWeeklyDraft() {
     state.weeklyDraftRevision = ++state.weeklyDraftSequence;
+    recordDrafts?.capture("weekly");
     updateWeeklyDraftStatus();
   }
 
@@ -1670,8 +1753,11 @@
   async function selectWeeklyWeek(next) {
     const owner = state.token;
     if (state.weeklySaving) { notify('正在保存复盘，请稍候再切换周次。', 'error'); return; }
-    if (next !== state.weeklyReviewWeekStart && state.weeklyDraftRevision && !window.confirm('本周复盘尚未保存，放弃修改并切换周次吗？')) return;
-    if (next !== state.weeklyReviewWeekStart) { state.weeklyDraftRevision = 0; state.weeklyReview = null; $("#weekly-reflection-form").reset(); }
+    if (next !== state.weeklyReviewWeekStart && state.weeklyDraftRevision) {
+      const retained=recordDrafts?.retained("weekly");
+      if(!window.confirm(retained?'复盘已保留在本机草稿，暂存并切换周次吗？':'本机草稿尚未确认保留。放弃编辑区修改并切换周次吗？重要文字请先导出。'))return;
+    }
+    if (next !== state.weeklyReviewWeekStart) { recordDrafts?.detach("weekly");state.weeklyBase=null;state.weeklyDraftRevision = 0; state.weeklyReview = null; $("#weekly-reflection-form").reset(); }
     state.weeklyReviewWeekStart = next;
     try { await refreshWeeklyReview(); }
     catch (error) { if (owner === state.token && next === state.weeklyReviewWeekStart) notify(error.message, 'error'); }
@@ -1693,7 +1779,9 @@
       notify("下周优先事项最多填写 5 项，请每行填写一项。", "error");
       return;
     }
-    const owner = state.token, week = state.weeklyReviewWeekStart, revision = state.weeklyDraftRevision;
+    const owner = state.token, week = state.weeklyReviewWeekStart, revision = state.weeklyDraftRevision, epoch=recordAccountEpoch;
+    const current=()=>owner===state.token&&epoch===recordAccountEpoch&&week===state.weeklyReviewWeekStart;
+    const sent=recordDrafts?.capture("weekly");
     const payload = {
         week_start: week,
         satisfaction: Number($("#weekly-satisfaction").value),
@@ -1701,20 +1789,30 @@
         challenges: $("#weekly-challenges").value,
         lessons: $("#weekly-lessons").value,
         next_week_priorities: priorities,
+        expected_version: recordVersion(state.weeklyBase),
       };
     state.weeklySaving = true; weeklyRequestVersion++; updateWeeklyDraftStatus();
     try {
       const reflection = await api("/api/v1/reviews/weekly/reflection", { method: "PUT", body: JSON.stringify(payload) });
-      if (owner !== state.token || week !== state.weeklyReviewWeekStart) return;
+      if (!current()) return;
       if (!reflection || reflection.week_start !== week) throw new Error('复盘保存响应不完整，请先核对记录。');
       state.weeklyReview = { ...(state.weeklyReview || {}), week_start: week, reflection, reflection_saved: true };
+      state.weeklyBase=reflection;
       if (state.weeklyDraftRevision === revision) state.weeklyDraftRevision = 0;
+      if(state.weeklyDraftRevision)recordDrafts?.capture("weekly");
+      recordDrafts?.ack("weekly",sent,!state.weeklyDraftRevision);
       try { await refreshWeeklyReview(); }
-      catch (_) { notify('复盘已保存，但汇总暂未更新；本次保存内容仍保留。', 'error'); return; }
-      notify(state.weeklyDraftRevision ? "已保存提交的复盘，新输入仍保留，需再次保存。" : "每周复盘已保存，可以随时返回这一周继续修改。");
+      catch (_) { if(current())notify('复盘已保存并提交服务，但汇总暂未更新；本次内容仍保留。', 'error'); return; }
+      if(current())notify(state.weeklyDraftRevision ? "已保存提交的复盘，新输入仍保留，需再次保存。" : "复盘已提交服务，可以随时返回这一周继续修改。");
     } catch (error) {
-      if (owner === state.token) { if (!state.weeklyDraftRevision) state.weeklyDraftRevision = ++state.weeklyDraftSequence; notify(error.message, "error"); }
-    } finally { if (owner === state.token) { state.weeklySaving = false; renderWeeklyReview(); updateWeeklyDraftStatus(); } }
+      if (current()) {
+        if (!state.weeklyDraftRevision) state.weeklyDraftRevision = ++state.weeklyDraftSequence;
+        recordDrafts?.capture("weekly");
+        const message=error.status===409?"服务端复盘已有修改，请打开本机草稿对照；输入内容已保留。":error.message;
+        if(error.status===409)recordDrafts?.problem("weekly",message);
+        notify(message, "error");
+      }
+    } finally { if (current()) { state.weeklySaving = false; renderWeeklyReview(); updateWeeklyDraftStatus(); } }
   }
 
   let vocabularyVersion = 0, vocabularyLibraryVersion = 0;
@@ -2409,7 +2507,6 @@
       }
       const moodChoice = event.target.closest("[data-mood-choice]");
       if (moodChoice) {
-        markMoodDraft();
         $("#mood-value").value = moodChoice.dataset.moodChoice;
         $$('[data-mood-choice]').forEach((button) => {
           const selected = button === moodChoice;
@@ -2417,6 +2514,7 @@
           button.setAttribute("aria-checked", String(selected));
           button.setAttribute("role", "radio"); button.tabIndex = selected ? 0 : -1;
         });
+        markMoodDraft();
       }
       const moodActivity = event.target.closest("[data-mood-activity]");
       if (moodActivity) { moodActivity.classList.toggle("selected"); moodActivity.setAttribute("aria-pressed", String(moodActivity.classList.contains("selected"))); markMoodDraft(); }
@@ -2528,7 +2626,7 @@
     $("#weekly-reflection-form").addEventListener("submit", saveWeeklyReflection);
     $("#weekly-reflection-form").addEventListener('input', markWeeklyDraft);
     $("#weekly-reflection-form").addEventListener('change', markWeeklyDraft);
-    $("#weekly-discard").addEventListener('click', () => { if (!state.weeklySaving && (!state.weeklyDraftRevision || window.confirm('放弃尚未保存的复盘修改吗？'))) { state.weeklyDraftRevision = 0; renderWeeklyReview(); } });
+    $("#weekly-discard").addEventListener('click', () => { if (!state.weeklySaving && (!state.weeklyDraftRevision || window.confirm('将编辑区还原为已读取的服务端内容？本机草稿仍保留，可在草稿箱继续。'))) { recordDrafts?.capture("weekly");recordDrafts?.detach("weekly");state.weeklyDraftRevision = 0; renderWeeklyReview(); } });
     window.addEventListener('beforeunload', event => { if (state.weeklyDraftRevision || state.weeklySaving) { event.preventDefault(); event.returnValue = ''; } });
     $("#export-learning-csv").addEventListener("click", async () => {
       const owner = state.token;
@@ -2594,10 +2692,12 @@
     });
     $("#focus-task").addEventListener("change", renderFocus);
     $("#mood-prev-month").addEventListener("click", () => shiftMoodMonth(-1));
+    $("#mood-reload").addEventListener("click",()=>refreshMoods().catch(e=>notify(e.message,"error")));
     $("#mood-form").addEventListener("input", markMoodDraft);
     $("#mood-today").addEventListener("click", async () => {
       if (!canLeaveMoodDraft()) return;
       state.moodMonth = monthKey(new Date()); state.moodSelectedDate = localDateKey(new Date());
+      state.moodLoadedMonth="";state.moodLoadError="";
       state.moodEntries=[];state.moodInsights=null;renderMoods();
       try { await refreshMoods(); } catch (error) { notify(error.message,"error"); }
     });
@@ -2976,6 +3076,7 @@
 
   async function bootstrap() {
     applyTheme(state.theme);
+    renderMoods();
     bindEvents();
     window.setInterval(updateFocusClock, 250);
     window.setInterval(() => {

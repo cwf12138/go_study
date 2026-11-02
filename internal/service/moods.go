@@ -8,21 +8,26 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/example/studyflow/internal/domain"
 	"github.com/example/studyflow/internal/platform"
 )
 
 type SaveMoodEntryInput struct {
-	Mood       domain.Mood
-	Note       string
-	Activities []string
-	Tags       []string
-	Stress     int
-	Energy     int
+	ExpectedVersion *string
+	Mood            domain.Mood
+	Note            string
+	Activities      []string
+	Tags            []string
+	Stress          int
+	Energy          int
 }
 
 func (s *Service) SaveMoodEntry(ctx context.Context, userID, date string, input SaveMoodEntryInput) (domain.MoodEntry, error) {
+	if err := validateRecordVersion(input.ExpectedVersion); err != nil {
+		return domain.MoodEntry{}, err
+	}
 	date, err := normalizeMoodDate(date)
 	if err != nil {
 		return domain.MoodEntry{}, err
@@ -31,7 +36,7 @@ func (s *Service) SaveMoodEntry(ctx context.Context, userID, date string, input 
 		return domain.MoodEntry{}, fmt.Errorf("%w: mood, stress, and energy must be within the supported range", domain.ErrInvalidInput)
 	}
 	note := strings.TrimSpace(input.Note)
-	if len(note) > 6000 {
+	if utf8.RuneCountInString(note) > 6000 {
 		return domain.MoodEntry{}, fmt.Errorf("%w: note cannot exceed 6000 characters", domain.ErrInvalidInput)
 	}
 	activities, err := cleanMoodLabels(input.Activities, 12)
@@ -56,8 +61,19 @@ func (s *Service) SaveMoodEntry(ctx context.Context, userID, date string, input 
 	entry.Tags = tags
 	entry.Stress = input.Stress
 	entry.Energy = input.Energy
-	entry.UpdatedAt = now
-	if err := s.repo.UpsertMoodEntry(ctx, entry); err != nil {
+	entry.UpdatedAt = advanceRecordTime(entry.UpdatedAt, now)
+	if input.ExpectedVersion != nil {
+		writer, ok := s.repo.(interface {
+			UpsertMoodEntryIfUnchanged(context.Context, domain.MoodEntry, string) error
+		})
+		if !ok {
+			return domain.MoodEntry{}, fmt.Errorf("%w: repository cannot protect mood versions", domain.ErrInvalidState)
+		}
+		err = writer.UpsertMoodEntryIfUnchanged(ctx, entry, *input.ExpectedVersion)
+	} else {
+		err = s.repo.UpsertMoodEntry(ctx, entry)
+	}
+	if err != nil {
 		return domain.MoodEntry{}, err
 	}
 	s.publish("mood.saved", userID, entry.ID, map[string]any{"date": date, "mood": entry.Mood})
@@ -113,11 +129,29 @@ func (s *Service) MoodInsights(ctx context.Context, userID, month string) (domai
 }
 
 func (s *Service) DeleteMoodEntry(ctx context.Context, userID, date string) error {
+	return s.DeleteMoodEntryWithVersion(ctx, userID, date, nil)
+}
+
+func (s *Service) DeleteMoodEntryWithVersion(ctx context.Context, userID, date string, expected *string) error {
+	if err := validateRecordVersion(expected); err != nil {
+		return err
+	}
 	date, err := normalizeMoodDate(date)
 	if err != nil {
 		return err
 	}
-	if err := s.repo.DeleteMoodEntry(ctx, userID, date); err != nil {
+	if expected != nil {
+		writer, ok := s.repo.(interface {
+			DeleteMoodEntryIfUnchanged(context.Context, string, string, string) error
+		})
+		if !ok {
+			return fmt.Errorf("%w: repository cannot protect mood deletion", domain.ErrInvalidState)
+		}
+		err = writer.DeleteMoodEntryIfUnchanged(ctx, userID, date, *expected)
+	} else {
+		err = s.repo.DeleteMoodEntry(ctx, userID, date)
+	}
+	if err != nil {
 		return err
 	}
 	s.publish("mood.deleted", userID, date, map[string]any{"date": date})
@@ -150,7 +184,7 @@ func cleanMoodLabels(values []string, maximum int) ([]string, error) {
 		return nil, fmt.Errorf("%w: at most %d labels are allowed", domain.ErrInvalidInput, maximum)
 	}
 	for _, value := range values {
-		if len(value) > 48 {
+		if utf8.RuneCountInString(value) > 48 {
 			return nil, fmt.Errorf("%w: each label cannot exceed 48 characters", domain.ErrInvalidInput)
 		}
 	}
