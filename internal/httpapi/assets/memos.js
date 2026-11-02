@@ -7,6 +7,7 @@
     initialized: false, loading: false, dirty: false, saving: false, preview: false,
     searchTimer: null, saveTimer: null, token: "", folderColor: "blue", revision: 0, savePromise: null,
     baseNote: null, manualSave: false, accountScope: "",
+    createPromise: null, createUncertain: false,
   };
 
   const $ = (selector) => document.querySelector(selector);
@@ -43,33 +44,15 @@
   });
 
   async function memoAPI(path, options = {}) {
-    const headers = new Headers(options.headers || {});
-    const token = localStorage.getItem("studyflow.token") || "";
-    const account = recovery?.sync() || "";
-    if (token) headers.set("Authorization", `Bearer ${token}`);
-    if (options.body) headers.set("Content-Type", "application/json");
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 25000);
     try {
-      const response = await fetch(path, { ...options, headers, signal: controller.signal });
-      if (token !== (localStorage.getItem("studyflow.token") || "") || account !== (recovery?.sync() || "")) throw new Error("账号或服务已切换，请重新打开备忘录。");
-      if (response.status === 204) return null;
-      const payload = await response.json().catch(() => null);
-      if (token !== (localStorage.getItem("studyflow.token") || "") || account !== (recovery?.sync() || "")) throw new Error("账号已切换，已忽略旧响应。");
-      if (response.status === 409) { const e = new Error("服务端备忘录已有变化。已保留本机文字，请在本机草稿中对照，或另存为新备忘录。"); e.status = 409; throw e; }
-      if (response.status === 404) {
-        if (payload?.error?.code === "not_found") throw new Error("这条备忘录或文件夹已不存在，请刷新列表后重试。");
-        throw new Error("备忘录接口不可用，请确认访问地址正确并重启 Go 服务。");
-      }
-      if (response.status === 401) throw new Error("登录已过期，请重新登录。");
-      if (!response.ok) throw new Error(payload?.error?.message || `请求失败（${response.status}）`);
-      if (!payload || !("data" in payload)) throw new Error("备忘录服务返回了无效数据，请重试。");
-      return payload.data;
+      if(!window.DaynestHTTP)throw Error("请求组件未加载，请刷新页面。");
+      return await window.DaynestHTTP.json(path, options);
     } catch (error) {
-      if (error.name === "AbortError") throw new Error("备忘录请求超时，请重试；未提交的文字仍保留在编辑区。");
-      if (error instanceof TypeError) throw new Error("无法连接到备忘录服务。");
+      if(error.status===409)error.message="服务端备忘录已有变化。已保留本机文字，请在本机草稿中对照，或另存为新备忘录。";
+      else if(error.status===404)error.message=error.code==="not_found"?"这条备忘录或文件夹已不存在，请刷新列表后重试。":"备忘录接口不可用，请确认访问地址正确并重启 Go 服务。";
+      else if(error.kind==="timeout")error.message="备忘录请求超时，请先核对结果；未提交的文字仍保留在编辑区。";
       throw error;
-    } finally { window.clearTimeout(timeout); }
+    }
   }
 
   function notify(message, type = "success") {
@@ -83,11 +66,12 @@
 
   function syncAccount() {
     const token = localStorage.getItem("studyflow.token") || "";
-    const account = recovery?.sync() || "";
+    const account = (recovery?.sync() || "") + ":" + (window.DaynestHTTP?.capture().session ?? "");
     if (state.token === token && state.accountScope === account) return token;
     window.clearTimeout(state.saveTimer);
     loadVersion++; selectionVersion++; state.savePromise = null; state.saving = false; state.manualSave = false; state.baseNote = null;
     recovery?.resetWriter(); state.accountScope = account;
+    state.createPromise=null;state.createUncertain=false;renderCreateState();
     state.token = token; state.folders = []; state.notes = []; state.allNotes = []; state.current = null;
     state.view = "all"; state.folderID = ""; state.tag = ""; state.query = ""; state.initialized = false; state.dirty = false;
     ["#memo-title", "#memo-content", "#memo-tags", "#memo-search"].forEach(s => { $(s).value = ""; });
@@ -167,6 +151,7 @@
     if (!state.notes.length) {
       const message = state.view === "trash" ? "最近删除中没有备忘录" : state.query ? "没有找到匹配的备忘录" : "这里还没有内容";
       $("#memo-note-list").innerHTML = `<div class="memo-list-empty"><span>${message}</span>${state.view !== "trash" ? '<button class="text-button" type="button" data-memo-create>新建一则</button>' : ""}</div>`;
+      renderCreateState();
       return;
     }
     $("#memo-note-list").innerHTML = state.notes.map((note) => {
@@ -222,13 +207,39 @@
   }
 
   async function createMemo(template = {}) {
-    if (state.dirty && !(await saveCurrent({ quiet: true }))) return;
-    try {
-      const note = await memoAPI("/api/v1/memos", { method: "POST", body: JSON.stringify({ folder_id: state.folderID || "", title: template.title || "新备忘录", content: template.content || "", color: "default", tags: [] }) });
-      state.view = "all"; state.tag = ""; state.query = ""; $("#memo-search").value = "";
-      await loadMemos({ preserveSelection: false }); await selectMemo(note.id, { skipSave: true });
-      $("#memo-title").select();
-    } catch (error) { notify(error.message, "error"); }
+    if(!syncAccount())return;
+    if(state.createPromise)return state.createPromise;
+    if(state.createUncertain){notify("上次新建结果尚未确认，请先在列表核对，再允许重新新建。","error");return;}
+    const context=window.DaynestHTTP?.capture(),token=state.token,account=state.accountScope;
+    const current=()=>token===state.token&&account===state.accountScope&&(!context||window.DaynestHTTP.current(context));
+    let accepted=false;
+    const pending=(async()=>{
+      try {
+        if(state.dirty&&!(await saveCurrent({quiet:true})))return;
+        if(!current())return;
+        const note=await memoAPI("/api/v1/memos",{method:"POST",body:JSON.stringify({folder_id:state.folderID || "",title:template.title || "新备忘录",content:template.content || "",color:"default",tags:[]})});
+        if(!current())return;
+        if(!note?.id){const error=Error("新建响应不完整，请先刷新列表核对。");error.uncertain=true;throw error;}
+        accepted=true;state.view="all";state.tag="";state.query="";$("#memo-search").value="";
+        await loadMemos({preserveSelection:false});if(!current())return;
+        await selectMemo(note.id);if(current()&&state.current?.id===note.id)$("#memo-title").select();
+      } catch(error) {
+        if(!current())return;
+        if(error.uncertain&&!accepted)state.createUncertain=true;
+        notify(state.createUncertain?"新建结果尚未确认，可能已经创建。请先刷新列表核对，避免重复新建。":error.message,"error");
+      }
+    })();
+    state.createPromise=pending;renderCreateState();
+    await pending;
+    if(state.createPromise===pending){state.createPromise=null;renderCreateState();}
+  }
+
+  function renderCreateState() {
+    const blocked=!!state.createPromise||state.createUncertain;
+    $("#memo-new").disabled=blocked;$("#memo-template").disabled=blocked;
+    $("#memo-new").textContent=state.createPromise?"正在新建…":"＋ 新建备忘录";
+    $$('[data-memo-create]').forEach(button=>{button.disabled=blocked;});
+    $("#memo-create-recovery").hidden=!state.createUncertain;
   }
 
   function markDirty() {
@@ -266,7 +277,7 @@
         return true;
       } catch (error) {
         if (state.token !== token || state.accountScope !== account || state.current?.id !== id) return false;
-        if (error.status === 409) { state.manualSave = true; recovery?.capture(); recovery?.problem(error.message); }
+        if (error.status === 409 || error.status === 401 || error.uncertain) { state.manualSave = true; recovery?.capture(); recovery?.problem(error.message); }
         setSaveState("error", "保存失败 · 点击保存重试"); notify(error.message, "error"); return false;
       }
     })();
@@ -414,6 +425,8 @@
   function folderColorValue(color) { return { yellow: "#e8b846", orange: "#e7924c", rose: "#de758c", violet: "#8d78d4", blue: "#6595df", mint: "#54b991", gray: "#929cab" }[color] || "#6595df"; }
 
   function bindEvents() {
+    $("#memo-create-recheck").addEventListener("click",()=>loadMemos());
+    $("#memo-create-allow").addEventListener("click",()=>{state.createUncertain=false;renderCreateState();});
     const accountReady = () => {
       syncAccount();
       Promise.resolve().then(() => { if ($("#panel-memos")?.classList.contains("active")) loadMemos(); });
@@ -506,7 +519,7 @@
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "n") { event.preventDefault(); createMemo(); }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); saveCurrent(); }
     });
-    window.DaynestUI?.registerGuard?.('memos', () => state.dirty || state.saving);window.addEventListener("beforeunload", (event) => { if (state.dirty || state.saving) { event.preventDefault(); event.returnValue = ""; } });
+    window.DaynestUI?.registerGuard?.('memos', () => state.dirty || state.saving || state.createPromise || state.createUncertain);window.addEventListener("beforeunload", (event) => { if (state.dirty || state.saving || state.createPromise || state.createUncertain) { event.preventDefault(); event.returnValue = ""; } });
   }
 
   bindEvents();

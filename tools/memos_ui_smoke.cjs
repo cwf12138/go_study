@@ -17,7 +17,7 @@ const selectors = [...script.matchAll(/\$\("#([^"]+)"\)/g)].map((match) => match
 const missing = [...new Set(selectors.filter((id) => !ids.has(id)))];
 if (missing.length) throw new Error(`memos.js references missing HTML ids: ${missing.join(", ")}`);
 
-for (const marker of ['data-view="memos"', 'id="panel-memos"', 'id="memo-editor"', '/static/memos.js?v=20261102-drafts', '/static/memos-refresh.css?v=20260909-1']) {
+for (const marker of ['data-view="memos"', 'id="panel-memos"', 'id="memo-editor"', '/static/memos.js?v=20261103-http', '/static/memos-refresh.css?v=20260909-1']) {
   if (!html.includes(marker)) throw new Error(`missing HTML marker: ${marker}`);
 }
 for (const marker of ["/api/v1/memo-folders", "/api/v1/memos/overview", "/restore", "/duplicate", "/permanent", "saveCurrent", "renderMarkdown"]) {
@@ -39,10 +39,11 @@ const getElement = (selector) => { if (!elements.has(selector)) elements.set(sel
 const documentEvents = {};
 const document = { querySelector: getElement, querySelectorAll() { return []; }, addEventListener(k, f) { documentEvents[k] = f; }, createElement() { return element(); } };
 const window = { setTimeout() {}, clearTimeout() {}, addEventListener() {}, confirm() { return false; }, prompt() { return null; } };
-class HeadersMock { set() {} }
+class HeadersMock extends Headers {}
 class BlobMock {}
-const context = { console, Date, Intl, URL, URLSearchParams, AbortController, Headers: HeadersMock, Blob: BlobMock, localStorage: { getItem() { return ""; } }, document, window };
-const instrumented = script.replace("\n  bindEvents();\n})();", "\n  window.__memoTest = { renderMarkdown, state, markDirty, saveCurrent, selectMemo, loadMemos, memoAPI };\n  bindEvents();\n})();");
+const context = { console, Date, Intl, URL, URLSearchParams, AbortController, Headers: HeadersMock, Blob: BlobMock, CustomEvent:class{},setTimeout:(...args)=>window.setTimeout(...args),clearTimeout:(...args)=>window.clearTimeout(...args),localStorage: { getItem() { return ""; } }, document, window };
+vm.runInNewContext(fs.readFileSync(path.join(root,'internal/httpapi/assets/http-client.js'),'utf8'),context);
+const instrumented = script.replace("\n  bindEvents();\n})();", "\n  window.__memoTest = { renderMarkdown, state, markDirty, saveCurrent, selectMemo, loadMemos, memoAPI, syncAccount, createMemo };\n  bindEvents();\n})();");
 if (instrumented === script) throw new Error("memo test instrumentation point was not found");
 vm.runInNewContext(instrumented, context, { filename: scriptPath });
 const rendered = context.window.__memoTest.renderMarkdown("# 清单\n- [x] 完成 <script>alert(1)</script>\n- [ ] 继续 **学习**");
@@ -53,6 +54,7 @@ console.log(`memo UI smoke passed: ${selectors.length} selectors, ${ids.size} do
 
 async function checkSaving() {
   const api = context.window.__memoTest;
+  api.syncAccount();
   api.state.current = { id: 'test-note', title: 'test' };
   getElement('#memo-title').value = 'test';
   getElement('#memo-content').value = 'first edit';
@@ -117,14 +119,24 @@ async function checkSaving() {
   context.fetch=async()=>({ok:false,status:404,json:async()=>{throw new Error('not JSON')}});
   await assert.rejects(api.memoAPI('/api/v1/memos'),/接口不可用/);
   context.fetch=async()=>({ok:true,status:200,json:async()=>({})});
-  await assert.rejects(api.memoAPI('/api/v1/memos'),/无效数据/);
+  await assert.rejects(api.memoAPI('/api/v1/memos'),/格式不完整|无效数据/);
   context.fetch=async()=>({ok:true,status:200,json:async()=>{context.localStorage.getItem=()=> 'changed';return {data:[]}}});
-  await assert.rejects(api.memoAPI('/api/v1/memos'),/账号已切换/);
+  await assert.rejects(api.memoAPI('/api/v1/memos'),/账号.*切换/);
   let abortRequest;
   context.window.setTimeout=callback=>{abortRequest=callback;return 1};
   context.fetch=(_url,options)=>new Promise((_resolve,reject)=>options.signal.addEventListener('abort',()=>reject(Object.assign(new Error('aborted'),{name:'AbortError'}))));
   const request=api.memoAPI('/api/v1/memos');abortRequest();
   await assert.rejects(request,/请求超时/);
   console.log('memo API regression passed: distinct 404 errors, malformed data, account switching and timeout');
+  api.syncAccount();
+  let creations=0,releaseCreate;
+  context.fetch=async(url,o={})=>{
+    if(o.method==='POST'){creations++;await new Promise(r=>releaseCreate=r);return response({id:'created-once',title:'新备忘录',content:''});}
+    return response(url==='/api/v1/memos/created-once'?{id:'created-once',title:'新备忘录',content:''}:url.includes('overview')?{}:[]);
+  };
+  const one=api.createMemo(),two=api.createMemo();assert.equal(creations,1);assert(api.state.createPromise);releaseCreate();await Promise.all([one,two]);assert.equal(creations,1);
+  context.fetch=async()=>{creations++;throw Error('response lost');};
+  await api.createMemo();assert(api.state.createUncertain);const knownCount=creations;await api.createMemo();assert.equal(creations,knownCount,'unknown create was blindly repeated');
+  console.log('memo create regression passed: one pending request and unknown-result reconciliation gate');
 }
 checkSaving().catch(error => { console.error(error); process.exitCode = 1; });

@@ -51,8 +51,8 @@ function fixture(shared=storage, userID='owner', server='http://localhost:8080',
     addEventListener(k,f){(documentEvents[k]||=[]).push(f);}};
   const window={DaynestMemoDrafts:C,DaynestMobile:{getConnectionInfo:()=>({server})},setTimeout:()=>1,clearTimeout(){},addEventListener(k,f){(windowEvents[k]||=[]).push(f);},confirm:()=>true};
   if(late){window.DaynestAccount={current:()=>({userID,token:'test-token',server})};el('panel-memos').classList.add('active');}
-  const ctx={console,Date,Intl,URL,URLSearchParams,AbortController,Headers,Blob,crypto,localStorage:shared,location:{origin:server},document,window,confirm:()=>true,setTimeout:()=>1};
-  vm.createContext(ctx);vm.runInContext(fs.readFileSync(path.join(dir,'memo-drafts.js'),'utf8'),ctx);
+  const ctx={console,Date,Intl,URL,URLSearchParams,AbortController,Headers,Blob,crypto,CustomEvent:class{},localStorage:shared,location:{origin:server},document,window,confirm:()=>true,setTimeout:()=>1,clearTimeout(){}};
+  vm.createContext(ctx);vm.runInContext(fs.readFileSync(path.join(dir,'http-client.js'),'utf8'),ctx);vm.runInContext(fs.readFileSync(path.join(dir,'memo-drafts.js'),'utf8'),ctx);
   const script=fs.readFileSync(path.join(dir,'memos.js'),'utf8');
   vm.runInContext(script.replace('\n  bindEvents();\n})();','\n  window.__test = {state, selectMemo, markDirty, saveCurrent, syncAccount, patchAction};\n  bindEvents();\n})();'),ctx);
   const api=window.__test; let current={...note}, writes=[], copies=[];
@@ -68,7 +68,7 @@ function fixture(shared=storage, userID='owner', server='http://localhost:8080',
     return response(url==='/api/v1/memos/'+note.id?current:url.includes('/overview')?{}:[]);
   };
   async function account(id=userID) {for(const f of documentEvents['daynest:account-ready']||[])await f({detail:{userID:id}});}
-  const settle=async()=>{for(let i=0;i<15;i++)await Promise.resolve();};
+  const settle=async()=>{for(let i=0;i<50;i++)await Promise.resolve();};
   return {ctx,api,el,window,shared,account,settle,writes,copies,setRemote:n=>current={...n},getRemote:()=>current};
 }
 

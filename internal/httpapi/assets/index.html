@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="/static/memos-refresh.css?v=20260909-1">
     <link rel="stylesheet" href="/static/memo-drafts.css?v=20261102-1">
     <link rel="stylesheet" href="/static/record-drafts.css?v=20261102-1">
+    <link rel="stylesheet" href="/static/auth-state.css?v=20261103-1">
     <link rel="stylesheet" href="/static/english.css?v=20261007-1">
     <link rel="stylesheet" href="/static/literature.css?v=20260902-1">
     <link rel="stylesheet" href="/static/literature-product.css?v=20260909-1">
@@ -168,6 +169,7 @@
         </header>
 
         <div id="main-content" class="content" tabindex="-1" role="main" aria-labelledby="page-title">
+          <aside id="auth-expiry" class="auth-expiry" role="status" aria-live="polite" hidden><span aria-hidden="true">!</span><div><strong>登录已过期，先留住正在写的内容。</strong><p>编辑区仍在，已保留的本机草稿不会清除。请先导出文字或核对草稿，再重新登录。</p></div><button id="auth-expiry-login" class="quiet" type="button">重新登录</button></aside>
           <span id="page-announcement" class="product-sr-only" role="status" aria-live="polite" aria-atomic="true"></span>
           <section id="panel-transfers" class="panel ft-space" aria-label="文件快传">
             <section class="tc-space" aria-labelledby="tc-heading">
@@ -473,6 +475,7 @@
             </div>
             <div id="memo-drafts-notice" class="memo-drafts-notice" hidden><span aria-hidden="true">▤</span><p id="memo-drafts-notice-text" role="status"></p><button id="memo-drafts-review" type="button">查看草稿 →</button></div>
             <p id="memo-drafts-local-state" class="memo-drafts-local-state" role="status">编辑时保留本机草稿</p>
+            <div id="memo-create-recovery" class="memo-create-recovery" role="status" hidden><strong>这次新建结果尚未确认</strong><p>可能已经创建成功。请先核对列表，再决定是否继续新建。</p><div><button id="memo-create-recheck" class="quiet" type="button">刷新列表核对</button><button id="memo-create-allow" class="quiet" type="button">已核对，允许再次新建</button></div></div>
             <div class="memo-workspace">
               <aside class="memo-sidebar">
                 <div class="memo-sidebar-scroll">
@@ -944,16 +947,18 @@
       <footer><div><label class="ld-setting"><input id="ld-enabled" type="checkbox" checked>在此设备保留心情与复盘草稿</label><p id="ld-health" role="status">恢复后请手动点击保存。</p><p>文字以明文留在此浏览器 / App，不跨设备同步。退出账号后仍保留；共用设备请在离开前清理。</p></div><button id="ld-clear" class="quiet" type="button">清理本账号长文草稿</button></footer>
     </dialog>
     <script src="/static/product-shell.js?v=20261027-nav" defer></script>
+    <script src="/static/http-client.js?v=20261103-1" defer></script>
+    <script src="/static/auth-state.js?v=20261103-1" defer></script>
     <script src="/static/diagnostics-core.js?v=20261030-1" defer></script>
     <script src="/static/diagnostics.js?v=20261030-1" defer></script>
     <script src="/static/data-center-core.js?v=20261101-1" defer></script>
-    <script src="/static/data-center.js?v=20261101-1" defer></script>
+    <script src="/static/data-center.js?v=20261103-http" defer></script>
     <script src="/static/navigation-core.js?v=20261027-1" defer></script>
     <script src="/static/navigation.js?v=20261027-1" defer></script>
     <script src="/static/draft-store.js?v=20261102-1" defer></script>
     <script src="/static/record-drafts-core.js?v=20261102-1" defer></script>
     <script src="/static/record-drafts.js?v=20261102-1" defer></script>
-    <script src="/static/app.js?v=20261102-record-drafts" defer></script>
+    <script src="/static/app.js?v=20261103-session" defer></script>
     <script src="/static/gentle-reminders-core.js?v=20261022-1" defer></script>
     <script src="/static/important-days-core.js?v=20261022-1" defer></script>
     <script src="/static/important-days.js?v=20261022-1" defer></script>
@@ -995,7 +1000,7 @@
     <script src="/static/text-clips.js?v=20261029-1" defer></script>
     <script src="/static/memo-drafts-core.js?v=20261102-2" defer></script>
     <script src="/static/memo-drafts.js?v=20261102-1" defer></script>
-    <script src="/static/memos.js?v=20261102-drafts" defer></script>
+    <script src="/static/memos.js?v=20261103-http" defer></script>
     <script src="/static/english.js?v=20261007-2" defer></script>
     <script src="/static/english-reading.js?v=20260915-1" defer></script>
     <script src="/static/explore.js?v=20260920-playrooms" defer></script>

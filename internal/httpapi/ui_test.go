@@ -25,7 +25,7 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 
 	home := httptest.NewRecorder()
 	handler.ServeHTTP(home, httptest.NewRequest(http.MethodGet, "/", nil))
-	if home.Code != http.StatusOK || !strings.Contains(home.Body.String(), "Daynest") || !strings.Contains(home.Body.String(), "mood-trend") || !strings.Contains(home.Body.String(), "theme-toggle") || !strings.Contains(home.Body.String(), "vocab-catalogs") || !strings.Contains(home.Body.String(), "vocab-pagination") || !strings.Contains(home.Body.String(), "panel-calendar") || !strings.Contains(home.Body.String(), "panel-memos") || !strings.Contains(home.Body.String(), "memo-editor") || strings.Contains(home.Body.String(), "panel-knowledge") || !strings.Contains(home.Body.String(), "panel-english") || !strings.Contains(home.Body.String(), "panel-literature") || !strings.Contains(home.Body.String(), "ebook-reader-dialog") || !strings.Contains(home.Body.String(), "classic-reader-dialog") || !strings.Contains(home.Body.String(), "english-reader-dialog") || !strings.Contains(home.Body.String(), "command-dialog") || !strings.Contains(home.Body.String(), "memos.js?v=20261102-drafts") || !regexp.MustCompile(`src="/static/app.js\?v=[^"]+"`).MatchString(home.Body.String()) || strings.Contains(home.Body.String(), "panel-review") || strings.Contains(home.Body.String(), `data-view="review"`) {
+	if home.Code != http.StatusOK || !strings.Contains(home.Body.String(), "Daynest") || !strings.Contains(home.Body.String(), "mood-trend") || !strings.Contains(home.Body.String(), "theme-toggle") || !strings.Contains(home.Body.String(), "vocab-catalogs") || !strings.Contains(home.Body.String(), "vocab-pagination") || !strings.Contains(home.Body.String(), "panel-calendar") || !strings.Contains(home.Body.String(), "panel-memos") || !strings.Contains(home.Body.String(), "memo-editor") || strings.Contains(home.Body.String(), "panel-knowledge") || !strings.Contains(home.Body.String(), "panel-english") || !strings.Contains(home.Body.String(), "panel-literature") || !strings.Contains(home.Body.String(), "ebook-reader-dialog") || !strings.Contains(home.Body.String(), "classic-reader-dialog") || !strings.Contains(home.Body.String(), "english-reader-dialog") || !strings.Contains(home.Body.String(), "command-dialog") || !strings.Contains(home.Body.String(), "memos.js?v=20261103-http") || !regexp.MustCompile(`src="/static/app.js\?v=[^"]+"`).MatchString(home.Body.String()) || strings.Contains(home.Body.String(), "panel-review") || strings.Contains(home.Body.String(), `data-view="review"`) {
 		t.Fatalf("home status = %d; missing or unexpected home markers", home.Code)
 	}
 	if contentType := home.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "text/html") {
@@ -48,6 +48,9 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 		{"navigation.js", "daynest.navigation.", "javascript"},
 		{"navigation.css", ".navigation-dialog", "text/css"},
 		{"product-shell.js", "window.DaynestUI", "javascript"},
+		{"http-client.js", "root.DaynestHTTP", "javascript"},
+		{"auth-state.js", "auth-expiry", "javascript"},
+		{"auth-state.css", ".auth-expiry", "text/css"},
 		{"product-polish.css", ".product-field-error", "text/css"},
 		{"parcels-core.js", "window.DaynestParcels", "javascript"},
 		{"parcels.js", "/api/v1/parcels", "javascript"},

@@ -139,8 +139,10 @@
 
   async function api(path, options = {}) {
     const requestToken = state.token;
+    const requestContext=window.DaynestHTTP?.capture();
     const storedToken = localStorage.getItem("studyflow.token") || "";
     if (requestToken !== storedToken) throw new Error("账号已切换，请等待重新连接或刷新页面。");
+    if(window.DaynestHTTP?.authExpired()&&!path.startsWith("/api/v1/auth/")){const error=Error("登录已过期。未提交内容仍在，请保留或导出后重新登录。");error.status=401;error.kind="auth";throw error;}
     const { returnEnvelope = false, ...requestOptions } = options;
     const headers = new Headers(requestOptions.headers || {});
     if (state.token) headers.set("Authorization", `Bearer ${state.token}`);
@@ -156,9 +158,12 @@
     try {
       response = await fetch(path, { ...requestOptions, headers, signal: controller.signal, cache: "no-store" });
       const payload = response.status === 204 ? null : await response.json().catch(error => { if (response.ok) throw error; return null; });
-      if (state.token !== requestToken || (localStorage.getItem("studyflow.token") || "") !== storedToken) throw new Error("账号已切换，已忽略旧请求结果。");
+      if (state.token !== requestToken || (localStorage.getItem("studyflow.token") || "") !== storedToken || (requestContext&&!window.DaynestHTTP.current(requestContext))) throw new Error("账号已切换，已忽略旧请求结果。");
       if (!response.ok) {
-        if (response.status === 401 && state.token) leaveApp();
+        if (response.status === 401 && state.token) {
+          if(window.DaynestHTTP?.reportUnauthorized)window.DaynestHTTP.reportUnauthorized(requestContext);
+          else leaveApp();
+        }
         const error = new Error(payload?.error?.message || `请求失败（${response.status}）`);
         error.status = response.status;
         throw error;
@@ -333,7 +338,7 @@
     // A fast session restore can complete before deferred feature scripts load.
     // Expose only a verified, still-current identity so late subscribers can catch up.
     const accountServer = () => window.DaynestMobile?.getConnectionInfo?.().server || window.location?.origin || "";
-    const verified = { userID: user.id, token: state.token, server: accountServer() };
+    const verified = { userID: user.id, token: state.token, server: accountServer(), sessionID: recordAccountEpoch };
     window.DaynestAccount = { current() {
       if (state.user?.id !== verified.userID || state.token !== verified.token || localStorage.getItem("studyflow.token") !== verified.token || accountServer() !== verified.server || $("#app-view").classList.contains("hidden")) return null;
       return { ...verified };

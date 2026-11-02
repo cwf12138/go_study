@@ -4,7 +4,7 @@
   const tabs=[document.getElementById('dg-tab-overview'),document.getElementById('dg-tab-data')];
   if(!C||!$('panel')||!overview||tabs.some(t=>!t))return;
   const token=()=>localStorage.getItem('studyflow.token')||'';
-  function identity(){if(app.classList.contains('hidden')||!token())return '';let origin=location.origin;try{origin=window.DaynestMobile?.getConnectionInfo?.().server||origin;}catch(_){}return origin+'\n'+token();}
+  function identity(){if(app.classList.contains('hidden')||!token())return '';let origin=location.origin;try{origin=window.DaynestMobile?.getConnectionInfo?.().server||origin;}catch(_){}return origin+'\n'+token()+'\n'+(window.DaynestHTTP?.capture().session??'');}
   let owner='',epoch=0,model=null,result=null,fresh=false,resultCurrent=false,loading=false,checking=false,exporting=false,guideBusy=false,checkController=null,tab=0;
   const controllers=new Set();
   const current=(id,account)=>id===epoch&&account===identity()&&dialog.open;
@@ -26,16 +26,20 @@
     if(result){const [label,copy,tone]=C.summary(result);$('check-badge').textContent=(resultCurrent?'':'上次 · ')+label;$('check-badge').dataset.tone=resultCurrent?tone:'neutral';$('check-copy').textContent=copy;$('check-time').textContent=(resultCurrent?'本次检查':'上次检查')+' · '+C.date(result.finished_at)+'。仅代表当时读取的已索引文件。';$('check-counts').textContent=`一致 ${result.verified} · 缺失 ${result.missing} · 内容不符 ${result.mismatched} · 无法读取 ${result.unreadable} · 期间变化 ${result.changed}`;$('issues').innerHTML=result.issues.map(row=>`<li><span>${C.escape(row.name)}</span><b>${{missing:'文件缺失',mismatched:'内容不符',unreadable:'无法读取',changed:'需要重查'}[row.state]}</b></li>`).join('');}
     else{$('check-badge').textContent='尚未检查';$('check-badge').dataset.tone='neutral';$('check-copy').textContent='主动核对附件大小与内容，不修改文件。';$('check-time').textContent='包含过期与回收站附件；不检查未被索引的文件。';$('check-counts').textContent='';$('issues').innerHTML='';}
   }
-  async function json(path,method,c){const response=await fetch(path,{method,headers:{Authorization:'Bearer '+token()},signal:c.signal,cache:'no-store'});const body=await response.json().catch(()=>null);if(!response.ok)throw Error(response.status===401?'登录已过期，请重新登录。':response.status===404?'当前服务缺少数据中心接口，请重启新版 Go 服务。':body?.error?.message||`请求未完成（${response.status}）。`);return body?.data;}
-  async function refresh(){if(!sync()||loading)return;const account=owner,id=epoch,c=new AbortController();controllers.add(c);loading=true;fresh=false;resultCurrent=false;render();status('正在读取当前账号的数据概览…');const timer=setTimeout(()=>c.abort(),20000);
-    try{const data=await json('/api/v1/data-center','GET',c);if(!current(id,account))return;if(!C.valid(data))throw Error('概览数据格式异常，请检查两端版本。');model=data;fresh=true;status(data.records.state==='available'&&data.attachments.state==='available'?'概览已更新。记录仍按现有快照规则保存。':'部分信息暂不可用，已明确标注；可以重新读取。');}
-    catch(e){if(current(id,account))status(e.name==='AbortError'?'读取已取消或超时，已有概览仅供参考。':(e instanceof TypeError?'无法连接到服务，请确认电脑在线。':e.message)+' 已有概览仅供参考。');}
-    finally{clearTimeout(timer);controllers.delete(c);if(id===epoch){if(account!==identity())sync();else{loading=false;render();}}}
+  async function json(path,method,c){
+    if(!window.DaynestHTTP)throw Error('请求组件未加载，请刷新页面。');
+    try{return await window.DaynestHTTP.json(path,{method,signal:c.signal,timeoutMs:method==='POST'?120000:20000});}
+    catch(e){if(e.status===404)e.message='当前服务缺少数据中心接口，请重启新版 Go 服务。';else if(path.endsWith('/transfers/check')&&(e.status===409||e.status===429))e.message='暂时无法开始检查，可能有另一项检查仍在运行。请稍后重新检查。';throw e;}
   }
-  async function inspect(){if(!sync()||checking||!fresh||model?.attachments.state!=='available')return;const account=owner,id=epoch,c=new AbortController();controllers.add(c);checkController=c;checking=true;resultCurrent=false;render();status('正在核对附件内容，可取消等待。');const timer=setTimeout(()=>c.abort(),120000);
+  async function refresh(){if(!sync()||loading)return;const account=owner,id=epoch,c=new AbortController();controllers.add(c);loading=true;fresh=false;resultCurrent=false;render();status('正在读取当前账号的数据概览…');
+    try{const data=await json('/api/v1/data-center','GET',c);if(!current(id,account))return;if(!C.valid(data))throw Error('概览数据格式异常，请检查两端版本。');model=data;fresh=true;status(data.records.state==='available'&&data.attachments.state==='available'?'概览已更新。记录仍按现有快照规则保存。':'部分信息暂不可用，已明确标注；可以重新读取。');}
+    catch(e){if(current(id,account))status(e.kind==='cancelled'||e.kind==='timeout'?'读取已取消或超时，已有概览仅供参考。':e.message+' 已有概览仅供参考。');}
+    finally{controllers.delete(c);if(id===epoch){if(account!==identity())sync();else{loading=false;render();}}}
+  }
+  async function inspect(){if(!sync()||checking||!fresh||model?.attachments.state!=='available')return;const account=owner,id=epoch,c=new AbortController();controllers.add(c);checkController=c;checking=true;resultCurrent=false;render();status('正在核对附件内容，可取消等待。');
     try{const data=await json('/api/v1/data-center/transfers/check','POST',c);if(!current(id,account))return;if(!C.integrity(data))throw Error('检查结果格式异常，未将其标记为通过。');result=data;resultCurrent=true;status('附件检查结束。它不等于已创建备份或已验证恢复。');}
-    catch(e){if(current(id,account))status(e.name==='AbortError'?'已停止等待检查结果；已有结果仅为上次记录。服务可能仍在结束本次只读检查。':e.message);}
-    finally{clearTimeout(timer);controllers.delete(c);if(id===epoch){if(account!==identity())sync();else{checking=false;checkController=null;render();}}}
+    catch(e){if(current(id,account))status(e.kind==='cancelled'||e.kind==='timeout'?'已停止等待检查结果；已有结果仅为上次记录。服务可能仍在结束本次只读检查。':e.message);}
+    finally{controllers.delete(c);if(id===epoch){if(account!==identity())sync();else{checking=false;checkController=null;render();}}}
   }
   async function saveBlob(blob,name,account){if(window.DaynestMobile?.saveBlob){await window.DaynestMobile.saveBlob(blob,name,account);return;}const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);}
   async function exportBlob(response){const limit=64*1024*1024,tooLarge=()=>Error('导出大小超出当前客户端范围，请在电脑端创建完整备份。');if(Number(response.headers.get('Content-Length'))>limit)throw tooLarge();if(!response.body?.getReader){const blob=await response.blob();if(blob.size>limit)throw tooLarge();if(!blob.size)throw Error('服务返回了空的导出文件，请重试。');return blob;}const reader=response.body.getReader(),chunks=[];let total=0;try{while(true){const {value,done}=await reader.read();if(done)break;total+=value.byteLength;if(total>limit){await reader.cancel();throw tooLarge();}chunks.push(value);}}finally{reader.releaseLock();}if(!total)throw Error('服务返回了空的导出文件，请重试。');return new Blob(chunks,{type:'application/json'});}
