@@ -2818,21 +2818,30 @@ paths:
     patch:
       tags: [Memos]
       security: [{ bearerAuth: [] }]
-      summary: Auto-save memo content and properties
+      summary: Save memo content and properties with an optional version precondition
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/SaveMemoNoteRequest" }
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/SaveMemoNoteRequest"
+                - type: object
+                  properties:
+                    expected_updated_at:
+                      type: string
+                      format: date-time
+                      description: Exact updated_at from the last read; compared atomically. A stale or trashed record is rejected. Omit for legacy unconditional saves.
       responses:
         "200":
-          description: Updated memo
+          description: Updated memo accepted in memory; the existing periodic snapshot policy still applies
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   data: { $ref: "#/components/schemas/MemoNote" }
+        "409": { description: Memo changed or repository cannot guarantee conditional writes; reload and compare, do not silently retry without the precondition }
     delete:
       tags: [Memos]
       security: [{ bearerAuth: [] }]

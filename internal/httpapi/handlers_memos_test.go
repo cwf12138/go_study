@@ -1,19 +1,68 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/example/studyflow/internal/domain"
 	"github.com/example/studyflow/internal/event"
 	"github.com/example/studyflow/internal/security"
 	"github.com/example/studyflow/internal/service"
 	"github.com/example/studyflow/internal/store"
 )
+
+func TestMemoHTTPConditionalSave(t *testing.T) {
+	ctx := context.Background()
+	repository := store.NewMemory()
+	tokens := security.NewTokenManager("memo-version-test-secret-long-enough", "test", time.Hour)
+	svc := service.New(repository, tokens, nil)
+	// A signed actor is sufficient; this route is tested independently from registration.
+	token, err := tokens.Issue("owner", "student")
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := NewHandler(svc, tokens, event.NewBus(), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	note, err := svc.CreateMemoNote(ctx, "owner", service.SaveMemoNoteInput{Title: "Before"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := "/api/v1/memos/" + note.ID
+	write := func(content string) *httptest.ResponseRecorder {
+		return performJSON(t, handler, http.MethodPatch, path, token, map[string]any{"content": content, "expected_updated_at": note.UpdatedAt})
+	}
+	if response := write("Accepted"); response.Code != http.StatusOK {
+		t.Fatalf("first write=%d %s", response.Code, response.Body.String())
+	}
+	if response := write("Stale"); response.Code != http.StatusConflict {
+		t.Fatalf("stale write=%d %s", response.Code, response.Body.String())
+	}
+	loaded, _ := svc.MemoNote(ctx, "owner", note.ID)
+	if loaded.Content != "Accepted" {
+		t.Fatal("stale request changed memo")
+	}
+	malformed := performJSON(t, handler, http.MethodPatch, path, token, map[string]any{"expected_updated_at": "invalid"})
+	if malformed.Code != http.StatusBadRequest {
+		t.Fatalf("malformed time=%d", malformed.Code)
+	}
+	// Existing API clients can still omit the precondition.
+	legacy := performJSON(t, handler, http.MethodPatch, path, token, map[string]any{"content": "Legacy"})
+	if legacy.Code != http.StatusOK {
+		t.Fatalf("legacy=%d", legacy.Code)
+	}
+	if err := repository.DeleteMemoNote(ctx, note.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.MemoNote(ctx, "owner", note.ID); err != domain.ErrNotFound {
+		t.Fatal(err)
+	}
+}
 
 func TestMemoAPIWorkflow(t *testing.T) {
 	repository := store.NewMemory()

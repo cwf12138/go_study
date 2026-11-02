@@ -4,10 +4,70 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/example/studyflow/internal/domain"
 	"github.com/example/studyflow/internal/store"
 )
+
+func TestMemoVersionRejectsStaleEditsAndAdvancesFrozenClock(t *testing.T) {
+	ctx := context.Background()
+	svc := New(store.NewMemory(), nil, nil)
+	svc.now = func() time.Time { return time.Unix(100, 0) }
+	note, err := svc.CreateMemoNote(ctx, "owner", SaveMemoNoteInput{Title: "Original"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := "first edit"
+	updated, err := svc.UpdateMemoNote(ctx, "owner", note.ID, UpdateMemoNoteInput{Content: &content, ExpectedUpdatedAt: &note.UpdatedAt})
+	if err != nil || !updated.UpdatedAt.After(note.UpdatedAt) {
+		t.Fatalf("update=%#v err=%v", updated, err)
+	}
+	content = "stale edit"
+	if _, err := svc.UpdateMemoNote(ctx, "owner", note.ID, UpdateMemoNoteInput{Content: &content, ExpectedUpdatedAt: &note.UpdatedAt}); !errors.Is(err, domain.ErrInvalidState) {
+		t.Fatalf("stale write: %v", err)
+	}
+	loaded, _ := svc.MemoNote(ctx, "owner", note.ID)
+	if loaded.Content != "first edit" {
+		t.Fatal("stale writer replaced accepted edit")
+	}
+	if _, err := svc.UpdateMemoNote(ctx, "other", note.ID, UpdateMemoNoteInput{Content: &content, ExpectedUpdatedAt: &updated.UpdatedAt}); !errors.Is(err, domain.ErrForbidden) {
+		t.Fatalf("foreign update: %v", err)
+	}
+	if err := svc.TrashMemoNote(ctx, "owner", note.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.UpdateMemoNote(ctx, "owner", note.ID, UpdateMemoNoteInput{Content: &content, ExpectedUpdatedAt: &updated.UpdatedAt}); !errors.Is(err, domain.ErrInvalidState) {
+		t.Fatalf("trashed update: %v", err)
+	}
+	restored, err := svc.RestoreMemoNote(ctx, "owner", note.ID)
+	if err != nil || !restored.UpdatedAt.After(updated.UpdatedAt) {
+		t.Fatalf("restore=%#v err=%v", restored, err)
+	}
+	if _, err := svc.UpdateMemoNote(ctx, "owner", note.ID, UpdateMemoNoteInput{Content: &content, ExpectedUpdatedAt: &updated.UpdatedAt}); !errors.Is(err, domain.ErrInvalidState) {
+		t.Fatalf("pre-restore version accepted: %v", err)
+	}
+}
+
+type memoRepositoryWithoutVersions struct{ store.Repository }
+
+func TestMemoConditionalWriteRequiresAtomicRepository(t *testing.T) {
+	ctx := context.Background()
+	repository := store.NewMemory()
+	svc := New(memoRepositoryWithoutVersions{repository}, nil, nil)
+	note, err := svc.CreateMemoNote(ctx, "owner", SaveMemoNoteInput{Title: "Original"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := "must not write"
+	if _, err := svc.UpdateMemoNote(ctx, "owner", note.ID, UpdateMemoNoteInput{Content: &content, ExpectedUpdatedAt: &note.UpdatedAt}); !errors.Is(err, domain.ErrInvalidState) {
+		t.Fatalf("non-atomic fallback: %v", err)
+	}
+	loaded, _ := repository.MemoNoteByID(ctx, note.ID)
+	if loaded.Content != "" || !loaded.UpdatedAt.Equal(note.UpdatedAt) {
+		t.Fatal("unsupported condition changed record")
+	}
+}
 
 func TestMemoLifecycleSearchAndChecklist(t *testing.T) {
 	ctx := context.Background()

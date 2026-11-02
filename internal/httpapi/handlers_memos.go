@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/example/studyflow/internal/service"
 )
@@ -110,19 +111,20 @@ func (s *Server) memoNote(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) updateMemoNote(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		FolderID *string   `json:"folder_id"`
-		Title    *string   `json:"title"`
-		Content  *string   `json:"content"`
-		Tags     *[]string `json:"tags"`
-		Color    *string   `json:"color"`
-		Pinned   *bool     `json:"pinned"`
-		Archived *bool     `json:"archived"`
+		ExpectedUpdatedAt *time.Time `json:"expected_updated_at"`
+		FolderID          *string    `json:"folder_id"`
+		Title             *string    `json:"title"`
+		Content           *string    `json:"content"`
+		Tags              *[]string  `json:"tags"`
+		Color             *string    `json:"color"`
+		Pinned            *bool      `json:"pinned"`
+		Archived          *bool      `json:"archived"`
 	}
 	if err := decodeJSON(w, r, &body); err != nil {
 		writeError(w, invalidJSON(err))
 		return
 	}
-	note, err := s.service.UpdateMemoNote(r.Context(), claimsFromContext(r.Context()).Subject, r.PathValue("note_id"), service.UpdateMemoNoteInput{FolderID: body.FolderID, Title: body.Title, Content: body.Content, Tags: body.Tags, Color: body.Color, Pinned: body.Pinned, Archived: body.Archived})
+	note, err := s.service.UpdateMemoNote(r.Context(), claimsFromContext(r.Context()).Subject, r.PathValue("note_id"), service.UpdateMemoNoteInput{ExpectedUpdatedAt: body.ExpectedUpdatedAt, FolderID: body.FolderID, Title: body.Title, Content: body.Content, Tags: body.Tags, Color: body.Color, Pinned: body.Pinned, Archived: body.Archived})
 	if err != nil {
 		writeError(w, err)
 		return

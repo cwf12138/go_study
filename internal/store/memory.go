@@ -870,6 +870,8 @@ func (m *Memory) DeleteMemoFolder(_ context.Context, id string) error {
 	for noteID, note := range m.memoNotes {
 		if note.FolderID == id {
 			note.FolderID = ""
+			// Folder removal also changes the memo, invalidating older conditional edits.
+			note.UpdatedAt = note.UpdatedAt.Add(time.Nanosecond)
 			m.memoNotes[noteID] = cloneMemoNote(note)
 		}
 	}

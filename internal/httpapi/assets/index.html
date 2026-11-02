@@ -22,6 +22,7 @@
     <link rel="stylesheet" href="/static/calendar.css?v=20261019-fitness-1">
     <link rel="stylesheet" href="/static/memos.css?v=20260904-1">
     <link rel="stylesheet" href="/static/memos-refresh.css?v=20260909-1">
+    <link rel="stylesheet" href="/static/memo-drafts.css?v=20261102-1">
     <link rel="stylesheet" href="/static/english.css?v=20261007-1">
     <link rel="stylesheet" href="/static/literature.css?v=20260902-1">
     <link rel="stylesheet" href="/static/literature-product.css?v=20260909-1">
@@ -465,8 +466,10 @@
             </div>
             <div class="memo-utility-bar">
               <span>随手记下 · 有序收藏 · 安静写作</span>
-              <div><select id="memo-template" aria-label="从模板新建备忘录"><option value="">从模板新建…</option><option value="study">学习笔记</option><option value="meeting">讨论记录</option><option value="daily">每日回顾</option></select><button id="memo-save" class="quiet" type="button" title="立即保存（Ctrl / ⌘ + S）">保存</button><button id="memo-focus" class="quiet" type="button" aria-pressed="false">专心写作</button></div>
+              <div><button id="memo-drafts-open" class="quiet" type="button" aria-haspopup="dialog" disabled>本机草稿</button><select id="memo-template" aria-label="从模板新建备忘录"><option value="">从模板新建…</option><option value="study">学习笔记</option><option value="meeting">讨论记录</option><option value="daily">每日回顾</option></select><button id="memo-save" class="quiet" type="button" title="立即保存（Ctrl / ⌘ + S）">保存</button><button id="memo-focus" class="quiet" type="button" aria-pressed="false">专心写作</button></div>
             </div>
+            <div id="memo-drafts-notice" class="memo-drafts-notice" hidden><span aria-hidden="true">▤</span><p id="memo-drafts-notice-text" role="status"></p><button id="memo-drafts-review" type="button">查看草稿 →</button></div>
+            <p id="memo-drafts-local-state" class="memo-drafts-local-state" role="status">编辑时保留本机草稿</p>
             <div class="memo-workspace">
               <aside class="memo-sidebar">
                 <div class="memo-sidebar-scroll">
@@ -507,6 +510,16 @@
               </article>
             </div>
             <dialog id="memo-folder-dialog" class="memo-folder-dialog"><form id="memo-folder-form" method="dialog"><div><p class="eyebrow">NEW FOLDER</p><h3>新建文件夹</h3><p>把同类备忘录放在一起，更容易回到重要内容。</p></div><label>文件夹名称<input id="memo-folder-name" required maxlength="80" placeholder="例如：工作、灵感、旅行"></label><fieldset><legend>标识颜色</legend><div class="memo-folder-colors"><button class="active blue" type="button" data-memo-folder-color="blue"></button><button class="violet" type="button" data-memo-folder-color="violet"></button><button class="yellow" type="button" data-memo-folder-color="yellow"></button><button class="rose" type="button" data-memo-folder-color="rose"></button><button class="mint" type="button" data-memo-folder-color="mint"></button><button class="gray" type="button" data-memo-folder-color="gray"></button></div></fieldset><div class="memo-dialog-actions"><button id="memo-folder-cancel" class="quiet" type="button">取消</button><button class="primary" type="submit">创建文件夹</button></div></form></dialog>
+            <dialog id="memo-drafts-dialog" class="memo-drafts-dialog" aria-labelledby="memo-drafts-heading" aria-describedby="memo-drafts-description">
+              <header><div><p class="eyebrow">LOCAL DRAFTS · 留住未完成</p><h3 id="memo-drafts-heading">从上次的念头继续。</h3></div><button id="memo-drafts-close" class="quiet" type="button" aria-label="关闭本机草稿">×</button></header>
+              <p id="memo-drafts-description" class="memo-drafts-description">仅显示当前账号与服务地址的本机草稿。先预览，再决定如何恢复。</p>
+              <div class="memo-drafts-layout"><nav id="memo-drafts-list" aria-label="本机草稿列表"></nav><section id="memo-drafts-preview" hidden>
+                <h4 id="memo-drafts-title"></h4><p id="memo-drafts-status" role="status" aria-live="polite"></p>
+                <div class="memo-drafts-compare"><label>本机草稿<small id="memo-drafts-text-meta"></small><textarea id="memo-drafts-text" readonly spellcheck="false"></textarea></label><label>服务端正文<small id="memo-drafts-server-meta"></small><textarea id="memo-drafts-server-text" readonly spellcheck="false" placeholder="尚未读取或无法连接"></textarea></label></div>
+                <div class="memo-drafts-actions"><button id="memo-drafts-restore" class="primary" type="button" disabled>恢复到编辑区</button><button id="memo-drafts-copy" class="quiet" type="button" disabled>另存为新备忘录</button><button id="memo-drafts-export" class="quiet" type="button">导出文字</button><button id="memo-drafts-discard" class="text-button" type="button">删除此草稿</button></div>
+              </section></div>
+              <footer><div><label class="memo-drafts-setting"><input id="memo-drafts-enabled" type="checkbox" checked>在此设备保留未提交草稿</label><p>文字以明文保存在此浏览器 / App 中，不跨设备同步。共用设备请在离开前清理。服务接收后清理草稿；服务仍按周期写盘。</p></div><button id="memo-drafts-clear" class="quiet" type="button">清理本账号草稿</button></footer>
+            </dialog>
           </section>
 
           <section id="panel-explore" class="panel">
@@ -926,7 +939,7 @@
     <script src="/static/data-center.js?v=20261101-1" defer></script>
     <script src="/static/navigation-core.js?v=20261027-1" defer></script>
     <script src="/static/navigation.js?v=20261027-1" defer></script>
-    <script src="/static/app.js?v=20261027-curation-1" defer></script>
+    <script src="/static/app.js?v=20261102-account-ready" defer></script>
     <script src="/static/gentle-reminders-core.js?v=20261022-1" defer></script>
     <script src="/static/important-days-core.js?v=20261022-1" defer></script>
     <script src="/static/important-days.js?v=20261022-1" defer></script>
@@ -966,7 +979,9 @@
     <script src="/static/transfers.js?v=20261021-1" defer></script>
     <script src="/static/text-clips-core.js?v=20261029-1" defer></script>
     <script src="/static/text-clips.js?v=20261029-1" defer></script>
-    <script src="/static/memos.js?v=20261020-search" defer></script>
+    <script src="/static/memo-drafts-core.js?v=20261102-1" defer></script>
+    <script src="/static/memo-drafts.js?v=20261102-1" defer></script>
+    <script src="/static/memos.js?v=20261102-drafts" defer></script>
     <script src="/static/english.js?v=20261007-2" defer></script>
     <script src="/static/english-reading.js?v=20260915-1" defer></script>
     <script src="/static/explore.js?v=20260920-playrooms" defer></script>

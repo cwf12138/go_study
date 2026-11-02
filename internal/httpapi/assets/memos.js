@@ -6,26 +6,57 @@
     view: "all", folderID: "", tag: "", query: "", sort: "updated_at:desc",
     initialized: false, loading: false, dirty: false, saving: false, preview: false,
     searchTimer: null, saveTimer: null, token: "", folderColor: "blue", revision: 0, savePromise: null,
+    baseNote: null, manualSave: false, accountScope: "",
   };
 
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
   let loadVersion = 0, selectionVersion = 0;
   const escapeHTML = (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+  function readPayload() {
+    return { title: $("#memo-title").value, content: $("#memo-content").value,
+      folder_id: $("#memo-folder-select").value, tags: splitTags($("#memo-tags").value), color: state.current?.color || "default" };
+  }
+  function setCurrent(note) { state.current = note; state.baseNote = { ...note, tags: [...(note.tags || [])] }; }
+  const recovery = window.DaynestMemoRecovery?.create({
+    read: () => ({ note: state.baseNote, payload: readPayload(), dirty: state.dirty }),
+    load: id => memoAPI(`/api/v1/memos/${id}`),
+    folderName: id => id ? state.folders.find(f => f.id === id)?.name || "原文件夹暂不可用" : "备忘录（默认）",
+    prepare: record => !state.dirty || (state.current?.id === record.noteID && window.DaynestMemoDrafts.equal(readPayload(), record.value)) || saveCurrent({ quiet: true }),
+    copy: value => memoAPI("/api/v1/memos", { method: "POST", body: JSON.stringify({ ...value, title: (value.title || "未命名备忘录").slice(0, 150) + "（草稿恢复）", folder_id: "" }) }),
+    async apply(note, value) {
+      if (!syncAccount()) return;
+      window.clearTimeout(state.saveTimer); loadVersion++; selectionVersion++;
+      setCurrent(note); state.dirty = false; state.manualSave = !!value;
+      renderFolderSelect(); renderEditor(); renderNoteList(); $(".memo-workspace").classList.add("show-editor");
+      if (value) {
+        $("#memo-title").value = value.title; $("#memo-content").value = value.content; $("#memo-tags").value = value.tags.join(", ");
+        // Deleted folders cannot be restored; keep the text in the default folder.
+        $("#memo-folder-select").value = state.folders.some(f => f.id === value.folder_id) ? value.folder_id : "";
+        state.current.color = value.color;
+        $$('[data-memo-color]').forEach(b => b.classList.toggle("active", b.dataset.memoColor === value.color));
+        state.revision++; state.dirty = true; updateEditorMeta(); setSaveState("saving", "草稿已恢复 · 请点击保存");
+      }
+      refreshLists().catch(() => {});
+    },
+    accountChanged: () => syncAccount(),
+  });
 
   async function memoAPI(path, options = {}) {
     const headers = new Headers(options.headers || {});
     const token = localStorage.getItem("studyflow.token") || "";
+    const account = recovery?.sync() || "";
     if (token) headers.set("Authorization", `Bearer ${token}`);
     if (options.body) headers.set("Content-Type", "application/json");
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 25000);
     try {
       const response = await fetch(path, { ...options, headers, signal: controller.signal });
-      if (token !== (localStorage.getItem("studyflow.token") || "")) throw new Error("账号已切换，请重新打开备忘录。");
+      if (token !== (localStorage.getItem("studyflow.token") || "") || account !== (recovery?.sync() || "")) throw new Error("账号或服务已切换，请重新打开备忘录。");
       if (response.status === 204) return null;
       const payload = await response.json().catch(() => null);
-      if (token !== (localStorage.getItem("studyflow.token") || "")) throw new Error("账号已切换，已忽略旧响应。");
+      if (token !== (localStorage.getItem("studyflow.token") || "") || account !== (recovery?.sync() || "")) throw new Error("账号已切换，已忽略旧响应。");
+      if (response.status === 409) { const e = new Error("服务端备忘录已有变化。已保留本机文字，请在本机草稿中对照，或另存为新备忘录。"); e.status = 409; throw e; }
       if (response.status === 404) {
         if (payload?.error?.code === "not_found") throw new Error("这条备忘录或文件夹已不存在，请刷新列表后重试。");
         throw new Error("备忘录接口不可用，请确认访问地址正确并重启 Go 服务。");
@@ -52,10 +83,15 @@
 
   function syncAccount() {
     const token = localStorage.getItem("studyflow.token") || "";
-    if (state.token === token) return token;
+    const account = recovery?.sync() || "";
+    if (state.token === token && state.accountScope === account) return token;
     window.clearTimeout(state.saveTimer);
+    loadVersion++; selectionVersion++; state.savePromise = null; state.saving = false; state.manualSave = false; state.baseNote = null;
+    recovery?.resetWriter(); state.accountScope = account;
     state.token = token; state.folders = []; state.notes = []; state.allNotes = []; state.current = null;
     state.view = "all"; state.folderID = ""; state.tag = ""; state.query = ""; state.initialized = false; state.dirty = false;
+    ["#memo-title", "#memo-content", "#memo-tags", "#memo-search"].forEach(s => { $(s).value = ""; });
+    clearEditor(); renderSidebar();
     return token;
   }
 
@@ -155,8 +191,8 @@
       const note = await memoAPI(`/api/v1/memos/${id}`);
       if (version !== selectionVersion || token !== state.token) return;
       if (revision !== state.revision) { notify("保留了你刚输入的修改，请保存后再切换备忘录。", "error"); return; }
-      state.current = note;
-      state.dirty = false; state.preview = false;
+      setCurrent(note); recovery?.resetWriter();
+      state.dirty = false; state.preview = false; state.manualSave = false;
       renderNoteList(); renderEditor();
       $(".memo-workspace").classList.add("show-editor");
     } catch (error) { if(version === selectionVersion && token === state.token) notify(error.message, "error"); }
@@ -180,7 +216,7 @@
   }
 
   function clearEditor() {
-    state.current = null; state.dirty = false;
+    state.current = state.baseNote = null; state.dirty = false; state.manualSave = false;
     $("#memo-editor").classList.add("hidden"); $("#memo-editor-empty").classList.remove("hidden");
     $(".memo-workspace").classList.remove("show-editor"); renderNoteList();
   }
@@ -196,9 +232,13 @@
   }
 
   function markDirty() {
+    syncAccount();
     if (!state.current || state.current.deleted_at) return;
     state.revision++; state.dirty = true; updateEditorMeta(); setSaveState("saving", "等待自动保存…");
-    window.clearTimeout(state.saveTimer); state.saveTimer = window.setTimeout(() => saveCurrent({ quiet: true }), 700);
+    recovery?.capture();
+    window.clearTimeout(state.saveTimer);
+    if (state.manualSave) setSaveState("saving", "待确认 · 请点击保存");
+    else state.saveTimer = window.setTimeout(() => saveCurrent({ quiet: true }), 700);
   }
 
   async function saveCurrent({ quiet = false } = {}) {
@@ -207,29 +247,33 @@
       return saveCurrent({ quiet });
     }
     if (!state.current || !state.dirty || state.current.deleted_at) return true;
+    if (state.manualSave && quiet) { notify("恢复或冲突内容需要先点击保存，或在本机草稿中对照。", "error"); return false; }
     state.saving = true; window.clearTimeout(state.saveTimer); setSaveState("saving", "正在保存…");
-    const id = state.current.id, revision = state.revision, token = state.token;
-    const payload = {
-      title: $("#memo-title").value, content: $("#memo-content").value,
-      folder_id: $("#memo-folder-select").value, tags: splitTags($("#memo-tags").value), color: state.current.color || "default",
-    };
-    state.savePromise = (async () => {
+    const id = state.current.id, revision = state.revision, token = state.token, account = state.accountScope;
+    const payload = readPayload(), draft = recovery?.capture();
+    if (state.baseNote?.updated_at) payload.expected_updated_at = state.baseNote.updated_at;
+    const pending = (async () => {
       try {
         const updated = await memoAPI(`/api/v1/memos/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
-        if (state.token !== token || state.current?.id !== id) return false;
-        if (state.revision === revision) { state.current = updated; state.dirty = false; setSaveState("saved"); }
-        else setSaveState("saving", "仍有新修改待保存…");
+        if (state.token !== token || state.accountScope !== account || state.current?.id !== id) return false;
+        state.baseNote = { ...updated, tags: [...(updated.tags || [])] };
+        if (state.revision === revision) { state.current = updated; state.dirty = false; state.manualSave = false; setSaveState("saved"); recovery?.saved(draft, true); }
+        else { setSaveState("saving", "仍有新修改待保存…"); recovery?.capture(); }
         // A failed list refresh must not misreport a successful save as a failed write.
         try { await refreshLists(); } catch (_) { /* Retry when reopening the list. */ }
+        if (state.token !== token || state.accountScope !== account || state.current?.id !== id) return false;
         if (!quiet && !state.dirty) notify("备忘录已保存。");
         return true;
       } catch (error) {
+        if (state.token !== token || state.accountScope !== account || state.current?.id !== id) return false;
+        if (error.status === 409) { state.manualSave = true; recovery?.capture(); recovery?.problem(error.message); }
         setSaveState("error", "保存失败 · 点击保存重试"); notify(error.message, "error"); return false;
       }
     })();
-    const saved = await state.savePromise;
-    state.savePromise = null; state.saving = false;
-    if (saved && state.dirty && state.token === token) return saveCurrent({ quiet });
+    state.savePromise = pending;
+    const saved = await pending;
+    if (state.savePromise === pending) { state.savePromise = null; state.saving = false; }
+    if (saved && state.dirty && state.token === token && state.accountScope === account) return saveCurrent({ quiet });
     return saved;
   }
 
@@ -241,7 +285,7 @@
     renderSidebar(); renderNoteList();
   }
 
-  function setSaveState(kind, text = "所有更改已保存") {
+  function setSaveState(kind, text = "已提交服务") {
     const target = $("#memo-save-state"); target.className = kind === "saved" ? "" : kind; target.innerHTML = `<i></i>${text}`;
   }
 
@@ -292,9 +336,16 @@
   async function patchAction(payload, successMessage) {
     if (!state.current) return;
     if (state.dirty && !(await saveCurrent({ quiet: true }))) return;
+    const id = state.current.id, token = state.token, version = selectionVersion, revision = state.revision;
+    if (state.baseNote?.updated_at) payload.expected_updated_at = state.baseNote.updated_at;
     try {
-      state.current = await memoAPI(`/api/v1/memos/${state.current.id}`, { method: "PATCH", body: JSON.stringify(payload) });
-      renderEditor(); await refreshLists(); if (successMessage) notify(successMessage);
+      const updated = await memoAPI(`/api/v1/memos/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+      if (state.token !== token || version !== selectionVersion || state.current?.id !== id) return;
+      if (state.revision !== revision) {
+        state.baseNote = { ...updated, tags: [...(updated.tags || [])] };
+        state.current = { ...updated, color: state.current.color }; recovery?.capture();
+      } else { setCurrent(updated); renderEditor(); }
+      await refreshLists(); if (successMessage) notify(successMessage);
     } catch (error) { notify(error.message, "error"); }
   }
 
@@ -363,6 +414,15 @@
   function folderColorValue(color) { return { yellow: "#e8b846", orange: "#e7924c", rose: "#de758c", violet: "#8d78d4", blue: "#6595df", mint: "#54b991", gray: "#929cab" }[color] || "#6595df"; }
 
   function bindEvents() {
+    const accountReady = () => {
+      syncAccount();
+      Promise.resolve().then(() => { if ($("#panel-memos")?.classList.contains("active")) loadMemos(); });
+    };
+    document.addEventListener("daynest:account-ready", accountReady);
+    if (window.DaynestAccount?.current?.()) accountReady();
+    if (typeof MutationObserver !== "undefined") new MutationObserver(() => {
+      if ($("#app-view").classList.contains("hidden")) { recovery?.deactivate(); syncAccount(); }
+    }).observe($("#app-view"), { attributes: true, attributeFilter: ["class"] });
     document.addEventListener("daynest:open-search-memo", async event => {
       const token = syncAccount(), id = event.detail?.id;
       if (!token || typeof id !== "string" || !/^[a-zA-Z0-9_-]+$/.test(id)) return;

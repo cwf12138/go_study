@@ -288,6 +288,14 @@
     $("#auth-view").classList.add("hidden");
     $("#app-view").classList.remove("hidden");
     $("#user-name").textContent = user.name;
+    // A fast session restore can complete before deferred feature scripts load.
+    // Expose only a verified, still-current identity so late subscribers can catch up.
+    const accountServer = () => window.DaynestMobile?.getConnectionInfo?.().server || window.location?.origin || "";
+    const verified = { userID: user.id, token: state.token, server: accountServer() };
+    window.DaynestAccount = { current() {
+      if (state.user?.id !== verified.userID || state.token !== verified.token || localStorage.getItem("studyflow.token") !== verified.token || accountServer() !== verified.server || $("#app-view").classList.contains("hidden")) return null;
+      return { ...verified };
+    } };
     document.dispatchEvent(new CustomEvent("daynest:account-ready", { detail: { userID: user.id } }));
     showView(viewFromURL() || state.currentView, { history: "replace" });
     updateWeeklyDraftStatus();

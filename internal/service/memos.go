@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/example/studyflow/internal/domain"
@@ -37,13 +38,14 @@ type SaveMemoNoteInput struct {
 }
 
 type UpdateMemoNoteInput struct {
-	FolderID *string
-	Title    *string
-	Content  *string
-	Tags     *[]string
-	Color    *string
-	Pinned   *bool
-	Archived *bool
+	ExpectedUpdatedAt *time.Time
+	FolderID          *string
+	Title             *string
+	Content           *string
+	Tags              *[]string
+	Color             *string
+	Pinned            *bool
+	Archived          *bool
 }
 
 type ListMemoNotesInput struct {
@@ -159,7 +161,14 @@ func (s *Service) UpdateMemoNote(ctx context.Context, userID, noteID string, inp
 		return domain.MemoNote{}, err
 	}
 	if note.DeletedAt != nil {
+		if input.ExpectedUpdatedAt != nil {
+			return domain.MemoNote{}, fmt.Errorf("%w: memo is now in trash", domain.ErrInvalidState)
+		}
 		return domain.MemoNote{}, fmt.Errorf("%w: restore a deleted memo before editing it", domain.ErrInvalidInput)
+	}
+	previous := note.UpdatedAt
+	if input.ExpectedUpdatedAt != nil && (input.ExpectedUpdatedAt.IsZero() || !previous.Equal(*input.ExpectedUpdatedAt)) {
+		return domain.MemoNote{}, fmt.Errorf("%w: memo changed; reload or keep a separate copy", domain.ErrInvalidState)
 	}
 	if input.FolderID != nil {
 		if err := s.requireMemoFolder(ctx, userID, *input.FolderID); err != nil {
@@ -189,8 +198,19 @@ func (s *Service) UpdateMemoNote(ctx context.Context, userID, noteID string, inp
 	if input.Archived != nil {
 		note.Archived = *input.Archived
 	}
-	note.UpdatedAt = s.now().UTC()
-	if err := s.repo.UpdateMemoNote(ctx, note); err != nil {
+	note.UpdatedAt = s.nextMemoTime(previous)
+	if input.ExpectedUpdatedAt != nil {
+		writer, ok := s.repo.(interface {
+			UpdateMemoNoteIfUnchanged(context.Context, domain.MemoNote, time.Time) error
+		})
+		if !ok {
+			return domain.MemoNote{}, fmt.Errorf("%w: repository cannot protect memo versions", domain.ErrInvalidState)
+		}
+		err = writer.UpdateMemoNoteIfUnchanged(ctx, note, *input.ExpectedUpdatedAt)
+	} else {
+		err = s.repo.UpdateMemoNote(ctx, note)
+	}
+	if err != nil {
 		return domain.MemoNote{}, err
 	}
 	s.publish("memo_note.updated", userID, note.ID, map[string]any{"title": note.Title})
@@ -205,7 +225,7 @@ func (s *Service) TrashMemoNote(ctx context.Context, userID, noteID string) erro
 	if note.DeletedAt != nil {
 		return nil
 	}
-	now := s.now().UTC()
+	now := s.nextMemoTime(note.UpdatedAt)
 	note.DeletedAt, note.UpdatedAt = &now, now
 	if err := s.repo.UpdateMemoNote(ctx, note); err != nil {
 		return err
@@ -221,7 +241,7 @@ func (s *Service) RestoreMemoNote(ctx context.Context, userID, noteID string) (d
 	}
 	note.DeletedAt = nil
 	note.Archived = false
-	note.UpdatedAt = s.now().UTC()
+	note.UpdatedAt = s.nextMemoTime(note.UpdatedAt)
 	if err := s.repo.UpdateMemoNote(ctx, note); err != nil {
 		return domain.MemoNote{}, err
 	}
@@ -242,6 +262,14 @@ func (s *Service) DeleteMemoNotePermanently(ctx context.Context, userID, noteID 
 	}
 	s.publish("memo_note.deleted", userID, noteID, map[string]any{"title": note.Title})
 	return nil
+}
+
+func (s *Service) nextMemoTime(previous time.Time) time.Time {
+	now := s.now().UTC()
+	if !now.After(previous) {
+		return previous.Add(time.Nanosecond)
+	}
+	return now
 }
 
 func (s *Service) DuplicateMemoNote(ctx context.Context, userID, noteID string) (domain.MemoNote, error) {
