@@ -92,7 +92,7 @@ export function boot({ Http, App, Files }) {
     window.DaynestMobile.openConnectionSettings=openSettings;
     window.DaynestMobile.getConnectionInfo=()=>({server:connection?.server||''});
     function closeReader(){reader.close();$('offline-frame').src='about:blank';}
-    window.DaynestMobile.openOfflineReader=()=>{if(!connection){state('请先选择并连接一次电脑，在原账号开启离线保留。');return;}$('offline-frame').src='/static/offline-reader.html?server='+encodeURIComponent(connection.server);if(!reader.open)reader.showModal();};
+    window.DaynestMobile.openOfflineReader=section=>{if(!connection){state('请先选择并连接一次电脑，在原账号开启离线保留。');return;}$('offline-frame').src='/static/offline-reader.html?server='+encodeURIComponent(connection.server)+(['todos','agenda'].includes(section)?'#'+section:'');if(!reader.open)reader.showModal();};
     $('offline').addEventListener('click',window.DaynestMobile.openOfflineReader);
     $('offline-close').addEventListener('click',closeReader);
     reader.addEventListener('close',()=>{$('offline-frame').src='about:blank';});

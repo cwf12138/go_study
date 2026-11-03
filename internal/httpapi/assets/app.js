@@ -155,6 +155,7 @@
     if (requestOptions.signal?.aborted) abort();
     else requestOptions.signal?.addEventListener("abort", abort, { once: true });
     const timeout = window.setTimeout(() => { timedOut = true; controller.abort(); }, 25000);
+    const endPlanningWrite=window.DaynestReadCache?.beginPlanningWrite(path,requestOptions.method,requestContext);
     try {
       response = await fetch(path, { ...requestOptions, headers, signal: controller.signal, cache: "no-store" });
       const payload = response.status === 204 ? null : await response.json().catch(error => { if (response.ok) throw error; return null; });
@@ -176,7 +177,7 @@
       if (error instanceof SyntaxError) throw new Error("服务返回了无效数据，请重试或检查服务日志。");
       if (error instanceof TypeError) throw new Error("无法连接到服务，请确认 Go API 正在运行。");
       throw error;
-    } finally { window.clearTimeout(timeout); requestOptions.signal?.removeEventListener("abort", abort); }
+    } finally { endPlanningWrite?.();window.clearTimeout(timeout); requestOptions.signal?.removeEventListener("abort", abort); }
   }
 
   const activeDownloads = new Map();

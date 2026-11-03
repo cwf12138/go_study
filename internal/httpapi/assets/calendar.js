@@ -33,6 +33,7 @@
     if (options.signal?.aborted) abort(); else options.signal?.addEventListener('abort', abort, { once: true });
     let timedOut = false;
     const timer = window.setTimeout(() => { timedOut = true; controller.abort(); }, 25000);
+    const endPlanningWrite=window.DaynestReadCache?.beginPlanningWrite(path,options.method,window.DaynestHTTP?.capture());
     try {
       const response = await fetch(path, { ...options, headers, signal: controller.signal, cache: 'no-store' });
       if (owner !== token()) throw new Error('账号已切换，请重新加载日历。');
@@ -51,7 +52,7 @@
     } catch (error) {
       if (error.name === 'AbortError') throw new Error(timedOut ? '日历请求超时。保存日程时请先核对结果，再决定是否重试。' : '日历请求已取消。');
       throw error;
-    } finally { window.clearTimeout(timer); options.signal?.removeEventListener('abort', abort); }
+    } finally { endPlanningWrite?.();window.clearTimeout(timer); options.signal?.removeEventListener('abort', abort); }
   }
 
   function notify(message, error = false) {
@@ -107,6 +108,7 @@
   }
 
   function renderCalendar() {
+    $("#calendar-offline-open")?.setAttribute("data-selected-date",state.selected);
     const anchor = state.anchor;
     const titles = {
       year: `${anchor.getFullYear()} 年`,

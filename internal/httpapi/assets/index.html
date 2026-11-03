@@ -430,7 +430,7 @@
             <div class="calendar-shell">
               <div class="calendar-toolbar">
                 <div class="calendar-nav-actions"><button id="calendar-today" class="quiet" type="button">今天</button><button id="calendar-prev" class="icon-button" type="button" aria-label="上一段">‹</button><button id="calendar-next" class="icon-button" type="button" aria-label="下一段">›</button><h3 id="calendar-title">日历</h3></div>
-                <div class="calendar-toolbar-actions"><div class="calendar-tool-icons"><button id="calendar-search-open" type="button" class="icon-button" aria-label="搜索日程" title="搜索日程" aria-haspopup="dialog" aria-controls="calendar-tools-dialog"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg></button><button id="calendar-filter-open" type="button" class="icon-button" aria-label="筛选与日期跳转" title="筛选与日期跳转" aria-haspopup="dialog" aria-controls="calendar-tools-dialog"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="currentColor"/><circle cx="15" cy="12" r="2" fill="currentColor"/><circle cx="8" cy="18" r="2" fill="currentColor"/></svg></button></div><div class="calendar-view-switch" role="tablist" aria-label="日历视图"><button type="button" data-calendar-view="year">年</button><button class="active" type="button" data-calendar-view="month">月</button><button type="button" data-calendar-view="week">周</button><button type="button" data-calendar-view="day">日</button></div><button id="calendar-create" class="primary" type="button">＋ 新建日程</button></div>
+                <div class="calendar-toolbar-actions"><div class="calendar-tool-icons"><button id="calendar-offline-open" type="button" class="icon-button" title="离线资料与保留设置" aria-label="离线资料与保留设置" aria-haspopup="dialog">▤</button><button id="calendar-search-open" type="button" class="icon-button" aria-label="搜索日程" title="搜索日程" aria-haspopup="dialog" aria-controls="calendar-tools-dialog"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg></button><button id="calendar-filter-open" type="button" class="icon-button" aria-label="筛选与日期跳转" title="筛选与日期跳转" aria-haspopup="dialog" aria-controls="calendar-tools-dialog"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="currentColor"/><circle cx="15" cy="12" r="2" fill="currentColor"/><circle cx="8" cy="18" r="2" fill="currentColor"/></svg></button></div><div class="calendar-view-switch" role="tablist" aria-label="日历视图"><button type="button" data-calendar-view="year">年</button><button class="active" type="button" data-calendar-view="month">月</button><button type="button" data-calendar-view="week">周</button><button type="button" data-calendar-view="day">日</button></div><button id="calendar-create" class="primary" type="button">＋ 新建日程</button></div>
               </div>
               <dialog id="calendar-tools-dialog" class="calendar-tools-dialog" aria-labelledby="calendar-tools-title"><header><h3 id="calendar-tools-title">搜索日程</h3><button id="calendar-tools-close" type="button" class="icon-button" aria-label="关闭搜索与筛选">×</button></header><div id="calendar-search-fields"><label>查找当前日期范围<input id="calendar-search" type="search" maxlength="100" placeholder="输入日程、计划或任务标题" autocomplete="off"></label><p>按标题即时查找，搜索条件在关闭后仍保留。</p></div><div id="calendar-filter-fields" class="hidden"><label>直达日期<input id="calendar-jump" type="date"></label><label>显示内容<select id="calendar-source"><option value="all">全部内容</option><option value="event">个人日程</option><option value="plan">学习计划</option><option value="tasks">任务与待办</option><option value="mood">心情记录</option><option value="fitness">锻炼记录</option><option value="care">生活保养</option><option value="focus">已完成专注</option></select></label><p>选择后立即生效。图标上的圆点表示正在使用搜索或来源筛选。</p></div><footer><button id="calendar-reset-filters" class="quiet" type="button">清除全部条件</button><button id="calendar-tools-done" class="primary" type="button">查看日历</button></footer></dialog>
               <p id="calendar-view-status" class="calendar-view-status" role="status" aria-live="polite"></p>
@@ -630,7 +630,7 @@
                 <form id="todo-list-form" class="todo-new-list-form"><input id="todo-list-name" maxlength="80" required aria-label="新分类名称" placeholder="新建分类，例如：生活"><input id="todo-list-color" type="color" value="#7c4dff" aria-label="分类颜色"><button class="quiet" type="submit">添加</button></form>
               </aside>
               <article class="surface todo-main-card">
-                <div class="todo-main-head"><div><p id="todo-view-kicker" class="eyebrow">MY DAY</p><h3 id="todo-view-title">我的一天</h3><p id="todo-view-description">从收集箱中挑选今天真正要完成的事。</p></div><span id="todo-view-count" class="pill">0 项</span></div>
+                <div class="todo-main-head"><div><p id="todo-view-kicker" class="eyebrow">MY DAY</p><h3 id="todo-view-title">我的一天</h3><p id="todo-view-description">从收集箱中挑选今天真正要完成的事。</p></div><button id="todo-offline-open" class="quiet" type="button" aria-haspopup="dialog">离线资料</button><span id="todo-view-count" class="pill">0 项</span></div>
                 <div class="todo-toolbar"><label class="todo-search"><span aria-hidden="true">⌕</span><input id="todo-search" type="search" aria-label="搜索待办标题、备注或标签" placeholder="搜索标题、备注或标签"></label><select id="todo-priority-filter" aria-label="按优先级筛选"><option value="">全部优先级</option><option value="high">高优先级</option><option value="medium">中优先级</option><option value="low">低优先级</option></select><select id="todo-tag-filter" aria-label="按标签筛选"><option value="">全部标签</option></select></div>
                 <div id="todo-items" class="todo-items empty-state">正在加载待办…</div>
                 <section id="todo-suggestions" class="todo-suggestions hidden"><div class="todo-suggestions-head"><div><p class="eyebrow">SUGGESTIONS</p><h4>可加入今天</h4></div><span>从未完成事项中挑选</span></div><div id="todo-suggestion-items" class="todo-suggestion-items"></div></section>
@@ -950,11 +950,12 @@
       <footer><div><label class="ld-setting"><input id="ld-enabled" type="checkbox" checked>在此设备保留心情与复盘草稿</label><p id="ld-health" role="status">恢复后请手动点击保存。</p><p>文字以明文留在此浏览器 / App，不跨设备同步。退出账号后仍保留；共用设备请在离开前清理。</p></div><button id="ld-clear" class="quiet" type="button">清理本账号长文草稿</button></footer>
     </dialog>
     <script src="/static/product-shell.js?v=20261027-nav" defer></script>
-    <script src="/static/http-client.js?v=20261103-1" defer></script>
+    <script src="/static/http-client.js?v=20261103-1&planning=2" defer></script>
     <script src="/static/actions-core.js?v=20261103-1" defer></script>
     <script src="/static/actions.js?v=20261103-1" defer></script>
     <script src="/static/read-cache-core.js?v=20261103-1" defer></script>
-    <script src="/static/read-cache.js?v=20261103-1" defer></script>
+    <script src="/static/planning-cache-core.js?v=20261103-2" defer></script>
+    <script src="/static/read-cache.js?v=20261103-1&planning=2" defer></script>
     <script src="/static/auth-state.js?v=20261103-1" defer></script>
     <script src="/static/diagnostics-core.js?v=20261030-1" defer></script>
     <script src="/static/diagnostics.js?v=20261030-1" defer></script>
@@ -965,7 +966,7 @@
     <script src="/static/draft-store.js?v=20261102-1" defer></script>
     <script src="/static/record-drafts-core.js?v=20261102-1" defer></script>
     <script src="/static/record-drafts.js?v=20261102-1" defer></script>
-    <script src="/static/app.js?v=20261103-session&actions=20261103&offline=1" defer></script>
+    <script src="/static/app.js?v=20261103-session&actions=20261103&offline=1&planning=2" defer></script>
     <script src="/static/gentle-reminders-core.js?v=20261022-1" defer></script>
     <script src="/static/important-days-core.js?v=20261022-1" defer></script>
     <script src="/static/important-days.js?v=20261022-1" defer></script>
@@ -982,8 +983,8 @@
     <script src="/static/meal-choice.js?v=20261014-1" defer></script>
     <script src="/static/fitness-core.js?v=20261019-checkin-1" defer></script>
     <script src="/static/care-core.js?v=20261020-1" defer></script>
-    <script src="/static/care.js?v=20261020-1" defer></script>
-    <script src="/static/fitness.js?v=20261019-checkin-1" defer></script>
+    <script src="/static/care.js?v=20261020-1&planning=2" defer></script>
+    <script src="/static/fitness.js?v=20261019-checkin-1&planning=2" defer></script>
     <script src="/static/fitness-nutrition-core.js?v=20261018-1" defer></script>
     <script src="/static/fitness-nutrition.js?v=20261018-1" defer></script>
     <script src="/static/bookmarks.js?v=20261011-2" defer></script>
@@ -998,7 +999,7 @@
     <script src="/static/timeline.js?v=20260910-1" defer></script>
     <script src="/static/weather.js?v=20261009-1" defer></script>
     <script src="/static/holiday.js?v=20261009-1" defer></script>
-    <script src="/static/calendar.js?v=20261020-care-1&actions=20261103" defer></script>
+    <script src="/static/calendar.js?v=20261020-care-1&actions=20261103&planning=2" defer></script>
     <script src="/static/commands.js?v=20260925-daynest" defer></script>
     <script src="/static/content-search.js?v=20261020-1" defer></script>
     <script src="/static/transfers-core.js?v=20261021-1" defer></script>

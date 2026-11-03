@@ -10,6 +10,7 @@
         return {token:localStorage.getItem("studyflow.token") || "",server:root.DaynestMobile?.getConnectionInfo?.().server || root.location?.origin || "",userID:verified?.userID || "",session:verified?.sessionID ?? null};
       },
       onUnauthorized() { document.dispatchEvent(new CustomEvent("daynest:auth-expired")); },
+      onWriteStart(request) { return root.DaynestReadCache?.beginPlanningWrite(request.path,request.method,request.context); },
     });
     const cancel = () => root.DaynestHTTP.cancelStale();
     document.addEventListener("daynest:account-ready", cancel);
@@ -58,7 +59,7 @@
       if(!validPath(path)||!["GET","HEAD","POST","PUT","PATCH","DELETE"].includes(method))throw new RequestError("请求地址或方法不受支持。",{kind:"invalid_request"});
       if(!current(context))throw new RequestError("账号或服务已切换，已忽略旧请求。",{kind:"account_changed"});
       if(same(expired,context))throw new RequestError("登录已过期。未提交内容仍在，请保留或导出后重新登录。",{status:401,code:"unauthorized",kind:"auth"});
-      const controller=new AbortController(),entry={context,controller};let timedOut=false,dispatched=false,timer;
+      const controller=new AbortController(),entry={context,controller};let timedOut=false,dispatched=false,timer,releaseWrite;
       const timeout=input.timeoutMs ?? 25000,maxBytes=input.maxBytes ?? 32*1024*1024;
       if(!Number.isFinite(timeout)||timeout<1||timeout>300000||!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>64*1024*1024)throw new RequestError("请求配置不正确。",{kind:"invalid_request"});
       const cancel=()=>controller.abort();
@@ -75,6 +76,7 @@
         catch(_){throw new RequestError("请求内容无法编码，请检查填写内容。",{kind:"invalid_request"});}
         timer=schedule(()=>{timedOut=true;controller.abort();},timeout);
         // Writes are never automatically retried, including after cancellation.
+        if(write){try{releaseWrite=options.onWriteStart?.({path,method,context});}catch(_){} }
         check();dispatched=true;
         const response=await race(send(path,{method,headers,body,signal:controller.signal,cache:"no-store",credentials:"same-origin",redirect:"error"}),controller.signal);
         check();
@@ -116,7 +118,7 @@
         check();
         if(e instanceof RequestError)throw e;
         throw new RequestError("无法连接到服务，请确认电脑与 Go 服务在线。",{kind:"network",uncertain:write&&dispatched});
-      } finally {if(timer!==undefined)unschedule(timer);input.signal?.removeEventListener("abort",cancel);requests.delete(entry);}
+      } finally {try{releaseWrite?.();}catch(_){}if(timer!==undefined)unschedule(timer);input.signal?.removeEventListener("abort",cancel);requests.delete(entry);}
     }
     return {json,capture,current,cancelStale,authExpired,reportUnauthorized};
   }
