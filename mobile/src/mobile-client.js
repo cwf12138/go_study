@@ -78,15 +78,26 @@ export function boot({ Http, App, Files }) {
   document.addEventListener('DOMContentLoaded', async () => {
     document.body.classList.add('daynest-native');
     const setup = document.createElement('dialog'); setup.id = 'mobile-connection'; setup.className = 'mobile-connection'; setup.setAttribute('aria-labelledby', 'mobile-title');
-    setup.innerHTML = `<header><span class="mobile-mark" aria-hidden="true">D</span><button id="mobile-close" type="button" aria-label="关闭连接设置" hidden>×</button></header><p class="mobile-eyebrow">DAYNEST · ANDROID</p><h1 id="mobile-title">把日常，带在身边。</h1><p>连接电脑上的 Daynest，继续使用同一账号与记录。</p><form id="mobile-form"><label>电脑服务地址<input id="mobile-server" type="url" inputmode="url" placeholder="http://192.168.1.10:8080" maxlength="500" required autocomplete="off" spellcheck="false"></label><label class="mobile-consent"><input id="mobile-consent" type="checkbox"><span>若使用 HTTP，我确认只在可信 Wi-Fi 中连接；登录信息和记录不会加密传输。</span></label><button id="mobile-connect" type="submit">检查并连接</button></form><p id="mobile-state" role="status" aria-live="polite"></p><details><summary>连接前请检查</summary><ol><li>手机和电脑位于同一可信局域网，电脑 Go 服务保持运行。</li><li>填写电脑局域网 IP，不是手机上的 localhost。</li><li>电脑需使用专用 JWT_SECRET；更换后已有网页需要重新登录，历史记录不变。</li><li>由你确认监听地址与防火墙端口，本 App 不会自动修改这些设置。</li></ol><p>这不是离线版。文件与业务记录仍保存在电脑，电脑关机后无法读取或保存；尚未确认保存的内容请保留并核对。</p></details>`;
+    setup.innerHTML = `<header><span class="mobile-mark" aria-hidden="true">D</span><button id="mobile-close" type="button" aria-label="关闭连接设置" hidden>×</button></header><p class="mobile-eyebrow">DAYNEST · ANDROID</p><h1 id="mobile-title">把日常，带在身边。</h1><p>连接电脑上的 Daynest，继续使用同一账号与记录。</p><form id="mobile-form"><label>电脑服务地址<input id="mobile-server" type="url" inputmode="url" placeholder="http://192.168.1.10:8080" maxlength="500" required autocomplete="off" spellcheck="false"></label><label class="mobile-consent"><input id="mobile-consent" type="checkbox"><span>若使用 HTTP，我确认只在可信 Wi-Fi 中连接；登录信息和记录不会加密传输。</span></label><button id="mobile-connect" type="submit">检查并连接</button></form><button id="mobile-offline" type="button" class="mobile-offline-button">离线阅读已保留的资料 ↗</button><p id="mobile-state" role="status" aria-live="polite"></p><details><summary>连接前请检查</summary><ol><li>手机和电脑位于同一可信局域网，电脑 Go 服务保持运行。</li><li>填写电脑局域网 IP，不是手机上的 localhost。</li><li>电脑需使用专用 JWT_SECRET；更换后已有网页需要重新登录，历史记录不变。</li><li>由你确认监听地址与防火墙端口，本 App 不会自动修改这些设置。</li></ol><p>主要数据与写入仍依赖电脑服务。事先开启保留的备忘录，可从「离线阅读」查看只读快照；尚未确认保存的编辑请从本机草稿核对。</p></details>`;
     document.body.append(setup);
+    const reader=document.createElement('dialog');reader.id='mobile-offline-reader';reader.className='mobile-offline-reader';reader.setAttribute('aria-label','本机离线阅读');
+    reader.innerHTML='<button id="mobile-offline-close" type="button" aria-label="关闭离线阅读">‹ 返回应用</button><iframe id="mobile-offline-frame" title="只读离线阅读库"></iframe>';
+    document.body.append(reader);
+
     const $ = id => document.getElementById('mobile-' + id), state = text => { $('state').textContent = text; };
     const bar = document.createElement('button'); bar.type = 'button'; bar.className = 'mobile-server-bar'; bar.textContent = '电脑连接 · 设置'; bar.hidden = true;
     document.querySelector('.workspace').prepend(bar);
-    function controls() { $('connect').disabled = busy; $('connect').textContent = fatal ? '重载界面' : busy ? '正在检查…' : '检查并连接'; $('server').disabled = busy; $('consent').disabled = busy; $('close').hidden = !loaded || fatal; }
+    function controls() { $('connect').disabled = busy; $('connect').textContent = fatal ? '重载界面' : busy ? '正在检查…' : '检查并连接'; $('server').disabled = busy; $('consent').disabled = busy; $('close').hidden = !loaded || fatal; $('offline').disabled = !connection; }
     function openSettings() { if (!setup.open) setup.showModal(); controls(); }
     window.DaynestMobile.openConnectionSettings=openSettings;
     window.DaynestMobile.getConnectionInfo=()=>({server:connection?.server||''});
+    function closeReader(){reader.close();$('offline-frame').src='about:blank';}
+    window.DaynestMobile.openOfflineReader=()=>{if(!connection){state('请先选择并连接一次电脑，在原账号开启离线保留。');return;}$('offline-frame').src='/static/offline-reader.html?server='+encodeURIComponent(connection.server);if(!reader.open)reader.showModal();};
+    $('offline').addEventListener('click',window.DaynestMobile.openOfflineReader);
+    $('offline-close').addEventListener('click',closeReader);
+    reader.addEventListener('close',()=>{$('offline-frame').src='about:blank';});
+    window.addEventListener('message',event=>{if(event.origin===location.origin&&event.source===$('offline-frame').contentWindow&&event.data?.type==='daynest:offline-close')closeReader();});
+
     async function activate() {
       if (loaded || loading) return; if (fatal) { location.reload(); return; }
       loading = true;

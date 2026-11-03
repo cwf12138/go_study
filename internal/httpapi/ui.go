@@ -60,3 +60,23 @@ func revalidateAssets(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+func (s *Server) offlineReader(w http.ResponseWriter, r *http.Request) {
+	s.readerAsset(w, "offline-reader.html", "text/html; charset=utf-8")
+}
+
+func (s *Server) offlineWorker(w http.ResponseWriter, r *http.Request) {
+	s.readerAsset(w, "offline-sw.js", "text/javascript; charset=utf-8")
+}
+
+func (s *Server) readerAsset(w http.ResponseWriter, name, contentType string) {
+	page, err := fs.ReadFile(s.assets, name)
+	if err != nil {
+		http.Error(w, "offline reader asset unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Cache-Control", "no-cache, max-age=0, must-revalidate")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	_, _ = w.Write(page)
+}

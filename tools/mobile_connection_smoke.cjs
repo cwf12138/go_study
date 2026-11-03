@@ -80,6 +80,11 @@ function harness(saved, existingToken = '') {
 
   const offline = harness(JSON.stringify({ server: origin, httpAcknowledged: true }), 'retain-token'); offline.answer = () => { throw Error('无法连接电脑'); }; await offline.init();
   assert.equal(offline.scripts.length, 0); assert.equal(offline.store.get('studyflow.token'), 'retain-token'); assert.match(offline.nodes.get('mobile-state').textContent, /无法连接电脑/);
+  const probeCount=offline.requests.length;
+  assert.equal(offline.nodes.get('mobile-offline').disabled,false);await offline.nodes.get('mobile-offline').fire('click');
+  assert(offline.nodes.get('mobile-offline-reader').open);assert.equal(offline.scripts.length,0);assert.equal(offline.requests.length,probeCount);
+  assert.equal(offline.nodes.get('mobile-offline-frame').src,'/static/offline-reader.html?server='+encodeURIComponent(origin));
+  await offline.nodes.get('mobile-offline-close').fire('click');assert(!offline.nodes.get('mobile-offline-reader').open);assert.equal(offline.nodes.get('mobile-offline-frame').src,'about:blank');
   offline.answer = null; await offline.submit(); assert.equal(offline.scripts.length, 2); assert.equal(offline.store.get('studyflow.token'), 'retain-token');
   offline.answer = () => { throw Error('offline'); }; await offline.appEvents.appStateChange({ isActive: true }); assert.match(offline.nodes.get('server-bar').textContent, /暂不可达/); assert.equal(offline.store.get('studyflow.token'), 'retain-token');
 

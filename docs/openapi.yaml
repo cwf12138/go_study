@@ -40,6 +40,28 @@ tags:
   - name: Shopping
   - name: Bookmarks
 paths:
+  /offline/:
+    get:
+      tags: [System]
+      summary: Public standalone read-only offline reader shell
+      description: Contains no user data. Account-owned snapshots are read locally after explicit opt-in; this route does not grant API access or authenticate an offline session.
+      responses:
+        "200":
+          description: Public reader HTML; revalidated while online
+          content:
+            text/html:
+              schema: { type: string }
+  /offline/sw.js:
+    get:
+      tags: [System]
+      summary: Service Worker restricted to the offline reader scope
+      description: Caches only the public reader shell and its static assets. No business API response or credential is cached.
+      responses:
+        "200":
+          description: Public Service Worker script
+          content:
+            text/javascript:
+              schema: { type: string }
   /api/v1/data-center:
     get:
       tags: [DataCenter]

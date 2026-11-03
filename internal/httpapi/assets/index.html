@@ -61,6 +61,7 @@
     <link rel="stylesheet" href="/static/product-polish.css?v=20261026-1">
     <link rel="stylesheet" href="/static/navigation.css?v=20261027-1">
     <link rel="stylesheet" href="/static/diagnostics.css?v=20261030-1">
+    <link rel="stylesheet" href="/static/offline-reader.css?v=20261103-1">
     <link rel="stylesheet" href="/static/actions.css?v=20261103-1">
     <link rel="stylesheet" href="/static/data-center.css?v=20261101-1">
     <link rel="stylesheet" href="/static/layout.css?v=20260922-1">
@@ -109,6 +110,7 @@
           <label>密码<input id="register-password" type="password" autocomplete="new-password" required minlength="8" placeholder="至少 8 位"></label>
           <button class="primary full" type="submit">创建账号并开始</button>
         </form>
+        <a id="auth-offline-open" class="rc-auth-link" href="/offline/" target="_blank" rel="noopener noreferrer">查看已保留的离线资料 ↗</a>
         <p class="hint">本界面直接连接当前 Go 服务，不依赖 Node、npm 或前端构建工具。</p>
       </section>
     </main>
@@ -472,7 +474,7 @@
             </div>
             <div class="memo-utility-bar">
               <span>随手记下 · 有序收藏 · 安静写作</span>
-              <div><button id="memo-drafts-open" class="quiet" type="button" aria-haspopup="dialog" disabled>本机草稿</button><select id="memo-template" aria-label="从模板新建备忘录"><option value="">从模板新建…</option><option value="study">学习笔记</option><option value="meeting">讨论记录</option><option value="daily">每日回顾</option></select><button id="memo-save" class="quiet" type="button" title="立即保存（Ctrl / ⌘ + S）">保存</button><button id="memo-focus" class="quiet" type="button" aria-pressed="false">专心写作</button></div>
+              <div><button id="memo-offline-open" class="quiet" type="button" aria-haspopup="dialog">离线阅读</button><button id="memo-drafts-open" class="quiet" type="button" aria-haspopup="dialog" disabled>本机草稿</button><select id="memo-template" aria-label="从模板新建备忘录"><option value="">从模板新建…</option><option value="study">学习笔记</option><option value="meeting">讨论记录</option><option value="daily">每日回顾</option></select><button id="memo-save" class="quiet" type="button" title="立即保存（Ctrl / ⌘ + S）">保存</button><button id="memo-focus" class="quiet" type="button" aria-pressed="false">专心写作</button></div>
             </div>
             <div id="memo-drafts-notice" class="memo-drafts-notice" hidden><span aria-hidden="true">▤</span><p id="memo-drafts-notice-text" role="status"></p><button id="memo-drafts-review" type="button">查看草稿 →</button></div>
             <p id="memo-drafts-local-state" class="memo-drafts-local-state" role="status">编辑时保留本机草稿</p>
@@ -951,6 +953,8 @@
     <script src="/static/http-client.js?v=20261103-1" defer></script>
     <script src="/static/actions-core.js?v=20261103-1" defer></script>
     <script src="/static/actions.js?v=20261103-1" defer></script>
+    <script src="/static/read-cache-core.js?v=20261103-1" defer></script>
+    <script src="/static/read-cache.js?v=20261103-1" defer></script>
     <script src="/static/auth-state.js?v=20261103-1" defer></script>
     <script src="/static/diagnostics-core.js?v=20261030-1" defer></script>
     <script src="/static/diagnostics.js?v=20261030-1" defer></script>
@@ -961,7 +965,7 @@
     <script src="/static/draft-store.js?v=20261102-1" defer></script>
     <script src="/static/record-drafts-core.js?v=20261102-1" defer></script>
     <script src="/static/record-drafts.js?v=20261102-1" defer></script>
-    <script src="/static/app.js?v=20261103-session&actions=20261103" defer></script>
+    <script src="/static/app.js?v=20261103-session&actions=20261103&offline=1" defer></script>
     <script src="/static/gentle-reminders-core.js?v=20261022-1" defer></script>
     <script src="/static/important-days-core.js?v=20261022-1" defer></script>
     <script src="/static/important-days.js?v=20261022-1" defer></script>
@@ -1003,7 +1007,7 @@
     <script src="/static/text-clips.js?v=20261029-1" defer></script>
     <script src="/static/memo-drafts-core.js?v=20261102-2" defer></script>
     <script src="/static/memo-drafts.js?v=20261102-1" defer></script>
-    <script src="/static/memos.js?v=20261103-http&actions=20261103" defer></script>
+    <script src="/static/memos.js?v=20261103-http&actions=20261103&offline=1" defer></script>
     <script src="/static/english.js?v=20261007-2" defer></script>
     <script src="/static/english-reading.js?v=20260915-1" defer></script>
     <script src="/static/explore.js?v=20260920-playrooms" defer></script>

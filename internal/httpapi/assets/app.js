@@ -350,6 +350,7 @@
   }
 
   function leaveApp({ keepStoredSession = false } = {}) {
+    document.dispatchEvent(new CustomEvent('daynest:account-leaving',{detail:{keepStoredSession}}));
     recordDrafts?.capture("mood"); recordDrafts?.capture("weekly"); recordAccountEpoch++;
     coreReadyToken = "";
     restoringSession = "";

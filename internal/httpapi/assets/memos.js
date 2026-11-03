@@ -44,10 +44,16 @@
   });
 
   async function memoAPI(path, options = {}) {
+    let context;
     try {
       if(!window.DaynestHTTP)throw Error("请求组件未加载，请刷新页面。");
-      return await window.DaynestHTTP.json(path, options);
+      context=options.context || window.DaynestHTTP.capture();
+      const data=await window.DaynestHTTP.json(path, {...options,context});
+      window.DaynestReadCache?.observe(path,(options.method||'GET').toUpperCase(),data,context);
+      return data;
     } catch (error) {
+      const id=path.match(/^\/api\/v1\/memos\/([\w-]+)$/)?.[1];
+      if(id&&context&&((error.status===404&&error.code==='not_found')||error.status===403))window.DaynestReadCache?.missing(id,context);
       if(error.status===409)error.message="服务端备忘录已有变化。已保留本机文字，请在本机草稿中对照，或另存为新备忘录。";
       else if(error.status===404)error.message=error.code==="not_found"?"这条备忘录或文件夹已不存在，请刷新列表后重试。":"备忘录接口不可用，请确认访问地址正确并重启 Go 服务。";
       else if(error.kind==="timeout")error.message="备忘录请求超时，请先核对结果；未提交的文字仍保留在编辑区。";
@@ -425,6 +431,9 @@
   function folderColorValue(color) { return { yellow: "#e8b846", orange: "#e7924c", rose: "#de758c", violet: "#8d78d4", blue: "#6595df", mint: "#54b991", gray: "#929cab" }[color] || "#6595df"; }
 
   function bindEvents() {
+    document.addEventListener('daynest:read-cache-enabled',()=>{
+      if(state.baseNote&&window.DaynestHTTP)window.DaynestReadCache?.observe(`/api/v1/memos/${state.baseNote.id}`,'GET',state.baseNote,window.DaynestHTTP.capture());
+    });
     $("#memo-create-recheck").addEventListener("click",()=>loadMemos());
     $("#memo-create-allow").addEventListener("click",()=>{state.createUncertain=false;renderCreateState();});
     const accountReady = () => {

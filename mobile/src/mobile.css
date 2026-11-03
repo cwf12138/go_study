@@ -17,3 +17,7 @@ body.daynest-native{padding-top:env(safe-area-inset-top);padding-bottom:env(safe
   .daynest-native .topbar #logout{min-height:40px;padding:6px 8px;font-size:13px}
   .daynest-native .topbar>.topbar-glance{grid-column:1/-1;grid-row:2;width:100%;margin:0}
 }
+
+.mobile-offline-button{width:100%;margin-top:12px;border:1px solid #dbe5df;border-radius:12px;padding:12px;background:#f4f7f4;color:#426957;font:inherit}.mobile-offline-reader{width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;margin:0;padding:0;border:0;border-radius:0;background:#f4f5f1}.mobile-offline-reader>button{width:100%;padding:calc(12px + env(safe-area-inset-top)) 16px 12px;border:0;background:#eff4ef;color:#426957;text-align:right;font:inherit}.mobile-offline-reader iframe{display:block;width:100%;height:calc(100% - 58px - env(safe-area-inset-top));border:0}
+
+.mobile-offline-reader[open]{display:grid;grid-template-rows:auto minmax(0,1fr);position:fixed;inset:0}.mobile-offline-reader>button{text-align:left}.mobile-offline-reader iframe{height:100%}

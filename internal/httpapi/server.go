@@ -48,6 +48,8 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 	root := http.NewServeMux()
 	staticFiles := http.StripPrefix("/static/", http.FileServer(http.FS(assets)))
 	root.Handle("GET /static/", revalidateAssets(staticFiles))
+	root.HandleFunc("GET /offline/{$}", s.offlineReader)
+	root.HandleFunc("GET /offline/sw.js", s.offlineWorker)
 	root.HandleFunc("/", s.home)
 	root.HandleFunc("GET /healthz", s.health)
 	root.HandleFunc("GET /readyz", s.ready)
