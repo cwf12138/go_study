@@ -163,7 +163,8 @@
     (state.overview?.events || []).forEach((item) => add(dateKey(new Date(item.occurrence_start)), { type: "event", id: item.id, title: item.title, time: item.all_day ? "全天" : clock(new Date(item.occurrence_start)), color: validColor(item.color), raw: item }));
     (state.overview?.plan_blocks || []).forEach((item) => add(dateKey(new Date(item.start_at)), { type: "plan", id: item.id, title: item.title, time: clock(new Date(item.start_at)), color: "#845fe8", raw: item }));
     (state.overview?.tasks || []).forEach((item) => add(dateKey(new Date(item.due_at)), { type: "task", id: item.id, title: `任务 · ${item.title}`, time: clock(new Date(item.due_at)), color: "#e5963e", raw: item }));
-    (state.overview?.todos || []).forEach((item) => add(dateKey(new Date(item.due_at)), { type: "todo", id: item.id, title: `待办 · ${item.title}`, time: clock(new Date(item.due_at)), color: "#e5963e", raw: item }));
+    (state.overview?.todos || []).forEach((item) => add(item.due_at ? dateKey(new Date(item.due_at)) : item.my_day_date, { type: "todo", id: item.id, title: `待办 · ${item.title}`, time: item.due_at ? clock(new Date(item.due_at)) : "当天", color: "#e5963e", raw: item }));
+    (state.overview?.focus_sessions || []).forEach(item=>add(dateKey(new Date(item.started_at)),{type:"focus",id:item.id,title:`专注 · ${item.title_snapshot || (state.overview?.tasks||[]).find(t=>t.id===item.task_id)?.title || "自由专注"}`,time:clock(new Date(item.started_at)),color:"#577e9a",raw:item}));
     (state.overview?.mood_entries || []).forEach((item) => add(item.date, { type: "mood", id: item.id, title: `心情 · ${calendarMood(item.mood).label}`, time: "记录", color: "#25ae85", raw: item }));
     (state.overview?.fitness_days || []).forEach((item) => add(item.date, { type: "fitness", id: 'fitness-day-'+item.date, title: '运动 · 已锻炼', time: '打卡', color: '#718b5d', raw: item }));
     (state.overview?.care_entries || []).forEach((item,index)=>add(item.date,{type:'care',id:'care-'+item.item_id+'-'+index,title:(item.kind==='done'?'已照顾 · ':'保养 · ')+item.title,time:item.kind==='done'?'完成':'待办',color:'#46797d',raw:item}));
@@ -380,7 +381,7 @@
     const items = itemsByDate().get(state.selected) || [];
     const agenda = $("#calendar-day-agenda");
     agenda.classList.toggle("empty-state", !items.length);
-    agenda.innerHTML = items.length ? items.map((item) => `<div class="calendar-agenda-item" ${item.type === "event" ? `role="button" tabindex="0" aria-label="编辑 ${escapeHTML(item.title)}" data-calendar-event="${escapeHTML(item.id)}"` : ""}><span class="calendar-agenda-time">${escapeHTML(item.time)}</span><i class="calendar-agenda-color" style="--item-color:${item.color}"></i><span><b>${calendarItemTitle(item)}</b><small>${escapeHTML(item.type === "event" ? item.raw.category : item.type === "fitness" ? fitnessDescription(item.raw) : typeLabel(item.type))}</small>${item.type === "fitness" ? `<button type="button" class="calendar-fitness-link" data-calendar-fitness="${escapeHTML(item.raw.date)}">查看运动记录 ↗</button>` : item.type === "care" ? `<button type="button" class="calendar-fitness-link" data-calendar-care="${escapeHTML(item.raw.item_id)}">查看保养事项 ↗</button>` : ""}</span></div>`).join("") : "这一天还没有安排。";
+    agenda.innerHTML = items.length ? items.map((item) => `<div class="calendar-agenda-item" ${item.type === "event" ? `role="button" tabindex="0" aria-label="编辑 ${escapeHTML(item.title)}" data-calendar-event="${escapeHTML(item.id)}"` : ""}><span class="calendar-agenda-time">${escapeHTML(item.time)}</span><i class="calendar-agenda-color" style="--item-color:${item.color}"></i><span><b>${calendarItemTitle(item)}</b><small>${escapeHTML(item.type === "event" ? item.raw.category : item.type === "fitness" ? fitnessDescription(item.raw) : item.type === "focus" ? `${item.raw.actual_minutes} 分钟 · 已完成` : typeLabel(item.type))}</small>${(item.type === "todo" || (item.type === "focus" && item.raw.todo_id)) ? `<button type="button" class="calendar-fitness-link" ${item.raw.memo_action_id ? `data-action-link="${escapeHTML(item.raw.memo_action_id)}"` : `data-action-todo-context="${escapeHTML(item.type === "todo" ? item.id : item.raw.todo_id)}"`}>查看待办与专注 ↗</button>` : ""}${item.type === "fitness" ? `<button type="button" class="calendar-fitness-link" data-calendar-fitness="${escapeHTML(item.raw.date)}">查看运动记录 ↗</button>` : item.type === "care" ? `<button type="button" class="calendar-fitness-link" data-calendar-care="${escapeHTML(item.raw.item_id)}">查看保养事项 ↗</button>` : ""}</span></div>`).join("") : "这一天还没有安排。";
   }
 
   function navigate(direction) {
@@ -470,6 +471,8 @@
 
   function bind() {
     window.addEventListener('daynest:fitness-changed',fitnessChanged);
+    document.addEventListener('daynest:focus-changed',fitnessChanged);
+    document.addEventListener('daynest:actions-changed',fitnessChanged);
     window.addEventListener('daynest:care-changed',fitnessChanged);
     window.addEventListener('daynest:calendar-date',event=>{const day=event.detail?.date;if(!token()||typeof day!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(day)||day<'2000-01-01'||day>'2100-12-31'||dateKey(fromDateKey(day))!==day)return;state.selected=day;state.anchor=fromDateKey(day);if($('#panel-calendar').classList.contains('active'))loadCalendar();});
     const tools = $("#calendar-tools-dialog");
@@ -628,7 +631,7 @@
     const mood = calendarMood(item.raw?.mood);
     return `<img class="calendar-mood-icon" src="/static/mood-art/${mood.value}-flat-v2.png" width="20" height="20" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><span class="calendar-mood-label">${escapeHTML(item.title)}</span>`;
   }
-  function typeLabel(value) { return ({ plan: "学习计划", task: "学习任务", todo: "待办事项", mood: "心情日记", fitness: "运动日常", care: "生活保养站" })[value] || value; }
+  function typeLabel(value) { return ({ plan: "学习计划", task: "学习任务", todo: "待办事项", mood: "心情日记", fitness: "运动日常", care: "生活保养站", focus: "已完成专注" })[value] || value; }
 
   bind();
 })();

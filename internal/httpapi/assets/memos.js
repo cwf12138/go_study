@@ -469,6 +469,18 @@
     });
     document.addEventListener("daynest:legacy-knowledge", () => loadMemos());
     $("#memo-save").addEventListener("click", () => saveCurrent());
+    $("#memo-to-action").addEventListener("click", async () => {
+      const noteID=state.current?.id, token=state.token, editor=$("#memo-content");
+      if(!noteID || state.current.deleted_at)return;
+      const start=editor.selectionStart,end=editor.selectionEnd,content=editor.value,title=$("#memo-title").value;
+      try {
+        window.DaynestActionCore.anchor({content,title},start,end);
+        if(state.dirty&&!(await saveCurrent({quiet:true})))return;
+        if(token!==state.token||state.current?.id!==noteID)return;
+        if(editor.value!==content||$("#memo-title").value!==title)throw Error("内容已变化，请重新选择需要关联的一行。");
+        await window.DaynestActions.openMemo({...state.baseNote},start,end);
+      }catch(error){notify(error.message,"error");}
+    });
     $("#memo-focus").addEventListener("click", () => {
       const focused = $(".memo-workspace").classList.toggle("memo-focused");
       $("#memo-focus").textContent = focused ? "退出专心写作" : "专心写作";

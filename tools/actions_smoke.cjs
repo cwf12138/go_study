@@ -1,0 +1,13 @@
+const assert=require('node:assert/strict'),C=require('../internal/httpapi/assets/actions-core.js');
+assert.equal(C.normalize('- [ ] 整理  房间'),'整理 房间');assert.equal(C.normalize('- [x] 整理 房间'),'整理 房间');
+const note={title:'明天做什么',content:'## 计划\n- [ ] 整理书架\n- 购买食材'};
+assert.deepEqual(C.anchor(note,note.content.indexOf('整理'),note.content.indexOf('整理')+2),{anchor_kind:'line',anchor_text:'整理书架'});
+assert.deepEqual(C.anchor(note,0,0),{anchor_kind:'title',anchor_text:note.title});assert.throws(()=>C.anchor(note,0,20));
+const data=new Map(),storage={getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v)},a=C.commands(storage,{userID:'a',server:'http://localhost:8080'}),b=C.commands(storage,{userID:'b',server:'http://localhost:8080'}),remote=C.commands(storage,{userID:'a',server:'http://other:8080'});
+const command={path:'/api/v1/focus-sessions',body:{todo_id:'todo-a',request_id:'request-123456789'},createdAt:Date.now()};a.put('focus',command);assert.deepEqual(a.read().focus,command);assert.deepEqual(b.read(),{});assert.deepEqual(remote.read(),{});assert.throws(()=>a.put('focus',command));assert(!JSON.stringify([...data]).includes('token'));a.remove('focus');assert.deepEqual(a.read(),{});
+assert.throws(()=>C.commands({getItem:()=>'{broken'}, {userID:'a',server:'server'}).read());assert.throws(()=>C.commands({getItem:()=>null,setItem:()=>{throw Error('quota');}},{userID:'a',server:'server'}).put('focus',command));
+console.log('PASS action anchors, per-account/server pending commands and blocked unsafe retries');
+const focus={id:'focus-a',user_id:'a',todo_id:'todo-a',status:'completed',phase:'focus',planned_minutes:25,actual_minutes:5,focused_seconds:300,phase_remaining_seconds:1200,started_at:'2026-11-03T01:00:00Z',phase_started_at:'2026-11-03T01:05:00Z'};
+const context={todo:{id:'todo-a',user_id:'a',title:'阅读',status:'open'},link:null,source:null,completed_minutes:5,sessions:[focus]};
+assert(C.validContext(context,'a'));assert(!C.validContext(context,'b'));assert(!C.validContext({...context,sessions:[{...focus,todo_id:'another-todo'}]},'a'));assert(!C.validContext({...context,sessions:null},'a'));assert(!C.validContext({},'a'));assert(!C.validFocus({...focus,phase_remaining_seconds:-1},'a'));
+console.log('PASS action response contracts reject malformed and foreign records');

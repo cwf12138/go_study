@@ -2494,6 +2494,8 @@ paths:
               type: object
               properties:
                 task_id: { type: string }
+                todo_id: { type: string, description: "Mutually exclusive with task_id and plan_block_id; only open todos may start a new session." }
+                request_id: { type: string, pattern: '^[A-Za-z0-9_-]{16,100}$', description: "Required with todo_id. Same account and ID replay the original session; changed parameters conflict. No automatic todo completion." }
                 plan_block_id: { type: string, description: "When set, duration and linked task can be inherited from the plan block." }
                 planned_minutes: { type: integer, minimum: 1, maximum: 240 }
                 break_enabled: { type: boolean, default: false, description: "Split focus time into two segments with a fixed 5-minute break." }
@@ -2856,6 +2858,104 @@ paths:
       summary: Move a memo to Recently Deleted
       responses:
         "204": { description: Moved to trash }
+  /api/v1/memos/{note_id}/actions:
+    parameters:
+      - { name: note_id, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Memos]
+      security: [{ bearerAuth: [] }]
+      summary: List current account's permanent action receipts for a memo
+      responses:
+        "200":
+          description: Includes existing receipts after the source memo has been deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/ActionLink" } }
+    post:
+      tags: [Memos, Todos]
+      security: [{ bearerAuth: [] }]
+      summary: Atomically link one memo title or line to a todo
+      description: Stable identity uses account, memo, anchor kind and normalized text. Replays return the original receipt without overwriting the todo or resurrecting a deleted todo. Copies of the source title and line remain in the receipt after deletion. A success is not an immediate disk durability guarantee.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [anchor_kind, anchor_text, expected_updated_at, title]
+              properties:
+                anchor_kind: { type: string, enum: [title, line] }
+                anchor_text: { type: string, minLength: 1, maxLength: 300 }
+                expected_updated_at: { type: string, format: date-time }
+                title: { type: string, minLength: 1, maxLength: 200 }
+                priority: { type: string, enum: [low, medium, high], default: medium }
+                due_at: { type: [string, 'null'], format: date-time }
+                my_day_date: { type: string, description: "Empty or YYYY-MM-DD" }
+      responses:
+        "201":
+          description: Created receipt and todo in the inbox
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemoActionResponse" }
+        "200":
+          description: Existing receipt; matches_request indicates whether original parameters matched
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemoActionResponse" }
+        "409": { description: "Source version changed or target ID conflicted; no partial creation" }
+  /api/v1/action-links/{action_id}:
+    get:
+      tags: [Memos, Todos]
+      security: [{ bearerAuth: [] }]
+      summary: Read source, target and recent focus history, including deleted targets
+      parameters:
+        - { name: action_id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Account-owned context
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ActionContext" }
+  /api/v1/todos/{todo_id}/context:
+    get:
+      tags: [Todos, Focus]
+      security: [{ bearerAuth: [] }]
+      summary: Read a todo and its source and focus history
+      parameters:
+        - { name: todo_id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Account-owned existing todo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ActionContext" }
+        "404": { description: Todo no longer exists; a known action link can still resolve history }
+  /api/v1/focus-sessions/requests/{request_id}:
+    get:
+      tags: [Focus]
+      security: [{ bearerAuth: [] }]
+      summary: Reconcile a todo focus start, including an already finished session
+      parameters:
+        - { name: request_id, in: path, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{16,100}$' } }
+      responses:
+        "200":
+          description: Original session for this account and request ID
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/FocusSession" }
+        "404": { description: No matching session in this account }
   /api/v1/memos/{note_id}/restore:
     post:
       tags: [Memos]
@@ -4304,6 +4404,7 @@ components:
         plan_blocks: { type: array, items: { $ref: "#/components/schemas/StudyPlanBlock" } }
         tasks: { type: array, items: { $ref: "#/components/schemas/StudyTask" } }
         todos: { type: array, items: { $ref: "#/components/schemas/TodoItem" } }
+        focus_sessions: { type: [array, 'null'], items: { $ref: "#/components/schemas/FocusSession" }, description: "Completed only, grouped by start date in Asia/Shanghai. Read-only projection; no duplicate event is stored." }
         mood_entries: { type: array, items: { $ref: "#/components/schemas/MoodEntry" } }
         fitness_days: { type: array, items: { $ref: "#/components/schemas/FitnessDay" } }
         care_entries: { type: array, items: { $ref: "#/components/schemas/CareCalendarEntry" } }
@@ -4496,6 +4597,7 @@ components:
         - type: object
           properties:
             id: { type: string }
+            memo_action_id: { type: string, description: "Optional permanent source receipt ID" }
             user_id: { type: string }
             status: { type: string, enum: [open, completed] }
             steps:
@@ -4700,12 +4802,53 @@ components:
         added: { type: integer, minimum: 0 }
         skipped: { type: integer, minimum: 0 }
         total: { type: integer, minimum: 0 }
+    ActionLink:
+      type: object
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        memo_id: { type: string }
+        todo_id: { type: string }
+        anchor_kind: { type: string, enum: [title, line] }
+        anchor_text: { type: string }
+        memo_title: { type: string }
+        memo_updated_at: { type: string, format: date-time }
+        fingerprint: { type: string }
+        created_at: { type: string, format: date-time }
+    ActionContext:
+      type: object
+      properties:
+        link: { oneOf: [{ $ref: "#/components/schemas/ActionLink" }, { type: 'null' }] }
+        todo: { oneOf: [{ $ref: "#/components/schemas/TodoItem" }, { type: 'null' }] }
+        source:
+          type: [object, 'null']
+          properties:
+            id: { type: string }
+            title: { type: string }
+            archived: { type: boolean }
+            deleted: { type: boolean }
+            changed: { type: boolean }
+        completed_minutes: { type: integer, minimum: 0 }
+        sessions: { type: array, maxItems: 20, items: { $ref: "#/components/schemas/FocusSession" } }
+    MemoActionResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            created: { type: boolean }
+            matches_request: { type: boolean }
+            context: { $ref: "#/components/schemas/ActionContext" }
     FocusSession:
       type: object
       properties:
         id: { type: string }
         user_id: { type: string }
         task_id: { type: string }
+        todo_id: { type: string }
+        memo_action_id: { type: string }
+        title_snapshot: { type: string }
+        request_fingerprint: { type: string }
         plan_block_id: { type: string }
         planned_minutes: { type: integer }
         actual_minutes: { type: integer }

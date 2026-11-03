@@ -26,6 +26,7 @@ const context = {
   localStorage: storage, sessionStorage: storage,
   location: { hash: "" },
   document: {
+    addEventListener() {},
     querySelector: getElement,
     querySelectorAll() { return []; },
   },

@@ -559,6 +559,11 @@
     ],
     "collections": [
       {
+        "section": "action_links",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
         "section": "bookmarks",
         "records": 0,
         "mode": "archive_only"

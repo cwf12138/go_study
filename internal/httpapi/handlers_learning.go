@@ -8,6 +8,8 @@ import (
 
 func (s *Server) startFocus(w http.ResponseWriter, r *http.Request) {
 	var body struct {
+		TodoID         string `json:"todo_id"`
+		RequestID      string `json:"request_id"`
 		TaskID         string `json:"task_id"`
 		PlanBlockID    string `json:"plan_block_id"`
 		PlannedMinutes int    `json:"planned_minutes"`
@@ -18,7 +20,7 @@ func (s *Server) startFocus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	session, err := s.service.StartFocus(r.Context(), claimsFromContext(r.Context()).Subject, service.StartFocusInput{
-		TaskID: body.TaskID, PlanBlockID: body.PlanBlockID, PlannedMinutes: body.PlannedMinutes, BreakEnabled: body.BreakEnabled,
+		TodoID: body.TodoID, RequestID: body.RequestID, TaskID: body.TaskID, PlanBlockID: body.PlanBlockID, PlannedMinutes: body.PlannedMinutes, BreakEnabled: body.BreakEnabled,
 	})
 	if err != nil {
 		writeError(w, err)

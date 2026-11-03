@@ -156,21 +156,22 @@ type TodoStep struct {
 }
 
 type TodoItem struct {
-	ID          string         `json:"id"`
-	UserID      string         `json:"user_id"`
-	ListID      string         `json:"list_id"`
-	Title       string         `json:"title"`
-	Notes       string         `json:"notes"`
-	Priority    TaskPriority   `json:"priority"`
-	Status      TodoStatus     `json:"status"`
-	DueAt       *time.Time     `json:"due_at,omitempty"`
-	MyDayDate   string         `json:"my_day_date,omitempty"`
-	RepeatRule  TodoRepeatRule `json:"repeat_rule"`
-	Tags        []string       `json:"tags"`
-	Steps       []TodoStep     `json:"steps"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
-	CompletedAt *time.Time     `json:"completed_at,omitempty"`
+	MemoActionID string         `json:"memo_action_id,omitempty"`
+	ID           string         `json:"id"`
+	UserID       string         `json:"user_id"`
+	ListID       string         `json:"list_id"`
+	Title        string         `json:"title"`
+	Notes        string         `json:"notes"`
+	Priority     TaskPriority   `json:"priority"`
+	Status       TodoStatus     `json:"status"`
+	DueAt        *time.Time     `json:"due_at,omitempty"`
+	MyDayDate    string         `json:"my_day_date,omitempty"`
+	RepeatRule   TodoRepeatRule `json:"repeat_rule"`
+	Tags         []string       `json:"tags"`
+	Steps        []TodoStep     `json:"steps"`
+	CreatedAt    time.Time      `json:"created_at"`
+	UpdatedAt    time.Time      `json:"updated_at"`
+	CompletedAt  *time.Time     `json:"completed_at,omitempty"`
 }
 
 // CalendarRepeatRule deliberately keeps recurrence compact. It covers the
@@ -245,16 +246,17 @@ type CalendarDayDetail struct {
 }
 
 type CalendarOverview struct {
-	Start       string               `json:"start"`
-	End         string               `json:"end"`
-	Days        []CalendarDaySummary `json:"days"`
-	Events      []CalendarOccurrence `json:"events"`
-	PlanBlocks  []StudyPlanBlock     `json:"plan_blocks"`
-	Tasks       []StudyTask          `json:"tasks"`
-	Todos       []TodoItem           `json:"todos"`
-	MoodEntries []MoodEntry          `json:"mood_entries"`
-	FitnessDays []FitnessDay         `json:"fitness_days"`
-	CareEntries []CareCalendarEntry  `json:"care_entries"`
+	FocusSessions []FocusSession       `json:"focus_sessions"`
+	Start         string               `json:"start"`
+	End           string               `json:"end"`
+	Days          []CalendarDaySummary `json:"days"`
+	Events        []CalendarOccurrence `json:"events"`
+	PlanBlocks    []StudyPlanBlock     `json:"plan_blocks"`
+	Tasks         []StudyTask          `json:"tasks"`
+	Todos         []TodoItem           `json:"todos"`
+	MoodEntries   []MoodEntry          `json:"mood_entries"`
+	FitnessDays   []FitnessDay         `json:"fitness_days"`
+	CareEntries   []CareCalendarEntry  `json:"care_entries"`
 }
 
 type VocabularyStage string
@@ -854,6 +856,10 @@ const (
 )
 
 type FocusSession struct {
+	TodoID                string      `json:"todo_id,omitempty"`
+	MemoActionID          string      `json:"memo_action_id,omitempty"`
+	TitleSnapshot         string      `json:"title_snapshot,omitempty"`
+	RequestFingerprint    string      `json:"request_fingerprint,omitempty"`
 	ID                    string      `json:"id"`
 	UserID                string      `json:"user_id"`
 	TaskID                string      `json:"task_id,omitempty"`

@@ -222,7 +222,16 @@ func (s *Service) CalendarOverview(ctx context.Context, userID, startValue, endV
 	if err != nil {
 		return domain.CalendarOverview{}, err
 	}
+	sessions, err := s.repo.ListFocusSessions(ctx, userID, start.UTC())
+	if err != nil {
+		return domain.CalendarOverview{}, err
+	}
 	overview := domain.CalendarOverview{Start: startValue, End: endValue, PlanBlocks: blocks, FitnessDays: fitnessCalendarDays(fitness, startValue, endValue)}
+	for _, session := range sessions {
+		if session.Status == domain.FocusCompleted && session.StartedAt.Before(end.UTC()) {
+			overview.FocusSessions = append(overview.FocusSessions, session)
+		}
+	}
 	overview.CareEntries = careCalendarEntries(care, startValue, endValue)
 	for day := start; day.Before(end); day = day.AddDate(0, 0, 1) {
 		overview.Days = append(overview.Days, calendarDaySummary(day))
@@ -234,7 +243,7 @@ func (s *Service) CalendarOverview(ctx context.Context, userID, startValue, endV
 		}
 	}
 	for _, todo := range todos {
-		if todo.DueAt != nil && !todo.DueAt.Before(start.UTC()) && todo.DueAt.Before(end.UTC()) {
+		if (todo.DueAt != nil && !todo.DueAt.Before(start.UTC()) && todo.DueAt.Before(end.UTC())) || (todo.DueAt == nil && todo.MyDayDate >= startValue && todo.MyDayDate < endValue) {
 			overview.Todos = append(overview.Todos, todo)
 		}
 	}

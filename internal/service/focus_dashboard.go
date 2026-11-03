@@ -15,6 +15,8 @@ import (
 const defaultBreakMinutes = 5
 
 type StartFocusInput struct {
+	TodoID         string
+	RequestID      string
 	TaskID         string
 	PlanBlockID    string
 	PlannedMinutes int
@@ -22,6 +24,9 @@ type StartFocusInput struct {
 }
 
 func (s *Service) StartFocus(ctx context.Context, userID string, input StartFocusInput) (domain.FocusSession, error) {
+	if input.TodoID != "" {
+		return s.startTodoFocus(ctx, userID, input)
+	}
 	if _, err := s.repo.ActiveFocusSession(ctx, userID); err == nil {
 		return domain.FocusSession{}, fmt.Errorf("%w: finish or abandon the current focus session first", domain.ErrConflict)
 	} else if !errors.Is(err, domain.ErrNotFound) {
@@ -47,6 +52,7 @@ func (s *Service) StartFocus(ctx context.Context, userID string, input StartFocu
 	if input.PlannedMinutes < 1 || input.PlannedMinutes > 240 {
 		return domain.FocusSession{}, fmt.Errorf("%w: planned_minutes must be between 1 and 240", domain.ErrInvalidInput)
 	}
+	titleSnapshot := ""
 	if input.TaskID != "" {
 		task, err := s.repo.TaskByID(ctx, input.TaskID)
 		if err != nil {
@@ -55,10 +61,12 @@ func (s *Service) StartFocus(ctx context.Context, userID string, input StartFocu
 		if err := requireOwner(task.UserID, userID); err != nil {
 			return domain.FocusSession{}, err
 		}
+		titleSnapshot = task.Title
 	}
 	now := s.now().UTC()
 	session := domain.FocusSession{
-		ID: platform.NewID(), UserID: userID, TaskID: input.TaskID, PlanBlockID: input.PlanBlockID,
+		TitleSnapshot: titleSnapshot,
+		ID:            platform.NewID(), UserID: userID, TaskID: input.TaskID, PlanBlockID: input.PlanBlockID,
 		PlannedMinutes: input.PlannedMinutes, BreakEnabled: input.BreakEnabled,
 		Phase: domain.FocusPhaseFocus, Status: domain.FocusRunning,
 		PhaseStartedAt: now, PhaseRemainingSeconds: input.PlannedMinutes * 60, StartedAt: now,
@@ -98,6 +106,7 @@ func (s *Service) PauseFocus(ctx context.Context, userID, sessionID string) (dom
 	if err != nil {
 		return domain.FocusSession{}, err
 	}
+	before := session
 	if session.Status != domain.FocusRunning {
 		return domain.FocusSession{}, fmt.Errorf("%w: only a running focus session can be paused", domain.ErrInvalidState)
 	}
@@ -105,7 +114,8 @@ func (s *Service) PauseFocus(ctx context.Context, userID, sessionID string) (dom
 	session = consumeRunningPhase(session, now)
 	session.Status = domain.FocusPaused
 	session.PausedAt = &now
-	if err := s.repo.UpdateFocusSession(ctx, session); err != nil {
+	session, err = s.updateFocus(ctx, before, session)
+	if err != nil {
 		return domain.FocusSession{}, err
 	}
 	s.publish("focus.paused", userID, session.ID, map[string]any{"phase": session.Phase, "remaining_seconds": session.PhaseRemainingSeconds})
@@ -117,6 +127,7 @@ func (s *Service) ResumeFocus(ctx context.Context, userID, sessionID string) (do
 	if err != nil {
 		return domain.FocusSession{}, err
 	}
+	before := session
 	if session.Status != domain.FocusPaused {
 		return domain.FocusSession{}, fmt.Errorf("%w: only a paused focus session can be resumed", domain.ErrInvalidState)
 	}
@@ -124,7 +135,8 @@ func (s *Service) ResumeFocus(ctx context.Context, userID, sessionID string) (do
 	session.Status = domain.FocusRunning
 	session.PausedAt = nil
 	session.PhaseStartedAt = now
-	if err := s.repo.UpdateFocusSession(ctx, session); err != nil {
+	session, err = s.updateFocus(ctx, before, session)
+	if err != nil {
 		return domain.FocusSession{}, err
 	}
 	s.publish("focus.resumed", userID, session.ID, map[string]any{"phase": session.Phase, "remaining_seconds": session.PhaseRemainingSeconds})
@@ -138,6 +150,7 @@ func (s *Service) AdvanceFocus(ctx context.Context, userID, sessionID string) (d
 	if err != nil {
 		return domain.FocusSession{}, err
 	}
+	before := session
 	if session.Status != domain.FocusRunning {
 		return domain.FocusSession{}, fmt.Errorf("%w: only a running focus session can advance", domain.ErrInvalidState)
 	}
@@ -157,7 +170,8 @@ func (s *Service) AdvanceFocus(ctx context.Context, userID, sessionID string) (d
 		return domain.FocusSession{}, fmt.Errorf("%w: this focus session has no next phase", domain.ErrInvalidState)
 	}
 	session.PhaseStartedAt = now
-	if err := s.repo.UpdateFocusSession(ctx, session); err != nil {
+	session, err = s.updateFocus(ctx, before, session)
+	if err != nil {
 		return domain.FocusSession{}, err
 	}
 	s.publish("focus.phase_advanced", userID, session.ID, map[string]any{"phase": session.Phase, "remaining_seconds": session.PhaseRemainingSeconds})
@@ -169,6 +183,13 @@ func (s *Service) FinishFocus(ctx context.Context, userID, sessionID string, aba
 	if err != nil {
 		return domain.FocusSession{}, err
 	}
+	if session.TodoID != "" && (session.Status == domain.FocusCompleted || session.Status == domain.FocusAbandoned) {
+		if (abandoned && session.Status == domain.FocusAbandoned) || (!abandoned && session.Status == domain.FocusCompleted) {
+			return session, nil
+		}
+		return domain.FocusSession{}, domain.ErrConflict
+	}
+	before := session
 	if session.Status != domain.FocusRunning && session.Status != domain.FocusPaused {
 		return domain.FocusSession{}, fmt.Errorf("%w: focus session is already finished", domain.ErrInvalidState)
 	}
@@ -184,7 +205,8 @@ func (s *Service) FinishFocus(ctx context.Context, userID, sessionID string, aba
 	} else {
 		session.Status = domain.FocusCompleted
 	}
-	if err := s.repo.UpdateFocusSession(ctx, session); err != nil {
+	session, err = s.updateFocus(ctx, before, session)
+	if err != nil {
 		return domain.FocusSession{}, err
 	}
 	if session.PlanBlockID != "" {

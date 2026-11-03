@@ -17,6 +17,7 @@ import (
 const exportSchemaVersion = 1
 
 type UserDataExport struct {
+	ActionLinks        []domain.ActionLink       `json:"action_links"`
 	TextClips          []domain.TextClip         `json:"text_clips"`
 	Parcels            []domain.Parcel           `json:"parcels"`
 	ImportantDays      []domain.ImportantDay     `json:"important_days"`
@@ -65,6 +66,11 @@ type UserDataExport struct {
 func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataExport, error) {
 	bundle := UserDataExport{SchemaVersion: exportSchemaVersion, ExportedAt: s.now().UTC(), Application: "StudyFlow", Counts: map[string]int{}}
 	var err error
+	if repo, ok := s.repo.(actionRepository); ok {
+		if bundle.ActionLinks, err = repo.ListActionLinks(ctx, userID); err != nil {
+			return bundle, err
+		}
+	}
 	if bundle.TextClips, err = s.repo.ListTextClips(ctx, userID); err != nil {
 		return bundle, err
 	}
@@ -206,6 +212,7 @@ func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataEx
 		"todos": len(bundle.Todos), "calendar_events": len(bundle.CalendarEvents), "word_books": len(bundle.WordBooks), "vocabulary_words": len(bundle.VocabularyWords),
 		"vocabulary_reviews": len(bundle.VocabularyReviews), "plan_blocks": len(bundle.PlanBlocks), "weekly_reflections": len(bundle.WeeklyReflections),
 		"memo_folders": len(bundle.MemoFolders), "memos": len(bundle.Memos),
+		"action_links":     len(bundle.ActionLinks),
 		"english_readings": len(bundle.EnglishReadings),
 		"ebook_readings":   len(bundle.EBookReadings), "classical_studies": len(bundle.ClassicalStudies), "focus_sessions": len(bundle.FocusSessions),
 	}

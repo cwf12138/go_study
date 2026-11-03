@@ -48,6 +48,7 @@ type Memory struct {
 	tasks                   map[string]domain.StudyTask
 	todoLists               map[string]domain.TodoList
 	todos                   map[string]domain.TodoItem
+	actionLinks             map[string]domain.ActionLink
 	calendarEvents          map[string]domain.CalendarEvent
 	wordBooks               map[string]domain.WordBook
 	words                   map[string]domain.VocabularyWord
@@ -94,6 +95,7 @@ func NewMemory() *Memory {
 		tasks:                   make(map[string]domain.StudyTask),
 		todoLists:               make(map[string]domain.TodoList),
 		todos:                   make(map[string]domain.TodoItem),
+		actionLinks:             make(map[string]domain.ActionLink),
 		calendarEvents:          make(map[string]domain.CalendarEvent),
 		wordBooks:               make(map[string]domain.WordBook),
 		words:                   make(map[string]domain.VocabularyWord),
@@ -1188,6 +1190,7 @@ type snapshot struct {
 	Tasks                   []domain.StudyTask          `json:"tasks"`
 	TodoLists               []domain.TodoList           `json:"todo_lists"`
 	Todos                   []domain.TodoItem           `json:"todos"`
+	ActionLinks             []domain.ActionLink         `json:"action_links,omitempty"`
 	CalendarEvents          []domain.CalendarEvent      `json:"calendar_events"`
 	WordBooks               []domain.WordBook           `json:"word_books"`
 	Words                   []domain.VocabularyWord     `json:"vocabulary_words"`
@@ -1306,6 +1309,9 @@ func (m *Memory) SaveJSON(path string) (saveErr error) {
 	}
 	for _, item := range m.todos {
 		s.Todos = append(s.Todos, cloneTodo(item))
+	}
+	for _, item := range m.actionLinks {
+		s.ActionLinks = append(s.ActionLinks, item)
 	}
 	for _, item := range m.calendarEvents {
 		s.CalendarEvents = append(s.CalendarEvents, item)
@@ -1507,6 +1513,10 @@ func (m *Memory) LoadJSON(path string) error {
 	m.tasks = make(map[string]domain.StudyTask, len(s.Tasks))
 	m.todoLists = make(map[string]domain.TodoList, len(s.TodoLists))
 	m.todos = make(map[string]domain.TodoItem, len(s.Todos))
+	m.actionLinks = make(map[string]domain.ActionLink, len(s.ActionLinks))
+	for _, item := range s.ActionLinks {
+		m.actionLinks[item.ID] = item
+	}
 	m.calendarEvents = make(map[string]domain.CalendarEvent, len(s.CalendarEvents))
 	m.wordBooks = make(map[string]domain.WordBook, len(s.WordBooks))
 	m.words = make(map[string]domain.VocabularyWord, len(s.Words))

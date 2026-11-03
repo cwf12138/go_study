@@ -542,7 +542,7 @@
     const plannerStart = state.plannerWeekStart, insightDays = state.insightsDays, weeklyStart = state.weeklyReviewWeekStart;
     const plannerVersion = plannerRequestVersion, insightVersion = insightRequestVersion, weeklyVersion = weeklyRequestVersion;
     const visible = {
-      dashboard: [6,7,14], focus: [5], goals: [1,2], tasks: [2,5], todo: [6,7],
+      dashboard: [6,7,14], focus: [5,7], goals: [1,2], tasks: [2,5], todo: [6,7],
       moods: [3,4], vocabulary: [8], planner: [2,5,6,7,10], insights: [11,12],
     };
     const needed = new Set([0,13,...(visible[state.currentView] || [])]), skipped = Symbol('not-requested');
@@ -646,11 +646,12 @@
       }
       return;
     }
-    const completeTask = state.focus?.id === session.id ? state.focus.completeTask : true;
+    const completeTask = !session.todo_id && (state.focus?.id === session.id ? state.focus.completeTask : true);
     state.focus = {
       id: session.id,
       userID: state.user.id,
       taskID: session.task_id,
+      todoID: session.todo_id, memoActionID: session.memo_action_id, titleSnapshot: session.title_snapshot,
       planBlockID: session.plan_block_id,
       startedAt: session.started_at,
       plannedMinutes: session.planned_minutes,
@@ -1109,7 +1110,7 @@
     const completed = todo.status === "completed";
     const due = todo.due_at ? `<span class="todo-due ${deadlineStatus(todo.due_at).startsWith("已逾期") ? "overdue" : ""}">◷ ${deadlineStatus(todo.due_at)}</span>` : "";
     const meta = [due, todoRepeatLabel(todo.repeat_rule) ? `<span>↻ ${todoRepeatLabel(todo.repeat_rule)}</span>` : "", list ? `<span><i class="todo-list-color" style="--todo-list-color:${escapeHTML(list.color || "#5b81ff")}"></i>${escapeHTML(list.name)}</span>` : ""].filter(Boolean).join("");
-    return `<article class="todo-item ${completed ? "completed" : ""}"><button class="todo-complete" type="button" data-todo-completed="${!completed}" data-id="${todo.id}" aria-label="${completed ? "重新打开" : "完成"}待办 ${escapeHTML(todo.title)}">${completed ? "✓" : ""}</button><div class="todo-item-body"><div class="todo-item-title"><h4>${escapeHTML(todo.title)}</h4><span class="priority-${todo.priority}">● ${priorityLabel(todo.priority)}</span></div>${todo.notes ? `<p>${escapeHTML(todo.notes)}</p>` : ""}${meta ? `<div class="todo-meta">${meta}</div>` : ""}${(todo.tags || []).map((tag) => `<span class="tag">#${escapeHTML(tag)}</span>`).join("")}${steps.length ? `<div class="todo-steps"><span>${completedSteps}/${steps.length} 个步骤</span>${steps.map((step) => `<button class="todo-step ${step.completed ? "done" : ""}" type="button" data-todo-step="${todo.id}" data-step-id="${step.id}" data-step-completed="${!step.completed}"><i>${step.completed ? "✓" : ""}</i>${escapeHTML(step.title)}</button>`).join("")}</div>` : ""}</div><div class="todo-item-actions">${!completed ? `<button class="text-button" type="button" data-todo-my-day="${todo.my_day_date === localDateKey(new Date()) ? "remove" : "add"}" data-id="${todo.id}">${todo.my_day_date === localDateKey(new Date()) ? "移出今天" : "加入今天"}</button>` : ""}<button class="todo-delete" type="button" data-todo-delete="${todo.id}" aria-label="删除待办 ${escapeHTML(todo.title)}" title="删除待办">×</button></div></article>`;
+    return `<article class="todo-item ${completed ? "completed" : ""}"><button class="todo-complete" type="button" data-todo-completed="${!completed}" data-id="${todo.id}" aria-label="${completed ? "重新打开" : "完成"}待办 ${escapeHTML(todo.title)}">${completed ? "✓" : ""}</button><div class="todo-item-body"><div class="todo-item-title"><h4>${escapeHTML(todo.title)}</h4><span class="priority-${todo.priority}">● ${priorityLabel(todo.priority)}</span></div>${todo.notes ? `<p>${escapeHTML(todo.notes)}</p>` : ""}${meta ? `<div class="todo-meta">${meta}</div>` : ""}${(todo.tags || []).map((tag) => `<span class="tag">#${escapeHTML(tag)}</span>`).join("")}${steps.length ? `<div class="todo-steps"><span>${completedSteps}/${steps.length} 个步骤</span>${steps.map((step) => `<button class="todo-step ${step.completed ? "done" : ""}" type="button" data-todo-step="${todo.id}" data-step-id="${step.id}" data-step-completed="${!step.completed}"><i>${step.completed ? "✓" : ""}</i>${escapeHTML(step.title)}</button>`).join("")}</div>` : ""}</div><div class="todo-item-actions"><button class="action-todo-link" type="button" data-action-todo-context="${todo.id}">${todo.memo_action_id ? "来源与专注" : "专注记录"} ↗</button>${!completed ? `<button class="text-button" type="button" data-todo-my-day="${todo.my_day_date === localDateKey(new Date()) ? "remove" : "add"}" data-id="${todo.id}">${todo.my_day_date === localDateKey(new Date()) ? "移出今天" : "加入今天"}</button>` : ""}<button class="todo-delete" type="button" data-todo-delete="${todo.id}" aria-label="删除待办 ${escapeHTML(todo.title)}" title="删除待办">×</button></div></article>`;
   }
 
   function taskIsOpen(task) {
@@ -1545,6 +1546,7 @@
       } else if (action === "lock") {
         await api(`/api/v1/plan-blocks/${id}`, { method: "PATCH", body: JSON.stringify({ locked: !block.locked }) });
       } else if (action === "focus") {
+        if(window.DaynestActions?.hasPendingFocus()){await window.DaynestActions.recovery();return;}
         if (state.focus) {
           showView("focus");
           notify("已有正在进行的专注会话，请先完成或放弃它。", "error");
@@ -2042,13 +2044,16 @@
       $("#focus-minutes").value = active.plannedMinutes;
       $("#focus-break-enabled").checked = active.breakEnabled;
       $("#focus-complete-task").checked = active.completeTask;
-      $("#focus-task").value = active.taskID || "";
+      $("#focus-task").value = active.todoID ? `todo:${active.todoID}` : active.taskID || "";
     } else {
       setFocusQuiet(false);
     }
-    const hasTask = Boolean(active?.taskID || $("#focus-task").value);
-    $("#focus-complete-task").disabled = Boolean(active) || updating || !hasTask;
-    $("#focus-complete-task-hint").textContent = hasTask ? "完成本次专注时同步完成任务，提前完成也适用。" : "自由专注不会修改任务，关联任务后可开启。";
+    const selectedValue = $("#focus-task").value;
+    const isTodo = Boolean(active?.todoID || selectedValue.startsWith("todo:"));
+    const hasTask = Boolean(active?.taskID || selectedValue);
+    $("#focus-complete-task").disabled = Boolean(active) || updating || !hasTask || isTodo;
+    if (isTodo) $("#focus-complete-task").checked = false;
+    $("#focus-complete-task-hint").textContent = isTodo ? "专注只记录投入时间，待办需要在清单中手动勾选完成。" : hasTask ? "完成本次专注时同步完成任务，提前完成也适用。" : "自由专注不会修改任务，关联任务后可开启。";
     $("#focus-clear-task").disabled = Boolean(active) || updating || !hasTask;
     $("#focus-setup-state").textContent = active ? "本次已锁定" : state.isStartingFocus ? "正在开启" : "自由安排";
     $("#focus-keyboard-hint").textContent = active ? "时钟获得焦点后，按空格暂停 / 继续" : "可直接开始，也可以先在设置中挑选节奏";
@@ -2062,11 +2067,11 @@
       $("#focus-session-step").textContent = "准备开始";
       stateLabel.textContent = "尚未开始专注";
       stateLabel.className = "focus-state is-idle";
-      const selectedTask = state.tasks.find((item) => item.id === $("#focus-task").value);
+      const selectedTask = isTodo ? state.todos.find(item=>`todo:${item.id}`===selectedValue) : state.tasks.find((item) => item.id === selectedValue);
       $("#focus-description").textContent = selectedTask ? `即将专注：${selectedTask.title}` : "选择一个任务，或给自己一段自由专注的时间。";
       return;
     }
-    const task = state.tasks.find((item) => item.id === active.taskID);
+    const task = active.todoID ? state.todos.find(item=>item.id===active.todoID) || {title:active.titleSnapshot || "原待办已删除"} : state.tasks.find((item) => item.id === active.taskID);
     $("#focus-session-step").textContent = focusSessionStep(active);
     stateLabel.textContent = paused ? `${focusPhaseLabel(active.phase)} · 已暂停` : focusPhaseLabel(active.phase);
     stateLabel.className = `focus-state ${paused ? "is-paused" : active.phase === "break" ? "is-break" : "is-running"}`;
@@ -2300,8 +2305,8 @@
   function renderFocusTaskPreview() {
     const container = $("#focus-task-preview");
     if (!container) return;
-    const selectedTaskID = state.focus?.taskID || $("#focus-task")?.value;
-    const available = state.tasks.filter((task) => task.status !== "done" && task.status !== "cancelled");
+    const selectedTaskID = state.focus?.todoID ? `todo:${state.focus.todoID}` : state.focus?.taskID || $("#focus-task")?.value;
+    const available = [...state.todos.filter(todo=>todo.status==="open").map(todo=>({...todo,id:`todo:${todo.id}`})), ...state.tasks.filter((task) => task.status !== "done" && task.status !== "cancelled")];
     // Keep a task chosen from the full select visible even when it is outside the first five.
     const selected = available.find((task) => task.id === selectedTaskID);
     const tasks = (selected ? [selected, ...available.filter((task) => task.id !== selected.id)] : available).slice(0, 5);
@@ -2338,9 +2343,12 @@
 
     const taskOptions = state.tasks.filter((task) => task.status !== "done" && task.status !== "cancelled").map((task) => `<option value="${task.id}">${escapeHTML(task.title)}</option>`).join("");
     const focusTask = $("#focus-task");
-    const previousTask = state.focus?.taskID || focusTask.value;
-    focusTask.innerHTML = `<option value="">不关联任务</option>${taskOptions}`;
-    focusTask.value = state.tasks.some((task) => task.id === previousTask) ? previousTask : "";
+    const previousTask = state.focus?.todoID ? `todo:${state.focus.todoID}` : state.focus?.taskID || focusTask.value;
+    const availableTodos=state.todos.filter(todo=>todo.status==="open" || todo.id===state.focus?.todoID);
+    let todoOptions=availableTodos.map(todo=>`<option value="todo:${escapeHTML(todo.id)}">${escapeHTML(todo.title)}</option>`).join("");
+    if(state.focus?.todoID&&!availableTodos.some(todo=>todo.id===state.focus.todoID))todoOptions+=`<option value="todo:${escapeHTML(state.focus.todoID)}">${escapeHTML(state.focus.titleSnapshot||"原待办已删除")}</option>`;
+    focusTask.innerHTML = `<option value="">不关联任务</option><optgroup label="待办事项">${todoOptions}</optgroup><optgroup label="学习任务">${taskOptions}</optgroup>`;
+    focusTask.value = [...focusTask.options].some(option=>option.value===previousTask) ? previousTask : "";
 
     const todoList = $("#todo-list");
     const previousTodoList = todoList.value;
@@ -2396,6 +2404,24 @@
   }
 
   function bindEvents() {
+    document.addEventListener("daynest:actions-changed",()=>{if(state.user)refresh({background:true}).catch(()=>undefined);});
+    document.addEventListener("daynest:todo-focus-recovered",event=>{
+      if(!state.user)return;
+      if(event.detail?.user_id!==state.user.id)return;
+      syncActiveFocus(["running","paused"].includes(event.detail?.status)?event.detail:null);render();
+      refresh({background:true}).catch(()=>undefined);
+    });
+    document.addEventListener("daynest:prepare-todo-focus",event=>{
+      const todo=event.detail;if(!state.user||!todo||todo.user_id!==state.user.id)return;
+      if(state.focus){showView("focus");notify("已有专注进行中，请先结束当前会话。","error");return;}
+      state.todos=[todo,...state.todos.filter(item=>item.id!==todo.id)];renderSelects();
+      $("#focus-task").value=`todo:${todo.id}`;showView("focus");renderFocus();
+    });
+    document.addEventListener("daynest:show-action-todo",event=>{
+      const todo=event.detail;if(!state.user||!todo||todo.user_id!==state.user.id)return;
+      state.todoView=todo.status==="completed"?"completed":"all";state.todoFilters={query:todo.title,priority:"",tag:""};
+      state.todos=[todo,...state.todos.filter(item=>item.id!==todo.id)];renderTodos();
+    });
     window.DaynestUI?.registerGuard?.('main', () => savingForms.size || state.moodDraftRevision || state.moodSaving || state.plannerDraftRevision || state.weeklyDraftRevision || state.weeklySaving || state.isStartingFocus || state.isUpdatingFocus || state.isFinishingFocus);
     $("#today-note-form").addEventListener("submit", saveTodayNote);
     $("#planner-preferences-form").addEventListener("input", markPlannerDraft);
@@ -2950,13 +2976,16 @@
     const plannedMinutes = clampPlannedMinutes($("#focus-minutes").value);
     const breakEnabled = $("#focus-break-enabled").checked;
     const taskID = $("#focus-task").value;
-    const completeTask = Boolean(taskID && $("#focus-complete-task").checked);
+    const isTodo=taskID.startsWith("todo:");
+    const completeTask = Boolean(!isTodo && taskID && $("#focus-complete-task").checked);
+    if(window.DaynestActions?.hasPendingFocus()){await window.DaynestActions.recovery();return;}
     const previousControl = document.activeElement;
     setFocusFeedback();
     state.isStartingFocus = true;
     renderFocus();
     try {
-      const session = await api("/api/v1/focus-sessions", { method: "POST", body: JSON.stringify({ task_id: taskID, planned_minutes: plannedMinutes, break_enabled: breakEnabled }) });
+      const session = isTodo ? await window.DaynestActions.startTodoFocus(taskID.slice(5),plannedMinutes,breakEnabled) : await api("/api/v1/focus-sessions", { method: "POST", body: JSON.stringify({ task_id: taskID, planned_minutes: plannedMinutes, break_enabled: breakEnabled }) });
+      if(!["running","paused"].includes(session.status)){await refresh();notify("这项操作对应的专注已结束，请查看专注记录。");return;}
       state.focus = { id: session.id, completeTask };
       syncActiveFocus(session);
       renderFocus();

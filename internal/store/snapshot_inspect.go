@@ -92,6 +92,8 @@ func InspectSnapshot(data []byte) (SnapshotInspection, error) {
 	for _, ref := range []struct{ from, field, to string }{
 		{"Tasks", "GoalID", "Goals"}, {"Todos", "ListID", "TodoLists"},
 		{"MemoNotes", "FolderID", "MemoFolders"}, {"Words", "BookID", "WordBooks"},
+		{"ActionLinks", "MemoID", "MemoNotes"}, {"ActionLinks", "TodoID", "Todos"},
+		{"Todos", "MemoActionID", "ActionLinks"}, {"Sessions", "TodoID", "Todos"}, {"Sessions", "MemoActionID", "ActionLinks"},
 		{"WordReviews", "WordID", "Words"}, {"Sessions", "TaskID", "Tasks"},
 		{"Sessions", "PlanBlockID", "PlanBlocks"},
 	} {
