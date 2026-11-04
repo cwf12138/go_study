@@ -373,6 +373,13 @@ func (m *Memory) ListTodoLists(_ context.Context, userID string) ([]domain.TodoL
 func (m *Memory) CreateTodo(_ context.Context, todo domain.TodoItem) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if _, exists := m.todos[todo.ID]; exists {
+		return domain.ErrConflict
+	}
+	list, exists := m.todoLists[todo.ListID]
+	if !exists || list.UserID != todo.UserID {
+		return domain.ErrConflict
+	}
 	m.todos[todo.ID] = cloneTodo(todo)
 	return nil
 }
@@ -390,8 +397,15 @@ func (m *Memory) TodoByID(_ context.Context, id string) (domain.TodoItem, error)
 func (m *Memory) UpdateTodo(_ context.Context, todo domain.TodoItem) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if _, ok := m.todos[todo.ID]; !ok {
+	old, ok := m.todos[todo.ID]
+	if !ok {
 		return domain.ErrNotFound
+	}
+	if old.UserID != todo.UserID {
+		return domain.ErrForbidden
+	}
+	if !todo.UpdatedAt.After(old.UpdatedAt) {
+		todo.UpdatedAt = old.UpdatedAt.Add(time.Nanosecond)
 	}
 	m.todos[todo.ID] = cloneTodo(todo)
 	return nil
@@ -1687,6 +1701,14 @@ func cloneTask(task domain.StudyTask) domain.StudyTask {
 }
 
 func cloneTodo(todo domain.TodoItem) domain.TodoItem {
+	if todo.DueAt != nil {
+		value := *todo.DueAt
+		todo.DueAt = &value
+	}
+	if todo.CompletedAt != nil {
+		value := *todo.CompletedAt
+		todo.CompletedAt = &value
+	}
 	todo.Tags = append([]string(nil), todo.Tags...)
 	todo.Steps = append([]domain.TodoStep(nil), todo.Steps...)
 	return todo

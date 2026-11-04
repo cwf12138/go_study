@@ -93,7 +93,7 @@ func InspectSnapshot(data []byte) (SnapshotInspection, error) {
 		{"Tasks", "GoalID", "Goals"}, {"Todos", "ListID", "TodoLists"},
 		{"MemoNotes", "FolderID", "MemoFolders"}, {"Words", "BookID", "WordBooks"},
 		{"ActionLinks", "MemoID", "MemoNotes"}, {"ActionLinks", "TodoID", "Todos"},
-		{"TodoImports", "TodoID", "Todos"}, {"Todos", "ImportReceiptID", "TodoImports"},
+		{"TodoImports", "TodoID", "Todos"}, {"Todos", "ImportReceiptID", "TodoImports"}, {"Todos", "NextTodoID", "Todos"},
 		{"Todos", "MemoActionID", "ActionLinks"}, {"Sessions", "TodoID", "Todos"}, {"Sessions", "MemoActionID", "ActionLinks"},
 		{"WordReviews", "WordID", "Words"}, {"Sessions", "TaskID", "Tasks"},
 		{"Sessions", "PlanBlockID", "PlanBlocks"},

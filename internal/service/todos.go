@@ -106,19 +106,11 @@ func (s *Service) DeleteTodoList(ctx context.Context, userID, listID string) err
 	if err != nil {
 		return err
 	}
-	todos, err := s.repo.ListTodos(ctx, userID, store.TodoFilter{ListID: list.ID})
+	writer, err := s.todoChanges()
 	if err != nil {
 		return err
 	}
-	now := s.now().UTC()
-	for _, todo := range todos {
-		todo.ListID = inbox.ID
-		todo.UpdatedAt = now
-		if err := s.repo.UpdateTodo(ctx, todo); err != nil {
-			return err
-		}
-	}
-	if err := s.repo.DeleteTodoList(ctx, list.ID); err != nil {
+	if err := writer.DeleteTodoListAndMove(ctx, userID, list.ID, inbox.ID, s.now().UTC()); err != nil {
 		return err
 	}
 	s.publish("todo_list.deleted", userID, list.ID, nil)
@@ -294,144 +286,121 @@ func lessTodo(left, right domain.TodoItem) bool {
 	return todoPriorityRank(left.Priority) > todoPriorityRank(right.Priority)
 }
 
-func (s *Service) CompleteTodo(ctx context.Context, userID, todoID string, completed bool) (domain.TodoItem, *domain.TodoItem, error) {
-	todo, err := s.repo.TodoByID(ctx, todoID)
+func (s *Service) CompleteTodo(ctx context.Context, userID, todoID string, completed bool, expected ...string) (domain.TodoItem, *domain.TodoItem, error) {
+	todo, err := s.todoForChange(ctx, userID, todoID, expected)
 	if err != nil {
 		return domain.TodoItem{}, nil, err
 	}
-	if err := requireOwner(todo.UserID, userID); err != nil {
-		return domain.TodoItem{}, nil, err
-	}
-	now := s.now().UTC()
-	if !completed {
-		todo.Status = domain.TodoOpen
-		todo.CompletedAt = nil
-		todo.UpdatedAt = now
-		if err := s.repo.UpdateTodo(ctx, todo); err != nil {
-			return domain.TodoItem{}, nil, err
-		}
-		s.publish("todo.reopened", userID, todo.ID, nil)
+	if (todo.Status == domain.TodoCompleted) == completed {
 		return todo, nil, nil
 	}
-	if todo.Status == domain.TodoCompleted {
-		return todo, nil, nil
-	}
-	todo.Status = domain.TodoCompleted
-	todo.MyDayDate = ""
-	todo.CompletedAt = &now
-	todo.UpdatedAt = now
-	if err := s.repo.UpdateTodo(ctx, todo); err != nil {
-		return domain.TodoItem{}, nil, err
-	}
+	previous, now := todo.UpdatedAt, s.now().UTC()
 	var next *domain.TodoItem
-	if todo.RepeatRule != domain.TodoRepeatNone {
-		created, err := s.makeNextTodo(ctx, todo, now)
-		if err != nil {
-			return domain.TodoItem{}, nil, err
+	if completed {
+		todo.Status, todo.MyDayDate, todo.CompletedAt = domain.TodoCompleted, "", &now
+		if todo.RepeatRule != domain.TodoRepeatNone && todo.NextTodoID == "" {
+			if todo.RepeatRule != domain.TodoRepeatDaily && todo.RepeatRule != domain.TodoRepeatWeekly && todo.RepeatRule != domain.TodoRepeatMonthly {
+				return todo, nil, domain.ErrInvalidState
+			}
+			if todo.DueAt == nil {
+				return todo, nil, domain.ErrInvalidState
+			}
+			created := makeNextTodo(todo, now)
+			next, todo.NextTodoID = &created, created.ID
 		}
-		next = &created
+	} else {
+		todo.Status, todo.CompletedAt = domain.TodoOpen, nil
 	}
-	s.publish("todo.completed", userID, todo.ID, map[string]any{"repeat_rule": todo.RepeatRule})
+	todo.UpdatedAt = s.nextRecordTime(previous)
+	if err := s.commitTodo(ctx, todo, previous, next); err != nil {
+		return domain.TodoItem{}, nil, err
+	}
+	kind := "todo.reopened"
+	if completed {
+		kind = "todo.completed"
+	}
+	s.publish(kind, userID, todo.ID, map[string]any{"repeat_rule": todo.RepeatRule})
 	return todo, next, nil
 }
 
-func (s *Service) makeNextTodo(ctx context.Context, completed domain.TodoItem, now time.Time) (domain.TodoItem, error) {
-	if completed.DueAt == nil {
-		return domain.TodoItem{}, fmt.Errorf("%w: recurring todo must have a due date", domain.ErrInvalidState)
-	}
+// No persistence here: the original and successor are committed together.
+func makeNextTodo(completed domain.TodoItem, now time.Time) domain.TodoItem {
 	nextDueAt := advanceTodoDueAt(*completed.DueAt, completed.RepeatRule, now)
 	next := completed
-	next.ID = platform.NewID()
-	next.Status = domain.TodoOpen
-	next.MyDayDate = ""
-	next.DueAt = &nextDueAt
-	next.CreatedAt = now
-	next.UpdatedAt = now
-	next.CompletedAt = nil
+	next.ID, next.NextTodoID, next.MemoActionID, next.ImportReceiptID = platform.NewID(), "", "", ""
+	next.Status, next.MyDayDate, next.DueAt = domain.TodoOpen, "", &nextDueAt
+	next.CreatedAt, next.UpdatedAt, next.CompletedAt = now, now, nil
 	next.Steps = append([]domain.TodoStep(nil), completed.Steps...)
 	for index := range next.Steps {
-		next.Steps[index].ID = platform.NewID()
-		next.Steps[index].Completed = false
-		next.Steps[index].CreatedAt = now
+		next.Steps[index].ID, next.Steps[index].Completed, next.Steps[index].CreatedAt = platform.NewID(), false, now
 	}
-	if err := s.repo.CreateTodo(ctx, next); err != nil {
-		return domain.TodoItem{}, err
-	}
-	return next, nil
+	return next
 }
 
-func (s *Service) SetTodoMyDay(ctx context.Context, userID, todoID, date string) (domain.TodoItem, error) {
-	todo, err := s.repo.TodoByID(ctx, todoID)
+func (s *Service) SetTodoMyDay(ctx context.Context, userID, todoID, date string, expected ...string) (domain.TodoItem, error) {
+	todo, err := s.todoForChange(ctx, userID, todoID, expected)
 	if err != nil {
-		return domain.TodoItem{}, err
-	}
-	if err := requireOwner(todo.UserID, userID); err != nil {
 		return domain.TodoItem{}, err
 	}
 	if todo.Status == domain.TodoCompleted {
-		return domain.TodoItem{}, fmt.Errorf("%w: completed todo cannot be added to My Day", domain.ErrInvalidState)
+		return todo, fmt.Errorf("%w: completed todo cannot be added to My Day", domain.ErrInvalidState)
 	}
 	normalized, err := normalizeTodoDate(date, true)
 	if err != nil {
-		return domain.TodoItem{}, err
+		return todo, err
 	}
-	todo.MyDayDate = normalized
-	todo.UpdatedAt = s.now().UTC()
-	if err := s.repo.UpdateTodo(ctx, todo); err != nil {
+	previous := todo.UpdatedAt
+	todo.MyDayDate, todo.UpdatedAt = normalized, s.nextRecordTime(previous)
+	if err := s.commitTodo(ctx, todo, previous, nil); err != nil {
 		return domain.TodoItem{}, err
 	}
 	s.publish("todo.my_day_added", userID, todo.ID, map[string]any{"date": normalized})
 	return todo, nil
 }
 
-func (s *Service) RemoveTodoMyDay(ctx context.Context, userID, todoID string) (domain.TodoItem, error) {
-	todo, err := s.repo.TodoByID(ctx, todoID)
+func (s *Service) RemoveTodoMyDay(ctx context.Context, userID, todoID string, expected ...string) (domain.TodoItem, error) {
+	todo, err := s.todoForChange(ctx, userID, todoID, expected)
 	if err != nil {
 		return domain.TodoItem{}, err
 	}
-	if err := requireOwner(todo.UserID, userID); err != nil {
-		return domain.TodoItem{}, err
-	}
-	todo.MyDayDate = ""
-	todo.UpdatedAt = s.now().UTC()
-	if err := s.repo.UpdateTodo(ctx, todo); err != nil {
+	previous := todo.UpdatedAt
+	todo.MyDayDate, todo.UpdatedAt = "", s.nextRecordTime(previous)
+	if err := s.commitTodo(ctx, todo, previous, nil); err != nil {
 		return domain.TodoItem{}, err
 	}
 	s.publish("todo.my_day_removed", userID, todo.ID, nil)
 	return todo, nil
 }
 
-func (s *Service) ToggleTodoStep(ctx context.Context, userID, todoID, stepID string, completed bool) (domain.TodoItem, error) {
-	todo, err := s.repo.TodoByID(ctx, todoID)
+func (s *Service) ToggleTodoStep(ctx context.Context, userID, todoID, stepID string, completed bool, expected ...string) (domain.TodoItem, error) {
+	todo, err := s.todoForChange(ctx, userID, todoID, expected)
 	if err != nil {
-		return domain.TodoItem{}, err
-	}
-	if err := requireOwner(todo.UserID, userID); err != nil {
 		return domain.TodoItem{}, err
 	}
 	for index := range todo.Steps {
 		if todo.Steps[index].ID == stepID {
-			todo.Steps[index].Completed = completed
-			todo.UpdatedAt = s.now().UTC()
-			if err := s.repo.UpdateTodo(ctx, todo); err != nil {
+			previous := todo.UpdatedAt
+			todo.Steps[index].Completed, todo.UpdatedAt = completed, s.nextRecordTime(previous)
+			if err := s.commitTodo(ctx, todo, previous, nil); err != nil {
 				return domain.TodoItem{}, err
 			}
 			s.publish("todo.step_updated", userID, todo.ID, map[string]any{"step_id": stepID, "completed": completed})
 			return todo, nil
 		}
 	}
-	return domain.TodoItem{}, domain.ErrNotFound
+	return todo, domain.ErrNotFound
 }
 
-func (s *Service) DeleteTodo(ctx context.Context, userID, todoID string) error {
-	todo, err := s.repo.TodoByID(ctx, todoID)
+func (s *Service) DeleteTodo(ctx context.Context, userID, todoID string, expected ...string) error {
+	todo, err := s.todoForChange(ctx, userID, todoID, expected)
 	if err != nil {
 		return err
 	}
-	if err := requireOwner(todo.UserID, userID); err != nil {
+	writer, err := s.todoChanges()
+	if err != nil {
 		return err
 	}
-	if err := s.repo.DeleteTodo(ctx, todoID); err != nil {
+	if err := writer.DeleteTodoIfUnchanged(ctx, userID, todoID, todo.UpdatedAt); err != nil {
 		return err
 	}
 	s.publish("todo.deleted", userID, todoID, nil)
@@ -460,7 +429,7 @@ func makeTodoSteps(values []string, now time.Time) ([]domain.TodoStep, error) {
 		if title == "" {
 			continue
 		}
-		if len(title) > 200 || len(steps) >= 30 {
+		if utf8.RuneCountInString(title) > 200 || len(steps) >= 30 {
 			return nil, fmt.Errorf("%w: steps must contain at most 30 titles of 200 characters", domain.ErrInvalidInput)
 		}
 		steps = append(steps, domain.TodoStep{ID: platform.NewID(), Title: title, CreatedAt: now})

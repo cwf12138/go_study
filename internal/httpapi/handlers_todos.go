@@ -84,6 +84,11 @@ func (s *Server) listTodos(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) changeTodoStatus(w http.ResponseWriter, r *http.Request) {
+	expected, conditionErr := todoCondition(r, false)
+	if conditionErr != nil {
+		writeError(w, conditionErr)
+		return
+	}
 	var body struct {
 		Completed bool `json:"completed"`
 	}
@@ -91,11 +96,12 @@ func (s *Server) changeTodoStatus(w http.ResponseWriter, r *http.Request) {
 		writeError(w, invalidJSON(err))
 		return
 	}
-	todo, next, err := s.service.CompleteTodo(r.Context(), claimsFromContext(r.Context()).Subject, r.PathValue("todo_id"), body.Completed)
+	todo, next, err := s.service.CompleteTodo(r.Context(), claimsFromContext(r.Context()).Subject, r.PathValue("todo_id"), body.Completed, expected...)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
+	todoETag(w, todo)
 	response := envelope{"data": todo}
 	if next != nil {
 		response["next"] = next
@@ -104,6 +110,11 @@ func (s *Server) changeTodoStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) addTodoToMyDay(w http.ResponseWriter, r *http.Request) {
+	expected, conditionErr := todoCondition(r, false)
+	if conditionErr != nil {
+		writeError(w, conditionErr)
+		return
+	}
 	var body struct {
 		Date string `json:"date"`
 	}
@@ -111,24 +122,36 @@ func (s *Server) addTodoToMyDay(w http.ResponseWriter, r *http.Request) {
 		writeError(w, invalidJSON(err))
 		return
 	}
-	todo, err := s.service.SetTodoMyDay(r.Context(), claimsFromContext(r.Context()).Subject, r.PathValue("todo_id"), strings.TrimSpace(body.Date))
+	todo, err := s.service.SetTodoMyDay(r.Context(), claimsFromContext(r.Context()).Subject, r.PathValue("todo_id"), strings.TrimSpace(body.Date), expected...)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
+	todoETag(w, todo)
 	writeJSON(w, http.StatusOK, envelope{"data": todo})
 }
 
 func (s *Server) removeTodoFromMyDay(w http.ResponseWriter, r *http.Request) {
-	todo, err := s.service.RemoveTodoMyDay(r.Context(), claimsFromContext(r.Context()).Subject, r.PathValue("todo_id"))
+	expected, conditionErr := todoCondition(r, false)
+	if conditionErr != nil {
+		writeError(w, conditionErr)
+		return
+	}
+	todo, err := s.service.RemoveTodoMyDay(r.Context(), claimsFromContext(r.Context()).Subject, r.PathValue("todo_id"), expected...)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
+	todoETag(w, todo)
 	writeJSON(w, http.StatusOK, envelope{"data": todo})
 }
 
 func (s *Server) toggleTodoStep(w http.ResponseWriter, r *http.Request) {
+	expected, conditionErr := todoCondition(r, false)
+	if conditionErr != nil {
+		writeError(w, conditionErr)
+		return
+	}
 	var body struct {
 		Completed bool `json:"completed"`
 	}
@@ -136,16 +159,22 @@ func (s *Server) toggleTodoStep(w http.ResponseWriter, r *http.Request) {
 		writeError(w, invalidJSON(err))
 		return
 	}
-	todo, err := s.service.ToggleTodoStep(r.Context(), claimsFromContext(r.Context()).Subject, r.PathValue("todo_id"), r.PathValue("step_id"), body.Completed)
+	todo, err := s.service.ToggleTodoStep(r.Context(), claimsFromContext(r.Context()).Subject, r.PathValue("todo_id"), r.PathValue("step_id"), body.Completed, expected...)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
+	todoETag(w, todo)
 	writeJSON(w, http.StatusOK, envelope{"data": todo})
 }
 
 func (s *Server) deleteTodo(w http.ResponseWriter, r *http.Request) {
-	if err := s.service.DeleteTodo(r.Context(), claimsFromContext(r.Context()).Subject, r.PathValue("todo_id")); err != nil {
+	expected, conditionErr := todoCondition(r, false)
+	if conditionErr != nil {
+		writeError(w, conditionErr)
+		return
+	}
+	if err := s.service.DeleteTodo(r.Context(), claimsFromContext(r.Context()).Subject, r.PathValue("todo_id"), expected...); err != nil {
 		writeError(w, err)
 		return
 	}

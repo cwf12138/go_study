@@ -1895,21 +1895,78 @@ paths:
                 properties:
                   data: { $ref: "#/components/schemas/TodoItem" }
   /api/v1/todos/{todo_id}:
-    delete:
+    get:
       tags: [Todos]
       security: [{ bearerAuth: [] }]
-      summary: 删除待办
+      summary: 读取账号所属待办与版本编辑能力
       parameters:
         - $ref: "#/components/parameters/TodoID"
       responses:
+        "200":
+          description: Current task and explicit conditional-write capability
+          headers:
+            ETag: { description: "Strong opaque ID@updated_at, preserving nanoseconds", schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/TodoItem" }
+                  meta:
+                    type: object
+                    properties:
+                      write_contract: { type: string, const: todo-if-match-v1 }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Todos]
+      security: [{ bearerAuth: [] }]
+      summary: 按读取版本替换待办的可编辑字段
+      description: |
+        If-Match 必填，保留完整纳秒精度。不接受状态、来源回执、下一周期引用和创建信息。
+        步骤携带原 ID 保留身份；新步骤 ID 为空，由服务分配。不提供的可编辑数组或日期会清空。
+        Memory 同一锁内校验版本及目标分类，409 不覆盖当前内容；成功仍沿用周期 JSON 快照。
+      parameters:
+        - $ref: "#/components/parameters/TodoID"
+        - $ref: "#/components/parameters/TodoIfMatchRequired"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateTodoRequest" }
+      responses:
+        "200":
+          description: Updated; new version in ETag and updated_at
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/TodoItem" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      tags: [Todos]
+      security: [{ bearerAuth: [] }]
+      summary: 删除待办；可提供版本条件
+      parameters:
+        - $ref: "#/components/parameters/TodoID"
+        - $ref: "#/components/parameters/TodoIfMatch"
+      responses:
         "204": { description: Deleted }
+        "409": { $ref: "#/components/responses/Conflict" }
   /api/v1/todos/{todo_id}/status:
     patch:
       tags: [Todos]
       security: [{ bearerAuth: [] }]
-      summary: 完成或重新打开待办；完成重复待办会创建下一个周期的事项
+      summary: 完成或重新打开待办；首次完成时原子创建下一周期，同一项重新完成不重复生成
       parameters:
         - $ref: "#/components/parameters/TodoID"
+        - $ref: "#/components/parameters/TodoIfMatch"
       requestBody:
         required: true
         content:
@@ -1936,6 +1993,7 @@ paths:
       summary: 加入指定日期的我的一天
       parameters:
         - $ref: "#/components/parameters/TodoID"
+        - $ref: "#/components/parameters/TodoIfMatch"
       requestBody:
         required: true
         content:
@@ -1953,6 +2011,7 @@ paths:
       summary: 移出我的一天
       parameters:
         - $ref: "#/components/parameters/TodoID"
+        - $ref: "#/components/parameters/TodoIfMatch"
       responses:
         "200": { description: Updated }
   /api/v1/todos/{todo_id}/steps/{step_id}:
@@ -1962,6 +2021,7 @@ paths:
       summary: 标记待办子步骤
       parameters:
         - $ref: "#/components/parameters/TodoID"
+        - $ref: "#/components/parameters/TodoIfMatch"
         - in: path
           name: step_id
           required: true
@@ -3715,6 +3775,18 @@ components:
       name: list_id
       required: true
       schema: { type: string }
+    TodoIfMatch:
+      in: header
+      name: If-Match
+      required: false
+      description: 'Single strong ETag from the clicked task: "ID@updated_at". Stale conditions return 409. Omitted only for older clients; server-side compare-and-write still applies.'
+      schema: { type: string }
+    TodoIfMatchRequired:
+      in: header
+      name: If-Match
+      required: true
+      description: 'Single strong ETag from the editor baseline: "ID@updated_at". Preserve every fractional digit; wildcard, weak and multiple tags rejected.'
+      schema: { type: string }
     TodoID:
       in: path
       name: todo_id
@@ -4696,6 +4768,30 @@ components:
       required: [data]
       properties:
         data: { $ref: "#/components/schemas/TodoImportResult" }
+    UpdateTodoRequest:
+      type: object
+      additionalProperties: false
+      required: [list_id, title, priority, repeat_rule]
+      properties:
+        list_id: { type: string }
+        title: { type: string, minLength: 1, maxLength: 200 }
+        notes: { type: string, maxLength: 6000, default: "" }
+        priority: { type: string, enum: [low, medium, high] }
+        due_at: { type: [string, 'null'], format: date-time }
+        my_day_date: { type: string, description: "YYYY-MM-DD or empty; completed tasks cannot join My Day" }
+        repeat_rule: { type: string, enum: [none, daily, weekly, monthly] }
+        tags: { type: array, items: { type: string } }
+        steps:
+          type: array
+          maxItems: 30
+          items:
+            type: object
+            additionalProperties: false
+            required: [title]
+            properties:
+              id: { type: string, description: "Existing owned step ID, or empty for a new step" }
+              title: { type: string, minLength: 1, maxLength: 200 }
+              completed: { type: boolean, default: false }
     TodoItem:
       allOf:
         - $ref: "#/components/schemas/CreateTodoRequest"
@@ -4704,6 +4800,7 @@ components:
             id: { type: string }
             memo_action_id: { type: string, description: "Optional permanent source receipt ID" }
             import_receipt_id: { type: string, description: "Optional original local-capture receipt; retained after target deletion" }
+            next_todo_id: { type: string, description: "Once-generated successor; retained after reopening or successor deletion to avoid duplicate generation" }
             user_id: { type: string }
             status: { type: string, enum: [open, completed] }
             steps:

@@ -1,0 +1,13 @@
+const assert=require('node:assert/strict');
+const C=require('../internal/httpapi/assets/todo-editor-core.js');
+const todo={id:'todo-fixture',user_id:'alice',list_id:'inbox-fixture',title:'测试标题',notes:'原备注',status:'open',priority:'medium',repeat_rule:'none',tags:[],steps:[{id:'step-fixture',title:'第一个步骤',completed:false}],updated_at:'2026-11-05T08:00:00.123456789Z',due_at:'2026-11-06T08:12:34.987654321Z'};
+assert(C.valid(todo,'alice'));assert(!C.valid(todo,'bob'));assert(!C.valid({...todo,steps:[{id:'s',title:'bad'}]},'alice'));
+assert.equal(C.headers(todo)['If-Match'],'"todo-fixture@2026-11-05T08:00:00.123456789Z"');
+const edit=C.editable(todo);edit.title='中'.repeat(200);edit.notes='文'.repeat(6000);
+assert.equal(C.payload(edit,todo).due_at,todo.due_at,'untouched time must retain seconds and nanoseconds');
+assert.equal(C.payload(edit,todo).steps[0].id,'step-fixture');assert.equal(todo.title,'测试标题');
+edit.due='';assert.equal(C.payload(edit,todo).due_at,null);edit.repeat_rule='daily';assert.throws(()=>C.payload(edit,todo));
+edit.repeat_rule='none';edit.title='中'.repeat(201);assert.throws(()=>C.payload(edit,todo));
+edit.title='中文';edit.steps[0].title='';assert.throws(()=>C.payload(edit,todo));
+assert(C.describe(todo).includes('原备注'));
+console.log('Todo editor passed: opaque nanosecond conditions, owner/shape guards, unchanged deadline precision, Unicode limits, step identity and explicit date clearing.');

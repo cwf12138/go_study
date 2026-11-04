@@ -104,3 +104,20 @@ func TestInspectTodoImportReferences(t *testing.T) {
 		t.Fatal("cross-account receipt backlink accepted")
 	}
 }
+
+func TestInspectTodoSuccessorReferences(t *testing.T) {
+	s := snapshot{Version: 1, SavedAt: time.Now(), Users: []persistedUser{
+		{User: domain.User{ID: "u1", Email: "one@example.test"}, PasswordHash: "one"},
+		{User: domain.User{ID: "u2", Email: "two@example.test"}, PasswordHash: "two"},
+	}, Todos: []domain.TodoItem{{ID: "original", UserID: "u1", NextTodoID: "next"}}}
+	raw, _ := json.Marshal(s)
+	result, err := InspectSnapshot(raw)
+	if err != nil || result.MissingReferences != 1 {
+		t.Fatalf("deleted successor must be a warning: %+v %v", result, err)
+	}
+	s.Todos = append(s.Todos, domain.TodoItem{ID: "next", UserID: "u2"})
+	raw, _ = json.Marshal(s)
+	if _, err = InspectSnapshot(raw); err == nil {
+		t.Fatal("cross-account successor accepted")
+	}
+}

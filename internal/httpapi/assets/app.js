@@ -553,8 +553,9 @@
     const today = localDateKey(new Date());
     const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
     setSyncStatus(background ? "正在同步当前页面…" : "正在同步核心模块…", true);
-    const todoListsRequest = request(6, "/api/v1/todo-lists");
-    const todosRequest = wants(7) ? todoListsRequest.then(() => api(`/api/v1/todos?view=all&date=${localDateKey(new Date())}`)) : Promise.resolve(skipped);
+    const todoRead = path => window.DaynestHTTP ? window.DaynestHTTP.json(path) : api(path);
+    const todoListsRequest = wants(6) ? todoRead("/api/v1/todo-lists") : Promise.resolve(skipped);
+    const todosRequest = wants(7) ? todoListsRequest.then(() => todoRead(`/api/v1/todos?view=all&date=${localDateKey(new Date())}`)) : Promise.resolve(skipped);
     const vocabularyRequest = wants(8) ? api("/api/v1/word-books").then(async (books = []) => {
       const selectedBookID = books.some((book) => book.id === state.vocabularyBookID)
         ? state.vocabularyBookID
@@ -1112,7 +1113,7 @@
     const completed = todo.status === "completed";
     const due = todo.due_at ? `<span class="todo-due ${deadlineStatus(todo.due_at).startsWith("已逾期") ? "overdue" : ""}">◷ ${deadlineStatus(todo.due_at)}</span>` : "";
     const meta = [todo.import_receipt_id ? `<span>本机收集</span>` : "", due, todoRepeatLabel(todo.repeat_rule) ? `<span>↻ ${todoRepeatLabel(todo.repeat_rule)}</span>` : "", list ? `<span><i class="todo-list-color" style="--todo-list-color:${escapeHTML(list.color || "#5b81ff")}"></i>${escapeHTML(list.name)}</span>` : ""].filter(Boolean).join("");
-    return `<article class="todo-item ${completed ? "completed" : ""}"><button class="todo-complete" type="button" data-todo-completed="${!completed}" data-id="${todo.id}" aria-label="${completed ? "重新打开" : "完成"}待办 ${escapeHTML(todo.title)}">${completed ? "✓" : ""}</button><div class="todo-item-body"><div class="todo-item-title"><h4>${escapeHTML(todo.title)}</h4><span class="priority-${todo.priority}">● ${priorityLabel(todo.priority)}</span></div>${todo.notes ? `<p>${escapeHTML(todo.notes)}</p>` : ""}${meta ? `<div class="todo-meta">${meta}</div>` : ""}${(todo.tags || []).map((tag) => `<span class="tag">#${escapeHTML(tag)}</span>`).join("")}${steps.length ? `<div class="todo-steps"><span>${completedSteps}/${steps.length} 个步骤</span>${steps.map((step) => `<button class="todo-step ${step.completed ? "done" : ""}" type="button" data-todo-step="${todo.id}" data-step-id="${step.id}" data-step-completed="${!step.completed}"><i>${step.completed ? "✓" : ""}</i>${escapeHTML(step.title)}</button>`).join("")}</div>` : ""}</div><div class="todo-item-actions"><button class="action-todo-link" type="button" data-action-todo-context="${todo.id}">${todo.memo_action_id ? "来源与专注" : "专注记录"} ↗</button>${!completed ? `<button class="text-button" type="button" data-todo-my-day="${todo.my_day_date === localDateKey(new Date()) ? "remove" : "add"}" data-id="${todo.id}">${todo.my_day_date === localDateKey(new Date()) ? "移出今天" : "加入今天"}</button>` : ""}<button class="todo-delete" type="button" data-todo-delete="${todo.id}" aria-label="删除待办 ${escapeHTML(todo.title)}" title="删除待办">×</button></div></article>`;
+    return `<article class="todo-item ${completed ? "completed" : ""}"><button class="todo-complete" type="button" data-todo-completed="${!completed}" data-id="${todo.id}" aria-label="${completed ? "重新打开" : "完成"}待办 ${escapeHTML(todo.title)}">${completed ? "✓" : ""}</button><div class="todo-item-body"><div class="todo-item-title"><h4>${escapeHTML(todo.title)}</h4><span class="priority-${todo.priority}">● ${priorityLabel(todo.priority)}</span></div>${todo.notes ? `<p>${escapeHTML(todo.notes)}</p>` : ""}${meta ? `<div class="todo-meta">${meta}</div>` : ""}${(todo.tags || []).map((tag) => `<span class="tag">#${escapeHTML(tag)}</span>`).join("")}${steps.length ? `<div class="todo-steps"><span>${completedSteps}/${steps.length} 个步骤</span>${steps.map((step) => `<button class="todo-step ${step.completed ? "done" : ""}" type="button" data-todo-step="${todo.id}" data-step-id="${step.id}" data-step-completed="${!step.completed}"><i>${step.completed ? "✓" : ""}</i>${escapeHTML(step.title)}</button>`).join("")}</div>` : ""}</div><div class="todo-item-actions"><button type="button" data-todo-edit="${todo.id}">编辑</button><button class="action-todo-link" type="button" data-action-todo-context="${todo.id}">${todo.memo_action_id ? "来源与专注" : "专注记录"} ↗</button>${!completed ? `<button class="text-button" type="button" data-todo-my-day="${todo.my_day_date === localDateKey(new Date()) ? "remove" : "add"}" data-id="${todo.id}">${todo.my_day_date === localDateKey(new Date()) ? "移出今天" : "加入今天"}</button>` : ""}<button class="todo-delete" type="button" data-todo-delete="${todo.id}" aria-label="删除待办 ${escapeHTML(todo.title)}" title="删除待办">×</button></div></article>`;
   }
 
   function taskIsOpen(task) {
@@ -2406,6 +2407,7 @@
   }
 
   function bindEvents() {
+    document.addEventListener("daynest:todos-changed",()=>{if(state.user)refresh({background:true}).catch(()=>undefined);});
     document.addEventListener("daynest:todo-imported",event=>{if(state.user?.id===event.detail?.userID&&event.detail.server===(window.DaynestMobile?.getConnectionInfo?.().server||location.origin))refresh({background:true}).catch(()=>undefined);});
     document.addEventListener("daynest:actions-changed",()=>{if(state.user)refresh({background:true}).catch(()=>undefined);});
     document.addEventListener("daynest:todo-focus-recovered",event=>{
@@ -2918,47 +2920,24 @@
     }
   }
 
+  function visibleTodo(id) {
+    return (state.currentView === "dashboard" ? state.todayTodos : state.todos)?.find(todo => todo.id === id);
+  }
+
   async function changeTodoCompletion(id, completed) {
-    try {
-      await api(`/api/v1/todos/${id}/status`, { method: "PATCH", body: JSON.stringify({ completed }) });
-      await refresh();
-      notify(completed ? "待办已完成。" : "待办已重新打开。");
-    } catch (error) {
-      notify(error.message, "error");
-    }
+    return window.DaynestTodos?.action(visibleTodo(id), "complete", completed);
   }
 
   async function changeTodoMyDay(id, action) {
-    try {
-      if (action === "add") {
-        await api(`/api/v1/todos/${id}/my-day`, { method: "PUT", body: JSON.stringify({ date: localDateKey(new Date()) }) });
-      } else {
-        await api(`/api/v1/todos/${id}/my-day`, { method: "DELETE" });
-      }
-      await refresh();
-      notify(action === "add" ? "已加入今天的计划。" : "已移出今天的计划。");
-    } catch (error) {
-      notify(error.message, "error");
-    }
+    return window.DaynestTodos?.action(visibleTodo(id), "myday", action === "add" ? localDateKey(new Date()) : "");
   }
 
   async function changeTodoStep(todoID, stepID, completed) {
-    try {
-      await api(`/api/v1/todos/${todoID}/steps/${stepID}`, { method: "PATCH", body: JSON.stringify({ completed }) });
-      await refresh();
-    } catch (error) {
-      notify(error.message, "error");
-    }
+    return window.DaynestTodos?.action(visibleTodo(todoID), "step", { id: stepID, completed });
   }
 
   async function deleteTodo(id) {
-    try {
-      await api(`/api/v1/todos/${id}`, { method: "DELETE" });
-      await refresh();
-      notify("待办已删除。");
-    } catch (error) {
-      notify(error.message, "error");
-    }
+    return window.DaynestTodos?.action(visibleTodo(id), "delete");
   }
 
   async function deleteTodoList(id) {

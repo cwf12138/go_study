@@ -156,6 +156,7 @@ type TodoStep struct {
 }
 
 type TodoItem struct {
+	NextTodoID      string         `json:"next_todo_id,omitempty"`
 	ImportReceiptID string         `json:"import_receipt_id,omitempty"`
 	MemoActionID    string         `json:"memo_action_id,omitempty"`
 	ID              string         `json:"id"`
