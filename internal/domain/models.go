@@ -156,22 +156,23 @@ type TodoStep struct {
 }
 
 type TodoItem struct {
-	MemoActionID string         `json:"memo_action_id,omitempty"`
-	ID           string         `json:"id"`
-	UserID       string         `json:"user_id"`
-	ListID       string         `json:"list_id"`
-	Title        string         `json:"title"`
-	Notes        string         `json:"notes"`
-	Priority     TaskPriority   `json:"priority"`
-	Status       TodoStatus     `json:"status"`
-	DueAt        *time.Time     `json:"due_at,omitempty"`
-	MyDayDate    string         `json:"my_day_date,omitempty"`
-	RepeatRule   TodoRepeatRule `json:"repeat_rule"`
-	Tags         []string       `json:"tags"`
-	Steps        []TodoStep     `json:"steps"`
-	CreatedAt    time.Time      `json:"created_at"`
-	UpdatedAt    time.Time      `json:"updated_at"`
-	CompletedAt  *time.Time     `json:"completed_at,omitempty"`
+	ImportReceiptID string         `json:"import_receipt_id,omitempty"`
+	MemoActionID    string         `json:"memo_action_id,omitempty"`
+	ID              string         `json:"id"`
+	UserID          string         `json:"user_id"`
+	ListID          string         `json:"list_id"`
+	Title           string         `json:"title"`
+	Notes           string         `json:"notes"`
+	Priority        TaskPriority   `json:"priority"`
+	Status          TodoStatus     `json:"status"`
+	DueAt           *time.Time     `json:"due_at,omitempty"`
+	MyDayDate       string         `json:"my_day_date,omitempty"`
+	RepeatRule      TodoRepeatRule `json:"repeat_rule"`
+	Tags            []string       `json:"tags"`
+	Steps           []TodoStep     `json:"steps"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+	CompletedAt     *time.Time     `json:"completed_at,omitempty"`
 }
 
 // CalendarRepeatRule deliberately keeps recurrence compact. It covers the

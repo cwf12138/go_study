@@ -72,16 +72,23 @@ export function boot({ Http, App, Files }) {
       return await race(Files.upload({ id, path: '/api/v1/transfers/' + id, filename: item.name, ttl: item.ttl, token: owner, data }), signal);
     } finally { if (listener) await listener.remove(); pending.delete(id); signal?.removeEventListener('abort', cancel); }
   }
-  window.DaynestMobile = { native: true, saveBlob, downloadServer, uploadFile, maxUploadBytes: 8 * 1024 * 1024,
+  async function todoOutboxRequest(path,options={}) {
+    const method=(options.method||'GET').toUpperCase(),allowed=method==='GET'&&(path==='/api/v1/me'||/^\/api\/v1\/todo-imports\/[A-Za-z0-9_-]{16,100}$/.test(path))||method==='POST'&&path==='/api/v1/todo-imports';
+    if(!allowed||!connection||connection.server!==options.expectedServer)throw Error('本机收集的请求或电脑地址不匹配。');
+    const owner=token(),version=generation,headers=new Headers(options.headers||{});
+    if(!owner||headers.get('Authorization')!=='Bearer '+owner)throw Error('账号已变化，请重新核验后提交。');
+    const response=await nativeRequest(connection.server,path,{method,headers,body:options.body,signal:options.signal});current(owner,version);return response;
+  }
+  window.DaynestMobile = { native: true, saveBlob, todoOutboxRequest, downloadServer, uploadFile, maxUploadBytes: 8 * 1024 * 1024,
     copyText: text => Files.writeClipboard({ text }), readText: async () => (await Files.readClipboard()).text };
 
   document.addEventListener('DOMContentLoaded', async () => {
     document.body.classList.add('daynest-native');
     const setup = document.createElement('dialog'); setup.id = 'mobile-connection'; setup.className = 'mobile-connection'; setup.setAttribute('aria-labelledby', 'mobile-title');
-    setup.innerHTML = `<header><span class="mobile-mark" aria-hidden="true">D</span><button id="mobile-close" type="button" aria-label="关闭连接设置" hidden>×</button></header><p class="mobile-eyebrow">DAYNEST · ANDROID</p><h1 id="mobile-title">把日常，带在身边。</h1><p>连接电脑上的 Daynest，继续使用同一账号与记录。</p><form id="mobile-form"><label>电脑服务地址<input id="mobile-server" type="url" inputmode="url" placeholder="http://192.168.1.10:8080" maxlength="500" required autocomplete="off" spellcheck="false"></label><label class="mobile-consent"><input id="mobile-consent" type="checkbox"><span>若使用 HTTP，我确认只在可信 Wi-Fi 中连接；登录信息和记录不会加密传输。</span></label><button id="mobile-connect" type="submit">检查并连接</button></form><button id="mobile-offline" type="button" class="mobile-offline-button">离线阅读已保留的资料 ↗</button><p id="mobile-state" role="status" aria-live="polite"></p><details><summary>连接前请检查</summary><ol><li>手机和电脑位于同一可信局域网，电脑 Go 服务保持运行。</li><li>填写电脑局域网 IP，不是手机上的 localhost。</li><li>电脑需使用专用 JWT_SECRET；更换后已有网页需要重新登录，历史记录不变。</li><li>由你确认监听地址与防火墙端口，本 App 不会自动修改这些设置。</li></ol><p>主要数据与写入仍依赖电脑服务。事先开启保留的备忘录，可从「离线阅读」查看只读快照；尚未确认保存的编辑请从本机草稿核对。</p></details>`;
+    setup.innerHTML = `<header><span class="mobile-mark" aria-hidden="true">D</span><button id="mobile-close" type="button" aria-label="关闭连接设置" hidden>×</button></header><p class="mobile-eyebrow">DAYNEST · ANDROID</p><h1 id="mobile-title">把日常，带在身边。</h1><p>连接电脑上的 Daynest，继续使用同一账号与记录。</p><form id="mobile-form"><label>电脑服务地址<input id="mobile-server" type="url" inputmode="url" placeholder="http://192.168.1.10:8080" maxlength="500" required autocomplete="off" spellcheck="false"></label><label class="mobile-consent"><input id="mobile-consent" type="checkbox"><span>若使用 HTTP，我确认只在可信 Wi-Fi 中连接；登录信息和记录不会加密传输。</span></label><button id="mobile-connect" type="submit">检查并连接</button></form><button id="mobile-offline" type="button" class="mobile-offline-button">离线资料与本机收集 ↗</button><p id="mobile-state" role="status" aria-live="polite"></p><details><summary>连接前请检查</summary><ol><li>手机和电脑位于同一可信局域网，电脑 Go 服务保持运行。</li><li>填写电脑局域网 IP，不是手机上的 localhost。</li><li>电脑需使用专用 JWT_SECRET；更换后已有网页需要重新登录，历史记录不变。</li><li>由你确认监听地址与防火墙端口，本 App 不会自动修改这些设置。</li></ol><p>主要数据仍依赖电脑服务；已保留的备忘录与安排可离线查看。新的简单待办可先在本机收集，联网后手动核验并提交；未确认的长文请从本机草稿核对。</p></details>`;
     document.body.append(setup);
-    const reader=document.createElement('dialog');reader.id='mobile-offline-reader';reader.className='mobile-offline-reader';reader.setAttribute('aria-label','本机离线阅读');
-    reader.innerHTML='<button id="mobile-offline-close" type="button" aria-label="关闭离线阅读">‹ 返回应用</button><iframe id="mobile-offline-frame" title="只读离线阅读库"></iframe>';
+    const reader=document.createElement('dialog');reader.id='mobile-offline-reader';reader.className='mobile-offline-reader';reader.setAttribute('aria-label','离线资料与本机收集');
+    reader.innerHTML='<button id="mobile-offline-close" type="button" aria-label="关闭离线资料与本机收集">‹ 返回应用</button><iframe id="mobile-offline-frame" title="离线资料与本机收集"></iframe>';
     document.body.append(reader);
 
     const $ = id => document.getElementById('mobile-' + id), state = text => { $('state').textContent = text; };
@@ -91,11 +98,11 @@ export function boot({ Http, App, Files }) {
     function openSettings() { if (!setup.open) setup.showModal(); controls(); }
     window.DaynestMobile.openConnectionSettings=openSettings;
     window.DaynestMobile.getConnectionInfo=()=>({server:connection?.server||''});
-    function closeReader(){reader.close();$('offline-frame').src='about:blank';}
-    window.DaynestMobile.openOfflineReader=section=>{if(!connection){state('请先选择并连接一次电脑，在原账号开启离线保留。');return;}$('offline-frame').src='/static/offline-reader.html?server='+encodeURIComponent(connection.server)+(['todos','agenda'].includes(section)?'#'+section:'');if(!reader.open)reader.showModal();};
+    async function closeReader(){const guard=$('offline-frame').contentWindow?.DaynestLocalInbox;if(guard&&!(await guard.prepareClose()))return;reader.close();$('offline-frame').src='about:blank';}
+    window.DaynestMobile.openOfflineReader=section=>{if(!connection){state('请先选择并连接一次电脑，在原账号准备离线资料或本机收集。');return;}$('offline-frame').src='/static/offline-reader.html?server='+encodeURIComponent(connection.server)+(['todos','agenda','capture'].includes(section)?'#'+section:'');if(!reader.open)reader.showModal();};
     $('offline').addEventListener('click',window.DaynestMobile.openOfflineReader);
     $('offline-close').addEventListener('click',closeReader);
-    reader.addEventListener('close',()=>{$('offline-frame').src='about:blank';});
+    reader.addEventListener('cancel',event=>{event.preventDefault();closeReader();});reader.addEventListener('close',()=>{const frame=$('offline-frame'),guard=frame.contentWindow?.DaynestLocalInbox;Promise.resolve(guard?.beforeDetach?.()).finally(()=>{if(!reader.open)frame.src='about:blank';});});
     window.addEventListener('message',event=>{if(event.origin===location.origin&&event.source===$('offline-frame').contentWindow&&event.data?.type==='daynest:offline-close')closeReader();});
 
     async function activate() {

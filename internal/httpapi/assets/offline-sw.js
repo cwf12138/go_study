@@ -1,6 +1,6 @@
 'use strict';
 // Public reader shell only. No tokens, API responses, documents or app routes.
-const CACHE='daynest-read-shell-v2-20261103',ASSETS=['/offline/','/static/read-cache-core.js?v=20261103-2','/static/offline-reader.js?v=20261103-2','/static/offline-reader.css?v=20261103-2','/static/planning-cache-core.js?v=20261103-2','/static/planning-reader.js?v=20261103-2'];
+const CACHE='daynest-read-shell-v3-20261104',ASSETS=['/offline/','/static/read-cache-core.js?v=20261104-3','/static/offline-reader.js?v=20261104-3','/static/offline-reader.css?v=20261104-3','/static/planning-cache-core.js?v=20261104-3','/static/planning-reader.js?v=20261104-3','/static/http-client.js?v=20261104-3','/static/todo-outbox-core.js?v=20261104-3','/static/todo-outbox-ui.js?v=20261104-3'];
 self.addEventListener('install',event=>event.waitUntil((async()=>{const cache=await caches.open(CACHE);try{await cache.addAll(ASSETS);}catch(error){await caches.delete(CACHE);throw error;}await self.skipWaiting();})()));
 self.addEventListener('activate',event=>event.waitUntil((async()=>{for(const key of await caches.keys())if(key.startsWith('daynest-read-shell-')&&key!==CACHE)await caches.delete(key);await self.clients.claim();})()));
 self.addEventListener('fetch',event=>{const url=new URL(event.request.url);if(event.request.method!=='GET'||url.origin!==self.location.origin||!ASSETS.includes(url.pathname+url.search))return;

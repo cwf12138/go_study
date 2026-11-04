@@ -1789,6 +1789,53 @@ paths:
       responses:
         "204": { description: Deleted }
         "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/todo-imports:
+    post:
+      tags: [Todos]
+      security: [{ bearerAuth: [] }]
+      summary: 手动提交本机收集的简单待办，并保存永久回执
+      description: |
+        同一账号、request_id 与规范化内容重试返回原回执，不覆盖后续编辑。
+        回执与必要收集箱 / 待办在同一 Memory 锁中创建；目标删除后不通过重试复活。
+        成功仍沿用周期 JSON 快照，不代表立即落盘；不承诺跨旧备份恢复的永久去重。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTodoImportRequest" }
+      responses:
+        "201":
+          description: Created receipt and inbox todo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TodoImportResponse" }
+        "200":
+          description: Existing receipt and current target, which may be null after deletion
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TodoImportResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { description: Same request ID with different original content, or conflicting target ID; no partial creation }
+  /api/v1/todo-imports/{request_id}:
+    get:
+      tags: [Todos]
+      security: [{ bearerAuth: [] }]
+      summary: 核对当前账号的原提交回执，不再次创建待办
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[A-Za-z0-9_-]{16,100}$' }
+      responses:
+        "200":
+          description: Receipt and current target; created is false
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TodoImportResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/todos:
     get:
       tags: [Todos]
@@ -4613,6 +4660,42 @@ components:
           type: array
           maxItems: 30
           items: { type: string, maxLength: 200 }
+    CreateTodoImportRequest:
+      type: object
+      additionalProperties: false
+      required: [schema_version, request_id, title]
+      properties:
+        schema_version: { type: integer, const: 1 }
+        request_id: { type: string, pattern: '^[A-Za-z0-9_-]{16,100}$' }
+        title: { type: string, minLength: 1, maxLength: 200, description: "Unicode characters after trimming whitespace and BOM" }
+        notes: { type: string, maxLength: 6000, default: "" }
+        priority: { type: string, enum: [low, medium, high], default: medium }
+    TodoImportReceipt:
+      type: object
+      required: [id, user_id, request_id, todo_id, schema_version, fingerprint, created_at]
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        request_id: { type: string }
+        todo_id: { type: string }
+        schema_version: { type: integer, const: 1 }
+        fingerprint:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+          description: "SHA-256 of length-prefixed UTF-8 parts: daynest.todo-import.v1, trimmed title, trimmed notes, priority. Describes original content, not current target fields."
+        created_at: { type: string, format: date-time }
+    TodoImportResult:
+      type: object
+      required: [created, receipt, todo]
+      properties:
+        created: { type: boolean }
+        receipt: { $ref: "#/components/schemas/TodoImportReceipt" }
+        todo: { oneOf: [{ $ref: "#/components/schemas/TodoItem" }, { type: 'null' }] }
+    TodoImportResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: "#/components/schemas/TodoImportResult" }
     TodoItem:
       allOf:
         - $ref: "#/components/schemas/CreateTodoRequest"
@@ -4620,6 +4703,7 @@ components:
           properties:
             id: { type: string }
             memo_action_id: { type: string, description: "Optional permanent source receipt ID" }
+            import_receipt_id: { type: string, description: "Optional original local-capture receipt; retained after target deletion" }
             user_id: { type: string }
             status: { type: string, enum: [open, completed] }
             steps:
@@ -5408,6 +5492,9 @@ components:
         todos:
           type: array
           items: { $ref: "#/components/schemas/TodoItem" }
+        todo_imports:
+          type: array
+          items: { $ref: "#/components/schemas/TodoImportReceipt" }
         memo_folders:
           type: array
           items: { $ref: "#/components/schemas/MemoFolder" }

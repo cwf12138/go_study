@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const groups=[
-    ['notes','备忘与安排','memos',[['action_links','行动关联回执'],['memos','备忘录'],['memo_folders','备忘录文件夹'],['todos','待办'],['todo_lists','待办清单'],['calendar_events','日程'],['important_days','重要日子']]],
+    ['notes','备忘与安排','memos',[['todo_imports','本机待办提交回执'],['action_links','行动关联回执'],['memos','备忘录'],['memo_folders','备忘录文件夹'],['todos','待办'],['todo_lists','待办清单'],['calendar_events','日程'],['important_days','重要日子']]],
     ['life','生活与物品','inventory',[['text_clips','文字片段'],['parcels','快递'],['inventory','物品'],['shopping','购物项'],['bookmarks','收藏'],['subscriptions','订阅'],['ledger','账本流水'],['meals','用餐记录']]],
     ['care','身心与习惯','moods',[['moods','心情日记'],['focus_sessions','专注会话'],['fitness','运动记录'],['nutrition','饮食安排'],['care','保养事项'],['habits','习惯']]],
     ['learning','学习与阅读','literature',[['goals','学习目标'],['tasks','学习任务'],['word_books','词书'],['vocabulary_words','单词'],['vocabulary_reviews','单词复习记录'],['planner_preferences','规划偏好'],['plan_blocks','计划时段'],['planner_reports','规划报告'],['weekly_reflections','周复盘'],['english_readings','精读记录'],['ebook_readings','电子书阅读'],['classical_studies','古诗文学习']]],

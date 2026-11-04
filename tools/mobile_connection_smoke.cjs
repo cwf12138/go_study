@@ -8,7 +8,8 @@ class Event {
   preventDefault() { if (this.cancelable) this.defaultPrevented = true; }
 }
 class Headers {
-  constructor(value = {}) { this.map = new Map(Object.entries(value)); }
+  constructor(value = {}) { this.map = new Map(value instanceof Headers ? value.map : Object.entries(value)); }
+  get(name) { return this.map.get(name) || null; }
   *[Symbol.iterator]() { yield* this.map; }
 }
 class Response {

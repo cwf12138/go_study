@@ -2,8 +2,8 @@
   'use strict';
   const C=window.DaynestReadCacheCore,P=window.DaynestPlanningCache,$=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   let section='notes',data=null,vault=null,identity=null,server='',selectedDate='',renderError='',lastBinding='';
-  try{const saved=sessionStorage.getItem('daynest.offline.section');if(['notes','todos','agenda'].includes(saved))section=saved;}catch(_){}
-  const requested=location.hash.slice(1);if(['notes','todos','agenda'].includes(requested))section=requested;
+  try{const saved=sessionStorage.getItem('daynest.offline.section');if(['notes','todos','agenda','capture'].includes(saved))section=saved;}catch(_){}
+  const requested=location.hash.slice(1);if(['notes','todos','agenda','capture'].includes(requested))section=requested;
   const labels={event:'个人日程',plan:'计划时段',task:'学习任务',todo:'待办',focus:'专注记录',mood:'心情',fitness:'运动',care:'生活保养'},states={open:'未完成',completed:'已完成',planned:'待进行',in_progress:'进行中',skipped:'已跳过',done:'已完成',due:'待照顾',cancelled:'已取消'},priorities={low:'低',medium:'普通',high:'重要'};
   const when=v=>new Date(v).toLocaleString('zh-CN',{timeZone:P.ZONE}),dateOnly=v=>P.today(new Date(v)),clock=v=>new Date(v).toLocaleTimeString('zh-CN',{timeZone:P.ZONE,hour:'2-digit',minute:'2-digit',hour12:false});
   function check(){try{const found=C.resolve(localStorage,server,localStorage.getItem('studyflow.token')||'');if(!found||found.userID!==identity?.userID||found.credentialTag!==identity?.credentialTag){load();return false;}if(parent!==window){const config=JSON.parse(localStorage.getItem('daynest.mobile.connection.v1')||'null');if(!config||C.origin(config.server)!==server){load();return false;}}return true;}catch(_){load();return false;}}
@@ -13,8 +13,9 @@
   function filteredAgenda(){return(activeDay()?.items||[]).filter(row=>matches(row)&&(!$('op-source').value||row.type===$('op-source').value));}
   function timeLabel(row){if(row.all_day||!row.start_at)return'全天';const start=selectedDate+'T00:00:00+08:00',end=P.nextDay(selectedDate)+'T00:00:00+08:00',from=Date.parse(row.start_at)<Date.parse(start)?'00:00':clock(row.start_at),to=row.end_at?(Date.parse(row.end_at)>=Date.parse(end)?'24:00':clock(row.end_at)):'';return from+(to?'–'+to:'')+((dateOnly(row.start_at)!==selectedDate||row.end_at&&Date.parse(row.end_at)>Date.parse(end))?' · 跨日':'');}
   function empty(message){$('op-content').innerHTML=`<div class="op-empty"><span aria-hidden="true">▤</span><h2>${esc(message)}</h2><p>在线时，从待办或智能日历的「离线资料」单独开启保留，并更新所需日期。</p></div>`;}
-  function render(){const planning=section!=='notes';$('or-workspace').hidden=planning;$('or-library').hidden=planning;$('offline-planning').hidden=!planning;$('op-todo-filters').hidden=section!=='todos';$('op-day-filters').hidden=section!=='agenda';
+  function render(){const planning=section==='todos'||section==='agenda';$('or-workspace').hidden=section!=='notes';$('or-library').hidden=section!=='notes';$('todo-outbox').hidden=section!=='capture';$('offline-planning').hidden=!planning;$('op-todo-filters').hidden=section!=='todos';$('op-day-filters').hidden=section!=='agenda';
     document.querySelectorAll('[data-offline-section]').forEach(button=>{const active=button.dataset.offlineSection===section;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));});
+    if(section==='capture'){document.dispatchEvent(new CustomEvent('daynest:outbox-show'));return;}document.querySelector('.or-badge').textContent='本机快照 · 只读';document.querySelector('.or-intro h1').textContent='离线，也能接着看。';document.querySelector('.or-intro .or-eyebrow').textContent='A QUIET PLACE TO READ';
     if(!planning)return;
     $('op-content').innerHTML='';$('op-read-at').textContent='';$('op-export').disabled=true;$('or-count').textContent='0';$('or-capacity-label').textContent='待办与当日安排 · 只读快照';
     if(!identity){$('or-status').textContent=renderError||'当前账号没有可核对的离线资料，请先在原服务在线登录。';empty('本机资料已锁定');return;}

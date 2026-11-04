@@ -145,6 +145,8 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 	private.HandleFunc("POST /api/v1/todos", s.createTodo)
 	private.HandleFunc("GET /api/v1/todos", s.listTodos)
 	private.HandleFunc("DELETE /api/v1/todos/{todo_id}", s.deleteTodo)
+	private.HandleFunc("POST /api/v1/todo-imports", s.createTodoImport)
+	private.HandleFunc("GET /api/v1/todo-imports/{request_id}", s.todoImport)
 	private.HandleFunc("PATCH /api/v1/todos/{todo_id}/status", s.changeTodoStatus)
 	private.HandleFunc("PUT /api/v1/todos/{todo_id}/my-day", s.addTodoToMyDay)
 	private.HandleFunc("DELETE /api/v1/todos/{todo_id}/my-day", s.removeTodoFromMyDay)

@@ -727,6 +727,11 @@
         "table": "text_clips"
       },
       {
+        "section": "todo_imports",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
         "section": "todo_lists",
         "records": 0,
         "mode": "relational_and_archive",

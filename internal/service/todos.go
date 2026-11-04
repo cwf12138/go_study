@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/example/studyflow/internal/domain"
 	"github.com/example/studyflow/internal/platform"
@@ -139,7 +140,7 @@ type CreateTodoInput struct {
 func (s *Service) CreateTodo(ctx context.Context, userID string, input CreateTodoInput) (domain.TodoItem, error) {
 	input.Title = strings.TrimSpace(input.Title)
 	input.Notes = strings.TrimSpace(input.Notes)
-	if input.Title == "" || len(input.Title) > 200 || len(input.Notes) > 6000 {
+	if input.Title == "" || utf8.RuneCountInString(input.Title) > 200 || utf8.RuneCountInString(input.Notes) > 6000 {
 		return domain.TodoItem{}, fmt.Errorf("%w: title or notes are invalid", domain.ErrInvalidInput)
 	}
 	if input.Priority == "" {

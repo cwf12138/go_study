@@ -74,3 +74,33 @@ func TestInspectSnapshotStorageKeysAndReferences(t *testing.T) {
 		}
 	})
 }
+
+func TestInspectTodoImportReferences(t *testing.T) {
+	base := snapshot{Version: 1, SavedAt: time.Now(), Users: []persistedUser{
+		{User: domain.User{ID: "u1", Email: "one@example.test"}, PasswordHash: "hash-one"},
+		{User: domain.User{ID: "u2", Email: "two@example.test"}, PasswordHash: "hash-two"},
+	}}
+	inspect := func(s snapshot) (SnapshotInspection, error) {
+		raw, err := json.Marshal(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return InspectSnapshot(raw)
+	}
+	base.TodoImports = []domain.TodoImportReceipt{{ID: "import-a", UserID: "u1", TodoID: "todo-a", RequestID: "request-1234567890"}}
+	if result, err := inspect(base); err != nil || result.MissingReferences != 1 {
+		t.Fatalf("deleted target must remain a historical warning: %+v %v", result, err)
+	}
+	base.Todos = []domain.TodoItem{{ID: "todo-a", UserID: "u2"}}
+	if _, err := inspect(base); err == nil {
+		t.Fatal("cross-account receipt target accepted")
+	}
+	base.Todos = []domain.TodoItem{{ID: "todo-a", UserID: "u1", ImportReceiptID: "import-a"}}
+	if result, err := inspect(base); err != nil || result.MissingReferences != 0 {
+		t.Fatalf("valid receipt pair: %+v %v", result, err)
+	}
+	base.TodoImports[0].UserID = "u2"
+	if _, err := inspect(base); err == nil {
+		t.Fatal("cross-account receipt backlink accepted")
+	}
+}

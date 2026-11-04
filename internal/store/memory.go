@@ -49,6 +49,7 @@ type Memory struct {
 	todoLists               map[string]domain.TodoList
 	todos                   map[string]domain.TodoItem
 	actionLinks             map[string]domain.ActionLink
+	todoImports             map[string]domain.TodoImportReceipt
 	calendarEvents          map[string]domain.CalendarEvent
 	wordBooks               map[string]domain.WordBook
 	words                   map[string]domain.VocabularyWord
@@ -96,6 +97,7 @@ func NewMemory() *Memory {
 		todoLists:               make(map[string]domain.TodoList),
 		todos:                   make(map[string]domain.TodoItem),
 		actionLinks:             make(map[string]domain.ActionLink),
+		todoImports:             make(map[string]domain.TodoImportReceipt),
 		calendarEvents:          make(map[string]domain.CalendarEvent),
 		wordBooks:               make(map[string]domain.WordBook),
 		words:                   make(map[string]domain.VocabularyWord),
@@ -1191,6 +1193,7 @@ type snapshot struct {
 	TodoLists               []domain.TodoList           `json:"todo_lists"`
 	Todos                   []domain.TodoItem           `json:"todos"`
 	ActionLinks             []domain.ActionLink         `json:"action_links,omitempty"`
+	TodoImports             []domain.TodoImportReceipt  `json:"todo_imports,omitempty"`
 	CalendarEvents          []domain.CalendarEvent      `json:"calendar_events"`
 	WordBooks               []domain.WordBook           `json:"word_books"`
 	Words                   []domain.VocabularyWord     `json:"vocabulary_words"`
@@ -1312,6 +1315,9 @@ func (m *Memory) SaveJSON(path string) (saveErr error) {
 	}
 	for _, item := range m.actionLinks {
 		s.ActionLinks = append(s.ActionLinks, item)
+	}
+	for _, item := range m.todoImports {
+		s.TodoImports = append(s.TodoImports, item)
 	}
 	for _, item := range m.calendarEvents {
 		s.CalendarEvents = append(s.CalendarEvents, item)
@@ -1514,6 +1520,10 @@ func (m *Memory) LoadJSON(path string) error {
 	m.todoLists = make(map[string]domain.TodoList, len(s.TodoLists))
 	m.todos = make(map[string]domain.TodoItem, len(s.Todos))
 	m.actionLinks = make(map[string]domain.ActionLink, len(s.ActionLinks))
+	m.todoImports = make(map[string]domain.TodoImportReceipt, len(s.TodoImports))
+	for _, item := range s.TodoImports {
+		m.todoImports[item.ID] = item
+	}
 	for _, item := range s.ActionLinks {
 		m.actionLinks[item.ID] = item
 	}

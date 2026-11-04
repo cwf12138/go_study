@@ -630,7 +630,7 @@
                 <form id="todo-list-form" class="todo-new-list-form"><input id="todo-list-name" maxlength="80" required aria-label="新分类名称" placeholder="新建分类，例如：生活"><input id="todo-list-color" type="color" value="#7c4dff" aria-label="分类颜色"><button class="quiet" type="submit">添加</button></form>
               </aside>
               <article class="surface todo-main-card">
-                <div class="todo-main-head"><div><p id="todo-view-kicker" class="eyebrow">MY DAY</p><h3 id="todo-view-title">我的一天</h3><p id="todo-view-description">从收集箱中挑选今天真正要完成的事。</p></div><button id="todo-offline-open" class="quiet" type="button" aria-haspopup="dialog">离线资料</button><span id="todo-view-count" class="pill">0 项</span></div>
+                <div class="todo-main-head"><div><p id="todo-view-kicker" class="eyebrow">MY DAY</p><h3 id="todo-view-title">我的一天</h3><p id="todo-view-description">从收集箱中挑选今天真正要完成的事。</p></div><button id="todo-local-open" class="quiet" type="button">＋ 本机收集</button><button id="todo-offline-open" class="quiet" type="button" aria-haspopup="dialog">离线资料</button><span id="todo-view-count" class="pill">0 项</span></div>
                 <div class="todo-toolbar"><label class="todo-search"><span aria-hidden="true">⌕</span><input id="todo-search" type="search" aria-label="搜索待办标题、备注或标签" placeholder="搜索标题、备注或标签"></label><select id="todo-priority-filter" aria-label="按优先级筛选"><option value="">全部优先级</option><option value="high">高优先级</option><option value="medium">中优先级</option><option value="low">低优先级</option></select><select id="todo-tag-filter" aria-label="按标签筛选"><option value="">全部标签</option></select></div>
                 <div id="todo-items" class="todo-items empty-state">正在加载待办…</div>
                 <section id="todo-suggestions" class="todo-suggestions hidden"><div class="todo-suggestions-head"><div><p class="eyebrow">SUGGESTIONS</p><h4>可加入今天</h4></div><span>从未完成事项中挑选</span></div><div id="todo-suggestion-items" class="todo-suggestion-items"></div></section>
@@ -955,18 +955,20 @@
     <script src="/static/actions.js?v=20261103-1" defer></script>
     <script src="/static/read-cache-core.js?v=20261103-1" defer></script>
     <script src="/static/planning-cache-core.js?v=20261103-2" defer></script>
-    <script src="/static/read-cache.js?v=20261103-1&planning=2" defer></script>
+    <script src="/static/todo-outbox-core.js?v=20261104-3" defer></script>
+    <script src="/static/read-cache.js?v=20261103-1&planning=2&outbox=3" defer></script>
+    <script src="/static/todo-outbox-bridge.js?v=20261104-3" defer></script>
     <script src="/static/auth-state.js?v=20261103-1" defer></script>
     <script src="/static/diagnostics-core.js?v=20261030-1" defer></script>
     <script src="/static/diagnostics.js?v=20261030-1" defer></script>
-    <script src="/static/data-center-core.js?v=20261101-1" defer></script>
+    <script src="/static/data-center-core.js?v=20261101-1&outbox=3" defer></script>
     <script src="/static/data-center.js?v=20261103-http" defer></script>
     <script src="/static/navigation-core.js?v=20261027-1" defer></script>
     <script src="/static/navigation.js?v=20261027-1" defer></script>
     <script src="/static/draft-store.js?v=20261102-1" defer></script>
     <script src="/static/record-drafts-core.js?v=20261102-1" defer></script>
     <script src="/static/record-drafts.js?v=20261102-1" defer></script>
-    <script src="/static/app.js?v=20261103-session&actions=20261103&offline=1&planning=2" defer></script>
+    <script src="/static/app.js?v=20261103-session&actions=20261103&offline=1&planning=2&outbox=3" defer></script>
     <script src="/static/gentle-reminders-core.js?v=20261022-1" defer></script>
     <script src="/static/important-days-core.js?v=20261022-1" defer></script>
     <script src="/static/important-days.js?v=20261022-1" defer></script>
