@@ -38,6 +38,7 @@
     <link rel="stylesheet" href="/static/playrooms.css?v=20260920-1">
     <link rel="stylesheet" href="/static/daily-card.css?v=20260923-dialog">
     <link rel="stylesheet" href="/static/ledger.css?v=20260922-1">
+    <link rel="stylesheet" href="/static/calendar-editor.css?v=20261105-2">
     <link rel="stylesheet" href="/static/calendar-experience.css?v=20260924-mood-icons">
     <link rel="stylesheet" href="/static/daynest.css?v=20260925-1">
     <link rel="stylesheet" href="/static/inventory.css?v=20260929-1">
@@ -431,7 +432,7 @@
             <div class="calendar-shell">
               <div class="calendar-toolbar">
                 <div class="calendar-nav-actions"><button id="calendar-today" class="quiet" type="button">今天</button><button id="calendar-prev" class="icon-button" type="button" aria-label="上一段">‹</button><button id="calendar-next" class="icon-button" type="button" aria-label="下一段">›</button><h3 id="calendar-title">日历</h3></div>
-                <div class="calendar-toolbar-actions"><div class="calendar-tool-icons"><button id="calendar-offline-open" type="button" class="icon-button" title="离线资料与保留设置" aria-label="离线资料与保留设置" aria-haspopup="dialog">▤</button><button id="calendar-search-open" type="button" class="icon-button" aria-label="搜索日程" title="搜索日程" aria-haspopup="dialog" aria-controls="calendar-tools-dialog"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg></button><button id="calendar-filter-open" type="button" class="icon-button" aria-label="筛选与日期跳转" title="筛选与日期跳转" aria-haspopup="dialog" aria-controls="calendar-tools-dialog"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="currentColor"/><circle cx="15" cy="12" r="2" fill="currentColor"/><circle cx="8" cy="18" r="2" fill="currentColor"/></svg></button></div><div class="calendar-view-switch" role="tablist" aria-label="日历视图"><button type="button" data-calendar-view="year">年</button><button class="active" type="button" data-calendar-view="month">月</button><button type="button" data-calendar-view="week">周</button><button type="button" data-calendar-view="day">日</button></div><button id="calendar-create" class="primary" type="button">＋ 新建日程</button></div>
+                <div class="calendar-toolbar-actions"><div class="calendar-tool-icons"><button id="calendar-offline-open" type="button" class="icon-button" title="离线资料与保留设置" aria-label="离线资料与保留设置" aria-haspopup="dialog">▤</button><button id="calendar-search-open" type="button" class="icon-button" aria-label="搜索日程" title="搜索日程" aria-haspopup="dialog" aria-controls="calendar-tools-dialog"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg></button><button id="calendar-filter-open" type="button" class="icon-button" aria-label="筛选与日期跳转" title="筛选与日期跳转" aria-haspopup="dialog" aria-controls="calendar-tools-dialog"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="currentColor"/><circle cx="15" cy="12" r="2" fill="currentColor"/><circle cx="8" cy="18" r="2" fill="currentColor"/></svg></button></div><div class="calendar-view-switch" role="tablist" aria-label="日历视图"><button type="button" data-calendar-view="year">年</button><button class="active" type="button" data-calendar-view="month">月</button><button type="button" data-calendar-view="week">周</button><button type="button" data-calendar-view="day">日</button></div><button id="calendar-recovery-open" class="quiet" type="button" hidden>待核对日程</button><button id="calendar-create" class="primary" type="button">＋ 新建日程</button></div>
               </div>
               <dialog id="calendar-tools-dialog" class="calendar-tools-dialog" aria-labelledby="calendar-tools-title"><header><h3 id="calendar-tools-title">搜索日程</h3><button id="calendar-tools-close" type="button" class="icon-button" aria-label="关闭搜索与筛选">×</button></header><div id="calendar-search-fields"><label>查找当前日期范围<input id="calendar-search" type="search" maxlength="100" placeholder="输入日程、计划或任务标题" autocomplete="off"></label><p>按标题即时查找，搜索条件在关闭后仍保留。</p></div><div id="calendar-filter-fields" class="hidden"><label>直达日期<input id="calendar-jump" type="date"></label><label>显示内容<select id="calendar-source"><option value="all">全部内容</option><option value="event">个人日程</option><option value="plan">学习计划</option><option value="tasks">任务与待办</option><option value="mood">心情记录</option><option value="fitness">锻炼记录</option><option value="care">生活保养</option><option value="focus">已完成专注</option></select></label><p>选择后立即生效。图标上的圆点表示正在使用搜索或来源筛选。</p></div><footer><button id="calendar-reset-filters" class="quiet" type="button">清除全部条件</button><button id="calendar-tools-done" class="primary" type="button">查看日历</button></footer></dialog>
               <p id="calendar-view-status" class="calendar-view-status" role="status" aria-live="polite"></p>
@@ -451,20 +452,26 @@
               </div>
             </div>
 
-            <dialog id="calendar-event-dialog" class="calendar-event-dialog">
-              <form id="calendar-event-form" method="dialog">
-                <div class="calendar-dialog-head"><div><p class="eyebrow">CALENDAR EVENT</p><h3 id="calendar-dialog-title">新建日程</h3></div><button id="calendar-dialog-close" class="icon-button" type="button" aria-label="关闭">×</button></div>
-                <input id="calendar-event-id" type="hidden">
-                <label>标题<input id="calendar-event-title" required maxlength="160" placeholder="例如：复习 Go 并发模型"></label>
-                <div class="calendar-form-row"><label>开始<input id="calendar-event-start" type="datetime-local" required></label><label>结束<input id="calendar-event-end" type="datetime-local" required></label></div>
-                <label class="check-label"><input id="calendar-event-all-day" type="checkbox">全天日程</label>
-                <div class="calendar-form-row"><label>分类<select id="calendar-event-category"><option>学习</option><option>工作</option><option>生活</option><option>纪念日</option></select></label><label>颜色<input id="calendar-event-color" type="color" value="#5b81ff"></label></div>
-                <div class="calendar-form-row"><label>重复<select id="calendar-event-repeat"><option value="none">不重复</option><option value="daily">每天</option><option value="weekly">每周</option><option value="monthly">每月</option><option value="yearly">每年</option></select></label><label>重复截止<input id="calendar-event-repeat-until" type="date"></label></div>
-                <div class="calendar-form-row"><label>提醒<select id="calendar-event-reminder"><option value="0">不提醒</option><option value="10">提前 10 分钟</option><option value="30">提前 30 分钟</option><option value="60">提前 1 小时</option><option value="1440">提前 1 天</option></select></label><label>地点<input id="calendar-event-location" maxlength="240" placeholder="可选"></label></div>
+            <dialog id="calendar-event-dialog" class="calendar-event-dialog" aria-labelledby="calendar-dialog-title">
+              <header class="calendar-dialog-head"><div><p class="eyebrow">A LITTLE ROOM FOR YOUR DAY</p><h3 id="calendar-dialog-title">新建日程</h3></div><button id="calendar-dialog-close" class="icon-button" type="button" aria-label="关闭日程编辑">×</button></header>
+              <div class="calendar-editor-body">
+                <div id="calendar-command-list" hidden></div><p id="calendar-editor-status" role="status" aria-live="polite"></p>
+                <p id="calendar-editor-scope" class="calendar-editor-scope"></p>
+                <form id="calendar-event-form"><fieldset id="calendar-event-fields">
+                  <input id="calendar-event-id" type="hidden">
+                  <label>标题<input id="calendar-event-title" required maxlength="320" placeholder="例如：周末与朋友见面"></label>
+                  <label class="check-label"><input id="calendar-event-all-day" type="checkbox">全天日程</label>
+                  <div class="calendar-form-row"><label><span id="calendar-start-label">开始 · 北京时间</span><input id="calendar-event-start" type="datetime-local" required></label><label><span id="calendar-end-label">结束 · 北京时间</span><input id="calendar-event-end" type="datetime-local" required></label></div>
+                  <div class="calendar-form-row"><label>分类<select id="calendar-event-category"><option>生活</option><option>工作</option><option>学习</option><option>纪念日</option></select></label><label>颜色<input id="calendar-event-color" type="color" value="#5b81ff"></label></div>
+                  <div class="calendar-form-row"><label>重复<select id="calendar-event-repeat"><option value="none">不重复</option><option value="daily">每天</option><option value="weekly">每周</option><option value="monthly">每月</option><option value="yearly">每年</option></select></label><label>重复截止<input id="calendar-event-repeat-until" type="date"></label></div>
+                  <div class="calendar-form-row"><label>提醒<select id="calendar-event-reminder"><option value="0">不提醒</option><option value="10">提前 10 分钟</option><option value="30">提前 30 分钟</option><option value="60">提前 1 小时</option><option value="1440">提前 1 天</option></select></label><label>地点<input id="calendar-event-location" maxlength="480" placeholder="可选"></label></div>
+                  <label>说明<textarea id="calendar-event-description" rows="5" maxlength="12000" placeholder="补充准备事项、地址或链接"></textarea></label>
+                </fieldset>
+                <div class="calendar-dialog-actions"><button id="calendar-event-delete" class="quiet danger-text hidden" type="button">删除日程</button><button id="calendar-event-export" class="quiet" type="button">导出文字 ↓</button><span></span><button id="calendar-event-cancel" class="quiet" type="button">关闭</button><button id="calendar-event-save" class="primary" type="submit">保存日程</button></div>
+                </form>
+                <section id="calendar-editor-review" class="calendar-editor-review" hidden><header><h4>先对照，再继续</h4><button id="calendar-event-check" class="quiet" type="button">读取最新版本</button></header><pre id="calendar-event-remote"></pre><div><button id="calendar-event-use-server" type="button">采用服务端内容</button><button id="calendar-event-keep-local" type="button">保留当前文字继续编辑</button><button id="calendar-command-retry" type="button" hidden>按原标识重试</button><button id="calendar-command-clear" type="button" hidden>清理本机待核对记录</button></div></section>
                 <p class="hint">网页打开时检查提醒，关闭网页或设备休眠不保证送达。<button id="calendar-notification-enable" class="text-button" type="button">允许浏览器提醒</button></p>
-                <label>说明<textarea id="calendar-event-description" rows="3" maxlength="6000" placeholder="补充准备事项或链接"></textarea></label>
-                <div class="calendar-dialog-actions"><button id="calendar-event-delete" class="quiet danger-text hidden" type="button">删除日程</button><span></span><button id="calendar-event-cancel" class="quiet" type="button">取消</button><button class="primary" type="submit">保存日程</button></div>
-              </form>
+              </div>
             </dialog>
           </section>
 
@@ -957,12 +964,12 @@
     <script src="/static/read-cache-core.js?v=20261103-1" defer></script>
     <script src="/static/planning-cache-core.js?v=20261103-2" defer></script>
     <script src="/static/todo-outbox-core.js?v=20261104-3" defer></script>
-    <script src="/static/read-cache.js?v=20261103-1&planning=2&outbox=3" defer></script>
+    <script src="/static/read-cache.js?v=20261103-1&planning=2&outbox=3&calendar=20261105" defer></script>
     <script src="/static/todo-outbox-bridge.js?v=20261104-3" defer></script>
     <script src="/static/auth-state.js?v=20261103-1" defer></script>
     <script src="/static/diagnostics-core.js?v=20261030-1" defer></script>
     <script src="/static/diagnostics.js?v=20261030-1" defer></script>
-    <script src="/static/data-center-core.js?v=20261101-1&outbox=3" defer></script>
+    <script src="/static/data-center-core.js?v=20261101-1&outbox=3&calendar=20261105" defer></script>
     <script src="/static/data-center.js?v=20261103-http" defer></script>
     <script src="/static/navigation-core.js?v=20261027-1" defer></script>
     <script src="/static/navigation.js?v=20261027-1" defer></script>
@@ -1004,7 +1011,9 @@
     <script src="/static/timeline.js?v=20260910-1" defer></script>
     <script src="/static/weather.js?v=20261009-1" defer></script>
     <script src="/static/holiday.js?v=20261009-1" defer></script>
-    <script src="/static/calendar.js?v=20261020-care-1&actions=20261103&planning=2" defer></script>
+    <script src="/static/calendar-editor-core.js?v=20261105-2" defer></script>
+    <script src="/static/calendar-editor.js?v=20261105-2" defer></script>
+    <script src="/static/calendar.js?v=20261020-care-1&actions=20261103&planning=2&editing=20261105" defer></script>
     <script src="/static/commands.js?v=20260925-daynest" defer></script>
     <script src="/static/content-search.js?v=20261020-1" defer></script>
     <script src="/static/transfers-core.js?v=20261021-1" defer></script>

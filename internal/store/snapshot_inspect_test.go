@@ -121,3 +121,20 @@ func TestInspectTodoSuccessorReferences(t *testing.T) {
 		t.Fatal("cross-account successor accepted")
 	}
 }
+
+func TestInspectCalendarCommandReferences(t *testing.T) {
+	s := snapshot{Version: 1, SavedAt: time.Now(), Users: []persistedUser{
+		{User: domain.User{ID: "u1", Email: "one@example.test"}, PasswordHash: "one"},
+		{User: domain.User{ID: "u2", Email: "two@example.test"}, PasswordHash: "two"},
+	}, CalendarCommands: []domain.CalendarCommandReceipt{{ID: "receipt", UserID: "u1", EventID: "event", RequestID: "request-12345678"}}}
+	raw, _ := json.Marshal(s)
+	result, err := InspectSnapshot(raw)
+	if err != nil || result.MissingReferences != 1 {
+		t.Fatalf("deleted event must be historical warning: %+v %v", result, err)
+	}
+	s.CalendarEvents = []domain.CalendarEvent{{ID: "event", UserID: "u2"}}
+	raw, _ = json.Marshal(s)
+	if _, err = InspectSnapshot(raw); err == nil {
+		t.Fatal("cross-owner event receipt accepted")
+	}
+}

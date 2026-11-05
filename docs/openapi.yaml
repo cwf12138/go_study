@@ -2111,28 +2111,106 @@ paths:
                   data: { $ref: "#/components/schemas/CalendarEvent" }
         "400": { $ref: "#/components/responses/BadRequest" }
   /api/v1/calendar/events/{event_id}:
+    get:
+      tags: [Calendar]
+      security: [{ bearerAuth: [] }]
+      summary: 读取原始日程系列和版本契约
+      parameters:
+        - { in: path, name: event_id, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Series base, not the clicked occurrence; complete fractional timestamp retained
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/CalendarEvent" }
+                  meta:
+                    type: object
+                    properties:
+                      write_contract: { type: string, const: calendar-if-match-v1 }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
     patch:
       tags: [Calendar]
       security: [{ bearerAuth: [] }]
-      summary: 更新个人日程或整个重复系列
+      summary: 更新原日程或整组重复系列，支持版本条件
+      description: 新版前端发送完整强 If-Match，保留所有纳秒。旧客户端可省略条件，但服务端仍在同一锁中以读取版本比较写入。没有单次实例例外编辑。
       parameters:
         - { in: path, name: event_id, required: true, schema: { type: string } }
+        - $ref: "#/components/parameters/CalendarIfMatch"
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/CalendarEventInput" }
+            schema: { $ref: "#/components/schemas/CalendarEventPatch" }
       responses:
-        "200": { description: Updated }
+        "200":
+          description: Updated series; success still uses periodic JSON snapshots
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/CalendarEvent" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
     delete:
       tags: [Calendar]
       security: [{ bearerAuth: [] }]
-      summary: 删除个人日程或整个重复系列
+      summary: 删除原日程或整组重复系列，保留新建回执
       parameters:
         - { in: path, name: event_id, required: true, schema: { type: string } }
+        - $ref: "#/components/parameters/CalendarIfMatch"
       responses:
         "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/calendar/event-commands:
+    post:
+      tags: [Calendar]
+      security: [{ bearerAuth: [] }]
+      summary: 以稳定提交标识新建日程并原子保存永久回执
+      description: 同一账号 / 标识 / 规范化原内容重试返回原回执和当前日程，不覆盖后续编辑。目标删除后返回 event null，不重新创建。同标识改内容返回 409。不承诺跨旧备份回滚的永久恰好一次。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CalendarCommandInput" }
+      responses:
+        "201":
+          description: Created event and receipt
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CalendarCommandResponse" }
+        "200":
+          description: Original receipt and current target
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CalendarCommandResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/calendar/event-commands/{request_id}:
+    get:
+      tags: [Calendar]
+      security: [{ bearerAuth: [] }]
+      summary: 核对当前账号的原始新建回执，不执行创建
+      parameters:
+        - { in: path, name: request_id, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{16,100}$' } }
+      responses:
+        "200":
+          description: Receipt and current event, possibly null after deletion
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CalendarCommandResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/goals/{goal_id}:
     delete:
@@ -3775,6 +3853,12 @@ components:
       name: list_id
       required: true
       schema: { type: string }
+    CalendarIfMatch:
+      in: header
+      name: If-Match
+      required: false
+      description: 'Single strong ETag "event ID@updated_at" from the series baseline. Preserve nanoseconds. Stale conditions return 409; weak, wildcard and multiple tags return 400.'
+      schema: { type: string }
     TodoIfMatch:
       in: header
       name: If-Match
@@ -4514,8 +4598,54 @@ components:
         end_at: { type: string, format: date-time }
         all_day: { type: boolean, default: false }
         repeat_rule: { type: string, enum: [none, daily, weekly, monthly, yearly], default: none }
-        repeat_until: { type: string, format: date-time }
+        repeat_until: { type: [string, 'null'], format: date-time }
         reminder_minutes: { type: integer, minimum: 0, maximum: 40320, default: 0 }
+    CalendarEventPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        title: { type: string, minLength: 1, maxLength: 160 }
+        description: { type: string, maxLength: 6000 }
+        location: { type: string, maxLength: 240 }
+        category: { type: string, maxLength: 60 }
+        color: { type: string, pattern: '^#[0-9A-Fa-f]{6}$' }
+        start_at: { type: string, format: date-time }
+        end_at: { type: string, format: date-time }
+        all_day: { type: boolean }
+        repeat_rule: { type: string, enum: [none, daily, weekly, monthly, yearly] }
+        repeat_until: { type: [string, 'null'], format: date-time }
+        clear_repeat_until: { type: boolean, description: "Explicitly clear repeat_until; null alone is not a clear operation" }
+        reminder_minutes: { type: integer, minimum: 0, maximum: 40320 }
+    CalendarCommandInput:
+      allOf:
+        - $ref: "#/components/schemas/CalendarEventInput"
+        - type: object
+          required: [schema_version, request_id]
+          properties:
+            schema_version: { type: integer, const: 1 }
+            request_id: { type: string, pattern: '^[A-Za-z0-9_-]{16,100}$' }
+    CalendarCommandReceipt:
+      type: object
+      required: [id, user_id, request_id, event_id, schema_version, fingerprint, created_at]
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        request_id: { type: string }
+        event_id: { type: string }
+        schema_version: { type: integer, const: 1 }
+        fingerprint: { type: string, pattern: '^[a-f0-9]{64}$', description: "Length-prefixed UTF-8 SHA-256 of normalized calendar-create.v1 command; describes original content" }
+        created_at: { type: string, format: date-time }
+    CalendarCommandResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [created, receipt, event]
+          properties:
+            created: { type: boolean }
+            receipt: { $ref: "#/components/schemas/CalendarCommandReceipt" }
+            event: { oneOf: [{ $ref: "#/components/schemas/CalendarEvent" }, { type: 'null' }] }
     CalendarEvent:
       allOf:
         - $ref: "#/components/schemas/CalendarEventInput"
@@ -5607,6 +5737,9 @@ components:
         classical_studies:
           type: array
           items: { $ref: "#/components/schemas/ClassicalStudy" }
+        calendar_commands:
+          type: array
+          items: { $ref: "#/components/schemas/CalendarCommandReceipt" }
         calendar_events:
           type: array
           items: { $ref: "#/components/schemas/CalendarEvent" }

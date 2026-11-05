@@ -569,6 +569,11 @@
         "mode": "archive_only"
       },
       {
+        "section": "calendar_commands",
+        "records": 0,
+        "mode": "archive_only"
+      },
+      {
         "section": "calendar_events",
         "records": 0,
         "mode": "archive_only"

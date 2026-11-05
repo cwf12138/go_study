@@ -2,6 +2,7 @@
   "use strict";
 
   const $ = (selector) => document.querySelector(selector);
+  const E = window.DaynestCalendarEditorCore;
   const pad = (value) => String(value).padStart(2, "0");
   const escapeHTML = (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 
@@ -11,48 +12,26 @@
   function startOfWeek(date) { const start = new Date(date); start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - ((start.getDay() + 6) % 7)); return start; }
   function formatDateTimeLocal(date) { return `${dateKey(date)}T${pad(date.getHours())}:${pad(date.getMinutes())}`; }
   function validColor(value, fallback = "#5b81ff") { return /^#[0-9a-f]{6}$/i.test(value || "") ? value : fallback; }
-  function isToday(value) { return value === dateKey(new Date()); }
+  function isToday(value) { return value === eventDay(new Date().toISOString()); }
+  function eventDay(value) { return E ? E.day(value) : dateKey(new Date(value)); }
   function token() { return localStorage.getItem("studyflow.token") || ""; }
 
   // Helpers must be initialized before state because the initial selected day
   // is derived through dateKey(), which itself uses the pad() constant above.
   const state = {
     view: localStorage.getItem("studyflow.calendar.view") || "month",
-    anchor: new Date(), selected: dateKey(new Date()), overview: null, detail: null,
+    anchor: fromDateKey(eventDay(new Date().toISOString())), selected: eventDay(new Date().toISOString()), overview: null, detail: null,
     saving: false, requestID: 0, detailRequestID: 0, query: '', source: 'all', owner: token(), loading: false, fitnessDirty: false, initialized: false, direction: 1, historyRequestID: 0, historyCache: new Map(),
   };
-  let eventDirty = false;
-
   async function api(path, options = {}) {
-    const owner = token();
-    const headers = new Headers(options.headers || {});
-    if (token()) headers.set("Authorization", `Bearer ${token()}`);
-    if (options.body) headers.set("Content-Type", "application/json");
-    const controller = new AbortController();
-    const abort = () => controller.abort();
-    if (options.signal?.aborted) abort(); else options.signal?.addEventListener('abort', abort, { once: true });
-    let timedOut = false;
-    const timer = window.setTimeout(() => { timedOut = true; controller.abort(); }, 25000);
-    const endPlanningWrite=window.DaynestReadCache?.beginPlanningWrite(path,options.method,window.DaynestHTTP?.capture());
-    try {
-      const response = await fetch(path, { ...options, headers, signal: controller.signal, cache: 'no-store' });
-      if (owner !== token()) throw new Error('账号已切换，请重新加载日历。');
-      if (response.status === 204) return null;
-      const payload = await response.json().catch(() => ({}));
-      if (owner !== token()) throw new Error('账号已切换，请重新加载日历。');
-      if (!response.ok) {
-        if (response.status === 404 && path.startsWith("/api/v1/calendar")) {
-          if (payload?.error?.code === 'not_found') throw new Error('该日程已不存在，请刷新日历后核对。');
-          throw new Error("当前运行的 Go 服务不包含日历 API，请停止旧进程并重新执行 go run ./cmd/api。");
-        }
-        throw new Error(payload?.error?.message || `日历请求失败（${response.status}）`);
-      }
-      if (!payload || typeof payload !== 'object' || !Object.hasOwn(payload, 'data')) throw new Error('日历响应不完整，请保留表单后重试。');
-      return payload.data;
-    } catch (error) {
-      if (error.name === 'AbortError') throw new Error(timedOut ? '日历请求超时。保存日程时请先核对结果，再决定是否重试。' : '日历请求已取消。');
-      throw error;
-    } finally { endPlanningWrite?.();window.clearTimeout(timer); options.signal?.removeEventListener('abort', abort); }
+    if (window.DaynestHTTP) return window.DaynestHTTP.json(path, options);
+    // Read-only first-paint harness; the real editor requires the common client.
+    if (options.method && options.method !== "GET") throw Error("请刷新页面加载日历请求模块。");
+    const owner=token(), response=await fetch(path,{...options,headers:owner?{Authorization:"Bearer "+owner}:{},cache:"no-store"});
+    const payload=await response.json();
+    if(owner!==token())throw Error("账号已变化。");
+    if(!response.ok)throw Error(payload?.error?.message||"日历暂不可用。");
+    return payload.data;
   }
 
   function notify(message, error = false) {
@@ -78,6 +57,7 @@
     const requestID = ++state.requestID, owner = token();
     const canvas = $("#calendar-canvas");
     if (!owner) { renderCalendar(); showCalendarError("请先登录后查看个人日程。"); return; }
+    if(window.DaynestHTTP&&!window.DaynestHTTP.capture().userID){renderCalendar();$("#calendar-view-status").textContent="正在核验当前账号…";return;}
     state.loading = true; state.fitnessDirty = false;
     const [start, end] = rangeForView();
     state.overview = null;
@@ -162,11 +142,16 @@
     const add = (key, item) => { if (!key) return;
       if (state.source !== 'all' && (state.source === 'tasks' ? !['task','todo'].includes(item.type) : item.type !== state.source)) return;
       if (state.query && !item.title.toLowerCase().includes(state.query)) return; if (!map.has(key)) map.set(key, []); map.get(key).push(item); };
-    (state.overview?.events || []).forEach((item) => add(dateKey(new Date(item.occurrence_start)), { type: "event", id: item.id, title: item.title, time: item.all_day ? "全天" : clock(new Date(item.occurrence_start)), color: validColor(item.color), raw: item }));
-    (state.overview?.plan_blocks || []).forEach((item) => add(dateKey(new Date(item.start_at)), { type: "plan", id: item.id, title: item.title, time: clock(new Date(item.start_at)), color: "#845fe8", raw: item }));
-    (state.overview?.tasks || []).forEach((item) => add(dateKey(new Date(item.due_at)), { type: "task", id: item.id, title: `任务 · ${item.title}`, time: clock(new Date(item.due_at)), color: "#e5963e", raw: item }));
-    (state.overview?.todos || []).forEach((item) => add(item.due_at ? dateKey(new Date(item.due_at)) : item.my_day_date, { type: "todo", id: item.id, title: `待办 · ${item.title}`, time: item.due_at ? clock(new Date(item.due_at)) : "当天", color: "#e5963e", raw: item }));
-    (state.overview?.focus_sessions || []).forEach(item=>add(dateKey(new Date(item.started_at)),{type:"focus",id:item.id,title:`专注 · ${item.title_snapshot || (state.overview?.tasks||[]).find(t=>t.id===item.task_id)?.title || "自由专注"}`,time:clock(new Date(item.started_at)),color:"#577e9a",raw:item}));
+    const [rangeStart,rangeEnd]=rangeForView();
+    (state.overview?.events || []).forEach(item=>{
+      const start=item.occurrence_start||item.start_at,end=item.occurrence_end||item.end_at;
+      const dates=E&&end?E.covered(start,end,dateKey(rangeStart),dateKey(rangeEnd)):[eventDay(start)];
+      dates.forEach(day=>add(day,{type:"event",id:item.id,title:item.title,time:item.all_day?"全天":day===eventDay(start)?clock(new Date(start)):"00:00 · 续",color:validColor(item.color),raw:item}));
+    });
+    (state.overview?.plan_blocks || []).forEach((item) => add(eventDay(item.start_at), { type: "plan", id: item.id, title: item.title, time: clock(new Date(item.start_at)), color: "#845fe8", raw: item }));
+    (state.overview?.tasks || []).forEach((item) => add(eventDay(item.due_at), { type: "task", id: item.id, title: `任务 · ${item.title}`, time: clock(new Date(item.due_at)), color: "#e5963e", raw: item }));
+    (state.overview?.todos || []).forEach((item) => add(item.due_at ? eventDay(item.due_at) : item.my_day_date, { type: "todo", id: item.id, title: `待办 · ${item.title}`, time: item.due_at ? clock(new Date(item.due_at)) : "当天", color: "#e5963e", raw: item }));
+    (state.overview?.focus_sessions || []).forEach(item=>add(eventDay(item.started_at),{type:"focus",id:item.id,title:`专注 · ${item.title_snapshot || (state.overview?.tasks||[]).find(t=>t.id===item.task_id)?.title || "自由专注"}`,time:clock(new Date(item.started_at)),color:"#577e9a",raw:item}));
     (state.overview?.mood_entries || []).forEach((item) => add(item.date, { type: "mood", id: item.id, title: `心情 · ${calendarMood(item.mood).label}`, time: "记录", color: "#25ae85", raw: item }));
     (state.overview?.fitness_days || []).forEach((item) => add(item.date, { type: "fitness", id: 'fitness-day-'+item.date, title: '运动 · 已锻炼', time: '打卡', color: '#718b5d', raw: item }));
     (state.overview?.care_entries || []).forEach((item,index)=>add(item.date,{type:'care',id:'care-'+item.item_id+'-'+index,title:(item.kind==='done'?'已照顾 · ':'保养 · ')+item.title,time:item.kind==='done'?'完成':'待办',color:'#46797d',raw:item}));
@@ -217,20 +202,22 @@
     for (let index = 0; index < count; index += 1) {
       const day = addDays(start, index), key = dateKey(day);
       heads += `<span>${["日", "一", "二", "三", "四", "五", "六"][day.getDay()]}<br><b>${day.getMonth() + 1}/${day.getDate()}</b></span>`;
-      const currentLine = isToday(key) ? `<i class="calendar-current-line" style="top:${(new Date().getHours() * 60 + new Date().getMinutes()) * .8}px"></i>` : "";
-      columns += `<div class="calendar-time-column" data-calendar-date="${key}">${currentLine}${(events.get(key) || []).filter((item) => item.type === "event" || item.type === "plan").map(timedEventHTML).join("")}</div>`;
+      const currentLine = isToday(key) ? `<i class="calendar-current-line" style="top:${(Number(clock(new Date()).slice(0,2)) * 60 + Number(clock(new Date()).slice(3,5))) * .8}px"></i>` : "";
+      columns += `<div class="calendar-time-column" data-calendar-date="${key}">${currentLine}${(events.get(key) || []).filter((item) => (item.type === "event" || item.type === "plan")&&!item.raw.all_day).map(item=>timedEventHTML(item,key)).join("")}</div>`;
     }
     const fitnessDays=Array.from({length:count},(_,i)=>dateKey(addDays(start,i)));
     const fitnessStrip=fitnessDays.some(day=>(events.get(day)||[]).some(item=>['fitness','care'].includes(item.type)))?`<div class="calendar-fitness-strip"><span>记录</span>${fitnessDays.map(day=>{const entries=(events.get(day)||[]).filter(item=>['fitness','care'].includes(item.type));return `<div>${entries.slice(0,3).map(item=>item.type==='fitness'?`<button type="button" data-calendar-fitness="${day}" title="${escapeHTML(fitnessDescription(item.raw))}">✓ 已锻炼</button>`:`<button type="button" data-calendar-care="${escapeHTML(item.raw.item_id)}">${escapeHTML(item.title)}</button>`).join('')}${entries.length>3?`<button type="button" data-calendar-date="${day}">另 ${entries.length-3} 条</button>`:''}</div>`;}).join('')}</div>`:'';
-    $("#calendar-canvas").innerHTML = `<div class="calendar-time-view" style="--day-count:${count}"><div class="calendar-time-head">${heads}</div>${fitnessStrip}<div class="calendar-time-grid">${columns}</div></div>`;
+    const allDay=fitnessDays.some(day=>(events.get(day)||[]).some(item=>item.type==='event'&&item.raw.all_day))?`<div class="calendar-all-day-strip"><span>全天</span>${fitnessDays.map(day=>`<div>${(events.get(day)||[]).filter(item=>item.type==='event'&&item.raw.all_day).map(item=>`<button type="button" data-calendar-event="${escapeHTML(item.id)}" style="--item-color:${item.color}">${escapeHTML(item.title)}</button>`).join('')}</div>`).join('')}</div>`:'';
+    $("#calendar-canvas").innerHTML = `<div class="calendar-time-view" style="--day-count:${count}"><div class="calendar-time-head">${heads}</div>${allDay}${fitnessStrip}<div class="calendar-time-grid">${columns}</div></div>`;
   }
 
-  function timedEventHTML(item) {
+  function timedEventHTML(item, day) {
     const rawStart = item.raw.occurrence_start || item.raw.start_at;
     const rawEnd = item.raw.occurrence_end || item.raw.end_at;
     const start = new Date(rawStart), end = new Date(rawEnd);
-    const top = item.raw.all_day ? 2 : (start.getHours() * 60 + start.getMinutes()) * .8;
-    const height = item.raw.all_day ? 28 : Math.max(24, (end - start) / 60000 * .8);
+    const midnight = E&&day?Date.parse(E.iso(day,true)):new Date(start.getFullYear(),start.getMonth(),start.getDate()).getTime();
+    const minutes=Math.max(0,(start.getTime()-midnight)/60000),endMinutes=Math.min(1440,(end.getTime()-midnight)/60000);
+    const top=Math.min(1128,minutes*.8),height=Math.min(1152-top,Math.max(24,(endMinutes-minutes)*.8));
     const eventAttribute = item.type === "event" ? `data-calendar-event="${escapeHTML(item.id)}"` : "";
     return `<button type="button" class="calendar-timed-event" ${eventAttribute} style="top:${top}px;height:${height}px;--item-color:${item.color}"><b>${escapeHTML(item.title)}</b><br>${escapeHTML(item.time)}</button>`;
   }
@@ -407,74 +394,16 @@
   }
 
   function openEventDialog(eventID = "", selectedDate = state.selected) {
-    if (state.saving) return;
-    eventDirty = false;
-    const occurrence = (state.overview?.events || []).find((item) => item.id === eventID);
-    const start = occurrence ? new Date(occurrence.start_at) : fromDateKey(selectedDate);
-    if (!occurrence) start.setHours(9, 0, 0, 0);
-    const end = occurrence ? new Date(occurrence.end_at) : new Date(start.getTime() + 60 * 60 * 1000);
-    $("#calendar-dialog-title").textContent = occurrence ? "编辑日程" : "新建日程";
-    $("#calendar-event-id").value = occurrence?.id || "";
-    $("#calendar-event-title").value = occurrence?.title || "";
-    $("#calendar-event-start").value = formatDateTimeLocal(start);
-    $("#calendar-event-end").value = formatDateTimeLocal(end);
-    $("#calendar-event-all-day").checked = occurrence?.all_day || false;
-    $("#calendar-event-category").value = occurrence?.category || "学习";
-    $("#calendar-event-color").value = validColor(occurrence?.color);
-    $("#calendar-event-repeat").value = occurrence?.repeat_rule || "none";
-    $("#calendar-event-repeat-until").value = occurrence?.repeat_until ? dateKey(new Date(occurrence.repeat_until)) : "";
-    $("#calendar-event-reminder").value = String(occurrence?.reminder_minutes || 0);
-    $("#calendar-event-location").value = occurrence?.location || "";
-    $("#calendar-event-description").value = occurrence?.description || "";
-    $("#calendar-event-delete").classList.toggle("hidden", !occurrence);
-    $("#calendar-event-dialog").showModal();
-    window.setTimeout(() => $("#calendar-event-title").focus(), 30);
-  }
-
-  async function saveEvent(event) {
-    event.preventDefault();
-    if (state.saving) return;
-    const start = new Date($("#calendar-event-start").value), end = new Date($("#calendar-event-end").value);
-    if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start) { notify("结束时间必须晚于开始时间。", true); return; }
-    const id = $("#calendar-event-id").value;
-    const repeatUntil = $("#calendar-event-repeat-until").value;
-    const body = {
-      title: $("#calendar-event-title").value, description: $("#calendar-event-description").value,
-      location: $("#calendar-event-location").value, category: $("#calendar-event-category").value,
-      color: $("#calendar-event-color").value, start_at: new Date($("#calendar-event-start").value).toISOString(),
-      end_at: new Date($("#calendar-event-end").value).toISOString(), all_day: $("#calendar-event-all-day").checked,
-      repeat_rule: $("#calendar-event-repeat").value, reminder_minutes: Number($("#calendar-event-reminder").value),
-    };
-    if (repeatUntil) body.repeat_until = new Date(`${repeatUntil}T23:59:59`).toISOString();
-    if (id && !repeatUntil) body.clear_repeat_until = true;
-    state.saving = true;
-    $("#calendar-event-form").querySelectorAll("button,input,select,textarea").forEach(node => node.disabled = true);
-    try {
-      await api(id ? `/api/v1/calendar/events/${id}` : "/api/v1/calendar/events", { method: id ? "PATCH" : "POST", body: JSON.stringify(body) });
-      // Notification permission is requested only through an explicit reminder action.
-      eventDirty = false;
-      $("#calendar-event-dialog").close();
-      await loadCalendar();
-      notify(id ? "日程已更新。" : "日程已创建。持续安排，也给自己留出余量。");
-    } catch (error) { notify(error.message + "，请核对日历后再重试。", true); }
-    finally {
-      state.saving = false;
-      $("#calendar-event-form").querySelectorAll("button,input,select,textarea").forEach(node => node.disabled = false);
-    }
-  }
-
-  async function deleteEvent() {
-    if (state.saving) return;
-    const id = $("#calendar-event-id").value;
-    if (!id || !window.confirm("删除这个日程及其全部重复实例？")) return;
-    try { await api(`/api/v1/calendar/events/${id}`, { method: "DELETE" }); $("#calendar-event-dialog").close(); await loadCalendar(); notify("日程已删除。"); }
-    catch (error) { notify(error.message, true); }
+    if (window.DaynestCalendarEvents) return window.DaynestCalendarEvents.open(eventID,selectedDate);
+    notify("日程编辑模块未加载，请刷新页面并核对服务版本。",true);
   }
 
   function bind() {
+    document.addEventListener("daynest:account-ready",()=>{if(token()&&$("#panel-calendar").classList.contains("active")){state.initialized=true;loadCalendar();}else state.initialized=false;});
     window.addEventListener('daynest:fitness-changed',fitnessChanged);
     document.addEventListener('daynest:focus-changed',fitnessChanged);
     document.addEventListener('daynest:actions-changed',fitnessChanged);
+    document.addEventListener('daynest:calendar-events-changed',fitnessChanged);
     window.addEventListener('daynest:care-changed',fitnessChanged);
     window.addEventListener('daynest:calendar-date',event=>{const day=event.detail?.date;if(!token()||typeof day!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(day)||day<'2000-01-01'||day>'2100-12-31'||dateKey(fromDateKey(day))!==day)return;state.selected=day;state.anchor=fromDateKey(day);if($('#panel-calendar').classList.contains('active'))loadCalendar();});
     const tools = $("#calendar-tools-dialog");
@@ -526,9 +455,7 @@
       state.owner = token(); state.requestID++; state.detailRequestID++; state.historyRequestID++;
       state.initialized = false;
       state.overview = null; state.detail = null; state.loading = false;
-      state.selected = dateKey(new Date()); state.anchor = new Date();
-      eventDirty = false;
-      $("#calendar-event-dialog").close(); $("#calendar-event-form").reset();
+      state.selected = eventDay(new Date().toISOString()); state.anchor = fromDateKey(state.selected);
       tools.close();
       state.query = ""; state.source = "all";
       $("#calendar-search").value = ""; $("#calendar-source").value = "all";
@@ -547,21 +474,12 @@
 	  state.initialized = true;
 	  loadCalendar();
 	});
-    const canCloseEvent = () => !state.saving && (!eventDirty || window.confirm('日程尚未保存，确定放弃修改吗？'));
-    $("#calendar-event-form").addEventListener('input', () => { eventDirty = true; });
-    $("#calendar-event-form").addEventListener('change', () => { eventDirty = true; });
-    $("#calendar-event-dialog").addEventListener("cancel", event => { if (!canCloseEvent()) event.preventDefault(); });
-    window.DaynestUI?.registerGuard?.('calendar', () => eventDirty && $('#calendar-event-dialog').open || state.saving);window.addEventListener('beforeunload', event => { if (eventDirty && $('#calendar-event-dialog').open || state.saving) { event.preventDefault(); event.returnValue = ''; } });
     $("#calendar-prev").addEventListener("click", () => navigate(-1));
     $("#calendar-next").addEventListener("click", () => navigate(1));
-    $("#calendar-today").addEventListener("click", () => { state.anchor = new Date(); state.selected = dateKey(new Date()); state.direction = 0; loadCalendar(true); });
+    $("#calendar-today").addEventListener("click", () => { state.selected = eventDay(new Date().toISOString()); state.anchor = fromDateKey(state.selected); state.direction = 0; loadCalendar(true); });
     document.querySelectorAll("[data-calendar-view]").forEach((button) => button.addEventListener("click", () => setView(button.dataset.calendarView)));
     $("#calendar-create").addEventListener("click", () => openEventDialog());
     $("#calendar-quick-create").addEventListener("click", () => openEventDialog());
-    $("#calendar-dialog-close").addEventListener("click", () => { if (canCloseEvent()) $("#calendar-event-dialog").close(); });
-    $("#calendar-event-cancel").addEventListener("click", () => { if (canCloseEvent()) $("#calendar-event-dialog").close(); });
-    $("#calendar-event-delete").addEventListener("click", deleteEvent);
-    $("#calendar-event-form").addEventListener("submit", saveEvent);
     $("#calendar-notification-enable").addEventListener('click', async () => {
       if (!("Notification" in window)) { notify('当前浏览器不支持系统通知；需要 HTTPS 或 localhost。', true); return; }
       try { const permission = await Notification.requestPermission(); notify(permission === 'granted' ? '已允许提醒。网页关闭或设备休眠时不保证送达。' : '未开启浏览器提醒，仍可在日历中查看安排。', permission !== 'granted'); }
@@ -580,7 +498,7 @@
     window.addEventListener("keydown", (event) => {
       if (!$("#panel-calendar").classList.contains("active") || $("#calendar-event-dialog").open || tools.open || /INPUT|TEXTAREA|SELECT|BUTTON/.test(event.target.tagName) || event.target.isContentEditable || event.ctrlKey || event.metaKey || event.altKey) return;
       const key = event.key.toLowerCase();
-      if (key === "arrowleft") navigate(-1); else if (key === "arrowright") navigate(1); else if (key === "t") { state.anchor = new Date(); state.selected = dateKey(new Date()); loadCalendar(true); }
+      if (key === "arrowleft") navigate(-1); else if (key === "arrowright") navigate(1); else if (key === "t") { state.selected = eventDay(new Date().toISOString()); state.anchor = fromDateKey(state.selected); loadCalendar(true); }
       else if (key === "c") openEventDialog(); else if ({ m: "month", w: "week", d: "day", y: "year" }[key]) setView({ m: "month", w: "week", d: "day", y: "year" }[key]);
     });
     if (location.hash === "#calendar" && token()) { state.initialized = true; window.setTimeout(loadCalendar, 0); }
@@ -619,7 +537,7 @@
   function openFitness(day){if(typeof window.dispatchEvent==='function'&&typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('daynest:fitness-date',{detail:{date:day}}));$('.nav-link[data-view="fitness"]')?.click();}
   function openCare(id){$('.nav-link[data-view="care"]')?.click();if(typeof window.dispatchEvent==='function'&&typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('daynest:care-item',{detail:{id}}));}
   function fitnessChanged(){if(!token())return;state.fitnessDirty=true;if($('#panel-calendar').classList.contains('active')&&!state.loading)loadCalendar();}
-  function clock(date) { return Number.isNaN(date.getTime()) ? "" : `${pad(date.getHours())}:${pad(date.getMinutes())}`; }
+  function clock(date) { return Number.isNaN(date.getTime()) ? "" : E?E.wall(date.toISOString()).slice(11):`${pad(date.getHours())}:${pad(date.getMinutes())}`; }
   function calendarMood(value) {
     return [
       { value: "awful", label: "很糟" }, { value: "low", label: "低落" },

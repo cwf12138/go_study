@@ -1,36 +1,14 @@
 package httpapi
 
 import (
-	"fmt"
 	"net/http"
-	"strings"
-	"time"
 
 	"github.com/example/studyflow/internal/domain"
 	"github.com/example/studyflow/internal/service"
 )
 
 func todoCondition(r *http.Request, required bool) ([]string, error) {
-	values := r.Header.Values("If-Match")
-	if len(values) == 0 && !required {
-		return nil, nil
-	}
-	if len(values) != 1 {
-		return nil, fmt.Errorf("%w: one strong If-Match is required", domain.ErrInvalidInput)
-	}
-	value := strings.TrimSpace(values[0])
-	if len(value) < 4 || len(value) > 500 || value[0] != '"' || value[len(value)-1] != '"' || strings.ContainsAny(value[1:len(value)-1], "\"\\,") {
-		return nil, domain.ErrInvalidInput
-	}
-	version := value[1 : len(value)-1]
-	index := strings.LastIndex(version, "@")
-	if index < 1 || version[:index] != r.PathValue("todo_id") {
-		return nil, domain.ErrInvalidInput
-	}
-	if _, err := time.Parse(time.RFC3339Nano, version[index+1:]); err != nil {
-		return nil, domain.ErrInvalidInput
-	}
-	return []string{version}, nil
+	return recordCondition(r, "todo_id", required)
 }
 
 func todoETag(w http.ResponseWriter, todo domain.TodoItem) {

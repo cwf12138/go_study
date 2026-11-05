@@ -17,56 +17,62 @@ import (
 const exportSchemaVersion = 1
 
 type UserDataExport struct {
-	ActionLinks        []domain.ActionLink        `json:"action_links"`
-	TodoImports        []domain.TodoImportReceipt `json:"todo_imports"`
-	TextClips          []domain.TextClip          `json:"text_clips"`
-	Parcels            []domain.Parcel            `json:"parcels"`
-	ImportantDays      []domain.ImportantDay      `json:"important_days"`
-	SchemaVersion      int                        `json:"schema_version"`
-	ExportedAt         time.Time                  `json:"exported_at"`
-	Application        string                     `json:"application"`
-	User               domain.User                `json:"user"`
-	Counts             map[string]int             `json:"counts"`
-	Goals              []domain.Goal              `json:"goals"`
-	Habits             []domain.Habit             `json:"habits"`
-	Explorations       []domain.Exploration       `json:"explorations"`
-	Keepsakes          []domain.Keepsake          `json:"keepsakes"`
-	Ledger             []domain.LedgerEntry       `json:"ledger"`
-	Inventory          []domain.InventoryItem     `json:"inventory"`
-	Shopping           []domain.ShoppingItem      `json:"shopping"`
-	Bookmarks          []domain.Bookmark          `json:"bookmarks"`
-	Subscriptions      []domain.Subscription      `json:"subscriptions"`
-	Meals              []domain.MealEntry         `json:"meals"`
-	Fitness            []domain.FitnessEntry      `json:"fitness"`
-	Care               []domain.CareItem          `json:"care"`
-	Splits             []domain.SplitGroup        `json:"splits"`
-	Whiteboards        []domain.Whiteboard        `json:"whiteboards"`
-	Nutrition          []domain.NutritionEntry    `json:"nutrition"`
-	Projects           []domain.Project           `json:"projects"`
-	TravelPlans        []domain.TravelPlan        `json:"travel_plans"`
-	Moods              []domain.MoodEntry         `json:"moods"`
-	Tasks              []domain.StudyTask         `json:"tasks"`
-	TodoLists          []domain.TodoList          `json:"todo_lists"`
-	Todos              []domain.TodoItem          `json:"todos"`
-	CalendarEvents     []domain.CalendarEvent     `json:"calendar_events"`
-	WordBooks          []domain.WordBook          `json:"word_books"`
-	VocabularyWords    []domain.VocabularyWord    `json:"vocabulary_words"`
-	VocabularyReviews  []domain.VocabularyReview  `json:"vocabulary_reviews"`
-	PlannerPreferences domain.PlannerPreferences  `json:"planner_preferences"`
-	PlanBlocks         []domain.StudyPlanBlock    `json:"plan_blocks"`
-	PlannerReports     []domain.PlannerReport     `json:"planner_reports"`
-	WeeklyReflections  []domain.WeeklyReflection  `json:"weekly_reflections"`
-	MemoFolders        []domain.MemoFolder        `json:"memo_folders"`
-	Memos              []domain.MemoNote          `json:"memos"`
-	EnglishReadings    []domain.EnglishReading    `json:"english_readings"`
-	EBookReadings      []domain.EBookReading      `json:"ebook_readings"`
-	ClassicalStudies   []domain.ClassicalStudy    `json:"classical_studies"`
-	FocusSessions      []domain.FocusSession      `json:"focus_sessions"`
+	CalendarCommands   []domain.CalendarCommandReceipt `json:"calendar_commands"`
+	ActionLinks        []domain.ActionLink             `json:"action_links"`
+	TodoImports        []domain.TodoImportReceipt      `json:"todo_imports"`
+	TextClips          []domain.TextClip               `json:"text_clips"`
+	Parcels            []domain.Parcel                 `json:"parcels"`
+	ImportantDays      []domain.ImportantDay           `json:"important_days"`
+	SchemaVersion      int                             `json:"schema_version"`
+	ExportedAt         time.Time                       `json:"exported_at"`
+	Application        string                          `json:"application"`
+	User               domain.User                     `json:"user"`
+	Counts             map[string]int                  `json:"counts"`
+	Goals              []domain.Goal                   `json:"goals"`
+	Habits             []domain.Habit                  `json:"habits"`
+	Explorations       []domain.Exploration            `json:"explorations"`
+	Keepsakes          []domain.Keepsake               `json:"keepsakes"`
+	Ledger             []domain.LedgerEntry            `json:"ledger"`
+	Inventory          []domain.InventoryItem          `json:"inventory"`
+	Shopping           []domain.ShoppingItem           `json:"shopping"`
+	Bookmarks          []domain.Bookmark               `json:"bookmarks"`
+	Subscriptions      []domain.Subscription           `json:"subscriptions"`
+	Meals              []domain.MealEntry              `json:"meals"`
+	Fitness            []domain.FitnessEntry           `json:"fitness"`
+	Care               []domain.CareItem               `json:"care"`
+	Splits             []domain.SplitGroup             `json:"splits"`
+	Whiteboards        []domain.Whiteboard             `json:"whiteboards"`
+	Nutrition          []domain.NutritionEntry         `json:"nutrition"`
+	Projects           []domain.Project                `json:"projects"`
+	TravelPlans        []domain.TravelPlan             `json:"travel_plans"`
+	Moods              []domain.MoodEntry              `json:"moods"`
+	Tasks              []domain.StudyTask              `json:"tasks"`
+	TodoLists          []domain.TodoList               `json:"todo_lists"`
+	Todos              []domain.TodoItem               `json:"todos"`
+	CalendarEvents     []domain.CalendarEvent          `json:"calendar_events"`
+	WordBooks          []domain.WordBook               `json:"word_books"`
+	VocabularyWords    []domain.VocabularyWord         `json:"vocabulary_words"`
+	VocabularyReviews  []domain.VocabularyReview       `json:"vocabulary_reviews"`
+	PlannerPreferences domain.PlannerPreferences       `json:"planner_preferences"`
+	PlanBlocks         []domain.StudyPlanBlock         `json:"plan_blocks"`
+	PlannerReports     []domain.PlannerReport          `json:"planner_reports"`
+	WeeklyReflections  []domain.WeeklyReflection       `json:"weekly_reflections"`
+	MemoFolders        []domain.MemoFolder             `json:"memo_folders"`
+	Memos              []domain.MemoNote               `json:"memos"`
+	EnglishReadings    []domain.EnglishReading         `json:"english_readings"`
+	EBookReadings      []domain.EBookReading           `json:"ebook_readings"`
+	ClassicalStudies   []domain.ClassicalStudy         `json:"classical_studies"`
+	FocusSessions      []domain.FocusSession           `json:"focus_sessions"`
 }
 
 func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataExport, error) {
 	bundle := UserDataExport{SchemaVersion: exportSchemaVersion, ExportedAt: s.now().UTC(), Application: "StudyFlow", Counts: map[string]int{}}
 	var err error
+	if repo, ok := s.repo.(calendarCommandRepository); ok {
+		if bundle.CalendarCommands, err = repo.ListCalendarCommands(ctx, userID); err != nil {
+			return bundle, err
+		}
+	}
 	if repo, ok := s.repo.(todoImportRepository); ok {
 		if bundle.TodoImports, err = repo.ListTodoImports(ctx, userID); err != nil {
 			return bundle, err
@@ -218,10 +224,11 @@ func (s *Service) ExportUserData(ctx context.Context, userID string) (UserDataEx
 		"todos": len(bundle.Todos), "calendar_events": len(bundle.CalendarEvents), "word_books": len(bundle.WordBooks), "vocabulary_words": len(bundle.VocabularyWords),
 		"vocabulary_reviews": len(bundle.VocabularyReviews), "plan_blocks": len(bundle.PlanBlocks), "weekly_reflections": len(bundle.WeeklyReflections),
 		"memo_folders": len(bundle.MemoFolders), "memos": len(bundle.Memos),
-		"action_links":     len(bundle.ActionLinks),
-		"todo_imports":     len(bundle.TodoImports),
-		"english_readings": len(bundle.EnglishReadings),
-		"ebook_readings":   len(bundle.EBookReadings), "classical_studies": len(bundle.ClassicalStudies), "focus_sessions": len(bundle.FocusSessions),
+		"action_links":      len(bundle.ActionLinks),
+		"calendar_commands": len(bundle.CalendarCommands),
+		"todo_imports":      len(bundle.TodoImports),
+		"english_readings":  len(bundle.EnglishReadings),
+		"ebook_readings":    len(bundle.EBookReadings), "classical_studies": len(bundle.ClassicalStudies), "focus_sessions": len(bundle.FocusSessions),
 	}
 	return bundle, nil
 }

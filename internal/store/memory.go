@@ -49,6 +49,7 @@ type Memory struct {
 	todoLists               map[string]domain.TodoList
 	todos                   map[string]domain.TodoItem
 	actionLinks             map[string]domain.ActionLink
+	calendarCommands        map[string]domain.CalendarCommandReceipt
 	todoImports             map[string]domain.TodoImportReceipt
 	calendarEvents          map[string]domain.CalendarEvent
 	wordBooks               map[string]domain.WordBook
@@ -97,6 +98,7 @@ func NewMemory() *Memory {
 		todoLists:               make(map[string]domain.TodoList),
 		todos:                   make(map[string]domain.TodoItem),
 		actionLinks:             make(map[string]domain.ActionLink),
+		calendarCommands:        make(map[string]domain.CalendarCommandReceipt),
 		todoImports:             make(map[string]domain.TodoImportReceipt),
 		calendarEvents:          make(map[string]domain.CalendarEvent),
 		wordBooks:               make(map[string]domain.WordBook),
@@ -438,7 +440,10 @@ func (m *Memory) ListTodos(_ context.Context, userID string, filter TodoFilter) 
 func (m *Memory) CreateCalendarEvent(_ context.Context, event domain.CalendarEvent) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.calendarEvents[event.ID] = event
+	if _, exists := m.calendarEvents[event.ID]; exists {
+		return domain.ErrConflict
+	}
+	m.calendarEvents[event.ID] = cloneCalendarEvent(event)
 	return nil
 }
 
@@ -449,16 +454,23 @@ func (m *Memory) CalendarEventByID(_ context.Context, id string) (domain.Calenda
 	if !ok {
 		return domain.CalendarEvent{}, domain.ErrNotFound
 	}
-	return event, nil
+	return cloneCalendarEvent(event), nil
 }
 
 func (m *Memory) UpdateCalendarEvent(_ context.Context, event domain.CalendarEvent) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if _, ok := m.calendarEvents[event.ID]; !ok {
+	old, ok := m.calendarEvents[event.ID]
+	if !ok {
 		return domain.ErrNotFound
 	}
-	m.calendarEvents[event.ID] = event
+	if old.UserID != event.UserID {
+		return domain.ErrForbidden
+	}
+	if !event.UpdatedAt.After(old.UpdatedAt) {
+		event.UpdatedAt = old.UpdatedAt.Add(time.Nanosecond)
+	}
+	m.calendarEvents[event.ID] = cloneCalendarEvent(event)
 	return nil
 }
 
@@ -478,7 +490,7 @@ func (m *Memory) ListCalendarEvents(_ context.Context, userID string) ([]domain.
 	items := make([]domain.CalendarEvent, 0)
 	for _, event := range m.calendarEvents {
 		if event.UserID == userID {
-			items = append(items, event)
+			items = append(items, cloneCalendarEvent(event))
 		}
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].StartAt.Before(items[j].StartAt) })
@@ -1179,51 +1191,52 @@ type persistedUser struct {
 }
 
 type snapshot struct {
-	TextClips               []domain.TextClip           `json:"text_clips,omitempty"`
-	Parcels                 []domain.Parcel             `json:"parcels,omitempty"`
-	ImportantDays           []domain.ImportantDay       `json:"important_days,omitempty"`
-	Habits                  []domain.Habit              `json:"habits"`
-	Explorations            []domain.Exploration        `json:"explorations"`
-	Keepsakes               []domain.Keepsake           `json:"keepsakes"`
-	Inventory               []domain.InventoryItem      `json:"inventory,omitempty"`
-	Shopping                []domain.ShoppingItem       `json:"shopping,omitempty"`
-	Bookmarks               []domain.Bookmark           `json:"bookmarks,omitempty"`
-	Subscriptions           []domain.Subscription       `json:"subscriptions,omitempty"`
-	Meals                   []domain.MealEntry          `json:"meals,omitempty"`
-	Fitness                 []domain.FitnessEntry       `json:"fitness,omitempty"`
-	Care                    []domain.CareItem           `json:"care,omitempty"`
-	Splits                  []domain.SplitGroup         `json:"splits,omitempty"`
-	Whiteboards             []domain.Whiteboard         `json:"whiteboards,omitempty"`
-	Nutrition               []domain.NutritionEntry     `json:"nutrition,omitempty"`
-	Ledger                  []domain.LedgerEntry        `json:"ledger"`
-	Projects                []domain.Project            `json:"projects"`
-	TravelPlans             []domain.TravelPlan         `json:"travel_plans,omitempty"`
-	Version                 int                         `json:"version"`
-	SavedAt                 time.Time                   `json:"saved_at"`
-	Users                   []persistedUser             `json:"users"`
-	Goals                   []domain.Goal               `json:"goals"`
-	Moods                   []domain.MoodEntry          `json:"moods"`
-	Tasks                   []domain.StudyTask          `json:"tasks"`
-	TodoLists               []domain.TodoList           `json:"todo_lists"`
-	Todos                   []domain.TodoItem           `json:"todos"`
-	ActionLinks             []domain.ActionLink         `json:"action_links,omitempty"`
-	TodoImports             []domain.TodoImportReceipt  `json:"todo_imports,omitempty"`
-	CalendarEvents          []domain.CalendarEvent      `json:"calendar_events"`
-	WordBooks               []domain.WordBook           `json:"word_books"`
-	Words                   []domain.VocabularyWord     `json:"vocabulary_words"`
-	WordReviews             []domain.VocabularyReview   `json:"vocabulary_reviews"`
-	PlannerPrefs            []domain.PlannerPreferences `json:"planner_preferences"`
-	PlanBlocks              []domain.StudyPlanBlock     `json:"plan_blocks"`
-	PlannerReports          []domain.PlannerReport      `json:"planner_reports"`
-	WeeklyReflections       []domain.WeeklyReflection   `json:"weekly_reflections"`
-	KnowledgeNotes          []domain.KnowledgeNote      `json:"knowledge_notes"`
-	KnowledgeMemoMigrations map[string]string           `json:"knowledge_memo_migrations,omitempty"`
-	MemoFolders             []domain.MemoFolder         `json:"memo_folders"`
-	MemoNotes               []domain.MemoNote           `json:"memo_notes"`
-	EnglishReadings         []domain.EnglishReading     `json:"english_readings"`
-	EBookReadings           []domain.EBookReading       `json:"ebook_readings"`
-	ClassicalStudies        []domain.ClassicalStudy     `json:"classical_studies"`
-	Sessions                []domain.FocusSession       `json:"focus_sessions"`
+	TextClips               []domain.TextClip               `json:"text_clips,omitempty"`
+	Parcels                 []domain.Parcel                 `json:"parcels,omitempty"`
+	ImportantDays           []domain.ImportantDay           `json:"important_days,omitempty"`
+	Habits                  []domain.Habit                  `json:"habits"`
+	Explorations            []domain.Exploration            `json:"explorations"`
+	Keepsakes               []domain.Keepsake               `json:"keepsakes"`
+	Inventory               []domain.InventoryItem          `json:"inventory,omitempty"`
+	Shopping                []domain.ShoppingItem           `json:"shopping,omitempty"`
+	Bookmarks               []domain.Bookmark               `json:"bookmarks,omitempty"`
+	Subscriptions           []domain.Subscription           `json:"subscriptions,omitempty"`
+	Meals                   []domain.MealEntry              `json:"meals,omitempty"`
+	Fitness                 []domain.FitnessEntry           `json:"fitness,omitempty"`
+	Care                    []domain.CareItem               `json:"care,omitempty"`
+	Splits                  []domain.SplitGroup             `json:"splits,omitempty"`
+	Whiteboards             []domain.Whiteboard             `json:"whiteboards,omitempty"`
+	Nutrition               []domain.NutritionEntry         `json:"nutrition,omitempty"`
+	Ledger                  []domain.LedgerEntry            `json:"ledger"`
+	Projects                []domain.Project                `json:"projects"`
+	TravelPlans             []domain.TravelPlan             `json:"travel_plans,omitempty"`
+	Version                 int                             `json:"version"`
+	SavedAt                 time.Time                       `json:"saved_at"`
+	Users                   []persistedUser                 `json:"users"`
+	Goals                   []domain.Goal                   `json:"goals"`
+	Moods                   []domain.MoodEntry              `json:"moods"`
+	Tasks                   []domain.StudyTask              `json:"tasks"`
+	TodoLists               []domain.TodoList               `json:"todo_lists"`
+	Todos                   []domain.TodoItem               `json:"todos"`
+	ActionLinks             []domain.ActionLink             `json:"action_links,omitempty"`
+	CalendarCommands        []domain.CalendarCommandReceipt `json:"calendar_commands,omitempty"`
+	TodoImports             []domain.TodoImportReceipt      `json:"todo_imports,omitempty"`
+	CalendarEvents          []domain.CalendarEvent          `json:"calendar_events"`
+	WordBooks               []domain.WordBook               `json:"word_books"`
+	Words                   []domain.VocabularyWord         `json:"vocabulary_words"`
+	WordReviews             []domain.VocabularyReview       `json:"vocabulary_reviews"`
+	PlannerPrefs            []domain.PlannerPreferences     `json:"planner_preferences"`
+	PlanBlocks              []domain.StudyPlanBlock         `json:"plan_blocks"`
+	PlannerReports          []domain.PlannerReport          `json:"planner_reports"`
+	WeeklyReflections       []domain.WeeklyReflection       `json:"weekly_reflections"`
+	KnowledgeNotes          []domain.KnowledgeNote          `json:"knowledge_notes"`
+	KnowledgeMemoMigrations map[string]string               `json:"knowledge_memo_migrations,omitempty"`
+	MemoFolders             []domain.MemoFolder             `json:"memo_folders"`
+	MemoNotes               []domain.MemoNote               `json:"memo_notes"`
+	EnglishReadings         []domain.EnglishReading         `json:"english_readings"`
+	EBookReadings           []domain.EBookReading           `json:"ebook_readings"`
+	ClassicalStudies        []domain.ClassicalStudy         `json:"classical_studies"`
+	Sessions                []domain.FocusSession           `json:"focus_sessions"`
 }
 
 // SnapshotRecoveryError reports a recoverable snapshot failure. The caller may
@@ -1333,8 +1346,11 @@ func (m *Memory) SaveJSON(path string) (saveErr error) {
 	for _, item := range m.todoImports {
 		s.TodoImports = append(s.TodoImports, item)
 	}
+	for _, item := range m.calendarCommands {
+		s.CalendarCommands = append(s.CalendarCommands, item)
+	}
 	for _, item := range m.calendarEvents {
-		s.CalendarEvents = append(s.CalendarEvents, item)
+		s.CalendarEvents = append(s.CalendarEvents, cloneCalendarEvent(item))
 	}
 	for _, item := range m.wordBooks {
 		s.WordBooks = append(s.WordBooks, item)
@@ -1541,6 +1557,10 @@ func (m *Memory) LoadJSON(path string) error {
 	for _, item := range s.ActionLinks {
 		m.actionLinks[item.ID] = item
 	}
+	m.calendarCommands = make(map[string]domain.CalendarCommandReceipt, len(s.CalendarCommands))
+	for _, item := range s.CalendarCommands {
+		m.calendarCommands[item.ID] = item
+	}
 	m.calendarEvents = make(map[string]domain.CalendarEvent, len(s.CalendarEvents))
 	m.wordBooks = make(map[string]domain.WordBook, len(s.WordBooks))
 	m.words = make(map[string]domain.VocabularyWord, len(s.Words))
@@ -1581,7 +1601,7 @@ func (m *Memory) LoadJSON(path string) error {
 		m.todos[item.ID] = cloneTodo(item)
 	}
 	for _, item := range s.CalendarEvents {
-		m.calendarEvents[item.ID] = item
+		m.calendarEvents[item.ID] = cloneCalendarEvent(item)
 	}
 	for _, item := range s.WordBooks {
 		m.wordBooks[item.ID] = item

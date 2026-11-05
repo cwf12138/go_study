@@ -56,6 +56,11 @@ func (s *Server) createCalendarEvent(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) updateCalendarEvent(w http.ResponseWriter, r *http.Request) {
+	expected, conditionErr := recordCondition(r, "event_id", false)
+	if conditionErr != nil {
+		writeError(w, conditionErr)
+		return
+	}
 	var body struct {
 		Title            *string                    `json:"title"`
 		Description      *string                    `json:"description"`
@@ -78,16 +83,22 @@ func (s *Server) updateCalendarEvent(w http.ResponseWriter, r *http.Request) {
 		Title: body.Title, Description: body.Description, Location: body.Location, Category: body.Category, Color: body.Color,
 		StartAt: body.StartAt, EndAt: body.EndAt, AllDay: body.AllDay, RepeatRule: body.RepeatRule, RepeatUntil: body.RepeatUntil,
 		ClearRepeatUntil: body.ClearRepeatUntil, ReminderMinutes: body.ReminderMinutes,
-	})
+	}, expected...)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
+	calendarETag(w, event)
 	writeJSON(w, http.StatusOK, envelope{"data": event})
 }
 
 func (s *Server) deleteCalendarEvent(w http.ResponseWriter, r *http.Request) {
-	if err := s.service.DeleteCalendarEvent(r.Context(), claimsFromContext(r.Context()).Subject, r.PathValue("event_id")); err != nil {
+	expected, conditionErr := recordCondition(r, "event_id", false)
+	if conditionErr != nil {
+		writeError(w, conditionErr)
+		return
+	}
+	if err := s.service.DeleteCalendarEvent(r.Context(), claimsFromContext(r.Context()).Subject, r.PathValue("event_id"), expected...); err != nil {
 		writeError(w, err)
 		return
 	}

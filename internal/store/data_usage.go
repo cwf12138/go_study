@@ -30,7 +30,7 @@ func (m *Memory) usageSources() []usageSource {
 	return []usageSource{
 		{"memos", m.memoNotes, true}, {"memo_folders", m.memoFolders, true},
 		{"action_links", m.actionLinks, true},
-		{"todo_imports", m.todoImports, true},
+		{"todo_imports", m.todoImports, true}, {"calendar_commands", m.calendarCommands, true},
 		{"todos", m.todos, true}, {"todo_lists", m.todoLists, true}, {"calendar_events", m.calendarEvents, true}, {"important_days", m.importantDays, true},
 		{"text_clips", m.textClips, true}, {"parcels", m.parcels, true}, {"inventory", m.inventory, true}, {"shopping", m.shopping, true}, {"bookmarks", m.bookmarks, true},
 		{"subscriptions", m.subscriptions, true}, {"ledger", m.ledger, true}, {"meals", m.meals, true},

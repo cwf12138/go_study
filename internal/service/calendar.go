@@ -3,6 +3,7 @@ package service
 import (
 	"container/list"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/6tail/lunar-go/HolidayUtil"
 	"github.com/6tail/lunar-go/calendar"
@@ -31,17 +33,17 @@ var calendarLocation = func() *time.Location {
 }()
 
 type CreateCalendarEventInput struct {
-	Title           string
-	Description     string
-	Location        string
-	Category        string
-	Color           string
-	StartAt         time.Time
-	EndAt           time.Time
-	AllDay          bool
-	RepeatRule      domain.CalendarRepeatRule
-	RepeatUntil     *time.Time
-	ReminderMinutes int
+	Title           string                    `json:"title"`
+	Description     string                    `json:"description"`
+	Location        string                    `json:"location"`
+	Category        string                    `json:"category"`
+	Color           string                    `json:"color"`
+	StartAt         time.Time                 `json:"start_at"`
+	EndAt           time.Time                 `json:"end_at"`
+	AllDay          bool                      `json:"all_day"`
+	RepeatRule      domain.CalendarRepeatRule `json:"repeat_rule"`
+	RepeatUntil     *time.Time                `json:"repeat_until"`
+	ReminderMinutes int                       `json:"reminder_minutes"`
 }
 
 type UpdateCalendarEventInput struct {
@@ -60,16 +62,11 @@ type UpdateCalendarEventInput struct {
 }
 
 func (s *Service) CreateCalendarEvent(ctx context.Context, userID string, input CreateCalendarEventInput) (domain.CalendarEvent, error) {
-	event := domain.CalendarEvent{
-		ID: platform.NewID(), UserID: userID, Title: strings.TrimSpace(input.Title),
-		Description: strings.TrimSpace(input.Description), Location: strings.TrimSpace(input.Location),
-		Category: strings.TrimSpace(input.Category), Color: strings.TrimSpace(input.Color),
-		StartAt: input.StartAt.UTC(), EndAt: input.EndAt.UTC(), AllDay: input.AllDay,
-		RepeatRule: input.RepeatRule, RepeatUntil: input.RepeatUntil, ReminderMinutes: input.ReminderMinutes,
-	}
-	if err := validateCalendarEvent(&event); err != nil {
+	event, err := newCalendarEvent(input)
+	if err != nil {
 		return domain.CalendarEvent{}, err
 	}
+	event.ID, event.UserID = platform.NewID(), userID
 	now := s.now().UTC()
 	event.CreatedAt, event.UpdatedAt = now, now
 	if err := s.repo.CreateCalendarEvent(ctx, event); err != nil {
@@ -79,28 +76,26 @@ func (s *Service) CreateCalendarEvent(ctx context.Context, userID string, input 
 	return event, nil
 }
 
-func (s *Service) UpdateCalendarEvent(ctx context.Context, userID, eventID string, input UpdateCalendarEventInput) (domain.CalendarEvent, error) {
-	event, err := s.repo.CalendarEventByID(ctx, eventID)
+func (s *Service) UpdateCalendarEvent(ctx context.Context, userID, eventID string, input UpdateCalendarEventInput, expected ...string) (domain.CalendarEvent, error) {
+	event, err := s.calendarForChange(ctx, userID, eventID, expected)
 	if err != nil {
 		return domain.CalendarEvent{}, err
 	}
-	if err := requireOwner(event.UserID, userID); err != nil {
-		return domain.CalendarEvent{}, err
-	}
+	previous, original := event.UpdatedAt, event
 	if input.Title != nil {
-		event.Title = strings.TrimSpace(*input.Title)
+		event.Title = trimCalendar(*input.Title)
 	}
 	if input.Description != nil {
-		event.Description = strings.TrimSpace(*input.Description)
+		event.Description = trimCalendar(*input.Description)
 	}
 	if input.Location != nil {
-		event.Location = strings.TrimSpace(*input.Location)
+		event.Location = trimCalendar(*input.Location)
 	}
 	if input.Category != nil {
-		event.Category = strings.TrimSpace(*input.Category)
+		event.Category = trimCalendar(*input.Category)
 	}
 	if input.Color != nil {
-		event.Color = strings.TrimSpace(*input.Color)
+		event.Color = trimCalendar(*input.Color)
 	}
 	if input.StartAt != nil {
 		event.StartAt = input.StartAt.UTC()
@@ -123,26 +118,34 @@ func (s *Service) UpdateCalendarEvent(ctx context.Context, userID, eventID strin
 	if input.ReminderMinutes != nil {
 		event.ReminderMinutes = *input.ReminderMinutes
 	}
+	if event.AllDay && (!original.AllDay || !original.StartAt.Equal(event.StartAt) || !original.EndAt.Equal(event.EndAt)) && event.EndAt.After(event.StartAt) {
+		normalizeAllDay(&event)
+	}
 	if err := validateCalendarEvent(&event); err != nil {
 		return domain.CalendarEvent{}, err
 	}
-	event.UpdatedAt = s.now().UTC()
-	if err := s.repo.UpdateCalendarEvent(ctx, event); err != nil {
+	event.UpdatedAt = s.nextRecordTime(previous)
+	writer, err := s.calendarWriter()
+	if err != nil {
+		return domain.CalendarEvent{}, err
+	}
+	if err := writer.UpdateCalendarEventIfUnchanged(ctx, event, previous); err != nil {
 		return domain.CalendarEvent{}, err
 	}
 	s.publish("calendar_event.updated", userID, event.ID, nil)
 	return event, nil
 }
 
-func (s *Service) DeleteCalendarEvent(ctx context.Context, userID, eventID string) error {
-	event, err := s.repo.CalendarEventByID(ctx, eventID)
+func (s *Service) DeleteCalendarEvent(ctx context.Context, userID, eventID string, expected ...string) error {
+	event, err := s.calendarForChange(ctx, userID, eventID, expected)
 	if err != nil {
 		return err
 	}
-	if err := requireOwner(event.UserID, userID); err != nil {
+	writer, err := s.calendarWriter()
+	if err != nil {
 		return err
 	}
-	if err := s.repo.DeleteCalendarEvent(ctx, eventID); err != nil {
+	if err := writer.DeleteCalendarEventIfUnchanged(ctx, userID, eventID, event.UpdatedAt); err != nil {
 		return err
 	}
 	s.publish("calendar_event.deleted", userID, eventID, nil)
@@ -150,7 +153,7 @@ func (s *Service) DeleteCalendarEvent(ctx context.Context, userID, eventID strin
 }
 
 func validateCalendarEvent(event *domain.CalendarEvent) error {
-	if event.Title == "" || len(event.Title) > 160 || len(event.Description) > 6000 || len(event.Location) > 240 || len(event.Category) > 60 {
+	if event.Title == "" || utf8.RuneCountInString(event.Title) > 160 || utf8.RuneCountInString(event.Description) > 6000 || utf8.RuneCountInString(event.Location) > 240 || utf8.RuneCountInString(event.Category) > 60 {
 		return fmt.Errorf("%w: calendar event text is invalid", domain.ErrInvalidInput)
 	}
 	if event.StartAt.IsZero() || event.EndAt.IsZero() || !event.EndAt.After(event.StartAt) || event.EndAt.Sub(event.StartAt) > 366*24*time.Hour {
@@ -179,6 +182,10 @@ func validateCalendarEvent(event *domain.CalendarEvent) error {
 	if len(event.Color) != 7 || event.Color[0] != '#' {
 		return fmt.Errorf("%w: color must use #RRGGBB", domain.ErrInvalidInput)
 	}
+	if _, err := hex.DecodeString(event.Color[1:]); err != nil {
+		return fmt.Errorf("%w: invalid color", domain.ErrInvalidInput)
+	}
+	event.Color = strings.ToLower(event.Color)
 	if event.Category == "" {
 		event.Category = "学习"
 	}
@@ -259,7 +266,11 @@ func expandCalendarEvents(events []domain.CalendarEvent, start, end time.Time) [
 	occurrences := make([]domain.CalendarOccurrence, 0)
 	for _, event := range events {
 		duration := event.EndAt.Sub(event.StartAt)
-		current := event.StartAt.In(calendarLocation)
+		location := calendarLocation
+		if event.AllDay {
+			location = calendarWallLocation
+		}
+		current := event.StartAt.In(location)
 		if event.RepeatRule == domain.CalendarRepeatNone {
 			if event.EndAt.After(start) && event.StartAt.Before(end) {
 				occurrences = append(occurrences, makeOccurrence(event, event.StartAt, event.EndAt))
@@ -268,13 +279,13 @@ func expandCalendarEvents(events []domain.CalendarEvent, start, end time.Time) [
 		}
 		for i := 0; i < 5000 && current.Before(end); i++ {
 			currentEnd := current.Add(duration)
-			if event.RepeatUntil != nil && current.After(event.RepeatUntil.In(calendarLocation)) {
+			if event.RepeatUntil != nil && current.After(event.RepeatUntil.In(location)) {
 				break
 			}
 			if currentEnd.After(start) {
 				occurrences = append(occurrences, makeOccurrence(event, current.UTC(), currentEnd.UTC()))
 			}
-			current = recurrenceAt(event.StartAt.In(calendarLocation), event.RepeatRule, i+1)
+			current = recurrenceAt(event.StartAt.In(location), event.RepeatRule, i+1)
 		}
 	}
 	sort.Slice(occurrences, func(i, j int) bool { return occurrences[i].OccurrenceStart.Before(occurrences[j].OccurrenceStart) })
