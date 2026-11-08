@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Daynest API
   version: 1.0.0
-  description: 学习目标、任务、专注会话、词汇学习和实时事件 API。
+  description: 日常生活工作台 API。备忘录、待办与日程的成功 JSON 写入可返回 X-Daynest-Write-Receipt；它仅表示服务已处理的观察凭据，需查询 system/write-status 确认是否被成功快照覆盖，不代表响应时立即落盘。
 servers:
   - url: http://localhost:8080
 tags:
@@ -154,6 +154,55 @@ paths:
         '422': { description: 索引超出在线检查范围，应使用电脑端离线校验 }
         '429': { description: 已有检查进行中，Retry-After 为 5 秒 }
         '500': { description: 元数据等暂不可读，不披露原始路径或异常 }
+  /api/v1/system/write-status:
+    post:
+      tags: [System]
+      security: [{ bearerAuth: [] }]
+      summary: 只读查询本账号提交是否被成功快照覆盖
+      description: 不写盘、不重发业务请求。凭据按账号及进程绑定，重启、模型替换、跨账号或签名无效均返回 unverifiable。snapshot_written 是成功快照的历史观察，不是备份、当前文件完整性或每个历史业务版本的保证。Cache-Control 为 no-store。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [receipts]
+              properties:
+                receipts:
+                  type: array
+                  maxItems: 20
+                  items: { type: string, maxLength: 180 }
+      responses:
+        '200':
+          description: 按请求顺序返回观察，不泄露其他账号的有效性
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    required: [schema_version, mode, available, interval_seconds, checking_triggers_write, receipts]
+                    properties:
+                      schema_version: { type: integer, const: 1 }
+                      mode: { type: string, const: periodic_json }
+                      available: { type: boolean }
+                      interval_seconds: { type: number, exclusiveMinimum: 0 }
+                      checking_triggers_write: { type: boolean, const: false }
+                      receipts:
+                        type: array
+                        maxItems: 20
+                        items:
+                          type: object
+                          required: [receipt, state]
+                          properties:
+                            receipt: { type: string }
+                            state: { type: string, enum: [waiting_snapshot, snapshot_written, snapshot_failed, unverifiable] }
+                            snapshot_at: { type: string, format: date-time }
+                            failure_at: { type: string, format: date-time }
+        '400': { description: JSON 无效或超过批次数量 / 凭据长度限制 }
+        '401': { description: 需要登录 }
   /api/v1/system/diagnostics:
     get:
       tags: [System]

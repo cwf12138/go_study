@@ -21,6 +21,7 @@ type Memory struct {
 	snapshotMu              sync.Mutex
 	statusMu                sync.RWMutex
 	snapshotStatus          SnapshotStatus
+	writeObservation        *writeObservation
 	mu                      sync.RWMutex
 	habits                  map[string]domain.Habit
 	explorations            map[string]domain.Exploration
@@ -1257,13 +1258,17 @@ func (e *SnapshotRecoveryError) Error() string {
 
 func (e *SnapshotRecoveryError) Unwrap() error { return e.Cause }
 
-func (m *Memory) SaveJSON(path string) (saveErr error) {
+func (m *Memory) SaveJSON(path string) error { return m.saveJSONWithWriter(path, writeSnapshotFile) }
+
+func (m *Memory) saveJSONWithWriter(path string, writer func(string, []byte) error) (saveErr error) {
 	m.snapshotMu.Lock()
 	defer m.snapshotMu.Unlock()
 	started := time.Now()
 	m.snapshotStarted(started)
 	defer func() { m.snapshotFinished(started, saveErr) }()
 	m.mu.RLock()
+	captured := m.captureWriteObservationLocked()
+	defer func() { m.finishWriteObservation(captured, saveErr) }()
 	s := snapshot{Version: 1, SavedAt: time.Now().UTC()}
 	for _, item := range m.textClips {
 		s.TextClips = append(s.TextClips, item)
@@ -1409,14 +1414,14 @@ func (m *Memory) SaveJSON(path string) (saveErr error) {
 	}
 	if previous, err := os.ReadFile(path); err == nil {
 		if _, validateErr := decodeSnapshot(previous); validateErr == nil {
-			if err := writeSnapshotFile(path+".bak", previous); err != nil {
+			if err := writer(path+".bak", previous); err != nil {
 				return fmt.Errorf("save previous snapshot backup: %w", err)
 			}
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	return writeSnapshotFile(path, data)
+	return writer(path, data)
 }
 
 func (m *Memory) LoadJSON(path string) error {
@@ -1466,6 +1471,7 @@ func (m *Memory) LoadJSON(path string) error {
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.writeObservation = nil
 	m.users = make(map[string]domain.User, len(s.Users))
 	m.habits = make(map[string]domain.Habit, len(s.Habits))
 	m.explorations = make(map[string]domain.Exploration, len(s.Explorations))

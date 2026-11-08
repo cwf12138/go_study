@@ -7,7 +7,7 @@
   dialog.id = 'todo-editor'; dialog.className = 'todo-editor'; dialog.setAttribute('aria-labelledby', 'te-title');
   dialog.innerHTML = `<header class="te-header"><div><p>MAKE ROOM FOR WHAT MATTERS</p><h2 id="te-title">整理这件待办</h2></div><button id="te-close" type="button" aria-label="关闭待办详情">×</button></header>
     <div class="te-body"><div class="te-meta"><span id="te-state"></span><span id="te-updated"></span></div>
-    <p id="te-status" role="status" aria-live="polite"></p>
+    <p id="te-status" role="status" aria-live="polite"></p><span id="te-save-proof" hidden></span><p id="te-draft-status" role="status"></p>
     <form id="te-form"><fieldset id="te-fields"><label>待办标题<input id="te-name" required maxlength="400" autocomplete="off"></label>
     <div class="te-row"><label>放入分类<select id="te-list"></select></label><label>优先级<select id="te-priority"><option value="medium">普通</option><option value="high">重要</option><option value="low">低</option></select></label></div>
     <div class="te-row"><label>截止时间 · 本地时间<input id="te-due" type="datetime-local"></label><label>安排到哪一天<input id="te-myday" type="date"></label></div>
@@ -17,7 +17,7 @@
     <div class="te-footer"><button id="te-export" type="button" class="quiet">导出当前文字 ↓</button><button id="te-save" type="submit" class="primary">保存修改</button></div></form>
     <section id="te-review" class="te-review" hidden><header><div><p>先核对，再继续</p><h3 id="te-review-title">服务端内容</h3></div><button id="te-check" type="button" class="quiet">读取最新版本</button></header><pre id="te-server"></pre>
     <div class="te-review-actions"><button id="te-use-server" type="button">采用服务端内容</button><button id="te-keep-local" type="button">保留我的文字，继续编辑</button><button id="te-finish-check" type="button" hidden>结束本次核对</button></div></section>
-    <p class="te-note">修改保存到电脑服务；多窗口发生变化时先对照。未提交文字仅保留在当前页面，可先导出。</p></div>`;
+    <p class="te-note">修改保存到电脑服务；多窗口发生变化时先对照。开启本机草稿后可在刷新后找回修改。请在「本机编辑草稿」核对保留结果，也可导出文字。</p></div>`;
   document.body.append(dialog);
   const banner = document.createElement('button');
   banner.className = 'te-pending'; banner.id = 'todo-pending'; banner.type = 'button'; banner.hidden = true;
@@ -46,8 +46,13 @@
     banner.textContent = `${entries.length} 项待办操作待核对 · 点击查看`;
   }
   function status(text) { $('te-status').textContent = text; }
+  function captureDraft() {
+    if (editor?.dirty && current()) window.DaynestTodoDrafts?.capture(editor.base, formValue());
+  }
   function renderState() {
     if (!editor) return;
+    captureDraft();
+    window.DaynestSaveStatus?.bind($("te-save-proof"), "todos", editor.base?.id);
     $('te-fields').disabled = editor.deleted || editor.loading || !!editor.action;
     $('te-save').disabled = busy || editor.loading || editor.deleted || editor.review;
     $('te-save').textContent = busy ? '正在保存…' : '保存修改';
@@ -83,7 +88,9 @@
     }
   }
   function fill(todo) {
-    const value = C.editable(todo);
+    applyFields(C.editable(todo));
+  }
+  function applyFields(value) {
     for (const [field, key] of [['name', 'title'], ['notes', 'notes'], ['list', 'list_id'], ['priority', 'priority'], ['due', 'due'], ['myday', 'my_day_date'], ['repeat', 'repeat_rule'], ['tags', 'tags']]) $('te-' + field).value = value[key];
     editor.steps = value.steps; editor.dirty = false; editor.sequence++;
     renderSteps(); renderState();
@@ -91,20 +98,20 @@
   function clear() {
     epoch++; controller?.abort(); controller = null; owner = null; editor = null; busy = false;
     for (const id of ['te-name', 'te-notes', 'te-tags', 'te-due', 'te-myday']) $(id).value = '';
-    for (const id of ['te-list', 'te-steps', 'te-server', 'te-status', 'te-updated', 'te-state']) $(id).textContent = '';
+    for (const id of ['te-list', 'te-steps', 'te-server', 'te-status', 'te-updated', 'te-state', 'te-draft-status']) $(id).textContent = '';
     $('te-close').disabled = false;
     if (dialog.open) dialog.close();
   }
   function close() {
     if (busy) return;
-    if (editor?.dirty && !confirm('当前修改尚未保存。可取消后先导出；确定放弃这些修改并关闭？')) return;
+    if (editor?.dirty && !confirm('当前修改尚未提交。请确认本机草稿已保留或已导出，确定关闭？')) return;
     const focus = returnFocus; clear(); focus?.focus?.();
   }
   async function open(id, action = null) {
     action = action || pending.get(id) || null;
     if (action?.state === 'sending') { notify('正在等待这项操作的结果，请稍后。'); return; }
     if (busy || editor?.dirty && !confirm('切换待办会放弃当前未保存的修改，确定继续？')) return;
-    clear(); const generation = epoch; owner = H.capture(); const context = owner; returnFocus = document.activeElement;
+    clear(); window.DaynestTodoDrafts?.begin(); const generation = epoch; owner = H.capture(); const context = owner; returnFocus = document.activeElement;
     if (!context.userID || H.authExpired()) { notify('请先在线核验账号。', true); return; }
     status('正在读取待办…'); dialog.showModal(); $('te-form').hidden = true; $('te-review').hidden = true;
     controller = new AbortController();
@@ -117,6 +124,7 @@
       $('te-form').hidden = false; $('te-server').textContent = action ? C.describe(todo) : '';
       fill(todo); status(action ? `原操作「${({complete:'更改完成状态',myday:'调整我的一天',step:'更改步骤状态',delete:'删除待办'})[action.kind]}」待核对，当前显示服务端最新内容。核对完成前不会再次发送。` : todo.next_todo_id ? '此周期任务已生成过下一项。重新完成不会再生成第二项。' : '修改标题、安排与步骤，保存时会校验读取的版本。');
       $('te-name').focus();
+      return true;
     } catch (error) {
       if (generation !== epoch || !current()) return;
       if (action && error.status === 404 && error.code === 'not_found') {
@@ -152,14 +160,14 @@
     let body; try { body = C.payload(formValue(), e.base); } catch (error) { status(error.message); return; }
     busy = true; controller = new AbortController(); renderState(); status('正在保存；此时继续输入的文字会保留。');
     try {
-      const todo = contract(await H.json('/api/v1/todos/' + e.base.id, { method: 'PATCH', body, headers: C.headers(e.base), context, signal: controller.signal }), context, true);
+      const todo = contract(await H.json('/api/v1/todos/' + e.base.id, { method: 'PATCH', body, headers: C.headers(e.base), context, signal: controller.signal, validate(value) { contract(value, context, true); if(value.id !== e.base.id || C.version(value) === C.version(e.base)) throw Error(); } }), context, true);
       if (generation !== epoch || !current()) return;
       if (todo.id !== e.base.id || C.version(todo) === C.version(e.base)) { const error = Error('保存响应与原任务或版本不一致，请核对结果。'); error.uncertain = true; throw error; }
       e.base = todo;
       // Step order cannot change during the request. Preserve new input while
       // adopting server-assigned identities for newly added steps.
       e.steps.forEach((step, i) => { if (!step.id) step.id = todo.steps?.[i]?.id || ''; });
-      if (sequence === e.sequence) fill(todo);
+      if (sequence === e.sequence) { fill(todo); window.DaynestTodoDrafts?.capture(todo, formValue(), true); }
       else e.dirty = true;
       status(e.dirty ? '上一版已提交，继续输入的修改仍在，请再次保存。' : '已提交服务，当前修改已保存。'); changed();
     } catch (error) {
@@ -199,8 +207,8 @@
   }
 
   $('te-form').addEventListener('submit', save);
-  $('te-form').addEventListener('input', () => { if (editor) { editor.dirty = true; editor.sequence++; } });
-  $('te-form').addEventListener('change', () => { if (editor) { editor.dirty = true; editor.sequence++; } });
+  $('te-form').addEventListener('input', () => { if (editor) { editor.dirty = true; editor.sequence++; captureDraft(); } });
+  $('te-form').addEventListener('change', () => { if (editor) { editor.dirty = true; editor.sequence++; captureDraft(); } });
   $('te-add-step').addEventListener('click', () => { if (editor && !busy && editor.steps.length < 30) { editor.steps.push({ id: '', title: '', completed: false }); editor.dirty = true; editor.sequence++; renderSteps(); renderState(); $('te-steps').lastElementChild?.querySelector('input[type=text]')?.focus(); } });
   $('te-close').addEventListener('click', close); dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
   $('te-check').addEventListener('click', check);
@@ -240,5 +248,21 @@
   document.addEventListener('daynest:auth-expired', () => { if (editor) status('登录已过期，当前文字仍在；可先导出，再重新登录。'); });
   window.addEventListener('storage', event => { if ((!event.key || event.key === 'studyflow.token') && owner && !current()) { clear(); pending.clear(); updateBanner(); } });
   window.DaynestUI?.registerGuard('todo-editor', () => !!editor?.dirty || busy || pending.size > 0);
+  window.DaynestTodoDrafts?.connect({
+    read, notice: text => { $('te-draft-status').textContent = text; },
+    async restore(record) {
+      const context = H.capture();
+      if (record.base.user_id !== context.userID || !await open(record.base.id) || !current()) return false;
+      const remote = editor.base;
+      editor.base = record.base;
+      const value = { ...record.value, steps: record.value.steps.map(step => ({ ...step })) };
+      if (record.baseDue !== undefined && value.due === record.baseDue) value.due = C.localTime(record.base.due_at);
+      applyFields(value);
+      editor.remote = remote; editor.review = true; editor.dirty = true;
+      $('te-server').textContent = C.describe(remote);
+      renderState(); status('草稿已恢复，请对照服务端内容，再选择保留当前文字或采用服务端版本。');
+      return true;
+    }
+  });
   window.DaynestTodos = { open, action, read, list: path => H.json(path), lists: () => H.json('/api/v1/todo-lists') };
 })();

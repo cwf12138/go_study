@@ -48,7 +48,13 @@
     try {
       if(!window.DaynestHTTP)throw Error("请求组件未加载，请刷新页面。");
       context=options.context || window.DaynestHTTP.capture();
-      const data=await window.DaynestHTTP.json(path, {...options,context});
+      const data=await window.DaynestHTTP.json(path, {...options,context,validate(value){
+        options.validate?.(value);
+        if((options.method||'GET').toUpperCase()==='PATCH'){
+          const input=typeof options.body==='string'?JSON.parse(options.body):options.body;
+          if(input?.expected_updated_at&&value?.updated_at===input.expected_updated_at)throw Error('保存响应没有新版本');
+        }
+      }});
       window.DaynestReadCache?.observe(path,(options.method||'GET').toUpperCase(),data,context);
       return data;
     } catch (error) {
@@ -274,12 +280,12 @@
         const updated = await memoAPI(`/api/v1/memos/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
         if (state.token !== token || state.accountScope !== account || state.current?.id !== id) return false;
         state.baseNote = { ...updated, tags: [...(updated.tags || [])] };
-        if (state.revision === revision) { state.current = updated; state.dirty = false; state.manualSave = false; setSaveState("saved"); recovery?.saved(draft, true); }
+        if (state.revision === revision) { state.current = updated; state.dirty = false; state.manualSave = false; setSaveState("saved", "已提交服务"); recovery?.saved(draft, true); }
         else { setSaveState("saving", "仍有新修改待保存…"); recovery?.capture(); }
         // A failed list refresh must not misreport a successful save as a failed write.
         try { await refreshLists(); } catch (_) { /* Retry when reopening the list. */ }
         if (state.token !== token || state.accountScope !== account || state.current?.id !== id) return false;
-        if (!quiet && !state.dirty) notify("备忘录已保存。");
+        if (!quiet && !state.dirty) notify("备忘录已提交服务，可在保存状态中查看快照确认。");
         return true;
       } catch (error) {
         if (state.token !== token || state.accountScope !== account || state.current?.id !== id) return false;
@@ -302,8 +308,11 @@
     renderSidebar(); renderNoteList();
   }
 
-  function setSaveState(kind, text = "已提交服务") {
-    const target = $("#memo-save-state"); target.className = kind === "saved" ? "" : kind; target.innerHTML = `<i></i>${text}`;
+  function setSaveState(kind, text = "服务端内容已载入") {
+    const target = $("#memo-save-state");
+    let proof = $("#memo-save-proof"); if (!proof) { proof = document.createElement("span"); proof.id = "memo-save-proof"; target.after(proof); }
+    window.DaynestSaveStatus?.bind(proof, "memos", state.current?.id);
+    target.className = kind === "saved" ? "" : kind; target.innerHTML = `<i></i>${text}`;
   }
 
   function updateEditorMeta() {

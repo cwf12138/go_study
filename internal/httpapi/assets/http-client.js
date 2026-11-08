@@ -11,6 +11,8 @@
       },
       onUnauthorized() { document.dispatchEvent(new CustomEvent("daynest:auth-expired")); },
       onWriteStart(request) { return root.DaynestReadCache?.beginPlanningWrite(request.path,request.method,request.context); },
+      onWriteEvent(event) { root.DaynestSaveStatus?.observe(event); },
+      validateWrite(path,method,data,context) { return root.DaynestSaveCore?.validResult(path,method,data,context,root)!==false; },
     });
     const cancel = () => root.DaynestHTTP.cancelStale();
     document.addEventListener("daynest:account-ready", cancel);
@@ -26,7 +28,8 @@
   const same = (a,b) => !!a && !!b && a.token===b.token && a.server===b.server && a.userID===b.userID && a.session===b.session;
   function create(options) {
     const send=options.fetch || ((...args)=>fetch(...args)),schedule=options.setTimeout || ((...args)=>setTimeout(...args)),unschedule=options.clearTimeout || (id=>clearTimeout(id));
-    const requests=new Set(); let expired=null;
+    const requests=new Set(); let expired=null, serial=0;
+    const emit=event=>{try{options.onWriteEvent?.(event);}catch(_){}};
     function capture() {
       try {
         const c=options.getContext();
@@ -59,7 +62,7 @@
       if(!validPath(path)||!["GET","HEAD","POST","PUT","PATCH","DELETE"].includes(method))throw new RequestError("请求地址或方法不受支持。",{kind:"invalid_request"});
       if(!current(context))throw new RequestError("账号或服务已切换，已忽略旧请求。",{kind:"account_changed"});
       if(same(expired,context))throw new RequestError("登录已过期。未提交内容仍在，请保留或导出后重新登录。",{status:401,code:"unauthorized",kind:"auth"});
-      const controller=new AbortController(),entry={context,controller};let timedOut=false,dispatched=false,timer,releaseWrite;
+      const controller=new AbortController(),entry={context,controller};let timedOut=false,dispatched=false,timer,releaseWrite,observation=null,receipt="",accepted=false,outcome=null,result=null;
       const timeout=input.timeoutMs ?? 25000,maxBytes=input.maxBytes ?? 32*1024*1024;
       if(!Number.isFinite(timeout)||timeout<1||timeout>300000||!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>64*1024*1024)throw new RequestError("请求配置不正确。",{kind:"invalid_request"});
       const cancel=()=>controller.abort();
@@ -76,10 +79,11 @@
         catch(_){throw new RequestError("请求内容无法编码，请检查填写内容。",{kind:"invalid_request"});}
         timer=schedule(()=>{timedOut=true;controller.abort();},timeout);
         // Writes are never automatically retried, including after cancellation.
-        if(write){try{releaseWrite=options.onWriteStart?.({path,method,context});}catch(_){} }
+        if(write){try{releaseWrite=options.onWriteStart?.({path,method,context});}catch(_){} observation={id:++serial,path,method,context};emit({...observation,phase:"start"});}
         check();dispatched=true;
         const response=await race(send(path,{method,headers,body,signal:controller.signal,cache:"no-store",credentials:"same-origin",redirect:"error"}),controller.signal);
         check();
+        if(response.ok)receipt=response.headers?.get?.("X-Daynest-Write-Receipt") || "";
         if(response.status===401){
           try{if(response.body?.cancel)Promise.resolve(response.body.cancel()).catch(()=>{});}catch(_){}
           reportUnauthorized(context);
@@ -111,14 +115,15 @@
           else if(status===429)message="请求较频繁或服务正在忙碌，请稍后再试。";
           throw new RequestError(message,{status,code,kind:"http",uncertain:write&&status>=500});
         }
-        if(response.status===204)return null;
+        if(response.status===204){try{input.validate?.(null);if(write&&options.validateWrite?.(path,method,null,context)===false)throw Error();}catch(_){throw new RequestError("保存响应与预期不一致，请先核对结果。",{kind:"invalid_response",status:response.status,uncertain:write});}accepted=true;return null;}
         if(!payload||typeof payload!=="object"||!Object.hasOwn(payload,"data"))throw new RequestError("服务返回格式不完整，请确认已重启当前版本的 Go 服务。",{kind:"invalid_response",status:response.status,uncertain:write});
-        return input.envelope?payload:payload.data;
+        try{input.validate?.(payload.data);if(write&&options.validateWrite?.(path,method,payload.data,context)===false)throw Error();}catch(_){throw new RequestError("保存响应与预期不一致，请先核对结果。",{kind:"invalid_response",status:response.status,uncertain:write});}
+        result=payload.data;accepted=true;return input.envelope?payload:payload.data;
       } catch(e) {
-        check();
-        if(e instanceof RequestError)throw e;
-        throw new RequestError("无法连接到服务，请确认电脑与 Go 服务在线。",{kind:"network",uncertain:write&&dispatched});
-      } finally {try{releaseWrite?.();}catch(_){}if(timer!==undefined)unschedule(timer);input.signal?.removeEventListener("abort",cancel);requests.delete(entry);}
+        try{check();}catch(changed){e=changed;}
+        outcome=e instanceof RequestError?e:new RequestError("无法连接到服务，请确认电脑与 Go 服务在线。",{kind:"network",uncertain:write&&dispatched});
+        throw outcome;
+      } finally {if(observation)emit({...observation,phase:"finish",accepted,receipt,data:result,dispatched,uncertain:!!outcome?.uncertain,errorKind:outcome?.kind || "",status:outcome?.status || 0});try{releaseWrite?.();}catch(_){}if(timer!==undefined)unschedule(timer);input.signal?.removeEventListener("abort",cancel);requests.delete(entry);}
     }
     return {json,capture,current,cancelStale,authExpired,reportUnauthorized};
   }

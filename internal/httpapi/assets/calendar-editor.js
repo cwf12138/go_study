@@ -35,6 +35,8 @@
       reminder_minutes: Number($('calendar-event-reminder').value) };
   }
   function render() {
+    let proof = $("calendar-save-proof"); if (!proof) { proof = document.createElement("span"); proof.id = "calendar-save-proof"; $("calendar-editor-status").after(proof); }
+    window.DaynestSaveStatus?.bind(proof, "calendar/events", editor?.base?.id);
     $('calendar-dialog-close').disabled = busy;
     $('calendar-event-cancel').disabled = busy;
     if (!editor) return;
@@ -144,12 +146,12 @@
     try {
       if (!e.base) {
         e.command = store(context).put(body); e.dirty = false; e.review = true; render(); refreshBadge();
-        const result = await H.json('/api/v1/calendar/event-commands', { method: 'POST', body: { schema_version: 1, request_id: e.command.request_id, ...e.command.body }, context, signal: controller.signal });
+        const result = await H.json('/api/v1/calendar/event-commands', { method: 'POST', body: { schema_version: 1, request_id: e.command.request_id, ...e.command.body }, context, signal: controller.signal, validate(value) { C.result(value, context, e.command); } });
         if (turn === generation && current()) acceptCommand(result, e.command);
       } else {
         render(); const latest = await read(e.base.id, context, controller.signal);
         if (C.version(latest) !== C.version(e.base)) { const error = Error('版本已变化'); error.status = 409; throw error; }
-        const result = contract(await H.json('/api/v1/calendar/events/' + e.base.id, { method: 'PATCH', body: { ...body, clear_repeat_until: !body.repeat_until }, headers: C.headers(e.base), context, signal: controller.signal }), context, e.base.id, true);
+        const result = contract(await H.json('/api/v1/calendar/events/' + e.base.id, { method: 'PATCH', body: { ...body, clear_repeat_until: !body.repeat_until }, headers: C.headers(e.base), context, signal: controller.signal, validate(value) { contract(value, context, e.base.id, true); if(C.version(value) === C.version(e.base)) throw Error(); } }), context, e.base.id, true);
         if (turn !== generation || !current()) return;
         if (C.version(result) === C.version(e.base)) { const error = Error('保存响应未提供新版本，请核对结果。'); error.uncertain = true; throw error; }
         e.base = result; if (sequence === e.sequence) fill(result); else e.dirty = true;
@@ -185,7 +187,7 @@
     if (!editor?.command || busy || !editor.missing || editor.command.known_deleted || !current()) return;
     if (!confirm('确认按原标识、原内容重试？不会创建新的提交标识，也不会覆盖已有日程的后续编辑。')) return;
     const turn = generation, row = editor.command; busy = true; controller = new AbortController(); render();
-    try { const result = await H.json('/api/v1/calendar/event-commands', { method: 'POST', body: { schema_version: 1, request_id: row.request_id, ...row.body }, context: owner, signal: controller.signal }); if (turn === generation && current()) acceptCommand(result, row); }
+    try { const result = await H.json('/api/v1/calendar/event-commands', { method: 'POST', body: { schema_version: 1, request_id: row.request_id, ...row.body }, context: owner, signal: controller.signal, validate(value) { C.result(value, owner, row); } }); if (turn === generation && current()) acceptCommand(result, row); }
     catch (error) { if (turn === generation && current()) status(explain(error)); }
     finally { if (turn === generation) { busy = false; controller = null; render(); refreshBadge(); } }
   }

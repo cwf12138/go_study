@@ -144,6 +144,7 @@
     if (requestToken !== storedToken) throw new Error("账号已切换，请等待重新连接或刷新页面。");
     if(window.DaynestHTTP?.authExpired()&&!path.startsWith("/api/v1/auth/")){const error=Error("登录已过期。未提交内容仍在，请保留或导出后重新登录。");error.status=401;error.kind="auth";throw error;}
     const { returnEnvelope = false, ...requestOptions } = options;
+    if(window.DaynestHTTP && window.DaynestSaveCore?.tracked(path, requestOptions.method)) return window.DaynestHTTP.json(path, { ...requestOptions, context: requestContext, envelope: returnEnvelope });
     const headers = new Headers(requestOptions.headers || {});
     if (state.token) headers.set("Authorization", `Bearer ${state.token}`);
     if (requestOptions.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");

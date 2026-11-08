@@ -66,6 +66,8 @@
     <link rel="stylesheet" href="/static/offline-reader.css?v=20261103-1">
     <link rel="stylesheet" href="/static/actions.css?v=20261103-1">
     <link rel="stylesheet" href="/static/data-center.css?v=20261101-1">
+    <link rel="stylesheet" href="/static/save-status.css?v=20261105-1">
+    <link rel="stylesheet" href="/static/todo-drafts.css?v=20261108-1">
     <link rel="stylesheet" href="/static/layout.css?v=20260922-1">
   </head>
   <body>
@@ -522,7 +524,7 @@
                     <textarea id="memo-content" maxlength="100000" spellcheck="true" aria-label="备忘录正文" placeholder="从一句话开始，不必急着写完整…&#10;&#10;输入 - [ ] 可以创建可勾选的清单。"></textarea>
                     <div id="memo-preview" class="memo-preview hidden"></div>
                   </div>
-                  <footer class="memo-editor-footer"><div class="memo-properties"><label>文件夹<select id="memo-folder-select"><option value="">备忘录</option></select></label><label>标签<input id="memo-tags" maxlength="1200" placeholder="用逗号分隔"></label><fieldset><legend>颜色</legend><div class="memo-color-picker"><button class="active default" type="button" data-memo-color="default" aria-label="默认"></button><button class="yellow" type="button" data-memo-color="yellow" aria-label="黄色"></button><button class="orange" type="button" data-memo-color="orange" aria-label="橙色"></button><button class="rose" type="button" data-memo-color="rose" aria-label="玫红"></button><button class="violet" type="button" data-memo-color="violet" aria-label="紫色"></button><button class="blue" type="button" data-memo-color="blue" aria-label="蓝色"></button><button class="mint" type="button" data-memo-color="mint" aria-label="薄荷绿"></button></div></fieldset></div><div class="memo-save-meta"><span id="memo-word-count">0 字</span><span id="memo-save-state"><i></i>所有更改已保存</span></div></footer>
+                  <footer class="memo-editor-footer"><div class="memo-properties"><label>文件夹<select id="memo-folder-select"><option value="">备忘录</option></select></label><label>标签<input id="memo-tags" maxlength="1200" placeholder="用逗号分隔"></label><fieldset><legend>颜色</legend><div class="memo-color-picker"><button class="active default" type="button" data-memo-color="default" aria-label="默认"></button><button class="yellow" type="button" data-memo-color="yellow" aria-label="黄色"></button><button class="orange" type="button" data-memo-color="orange" aria-label="橙色"></button><button class="rose" type="button" data-memo-color="rose" aria-label="玫红"></button><button class="violet" type="button" data-memo-color="violet" aria-label="紫色"></button><button class="blue" type="button" data-memo-color="blue" aria-label="蓝色"></button><button class="mint" type="button" data-memo-color="mint" aria-label="薄荷绿"></button></div></fieldset></div><div class="memo-save-meta"><span id="memo-word-count">0 字</span><span id="memo-save-state"><i></i>服务端内容已载入</span><span id="memo-save-proof" hidden></span></div></footer>
                 </div>
               </article>
             </div>
@@ -958,7 +960,9 @@
       <footer><div><label class="ld-setting"><input id="ld-enabled" type="checkbox" checked>在此设备保留心情与复盘草稿</label><p id="ld-health" role="status">恢复后请手动点击保存。</p><p>文字以明文留在此浏览器 / App，不跨设备同步。退出账号后仍保留；共用设备请在离开前清理。</p></div><button id="ld-clear" class="quiet" type="button">清理本账号长文草稿</button></footer>
     </dialog>
     <script src="/static/product-shell.js?v=20261027-nav" defer></script>
-    <script src="/static/http-client.js?v=20261103-1&planning=2" defer></script>
+    <script src="/static/http-client.js?v=20261105-1" defer></script>
+    <script src="/static/save-status-core.js?v=20261105-1" defer></script>
+    <script src="/static/save-status.js?v=20261105-1" defer></script>
     <script src="/static/actions-core.js?v=20261103-1" defer></script>
     <script src="/static/actions.js?v=20261103-1" defer></script>
     <script src="/static/read-cache-core.js?v=20261103-1" defer></script>
@@ -973,12 +977,14 @@
     <script src="/static/data-center.js?v=20261103-http" defer></script>
     <script src="/static/navigation-core.js?v=20261027-1" defer></script>
     <script src="/static/navigation.js?v=20261027-1" defer></script>
-    <script src="/static/draft-store.js?v=20261102-1" defer></script>
+    <script src="/static/draft-store.js?v=20261108-1" defer></script>
     <script src="/static/record-drafts-core.js?v=20261102-1" defer></script>
     <script src="/static/record-drafts.js?v=20261102-1" defer></script>
     <script src="/static/todo-editor-core.js?v=20261105-1" defer></script>
-    <script src="/static/todo-editor.js?v=20261105-1" defer></script>
-    <script src="/static/app.js?v=20261103-session&actions=20261103&offline=1&planning=2&outbox=3&todos=20261105" defer></script>
+    <script src="/static/todo-drafts-core.js?v=20261108-1" defer></script>
+    <script src="/static/todo-drafts.js?v=20261108-1" defer></script>
+    <script src="/static/todo-editor.js?v=20261108-1&save=20261105" defer></script>
+    <script src="/static/app.js?v=20261103-session&actions=20261103&offline=1&planning=2&outbox=3&todos=20261105&save=20261105" defer></script>
     <script src="/static/gentle-reminders-core.js?v=20261022-1" defer></script>
     <script src="/static/important-days-core.js?v=20261022-1" defer></script>
     <script src="/static/important-days.js?v=20261022-1" defer></script>
@@ -1012,7 +1018,7 @@
     <script src="/static/weather.js?v=20261009-1" defer></script>
     <script src="/static/holiday.js?v=20261009-1" defer></script>
     <script src="/static/calendar-editor-core.js?v=20261105-2" defer></script>
-    <script src="/static/calendar-editor.js?v=20261105-2" defer></script>
+    <script src="/static/calendar-editor.js?v=20261105-2&save=20261105" defer></script>
     <script src="/static/calendar.js?v=20261020-care-1&actions=20261103&planning=2&editing=20261105" defer></script>
     <script src="/static/commands.js?v=20260925-daynest" defer></script>
     <script src="/static/content-search.js?v=20261020-1" defer></script>
@@ -1022,7 +1028,7 @@
     <script src="/static/text-clips.js?v=20261029-1" defer></script>
     <script src="/static/memo-drafts-core.js?v=20261102-2" defer></script>
     <script src="/static/memo-drafts.js?v=20261102-1" defer></script>
-    <script src="/static/memos.js?v=20261103-http&actions=20261103&offline=1" defer></script>
+    <script src="/static/memos.js?v=20261103-http&actions=20261103&offline=1&save=20261105" defer></script>
     <script src="/static/english.js?v=20261007-2" defer></script>
     <script src="/static/english-reading.js?v=20260915-1" defer></script>
     <script src="/static/explore.js?v=20260920-playrooms" defer></script>
