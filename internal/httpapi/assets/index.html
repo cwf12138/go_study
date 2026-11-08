@@ -67,7 +67,7 @@
     <link rel="stylesheet" href="/static/actions.css?v=20261103-1">
     <link rel="stylesheet" href="/static/data-center.css?v=20261101-1">
     <link rel="stylesheet" href="/static/save-status.css?v=20261105-1">
-    <link rel="stylesheet" href="/static/todo-drafts.css?v=20261108-1">
+    <link rel="stylesheet" href="/static/todo-drafts.css?v=20261109-1">
     <link rel="stylesheet" href="/static/layout.css?v=20260922-1">
   </head>
   <body>
@@ -457,7 +457,7 @@
             <dialog id="calendar-event-dialog" class="calendar-event-dialog" aria-labelledby="calendar-dialog-title">
               <header class="calendar-dialog-head"><div><p class="eyebrow">A LITTLE ROOM FOR YOUR DAY</p><h3 id="calendar-dialog-title">新建日程</h3></div><button id="calendar-dialog-close" class="icon-button" type="button" aria-label="关闭日程编辑">×</button></header>
               <div class="calendar-editor-body">
-                <div id="calendar-command-list" hidden></div><p id="calendar-editor-status" role="status" aria-live="polite"></p>
+                <div id="calendar-command-list" hidden></div><p id="calendar-editor-status" role="status" aria-live="polite"></p><p id="calendar-draft-status" role="status"></p>
                 <p id="calendar-editor-scope" class="calendar-editor-scope"></p>
                 <form id="calendar-event-form"><fieldset id="calendar-event-fields">
                   <input id="calendar-event-id" type="hidden">
@@ -977,12 +977,13 @@
     <script src="/static/data-center.js?v=20261103-http" defer></script>
     <script src="/static/navigation-core.js?v=20261027-1" defer></script>
     <script src="/static/navigation.js?v=20261027-1" defer></script>
-    <script src="/static/draft-store.js?v=20261108-1" defer></script>
+    <script src="/static/draft-store.js?v=20261109-1" defer></script>
     <script src="/static/record-drafts-core.js?v=20261102-1" defer></script>
     <script src="/static/record-drafts.js?v=20261102-1" defer></script>
     <script src="/static/todo-editor-core.js?v=20261105-1" defer></script>
     <script src="/static/todo-drafts-core.js?v=20261108-1" defer></script>
-    <script src="/static/todo-drafts.js?v=20261108-1" defer></script>
+    <script src="/static/editor-drafts.js?v=20261109-1" defer></script>
+    <script src="/static/todo-drafts.js?v=20261109-1" defer></script>
     <script src="/static/todo-editor.js?v=20261108-1&save=20261105" defer></script>
     <script src="/static/app.js?v=20261103-session&actions=20261103&offline=1&planning=2&outbox=3&todos=20261105&save=20261105" defer></script>
     <script src="/static/gentle-reminders-core.js?v=20261022-1" defer></script>
@@ -1018,7 +1019,9 @@
     <script src="/static/weather.js?v=20261009-1" defer></script>
     <script src="/static/holiday.js?v=20261009-1" defer></script>
     <script src="/static/calendar-editor-core.js?v=20261105-2" defer></script>
-    <script src="/static/calendar-editor.js?v=20261105-2&save=20261105" defer></script>
+    <script src="/static/calendar-drafts-core.js?v=20261109-1" defer></script>
+    <script src="/static/calendar-drafts.js?v=20261109-1" defer></script>
+    <script src="/static/calendar-editor.js?v=20261109-1&save=20261105" defer></script>
     <script src="/static/calendar.js?v=20261020-care-1&actions=20261103&planning=2&editing=20261105" defer></script>
     <script src="/static/commands.js?v=20260925-daynest" defer></script>
     <script src="/static/content-search.js?v=20261020-1" defer></script>

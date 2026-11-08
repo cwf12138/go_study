@@ -147,7 +147,7 @@
   outline:3px solid #76a6b5;
   outline-offset:2px
 }
-#td-restore {
+.td-actions button:first-child {
   background:#386e5b;
   color:#fff;
   border-color:#386e5b

@@ -1,0 +1,82 @@
+// Real Go + Edge with isolated accounts and snapshots. No production data/device.
+const fs=require('node:fs'),path=require('node:path'),net=require('node:net'),crypto=require('node:crypto'),assert=require('node:assert/strict'),{spawn}=require('node:child_process');
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright'),root=path.resolve(__dirname,'..'),out=path.join(root,'.local/checks');fs.mkdirSync(out,{recursive:true});
+let api,browser,page,release;const report={schema_version:1,started_at:new Date().toISOString(),fixtures_only:true,production_changed:false,apk_built:false,device_verified:false,checks:[]},pass=name=>{report.checks.push({name,passed:true});console.log('PASS '+name);};
+(async()=>{
+ const reserve=net.createServer();await new Promise(r=>reserve.listen(0,'127.0.0.1',r));const port=reserve.address().port;await new Promise(r=>reserve.close(r));const origin='http://127.0.0.1:'+port,dir=fs.mkdtempSync(path.join(root,'.local/calendar-editor-'));
+ api=spawn(path.resolve(process.env.DAYNEST_TEST_API||path.join(root,'.local/calendar-edit-api.exe')),[],{cwd:root,windowsHide:true,env:{...process.env,HTTP_ADDR:'127.0.0.1:'+port,JWT_SECRET:crypto.randomBytes(32).toString('hex'),DATA_FILE:path.join(dir,'fixture.json'),FRONTEND_DIR:path.join(root,'internal/httpapi/assets')},stdio:'ignore'});
+ let ready=false;for(let i=0;i<100;i++){try{if((await fetch(origin+'/healthz')).ok){ready=true;break;}}catch{}await new Promise(r=>setTimeout(r,100));}assert(ready);
+ async function json(route,token,method='GET',body,headers={}){const r=await fetch(origin+route,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...headers},...(body?{body:JSON.stringify(body)}:{})});const value=r.status===204?{}:await r.json();assert(r.ok,JSON.stringify(value));return value.data;}
+ const a=await json('/api/v1/auth/register','','POST',{name:'日程 A',email:'calendar-editor-a@example.test',password:'fixture-password-123'}),b=await json('/api/v1/auth/register','','POST',{name:'日程 B',email:'calendar-editor-b@example.test',password:'fixture-password-123'});
+ const C=require('../internal/httpapi/assets/calendar-editor-core.js'),today=C.day(new Date().toISOString()),next=C.shift(today,1),later=C.shift(today,2),last=C.shift(today,3),pathOf=id=>'/api/v1/calendar/events/'+id,get=id=>json(pathOf(id),a.token);
+ const timed=await json('/api/v1/calendar/events',a.token,'POST',{title:'日程精度测试',description:'原始说明',category:'个人安排',color:'#557766',start_at:today+'T09:00:00.123456789+08:00',end_at:today+'T10:00:00.123456789+08:00',repeat_rule:'weekly',repeat_until:C.shift(today,30)+'T23:59:59.987654321+08:00',reminder_minutes:15});
+ const night=await json('/api/v1/calendar/events',a.token,'POST',{title:'跨夜日程',start_at:today+'T23:00:00+08:00',end_at:next+'T01:00:00+08:00',category:'生活',color:'#556677'});
+ const errors=[];browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_EXECUTABLE});const context=await browser.newContext({viewport:{width:1440,height:1050},timezoneId:'Asia/Shanghai'});context.on('page',p=>{p.on('pageerror',e=>errors.push(e.message));p.on('dialog',d=>d.accept());});
+ await context.addInitScript(token=>{if(window!==top||!location.href.startsWith('http://'))return;try{if(!localStorage.getItem('studyflow.token'))localStorage.setItem('studyflow.token',token);}catch{}},a.token);
+ page=await context.newPage();await page.goto(origin+'/#calendar');await page.waitForFunction(()=>!!window.DaynestAccount?.current?.());await page.locator(`[data-calendar-event="${timed.id}"]`).first().waitFor();
+ const open=async(p,id)=>{await p.evaluate(id=>DaynestCalendarEvents.open(id),id);await p.waitForFunction(()=>!document.getElementById('calendar-event-form').hidden);},close=async p=>{await p.click('#calendar-dialog-close');await p.waitForFunction(()=>!document.getElementById('calendar-event-dialog').open);};
+ async function preview() {
+   await page.click('#calendar-drafts-open');
+   await page.locator('#cd-list button').first().click();
+   await page.waitForFunction(()=>!document.getElementById('cd-restore').disabled);
+ }
+ async function restore() {
+   await page.click('#cd-restore');
+   await page.waitForFunction(()=>document.getElementById('calendar-event-dialog').open&&!document.getElementById('calendar-editor-review').hidden);
+ }
+ await open(page,timed.id);
+ await page.fill('#calendar-event-description','刷新后找回的说明');
+ await page.fill('#calendar-event-location','图书馆');
+ await page.reload();await page.waitForFunction(()=>!!window.DaynestAccount?.current?.());
+ await preview();
+ assert((await page.inputValue('#cd-local')).includes('刷新后找回的说明'));
+ await restore();
+ assert.equal(await page.inputValue('#calendar-event-description'),'刷新后找回的说明');
+ assert.equal(await page.inputValue('#calendar-event-location'),'图书馆');
+ assert(await page.isDisabled('#calendar-event-save'));
+ pass('refresh_restores_event_fields_and_requires_explicit_comparison');
+ await page.click('#calendar-event-keep-local');
+ await page.click('#calendar-event-save');
+ await page.waitForFunction(()=>document.getElementById('calendar-editor-status').textContent.startsWith('已提交服务'));
+ const saved=await get(timed.id);
+ assert.equal(saved.start_at,timed.start_at);assert.equal(saved.end_at,timed.end_at);assert.equal(saved.repeat_until,timed.repeat_until);
+ assert.equal(saved.description,'刷新后找回的说明');
+ await close(page);
+ pass('manual_save_preserves_precise_times_and_repeat_until');
+ await open(page,night.id);await page.check('#calendar-event-all-day');
+ await page.fill('#calendar-event-end',later);await page.fill('#calendar-event-description','全天草稿');
+ await page.reload();await page.waitForFunction(()=>!!window.DaynestAccount?.current?.());
+ await preview();await restore();
+ assert(await page.isChecked('#calendar-event-all-day'));assert.equal(await page.inputValue('#calendar-event-end'),later);
+ assert.equal(await page.getAttribute('#calendar-event-start','type'),'date');
+ await page.click('#calendar-event-keep-local');await page.click('#calendar-event-save');
+ await page.waitForFunction(()=>document.getElementById('calendar-editor-status').textContent.startsWith('已提交服务'));
+ assert.equal((await get(night.id)).end_at,C.iso(C.shift(later,1),true));await close(page);
+ pass('all_day_recovery_keeps_inclusive_end_date');
+ await open(page,timed.id);await page.fill('#calendar-event-description','本机的新修改');
+ await page.reload();await page.waitForFunction(()=>!!window.DaynestAccount?.current?.());
+ const remote=await get(timed.id);
+ await json(pathOf(timed.id),a.token,'PATCH',Object.fromEntries(['title','description','location','category','color','start_at','end_at','all_day','repeat_rule','repeat_until','reminder_minutes'].map(key=>[key,key==='description'?'其他窗口修改':remote[key]??null])),C.headers(remote));
+ await preview();assert((await page.inputValue('#cd-remote')).includes('其他窗口修改'));
+ await restore();assert.equal(await page.inputValue('#calendar-event-description'),'本机的新修改');
+ assert((await page.textContent('#calendar-event-remote')).includes('其他窗口修改'));assert(await page.isDisabled('#calendar-event-save'));await close(page);
+ pass('remote_changes_are_compared_before_restored_edits_can_save');
+ await open(page,timed.id);
+ await page.evaluate(()=>{window.__originalSet=Storage.prototype.setItem;Storage.prototype.setItem=function(key,value){if(key.startsWith('daynest.calendar-draft.v1:'))throw Error('fixture quota');return window.__originalSet.call(this,key,value);};});
+ await page.fill('#calendar-event-description','存储失败仍保留在编辑器');
+ assert((await page.textContent('#calendar-draft-status')).includes('未能保存'));assert(await page.isEnabled('#calendar-event-export'));
+ await page.evaluate(()=>Storage.prototype.setItem=window.__originalSet);await close(page);
+ pass('storage_failure_retains_editable_and_exportable_text');
+ await page.setViewportSize({width:390,height:844});await page.evaluate(()=>document.documentElement.dataset.theme='dark');await preview();
+ assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:path.join(out,'calendar-drafts-mobile.png')});
+ pass('calendar_draft_preview_fits_mobile_dark_layout');
+ await json(pathOf(timed.id),a.token,'DELETE');await page.locator('#cd-list button').first().click();
+ await page.waitForFunction(()=>document.getElementById('cd-status').textContent.includes('原日程已删除'));
+ assert(await page.isDisabled('#cd-restore'));assert(await page.isEnabled('#cd-export'));
+ pass('deleted_event_keeps_exportable_draft_and_blocks_restore');
+ await page.evaluate(token=>{localStorage.setItem('studyflow.token',token);dispatchEvent(new StorageEvent('storage',{key:'studyflow.token'}));},b.token);
+ await page.waitForFunction(id=>window.DaynestAccount?.current?.()?.userID===id,b.user.id);
+ await page.click('#calendar-drafts-open');assert.equal(await page.locator('#cd-list button').count(),0);assert.equal(await page.inputValue('#cd-local'),'');
+ pass('account_change_clears_preview_and_isolates_drafts');
+ assert.deepEqual(errors,[]);report.passed=true;
+})().catch(async error=>{report.passed=false;report.failure=error.message;console.error(error);process.exitCode=1;if(page)await page.screenshot({path:path.join(out,'calendar-drafts-failure.png'),fullPage:true}).catch(()=>{});}).finally(async()=>{release?.();if(browser)await browser.close();if(api){api.kill();await Promise.race([new Promise(r=>api.once('exit',r)),new Promise(r=>setTimeout(r,2000))]);}report.finished_at=new Date().toISOString();fs.writeFileSync(path.join(out,'calendar-drafts-browser-report.json'),JSON.stringify(report,null,2)+'\n');console.log('Report: .local/checks/calendar-drafts-browser-report.json. Fixture data only; no APK/device.');});

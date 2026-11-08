@@ -23,7 +23,7 @@
     if (!C.valid(event, context.userID) || id && event.id !== id) { const error = Error('日程响应与原记录不一致，请先核对结果。'); error.uncertain = uncertain; throw error; }
     return event;
   }
-  async function read(id, context, signal) {
+  async function read(id, context = H.capture(), signal) {
     const response = await H.json('/api/v1/calendar/events/' + encodeURIComponent(id), { context, signal, envelope: true });
     if (response.meta?.write_contract !== 'calendar-if-match-v1') throw Error('当前服务不支持日程版本校验，请重启新版 Go 服务。');
     return contract(response.data, context, id);
@@ -34,7 +34,13 @@
       all_day: $('calendar-event-all-day').checked, repeat_rule: $('calendar-event-repeat').value, repeat_until: $('calendar-event-repeat-until').value,
       reminder_minutes: Number($('calendar-event-reminder').value) };
   }
+  function captureDraft() {
+    if (editor?.base && editor.dirty && !editor.command && current()) {
+      window.DaynestCalendarDrafts?.capture(editor.base, { ...value(), timed: editor.timed ? { ...editor.timed } : null });
+    }
+  }
   function render() {
+    captureDraft();
     let proof = $("calendar-save-proof"); if (!proof) { proof = document.createElement("span"); proof.id = "calendar-save-proof"; $("calendar-editor-status").after(proof); }
     window.DaynestSaveStatus?.bind(proof, "calendar/events", editor?.base?.id);
     $('calendar-dialog-close').disabled = busy;
@@ -66,25 +72,28 @@
     node.value = value;
   }
   function fill(event) {
-    const v = C.editable(event); editor.mode = v.all_day;
+    applyFields(C.editable(event));
+  }
+  function applyFields(v) {
+    editor.mode = v.all_day;
     $('calendar-event-all-day').checked = v.all_day;
     $('calendar-event-start').type = $('calendar-event-end').type = v.all_day ? 'date' : 'datetime-local';
     for (const field of ['title', 'description', 'location', 'color', 'start', 'end']) $('calendar-event-' + field).value = v[field];
     option('calendar-event-category', v.category); option('calendar-event-reminder', v.reminder_minutes, v.reminder_minutes ? `提前 ${v.reminder_minutes} 分钟` : '不提醒');
     $('calendar-event-repeat').value = v.repeat_rule; $('calendar-event-repeat-until').value = v.repeat_until;
     $('calendar-event-id').value = editor.base?.id || '';
-    editor.timed = v.all_day ? null : { start: v.start, end: v.end }; editor.dirty = false; editor.sequence++; render();
+    editor.timed = v.all_day ? v.timed || null : { start: v.start, end: v.end }; editor.dirty = false; editor.sequence++; render();
   }
   function clear() {
     generation++; controller?.abort(); controller = null; owner = null; editor = null; busy = false;
     form.reset(); form.querySelectorAll('option[data-calendar-custom]').forEach(option=>option.remove()); $('calendar-event-id').value = ''; $('calendar-event-fields').disabled = false; $('calendar-dialog-close').disabled = false; $('calendar-event-cancel').disabled = false;
     $('calendar-command-list').replaceChildren(); $('calendar-command-list').hidden = true;
-    $('calendar-event-remote').textContent = ''; $('calendar-editor-status').textContent = ''; $('calendar-editor-scope').textContent = '';
+    $('calendar-event-remote').textContent = ''; $('calendar-editor-status').textContent = ''; $('calendar-draft-status').textContent = ''; $('calendar-editor-scope').textContent = '';
     if (dialog.open) dialog.close();
   }
   function close() {
     if (busy) return;
-    if (editor?.dirty && !confirm('当前日程修改尚未保存。可取消后先导出，确定放弃这些修改并关闭？')) return;
+    if (editor?.dirty && !confirm('当前日程修改尚未提交。请确认本机草稿已保留或已导出，确定关闭？')) return;
     const focus = returnFocus; clear(); refreshBadge(); (focus?.isConnected?focus:$('calendar-create'))?.focus?.();
   }
   function begin(title) {
@@ -115,12 +124,14 @@
   async function open(id = '', selected = C.day(new Date().toISOString())) {
     if (!id) { try { if (store(H.capture()).read().some(row=>!row.confirmed||row.missing)) { recovery(); return; } } catch (error) { notify(error.message, true); return; } }
     const turn = begin(id ? '编辑日程' : '留一段时间给它'); if (turn === null) return;
+    window.DaynestCalendarDrafts?.begin();
     const context = owner; controller = new AbortController(); status(id ? '正在读取日程原文与版本…' : '先安排时间，再从容准备。');
     try {
       const event = id ? await read(id, context, controller.signal) : { title: '', description: '', location: '', category: '生活', color: '#5b81ff', start_at: C.iso(C.date(selected) + 'T09:00'), end_at: C.iso(selected + 'T10:00'), all_day: false, repeat_rule: 'none', reminder_minutes: 0 };
       if (turn !== generation || !current()) return;
       editor = { base: id ? event : null, command: null, remote: null, review: false, missing: false, deleted: false, loading: false, dirty: false, sequence: 0 };
       form.hidden = false; fill(event); status(id ? '保存时核对读取的完整版本；未改动的时间保留原有精度。' : '新建前会在本机保留原提交，结果不明时可核对，避免重复创建。'); $('calendar-event-title').focus();
+      return true;
     } catch (error) { if (turn === generation && current()) status(error.message); }
     finally { if (turn === generation) controller = null; }
   }
@@ -154,7 +165,11 @@
         const result = contract(await H.json('/api/v1/calendar/events/' + e.base.id, { method: 'PATCH', body: { ...body, clear_repeat_until: !body.repeat_until }, headers: C.headers(e.base), context, signal: controller.signal, validate(value) { contract(value, context, e.base.id, true); if(C.version(value) === C.version(e.base)) throw Error(); } }), context, e.base.id, true);
         if (turn !== generation || !current()) return;
         if (C.version(result) === C.version(e.base)) { const error = Error('保存响应未提供新版本，请核对结果。'); error.uncertain = true; throw error; }
-        e.base = result; if (sequence === e.sequence) fill(result); else e.dirty = true;
+        e.base = result;
+        if (sequence === e.sequence) {
+          fill(result);
+          window.DaynestCalendarDrafts?.capture(result, { ...value(), timed: editor.timed }, true);
+        } else e.dirty = true;
         status(e.dirty ? '上一版已提交，继续输入的修改仍在，请再次保存。' : '已提交服务，当前日程修改已保存。'); changed();
       }
     } catch (error) {
@@ -205,7 +220,7 @@
     finally { if (turn === generation) { busy = false; controller = null; render(); } }
   }
   form.addEventListener('submit', save);
-  const touch = () => { if (editor) { editor.dirty = true; editor.sequence++; } };
+  const touch = () => { if (editor) { editor.dirty = true; editor.sequence++; captureDraft(); } };
   form.addEventListener('input', touch); form.addEventListener('change', () => { touch(); render(); });
   $('calendar-event-all-day').addEventListener('change', () => {
     if (!editor) return; const v = value(), start = v.start, end = v.end;
@@ -251,6 +266,20 @@
     if ((!event.key || event.key === 'studyflow.token') && owner && !current()) clear();
     if (!event.key || event.key === 'studyflow.token' || event.key.startsWith(C.PREFIX)) refreshBadge();
     if (event.key === C.PREFIX + 'changed') try { const v = JSON.parse(event.newValue), context = H.capture(); if (v.server === context.server && v.userID === context.userID) changed(false); } catch (_) {}
+  });
+  window.DaynestCalendarDrafts?.connect({
+    read, notice: text => { $('calendar-draft-status').textContent = text; },
+    async restore(record) {
+      const context = H.capture();
+      if (record.base.user_id !== context.userID || !await open(record.base.id) || !current() || !H.current(context)) return false;
+      const remote = editor.base;
+      editor.base = record.base;
+      applyFields({ ...record.value, timed: record.value.timed ? { ...record.value.timed } : null });
+      editor.remote = remote; editor.review = true; editor.dirty = true;
+      $('calendar-event-remote').textContent = C.describe(remote);
+      render(); status('草稿已恢复，请对照服务端版本，再选择保留当前字段或采用服务端内容。');
+      return true;
+    }
   });
   window.DaynestCalendarEvents = { open, recovery };
   refreshBadge();

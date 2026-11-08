@@ -5,7 +5,7 @@
   else root.DaynestDraftStore = api;
 })(typeof window === "undefined" ? globalThis : window, function () {
   "use strict";
-  const prefixes = ["daynest.memo-draft.v1:", "daynest.record-draft.v1:", "daynest.todo-draft.v1:"];
+  const prefixes = ["daynest.memo-draft.v1:", "daynest.record-draft.v1:", "daynest.todo-draft.v1:", "daynest.calendar-draft.v1:"];
   function scope(server, user) {
     try {
       const url = new URL(server);
