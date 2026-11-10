@@ -16,10 +16,11 @@ class Response {
   constructor(body, options = {}) { this.body = body; this.status = options.status || 200; this.ok = this.status >= 200 && this.status < 300; }
   async json() { return JSON.parse(this.body); }
 }
-function harness(saved, existingToken = '') {
+function harness(saved, existingToken = '', defaultServer = '', primaryMarker) {
   const nodes = new Map(), events = {}, appEvents = {}, requests = [], files = [], scripts = [], store = new Map();
   if (saved !== undefined) store.set(key, saved);
   if (existingToken) store.set('studyflow.token', existingToken);
+  if (primaryMarker) store.set('daynest.mobile.primary-server.v1', primaryMarker);
   let reloads = 0, minimized = 0, backs = 0, answer, failStorage = false, confirm = true, scriptFailure = false;
   class Node {
     constructor(tag = 'div') { this.tagName = tag.toUpperCase(); this.events = {}; this.dataset = {}; this.value = ''; this.checked = false; this.open = false; this.hidden = false; this.disabled = false; this.textContent = ''; this.classList = { add() {} }; }
@@ -50,7 +51,7 @@ function harness(saved, existingToken = '') {
     localStorage: { getItem: k => store.get(k) || null, setItem(k, value) { if (failStorage) throw Error('存储空间不足'); store.set(k, value); }, removeItem: k => store.delete(k) },
     history: { replaceState() {}, back() { backs++; } }, MutationObserver: class { observe() {} }
   });
-  vm.runInContext(core, ctx); vm.runInContext(client, ctx); window.testBoot({ Http, Files, App });
+  vm.runInContext(core, ctx); vm.runInContext(client, ctx); window.testBoot({ Http, Files, App, defaultServer });
   return { nodes, store, requests, files, scripts, appEvents,
     init: async () => { for (const handler of events.DOMContentLoaded) await handler(); await settle(); },
     submit: () => nodes.get('mobile-form').fire('submit'),
@@ -60,6 +61,22 @@ function harness(saved, existingToken = '') {
   };
 }
 (async () => {
+  const cloudOrigin = 'https://111.230.184.144';
+  const cloud = harness(undefined, 'unassigned-token', cloudOrigin); await cloud.init();
+  assert.equal(cloud.scripts.length, 2); assert(!cloud.nodes.get('mobile-connection').open);
+  assert.equal(cloud.store.get('studyflow.token'), undefined);
+  assert.equal(JSON.parse(cloud.store.get(key)).server, cloudOrigin);
+  assert(cloud.requests.every(request => request.url.startsWith(cloudOrigin + '/')));
+  const migrated = harness(JSON.stringify({server:origin,httpAcknowledged:true}), 'old-local-server-token', cloudOrigin);
+  migrated.store.set('keep-local-draft', 'original writing'); await migrated.init();
+  assert.equal(migrated.store.get('studyflow.token'), undefined);
+  assert.equal(migrated.store.get('keep-local-draft'), 'original writing');
+  assert.equal(JSON.parse(migrated.store.get(key)).server, cloudOrigin);
+  const cloudRestore = harness(JSON.stringify({server:cloudOrigin,httpAcknowledged:false}), 'cloud-session', cloudOrigin); await cloudRestore.init();
+  assert.equal(cloudRestore.store.get('studyflow.token'), 'cloud-session');
+  const chosenServer = harness(JSON.stringify({server:origin,httpAcknowledged:true}), 'chosen-session', cloudOrigin, cloudOrigin); await chosenServer.init();
+  assert.equal(chosenServer.store.get('studyflow.token'), 'chosen-session');
+  assert.equal(chosenServer.files.find(call=>call[0]==='configure')[1].server, origin);
   const h = harness('{bad JSON', 'orphaned-token'); await h.init();
   assert(h.nodes.get('mobile-connection').open); assert.equal(h.scripts.length, 0); assert.match(h.nodes.get('mobile-state').textContent, /已忽略/);
   h.appEvents.backButton({ canGoBack: false }); assert.equal(h.minimized, 1, 'setup screen can leave app via Android back');

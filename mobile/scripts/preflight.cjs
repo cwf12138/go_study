@@ -1,5 +1,14 @@
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{spawnSync}=require('node:child_process');
-function inspect({root=path.resolve(__dirname,'..'),sdk=process.env.ANDROID_SDK_ROOT||process.env.ANDROID_HOME||(process.platform==='win32'?path.join(process.env.LOCALAPPDATA||os.homedir(),'Android','Sdk'):''),nodeVersion=process.versions.node,javaVersion}={}){
+function configuredSDK(root){
+ const properties=path.join(root,'android/local.properties');
+ if(fs.existsSync(properties)){
+  const value=fs.readFileSync(properties,'utf8').match(/^\s*sdk\.dir\s*=\s*(.+)\s*$/m)?.[1];
+  if(value)return value.trim().replace(/\\([\\:= ])/g,'$1');
+ }
+ return process.env.ANDROID_SDK_ROOT||process.env.ANDROID_HOME||(process.platform==='win32'?path.join(process.env.LOCALAPPDATA||os.homedir(),'Android','Sdk'):'');
+}
+function inspect({root=path.resolve(__dirname,'..'),sdk,nodeVersion=process.versions.node,javaVersion}={}){
+ sdk=sdk??configuredSDK(root);
  let javaProbeError=null;
  if(javaVersion===undefined){const executable=process.env.JAVA_HOME?path.join(process.env.JAVA_HOME,'bin',process.platform==='win32'?'java.exe':'java'):'java';const result=spawnSync(executable,['-version'],{encoding:'utf8',timeout:10000,windowsHide:true});javaVersion=result.error?'':String(result.stdout||'')+String(result.stderr||'');if(result.error)javaProbeError=result.error.code==='EPERM'?'permission_denied':result.error.code==='ENOENT'?'not_found':'probe_failed';}
  const match=String(javaVersion).match(/(?:version\s+"?|openjdk\s+)(\d+)/),javaMajor=match?Number(match[1]):null;

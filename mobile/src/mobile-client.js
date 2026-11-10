@@ -1,6 +1,7 @@
-export function boot({ Http, App, Files }) {
+export function boot({ Http, App, Files, defaultServer = '' }) {
   const C = window.DaynestMobileCore, originalFetch = window.fetch.bind(window);
   const configKey = 'daynest.mobile.connection.v1';
+  const primaryKey = 'daynest.mobile.primary-server.v1', primaryServer = defaultServer ? C.server(defaultServer) : '';
   let connection = null, loaded = false, loading = false, busy = false, generation = 0, session = '', fileBusy = false, fatal = false;
   const dialogs = [], pending = new Set();
   const abortError = () => new DOMException('操作已取消；服务端结果仍需核对。', 'AbortError');
@@ -15,16 +16,16 @@ export function boot({ Http, App, Files }) {
     if (options.signal?.aborted) throw abortError();
     const headers = Object.fromEntries(new Headers(options.headers || {}));
     const response = await race(Http.request({ url: origin + path, method: options.method || 'GET', headers, data: options.body, connectTimeout: 8000, readTimeout: 25000, disableRedirects: true, responseType: 'text' }), options.signal);
-    if (response.status >= 300 && response.status < 400) throw Error('电脑服务返回重定向，请直接填写最终服务地址；不会自动转发登录令牌。');
+    if (response.status >= 300 && response.status < 400) throw Error('服务返回重定向，请填写最终服务地址；不会自动转发登录令牌。');
     if (response.url && new URL(response.url).origin !== origin) throw Error('服务地址改变，已拒绝展示跨地址响应。');
-    if (!Number.isInteger(response.status) || response.status < 200 || response.status > 599) throw Error('电脑服务没有返回有效 HTTP 状态。');
+    if (!Number.isInteger(response.status) || response.status < 200 || response.status > 599) throw Error('服务暂时无法响应，请稍后重试。');
     const body = response.status === 204 ? null : typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
     return new Response(body, { status: response.status, headers: response.headers || {} });
   }
   window.fetch = function(input, options = {}) {
     const url = new URL(typeof input === 'string' || input instanceof URL ? String(input) : input.url, window.location.href);
     if (!url.pathname.startsWith('/api/v1/')) return originalFetch(input, options);
-    if (!connection) return Promise.reject(Error('请先连接电脑上的 Daynest 服务。'));
+    if (!connection) return Promise.reject(Error('请先连接 Daynest 服务。'));
     if (url.origin !== location.origin && url.origin !== connection.server) return Promise.reject(Error('拒绝向未选择的服务器发送应用请求。'));
     const path = C.apiPath(url.pathname + url.search, location.origin), version = generation;
     if (path.startsWith('/api/v1/ai/')) return Promise.resolve(new Response(JSON.stringify({ error: { code: 'desktop_only', message: '此 AI 授权功能仅限电脑本机使用；手机版请使用本地推荐。' } }), { status: 403, headers: { 'Content-Type': 'application/json' } }));
@@ -85,21 +86,21 @@ export function boot({ Http, App, Files }) {
   document.addEventListener('DOMContentLoaded', async () => {
     document.body.classList.add('daynest-native');
     const setup = document.createElement('dialog'); setup.id = 'mobile-connection'; setup.className = 'mobile-connection'; setup.setAttribute('aria-labelledby', 'mobile-title');
-    setup.innerHTML = `<header><span class="mobile-mark" aria-hidden="true">D</span><button id="mobile-close" type="button" aria-label="关闭连接设置" hidden>×</button></header><p class="mobile-eyebrow">DAYNEST · ANDROID</p><h1 id="mobile-title">把日常，带在身边。</h1><p>连接电脑上的 Daynest，继续使用同一账号与记录。</p><form id="mobile-form"><label>电脑服务地址<input id="mobile-server" type="url" inputmode="url" placeholder="http://192.168.1.10:8080" maxlength="500" required autocomplete="off" spellcheck="false"></label><label class="mobile-consent"><input id="mobile-consent" type="checkbox"><span>若使用 HTTP，我确认只在可信 Wi-Fi 中连接；登录信息和记录不会加密传输。</span></label><button id="mobile-connect" type="submit">检查并连接</button></form><button id="mobile-offline" type="button" class="mobile-offline-button">离线资料与本机收集 ↗</button><p id="mobile-state" role="status" aria-live="polite"></p><details><summary>连接前请检查</summary><ol><li>手机和电脑位于同一可信局域网，电脑 Go 服务保持运行。</li><li>填写电脑局域网 IP，不是手机上的 localhost。</li><li>电脑需使用专用 JWT_SECRET；更换后已有网页需要重新登录，历史记录不变。</li><li>由你确认监听地址与防火墙端口，本 App 不会自动修改这些设置。</li></ol><p>主要数据仍依赖电脑服务；已保留的备忘录与安排可离线查看。新的简单待办可先在本机收集，联网后手动核验并提交；未确认的长文请从本机草稿核对。</p></details>`;
+    setup.innerHTML = `<header><span class="mobile-mark" aria-hidden="true">D</span><button id="mobile-close" type="button" aria-label="关闭连接设置" hidden>×</button></header><p class="mobile-eyebrow">DAYNEST · ANDROID</p><h1 id="mobile-title">把日常，带在身边。</h1><p>日程、待办与心情，随时回到你的日常。</p><form id="mobile-form"><details id="mobile-advanced"><summary>连接设置</summary><label>服务地址<input id="mobile-server" type="url" inputmode="url" placeholder="https://111.230.184.144" maxlength="500" required autocomplete="off" spellcheck="false"></label><label id="mobile-http-notice" class="mobile-consent"><input id="mobile-consent" type="checkbox"><span>使用局域网 HTTP 时，我确认只连接可信网络；登录信息和记录不会加密传输。</span></label><p>默认已配置个人云端服务，无需电脑保持开机。只有连接自己的其他服务时，才需要修改地址。</p></details><button id="mobile-connect" type="submit">重新连接</button></form><button id="mobile-offline" type="button" class="mobile-offline-button">离线资料与本机收集 ↗</button><p id="mobile-state" role="status" aria-live="polite"></p><p class="mobile-footnote">账号与记录保存在所连接的服务中。网络恢复后可继续使用，本机草稿会保留供你核对。</p>`;
     document.body.append(setup);
     const reader=document.createElement('dialog');reader.id='mobile-offline-reader';reader.className='mobile-offline-reader';reader.setAttribute('aria-label','离线资料与本机收集');
     reader.innerHTML='<button id="mobile-offline-close" type="button" aria-label="关闭离线资料与本机收集">‹ 返回应用</button><iframe id="mobile-offline-frame" title="离线资料与本机收集"></iframe>';
     document.body.append(reader);
 
     const $ = id => document.getElementById('mobile-' + id), state = text => { $('state').textContent = text; };
-    const bar = document.createElement('button'); bar.type = 'button'; bar.className = 'mobile-server-bar'; bar.textContent = '电脑连接 · 设置'; bar.hidden = true;
+    const bar = document.createElement('button'); bar.type = 'button'; bar.className = 'mobile-server-bar'; bar.textContent = '服务连接 · 设置'; bar.hidden = true;
     document.querySelector('.workspace').prepend(bar);
-    function controls() { $('connect').disabled = busy; $('connect').textContent = fatal ? '重载界面' : busy ? '正在检查…' : '检查并连接'; $('server').disabled = busy; $('consent').disabled = busy; $('close').hidden = !loaded || fatal; $('offline').disabled = !connection; }
+    function controls() { $('connect').disabled = busy; $('connect').textContent = fatal ? '重载界面' : busy ? '正在连接…' : '重新连接'; $('server').disabled = busy; $('consent').disabled = busy; $('close').hidden = !loaded || fatal; $('offline').disabled = !connection; $('http-notice').hidden = !$('server').value.startsWith('http:'); }
     function openSettings() { if (!setup.open) setup.showModal(); controls(); }
     window.DaynestMobile.openConnectionSettings=openSettings;
     window.DaynestMobile.getConnectionInfo=()=>({server:connection?.server||''});
     async function closeReader(){const guard=$('offline-frame').contentWindow?.DaynestLocalInbox;if(guard&&!(await guard.prepareClose()))return;reader.close();$('offline-frame').src='about:blank';}
-    window.DaynestMobile.openOfflineReader=section=>{if(!connection){state('请先选择并连接一次电脑，在原账号准备离线资料或本机收集。');return;}$('offline-frame').src='/static/offline-reader.html?server='+encodeURIComponent(connection.server)+(['todos','agenda','capture'].includes(section)?'#'+section:'');if(!reader.open)reader.showModal();};
+    window.DaynestMobile.openOfflineReader=section=>{if(!connection){state('请先登录一次，在原账号准备离线资料或本机收集。');return;}$('offline-frame').src='/static/offline-reader.html?server='+encodeURIComponent(connection.server)+(['todos','agenda','capture'].includes(section)?'#'+section:'');if(!reader.open)reader.showModal();};
     $('offline').addEventListener('click',window.DaynestMobile.openOfflineReader);
     $('offline-close').addEventListener('click',closeReader);
     reader.addEventListener('cancel',event=>{event.preventDefault();closeReader();});reader.addEventListener('close',()=>{const frame=$('offline-frame'),guard=frame.contentWindow?.DaynestLocalInbox;Promise.resolve(guard?.beforeDetach?.()).finally(()=>{if(!reader.open)frame.src='about:blank';});});
@@ -114,7 +115,7 @@ export function boot({ Http, App, Files }) {
           const src = placeholder.dataset.mobileSrc; if (!src.startsWith('/static/')) throw Error('安装包脚本路径无效');
           await new Promise((resolve, reject) => { const script = document.createElement('script'); script.src = src; script.onload = resolve; script.onerror = () => reject(Error('安装包资源不完整，请重载或重新打包。')); document.body.append(script); });
         }
-        loaded = true; bar.hidden = false; bar.textContent = '已连接电脑 · 连接设置';
+        loaded = true; bar.hidden = false; bar.dataset.connectionState = 'online'; bar.textContent = '已连接服务 · 连接设置';
         window.DaynestUI?.registerGuard?.('mobile-files', () => fileBusy || pending.size > 0);
         const transferIntro = document.querySelector('#ft-drop p'); if (transferIntro) transferIntro.textContent = '支持多选 · 当前 App 单文件最多 8 MiB，电脑网页为 32 MiB';
       } catch (error) { fatal = true; state(error.message); throw error; }
@@ -126,29 +127,37 @@ export function boot({ Http, App, Files }) {
       try {
         const origin = C.server($('server').value);
         if (origin.startsWith('http:') && !$('consent').checked) throw Error('请先确认 HTTP 的明文传输提示，或改用可信 HTTPS。');
-        state('正在检查电脑服务…');
+        state('正在安全连接你的 Daynest…');
         const response = await nativeRequest(origin, '/api/v1/mobile-info');
         const out = await response.json().catch(() => null);
-        if (!response.ok || !C.metadata(out?.data)) throw Error('电脑服务不兼容或地址不正确，请重启新版 Go 服务后再试。');
-        if (out.data.requires_secure_secret) throw Error('电脑仍使用公开开发密钥，请设置专用 JWT_SECRET 并重启 Go 服务，再连接手机。');
+        if (!response.ok || !C.metadata(out?.data)) throw Error('服务暂时不可用或版本不兼容，请稍后重试。');
+        if (out.data.requires_secure_secret) throw Error('服务仍使用公开开发密钥，请配置专用 JWT_SECRET 后再连接。');
         const changed = !connection || connection.server !== origin;
-        if (changed && pending.size) throw Error('请先完成或取消正在进行的文件操作，再切换电脑。');
-        if (loaded && changed && !window.confirm('切换电脑会重新登录，未保存内容可能丢失；原电脑上的记录不会删除。确定切换吗？')) return;
+        if (changed && pending.size) throw Error('请先完成或取消正在进行的文件操作，再切换服务。');
+        if (loaded && changed && !window.confirm('切换服务需要重新登录，请先保存当前编辑。原服务上的记录会保留。确定切换吗？')) return;
         if (changed) { localStorage.removeItem('studyflow.token'); credentialsChanged = true; localStorage.removeItem('studyflow.focus'); await Files.setSession({ token: '' }); }
         await Files.configure({ server: origin });
         const next = { server: origin, httpAcknowledged: $('consent').checked };
         localStorage.setItem(configKey, JSON.stringify(next));
+        if (primaryServer) localStorage.setItem(primaryKey, primaryServer);
         connection = next; generation++;
         if (loaded && changed) { history.replaceState(null, '', '/#dashboard'); location.reload(); return; }
-        state('电脑已连接，正在准备界面…'); await activate(); setup.close();
-      } catch (error) { if (credentialsChanged && loaded) fatal = true; state((error.message || '连接失败，请检查同一 Wi-Fi、IP、端口和电脑服务。') + (fatal ? ' 请点击按钮重载界面后重试。' : '')); }
+        state('已连接，正在准备你的日常…'); await activate(); setup.close();
+      } catch (error) { if (credentialsChanged && loaded) fatal = true; state((error.message || '暂时无法连接，请检查手机网络后重试。') + (fatal ? ' 请点击按钮重载界面后重试。' : '')); }
       finally { busy = false; controls(); }
     }
     $('form').addEventListener('submit', connect); bar.addEventListener('click', openSettings); $('close').addEventListener('click', () => setup.close());
     setup.addEventListener('cancel', event => { if (!loaded || busy || fatal) event.preventDefault(); });
-    $('server').addEventListener('input', () => { $('consent').checked = false; });
-    try { const saved = JSON.parse(localStorage.getItem(configKey) || 'null'); if (saved) { connection = { server: C.server(saved.server), httpAcknowledged: saved.httpAcknowledged === true }; $('server').value = connection.server; $('consent').checked = connection.httpAcknowledged; } } catch (_) { state('已忽略无效的本机连接设置，请重新输入电脑地址。'); }
-    openSettings(); if (connection) connect();
+    $('server').addEventListener('input', () => { $('consent').checked = false; controls(); });
+    try {
+      const saved = JSON.parse(localStorage.getItem(configKey) || 'null');
+      const adoptPrimary = primaryServer && localStorage.getItem(primaryKey) !== primaryServer;
+      if (saved && (!adoptPrimary || C.server(saved.server) === primaryServer)) {
+        connection = { server: C.server(saved.server), httpAcknowledged: saved.httpAcknowledged === true };
+        $('server').value = connection.server; $('consent').checked = connection.httpAcknowledged;
+      } else if (primaryServer) { $('server').value = primaryServer; }
+    } catch (_) { state('已忽略无效的本机连接设置，请重新选择服务。'); if (primaryServer) $('server').value = primaryServer; }
+    openSettings(); if (connection || primaryServer) connect();
 
     function syncSession() { const next = token(); if (next !== session) { session = next; for (const id of pending) Files.cancel({ id }).catch(() => {}); pending.clear(); Files.setSession({ token: next }).catch(() => {}); } }
     document.addEventListener('daynest:account-ready', syncSession);
@@ -170,8 +179,8 @@ export function boot({ Http, App, Files }) {
     await App.addListener('appStateChange', async ({ isActive }) => {
       if (!isActive) { window.dispatchEvent(new Event('daynest:mobile-pause')); return; }
       if (!loaded || !connection || busy || fatal) return;
-      try { const res = await nativeRequest(connection.server, '/api/v1/mobile-info'); if (!res.ok) throw Error(); bar.textContent = '已连接电脑 · 连接设置'; if (token()) document.getElementById('app-sync-retry')?.click(); }
-      catch (_) { bar.textContent = '电脑暂不可达 · 检查连接'; }
+      try { const res = await nativeRequest(connection.server, '/api/v1/mobile-info'); if (!res.ok) throw Error(); bar.dataset.connectionState = 'online'; bar.textContent = '已连接服务 · 连接设置'; if (token()) document.getElementById('app-sync-retry')?.click(); }
+      catch (_) { bar.dataset.connectionState = 'offline'; bar.textContent = '服务暂不可达 · 检查连接'; }
     });
   });
 }

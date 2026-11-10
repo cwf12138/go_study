@@ -1,115 +1,79 @@
 # 日常 Daynest · Android
 
-这是「安卓 App 连接电脑 Go 服务」模式。界面、样式和图标打包在 APK 中，API 通过原生网络通道连接你指定的电脑。手机和网页登录同一账号后，使用电脑上同一份业务记录；服务端无需复制数据或重新注册账号。
+当前客户端版本为 **0.2.0 / versionCode 2**。App 内置公开网页资源，默认通过可信 HTTPS 连接 `https://111.230.184.144`，手机与网页使用同一服务端账号和记录，电脑无需保持开机。
 
-**交付状态：Android 工程和前端资源已生成，连接与文件通道有自动化检查；尚未构建 APK、安装手机或完成真机验收。** 当前电脑有 JDK 21，但 Android SDK 仅 API 30；项目采用 Capacitor 8，要求 SDK 36。下面的 APK 路径是构建成功后的输出位置，当前没有该产物。
+## 使用
 
-## 1. 启动电脑服务
+打开 App 后自动检查服务并进入登录页；使用网站原账号登录即可。有效登录状态会保留，重新打开会恢复；令牌过期后需要重新登录。App 不内置账号、密码或服务器 JWT 密钥。
 
-先停止原来占用端口的 Go 服务。在项目根目录执行：
+连接正常时隐藏连接状态条。网络失败会保留已有登录与本机草稿，并提供重试和已保留资料入口。服务器切换放在「设置与诊断 → 连接设置」中；首次从旧版电脑连接模式升级时，默认转向个人云端并重新登录。旧服务的草稿按原账号与服务隔离保留。
 
-```powershell
-.\scripts\run-mobile-server.ps1 -HTTPAddr ':8080'
-```
+邮箱输入关闭自动纠错；手机登录页压缩介绍区域，顶部信息卡片可横向滚动，保留日历、待办、备忘录等入口与 Android 返回键处理。
 
-脚本只在本次进程中设置环境变量，结束后恢复。已有专用 `JWT_SECRET` 会直接复用；没有时生成随机密钥，保存到忽略提交的 `.local/android-jwt.key`，后续启动继续使用。不要分享或提交这个文件，也不要给不同服务复用同一个密钥。第一次替换密钥后原有网页登录会过期，重新登录即可，历史记录不变。脚本不会修改防火墙或系统环境变量，也不会替你终止旧服务。
+## 构建
 
-也可自行配置 `JWT_SECRET`（至少 24 字符、足够随机）和 `HTTP_ADDR` 后继续用 `go run ./cmd/api`。App 会拒绝连接仍使用公开开发密钥的服务。`DATA_FILE` 等配置沿用项目原来的方式。
+需要 Node.js 22+、JDK 21、SDK Platform 36、所需 Build Tools 与 Platform Tools。`android/local.properties` 的 `sdk.dir` 应指向实际 SDK；预检现在与 Gradle 一样读取该文件，再回退到环境变量或系统默认位置。
 
-用 `ipconfig` 找到电脑当前 Wi-Fi / 以太网适配器的 IPv4，例如 `192.168.1.10`。手机应与电脑位于同一可信局域网。先在手机浏览器访问 `http://192.168.1.10:8080/healthz` 检查是否可达；看到 JSON 就表示服务连通。若不通，检查监听地址、端口、防火墙和路由器的设备隔离。由你自行决定是否允许该端口通过专用网络防火墙。
-
-## 2. 构建并安装 App
-
-可先在 `mobile/` 运行 `pnpm android:check` 只读检查环境。新版构建生成 `client-build.json`，包含版本、提交和资源摘要；同步后在根目录运行 `node tools/verify-mobile.cjs` 校验资源。顶部「设置与诊断」显示两端版本与快照观察，使用说明与 CI 签名边界见 [R0 交付说明](../docs/release-baseline.md)。
-
-需要：
-
-- Node.js 22 或更高版本、pnpm，以及现有 Go 环境。
-- JDK 21。
-- 支持 Android Gradle Plugin 8.13 的 Android Studio；在 SDK Manager 安装 **Android SDK Platform 36**、对应 Build Tools 和 Platform Tools。
-- Android 7.0 / API 24 或更高的手机，并保持 Android System WebView 更新。系统版本满足最低要求不等于旧 WebView 能运行所有现代网页能力。
-
-依赖精确版本保存在 `package.json`，完整依赖树保存在 `pnpm-lock.yaml`。在项目根目录执行：
+已有依赖时，在 `mobile/` 运行：
 
 ```powershell
-cd mobile
-pnpm install --frozen-lockfile --registry=https://registry.npmjs.org
-pnpm android:sync
-pnpm android:open
+node scripts/preflight.cjs
+node scripts/build.cjs
+node scripts/configure-android.cjs
+node node_modules/@capacitor/cli/bin/capacitor sync android
+cd android
+.\gradlew.bat :app:assembleDebug
 ```
 
-已有 `android/` 工程，**不必再次执行 `android:init`**。`android:sync` 会打包原项目公开前端、复制自有 Java / XML 文件并同步 Capacitor 插件。它不会把用户 JSON、`.env`、账号或签名密钥加入 App，也没有配置远程 `server.url`。
+构建输出为 `mobile/android/app/build/outputs/apk/debug/app-debug.apk`。初次准备依赖时使用 `pnpm install --frozen-lockfile --registry=https://registry.npmjs.org`；不关闭证书校验。个人 SDK 路径、缓存和签名私钥不提交到仓库。
 
-在 Android Studio 中选择已连接手机运行，或使用 Build 菜单生成调试 APK。也可在 `mobile/android` 中执行：
+产品默认服务在 `mobile/app-config.json` 中配置。此文件只包含公开地址。`mobile/native/` 是自有 Java / XML 源文件，`configure-android.cjs` 会复制到生成的 Android 工程；修改这些源文件后重新同步。
+
+`package.json` 的版本及 `daynestAndroidVersionCode` 会同步到 Gradle。以后发布更新需递增版本号，保持应用 ID 与签名一致。覆盖安装使用：
 
 ```powershell
-.\gradlew.bat assembleDebug
+adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-成功后文件在 `mobile/android/app/build/outputs/apk/debug/app-debug.apk`。可以复制到手机安装，或使用 SDK 的 `adb install -r` 安装。首次构建会下载 Gradle 和 Google / Maven 依赖，需要能正常访问这些官方服务。遇到证书错误应修复证书或网络配置，不要关闭 TLS 校验。
+`-r` 保留数据。签名不匹配时应先核对原签名，不通过卸载来处理，以免丢失手机本机草稿和设置。当前是个人调试签名版本，未作为应用商店发布包。
 
-若命令行找不到 SDK，通过 Android Studio 选择本机 SDK 路径，或在忽略提交的 `android/local.properties` 中填写 `sdk.dir`；不要提交个人电脑路径。发布版需另行配置自己的签名，当前没有预置发布证书。
+## 检查与真机验收
 
-## 3. 首次连接
-
-1. 打开 App，在连接向导输入电脑地址，例如 `http://192.168.1.10:8080`。地址只能包含协议、主机和端口。
-2. 使用 HTTP 时，确认只在可信 Wi-Fi 中使用：登录密码、令牌和记录是明文传输。HTTP 仅允许明确的 RFC 1918 局域网 IPv4。其他主机需使用有可信证书的 HTTPS；不跳过证书校验。
-3. 点击「检查并连接」。App 检查新版服务的 `/api/v1/mobile-info`，通过后才初始化功能页面。
-4. 登录原账号。手机上的 `localhost` 指手机自身，不能用来连接电脑；Android 模拟器可用 `http://10.0.2.2:8080`。
-
-登录后的顶部有「已连接电脑 · 连接设置」。切换电脑会要求确认并清除当前设备的登录令牌和专注临时信息，再重新登录；原电脑的数据不会删除。正在进行文件操作时不能切换。连接配置只记住服务器地址和 HTTP 确认，不内置账号或服务端密钥。
-
-## 使用体验与边界
-
-- **文字快传。** 文件快传顶部可发送纯文字并在同账号设备之间同步，点击时才读写系统剪贴板；Android 使用原生剪贴板通道，网页不支持自动复制时提供选中后的手动复制。新代码需重新同步资源并构建 APK；复制到系统剪贴板的文字不随退出账号自动清除。
-
-- **电脑需要持续运行。** 界面本地打包，业务数据仍依赖 Go 服务；支持新的简单待办在本机收集，联网后手动核验并提交；不提供已有数据的离线编辑、云端中转或自动离线合并。未确认保存成功时请保留内容，恢复连接后核对。现有服务采用内存状态与周期性 JSON 快照，App 不改变其落盘语义。
-- **更新方式。** 修改 Go 代码后重启电脑服务；修改界面或原生代码后执行 `pnpm android:sync`，重新构建并安装 APK。已安装 App 不会自动加载电脑上的新版前端。
-- **返回与重连。** 返回键优先关闭弹窗、侧栏，再返回上一页面；根页面切回后台。初始连接页可用系统返回键切回后台。回到前台会检查电脑是否可达，保留现有草稿和登录；没有自动重放失败写请求。
-- **文件。** 下载和导出先进入 App 私有暂存，再弹出 Android「保存到」窗口；只有用户选择位置且写入完成才显示成功。取消保存不算成功。若写入中断，所选位置可能留下不完整文件，请核对后自行清理。正常完成 / 取消会清理私有暂存；进程异常终止可能遗留缓存，可通过系统清除 App 缓存处理。
-- **大小限制。** 原生下载 / 单次导出上限 64 MiB；文件快传在手机上传单文件最多 8 MiB，电脑网页仍为 32 MiB。上传进度显示原生网络写入进度，保存结果以服务确认和后续列表核对为准；上传失败原样重试继续使用同一个任务 ID。
-- **请求取消。** 普通 API 的超时或取消会停止客户端等待，但不能保证已发出的原生 HTTP 请求在服务端停止。不要因界面超时就假定写入失败；先刷新核对。原生文件通道另有断开连接和清理处理。
-- **后台和录音。** 手机进入后台会结束录音，返回后可试听并保存；不会在后台持续录音。专注计时沿用服务状态，但轻提醒、声音和网页通知不保证在息屏、系统休眠或 App 被结束时准时运行；当前没有原生后台提醒服务。
-- **设备偏好。** 主题、导航整理、轻提醒等原本保存在浏览器的偏好，在 App 内是独立的本机配置；账号业务记录保存在电脑。卸载 / 清除 App 数据会清掉本机配置和登录，不删除电脑数据。App 禁用 Android 自动备份，登录令牌沿用本地网页存储，不承诺系统密钥库级保护。
-- **电脑专用接口。** ChatGPT 本机授权等 AI 接口保持电脑回环限制，手机版会明确提示仅电脑可用，饮食本地推荐仍可使用；没有开放或绕过这些接口。
-- **外部内容。** 天气、新闻和图书等内容仍受原有来源和网络条件影响；打开外链使用系统处理，App 不放宽 WebView 的远程导航或混合内容限制。
-
-## 开发与验证
-
-源代码入口：`src/mobile-client.js` 为连接和生命周期，`src/core.js` 为地址策略，`src/mobile.css` 为移动界面，`native/` 为自有 Android 文件通道与资源。`scripts/configure-android.cjs` 会将 `native/` 复制进 `android/`，请修改源文件，避免下次同步覆盖修改。
-
-本次通过了 Go 全量测试、`go vet`、53 项前端冒烟测试，以及 Java 源码 / API 测试桩检查。另在 390 × 844 的浏览器窗口中，使用隔离临时账号、真实 Go 服务和模拟原生桥验证了连接、登录、日历渲染、创建待办后 API 回读、备忘录入口和返回键弹窗处理；检查了窄屏布局，并压缩了 App 顶部工具区。该浏览器检查仍不能证明 Android 系统文件窗口、权限和 WebView 的设备行为。
-
-在项目根目录运行：
+项目根目录：
 
 ```powershell
-go test ./...
-go vet ./...
-node tools/mobile_smoke.cjs
-node tools/mobile_connection_smoke.cjs
-node tools/toolkit_pocket_smoke.cjs
+node tools/check.cjs
+node tools/verify-mobile.cjs
 ```
 
-已有 Android SDK 时可额外进行 Java 源码与地址策略检查（将路径换成自己的）：
+真实 Android 验收测试在 `android/app/src/androidTest/java/app/daynest/personal/CloudDeviceTest.java`。只对显式传入的 `@example.test` 隔离账号运行；未提供参数时跳过，不在测试代码或 APK 中写入账号密码。
+
+在 `mobile/android/` 构建本应用的验收包：
 
 ```powershell
-.\mobile\scripts\check-java.ps1 -AndroidJar 'C:\Users\你的账号\AppData\Local\Android\Sdk\platforms\android-36\android.jar'
+.\gradlew.bat :app:assembleDebugAndroidTest
 ```
 
-该检查使用最小 Capacitor API 测试桩，能发现 Java 语法、基础 Android API 和地址策略问题，**不等于完整 Gradle 构建或设备验证**。这些测试桩不进入 App。
+测试覆盖实际 WebView 中的默认 HTTPS 连接、账号密码登录、待办 / 备忘录 / 日程表单，以及重开后登录恢复与记录回读。测试通过表单触发真实原生 HTTP 请求；输入使用 DOM 事件，不能代替对所有输入法的手工验收。测试包与产品 APK 分开，日常使用只需要产品 APK。
 
-安装后需在真机完成：首次连接、原账号登录、日历 / 备忘录写入后网页回读、断网后保留输入、前后台计时、弹窗及侧栏返回、切换电脑重新登录、录音拒绝与授权及后台停止、文件上传 / 取消 / 保存 / 导出、系统保存窗口取消、横竖屏与大字号、深色模式、外部链接。使用临时账号验证，不要拿唯一副本测试删除操作。
+浏览器模拟桥报告、真机报告与 APK 构建是不同证据，不能互相替代。具体本轮结果见项目的发布验收记录。
 
-技术依据：[Capacitor 环境要求](https://capacitorjs.com/docs/getting-started/environment-setup)、[配置](https://capacitorjs.com/docs/config)、[原生 HTTP](https://capacitorjs.com/docs/apis/http)、[App 生命周期与返回键](https://capacitorjs.com/docs/apis/app)。
+## 服务器与数据
 
-## 本机收集待办
+部署操作见 [服务器部署说明](../docs/deployment.md)。服务器采用 Nginx HTTPS 入口，Go 服务仅监听回环地址。证书校验不放宽，公网 HTTP 不在 App 支持范围内；高级设置仍支持明确确认后的可信局域网 HTTP。
 
-在线登录后，从「待办清单 → ＋ 本机收集」准备账号入口。电脑不可达时，从连接页「离线资料与本机收集」进入，可创建、自动暂存、导出和删除本机草稿，关闭窗口前等待保存。联网后手动提交，遇到结果不明先核对回执；不自动补发，不改选其他电脑。需安装包含本次资源的新包；目前只验证打包资源与模拟桥，APK / 真机验收仍待完成。详见 [本机收集说明](../docs/offline-todo-outbox.md)。
+公网防火墙需保留 TCP 443；当前证书使用 HTTP-01 自动续期，还需保留 TCP 80。SSH 运维保留 TCP 22，亦可单独限制管理员来源。防火墙模板需要应用到实际实例。
 
-## 待办在线编辑
+业务记录使用服务器 JSON 快照，每 15 秒尝试保存，正常停止时再保存。业务提交与快照确认有区别。新版 App 沿用已有的保存状态、版本冲突、回执与本机草稿保护，不承诺整站即时写盘。
 
-新版卡片「编辑」可修改安排与步骤；请求发往所选电脑，使用完整版本条件。冲突 / 响应丢失保留编辑内容，手动读取核对，文字导出复用系统文件通道。新周期不会因重复完成生成第二项。弹窗有固定标题、关闭和底部保存区，返回键沿用未保存确认。资源与模拟桥流程已验证；安装包 / 真机软键盘及前后台恢复仍待独立验收。详见 [待办保存契约](../docs/todo-editing.md)。
+本机与服务器的数据目录独立；日常升级只发布程序和资源，不把本机 data/ 覆盖到服务器。浏览器 / App 的草稿、离线资料、主题与设备偏好属于各自本机内容，不会自动在设备之间同步。
 
-## 日程编辑与新建核对
+## 功能边界
 
-安装包含新版资源的 App 后，日程在所选电脑按原版本编辑 / 删除，新建使用稳定身份与回执。本机原文和确认标记继续保留，断网后不自动重发；重新连接、核验原账号后从日历「待核对日程 / 新建记录」读取。此功能没有扩展冷启动离线日程编辑。弹窗支持全天日期、整组说明、固定关闭和底部操作；资源与模拟桥验证不等于 APK / 真机验收。详见 [日历保存边界](../docs/calendar-editing.md)。
+- 支持备忘录、待办和当日安排的有限离线查看，以及新简单待办的本机收集；联网后手动核验并提交。已有数据离线编辑和自动双向同步尚未实现。
+- 普通请求取消 / 超时只表示客户端停止等待，保存结果不明时先核对回执或列表。
+- 返回键优先关闭弹窗与侧栏，再返回页面；根页面返回后台。回到前台检查连接，不自动重放写入。
+- 文件导出使用 Android「保存到」窗口，选择并写入完成才显示成功。手机上传单文件 8 MiB，单次导出 / 下载上限 64 MiB。
+- 录音进入后台时停止，保留试听结果；尚无保证息屏准时运行的原生提醒服务。
+- ChatGPT 授权仍限服务器本机，不向公网或手机版开放；本地饮食推荐等功能仍可使用。
+- 天气、图书和资讯取决于外部来源及网络可达性。

@@ -1,9 +1,9 @@
 {
   "name": "daynest-android",
-  "version": "0.1.0",
-  "daynestAndroidVersionCode": 1,
+  "version": "0.2.0",
+  "daynestAndroidVersionCode": 2,
   "private": true,
-  "description": "Android companion for the existing Daynest Go server",
+  "description": "Daynest Android app connected to the personal cloud server",
   "engines": { "node": ">=22" },
   "scripts": {
     "android:check": "node scripts/preflight.cjs",

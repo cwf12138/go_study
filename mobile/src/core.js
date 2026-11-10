@@ -7,10 +7,10 @@
   };
   function server(raw) {
     const text = String(raw || '').trim();
-    if (!/^https?:\/\//i.test(text) || text.length > 500 || /[\\\u0000-\u0020]/.test(text)) throw Error('请填写完整电脑地址，如 http://192.168.1.10:8080');
+    if (!/^https?:\/\//i.test(text) || text.length > 500 || /[\\\u0000-\u0020]/.test(text)) throw Error('请填写完整服务地址，如 https://111.230.184.144');
     const u = new URL(text);
     if (u.username || u.password || u.search || u.hash || u.pathname !== '/') throw Error('服务器地址只能包含协议、主机与端口，不能含账号、路径或参数。');
-    if (['localhost','127.0.0.1','[::1]','0.0.0.0'].includes(u.hostname)) throw Error('手机上的 localhost 指手机自己，请填写电脑的局域网 IP。模拟器可用 10.0.2.2。');
+    if (['localhost','127.0.0.1','[::1]','0.0.0.0'].includes(u.hostname)) throw Error('手机上的 localhost 指手机自己，请填写服务器地址。模拟器连接电脑可用 10.0.2.2。');
     if (u.protocol === 'http:' && !privateIP(u.hostname)) throw Error('未加密 HTTP 只允许明确的局域网 IPv4 地址；其他主机请使用可信 HTTPS。');
     if (!['http:','https:'].includes(u.protocol)) throw Error('只支持 HTTP 或 HTTPS。');
     return u.origin;
