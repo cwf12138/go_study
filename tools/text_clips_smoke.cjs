@@ -1,7 +1,6 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const root='internal/httpapi/assets/',html=fs.readFileSync(root+'index.html','utf8'),core=fs.readFileSync(root+'text-clips-core.js','utf8'),source=fs.readFileSync(root+'text-clips.js','utf8');
-const ids=new Set([...html.matchAll(/id="([^"]+)"/g)].map(m=>m[1]));for(const [,id]of source.matchAll(/\$\('([^']+)'\)/g))assert(ids.has('tc-'+id),id);
-for(const name of ['text-clips-core.js','text-clips.js','text-clips.css'])assert(html.includes('/static/'+name)&&fs.existsSync(root+name));
+assert(!html.includes('id="tc-board"'));assert(!html.includes('/static/text-clips.js?'));
 const settle=async()=>{for(let i=0;i<25;i++)await Promise.resolve();};
 function harness(){
  let owner='alice',counter=0,lose=false,failCopy=false,defer=false,release;const rows=new Map(),nodes=new Map(),calls=[],copied=[],windowEvents={},intervals=[],appended=[];

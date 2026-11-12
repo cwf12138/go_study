@@ -6,10 +6,7 @@ const root=path.resolve(__dirname,'..');
 const html=fs.readFileSync(path.join(root,'internal/httpapi/assets/index.html'),'utf8');
 const script=fs.readFileSync(path.join(root,'internal/httpapi/assets/bookmarks.js'),'utf8');
 const styles=fs.readFileSync(path.join(root,'internal/httpapi/assets/bookmarks.css'),'utf8');
-const ids=new Set([...html.matchAll(/id="([^"]+)"/g)].map(m=>m[1]));
-for(const m of script.matchAll(/\$\('([^']+)'\)/g))assert.ok(ids.has('bookmark-'+m[1]),'missing '+m[1]);
-for(const id of ['search','sort'])assert.ok(ids.has('bookmark-'+id));
-for(const marker of ['data-view="bookmarks"','/static/bookmarks.js?v=20261011-2','/static/bookmarks.css?v=20261007-1'])assert.ok(html.includes(marker));
+assert(!html.includes('id="panel-bookmarks"'));assert(!html.includes('/static/bookmarks.js?'));
 for(const marker of ['prefers-reduced-motion','data-theme="dark"','max-width:640px','focus-visible'])assert.ok(styles.includes(marker));
 const nodes=new Map();
 function node(id){

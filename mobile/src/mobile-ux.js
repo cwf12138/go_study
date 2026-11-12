@@ -24,6 +24,7 @@ export function installMobileUX() {
       node, view: node.dataset.view,
       title: [...node.childNodes].filter(child => child.nodeType === 3).map(child => child.textContent).join('').trim() || node.textContent.trim(),
       group: node.closest('.nav-group')?.querySelector('.nav-group-label')?.textContent.trim() || '其他',
+      keywords: node.dataset.searchKeywords || '',
     }));
     const nav = document.createElement('nav'); nav.id = 'mobile-tabs'; nav.className = 'mobile-tabs'; nav.setAttribute('aria-label', '主要功能'); nav.hidden = true;
     for (const [view, title] of [['dashboard','今天'],['calendar','日历'],['todo','待办'],['memos','记录'],['all','全部']]) {
@@ -32,7 +33,7 @@ export function installMobileUX() {
     }
     const all = nav.querySelector('[data-mobile-view=all]');
     const dialog = document.createElement('dialog'); dialog.id = 'mobile-functions'; dialog.className = 'mobile-functions'; dialog.setAttribute('aria-labelledby','mobile-functions-title');
-    dialog.innerHTML = '<header><div><p>随时找到需要的工具</p><h2 id="mobile-functions-title">全部功能</h2></div><button type="button" id="mobile-functions-close" aria-label="关闭全部功能">×</button></header><label class="mobile-functions-search">搜索功能<input id="mobile-functions-query" type="search" placeholder="例如：运动、快传、账本" autocomplete="off"></label><p id="mobile-functions-count" role="status" aria-live="polite"></p><div id="mobile-functions-list"></div><footer><button type="button" data-mobile-action="settings">设置与数据</button><button type="button" data-mobile-action="connection">连接设置</button><button type="button" data-mobile-action="theme">切换主题</button><button type="button" data-mobile-action="logout">退出账号</button></footer>';
+    dialog.innerHTML = '<header><h2 id="mobile-functions-title">全部功能</h2><button type="button" id="mobile-functions-close" aria-label="关闭全部功能">×</button></header><label class="mobile-functions-search">搜索功能<input id="mobile-functions-query" type="search" placeholder="例如：运动、账本、阅读" autocomplete="off"></label><p id="mobile-functions-count" role="status" aria-live="polite"></p><div id="mobile-functions-list"></div><footer><button type="button" data-mobile-action="settings">设置与数据</button><button type="button" data-mobile-action="connection">连接设置</button><button type="button" data-mobile-action="theme">切换主题</button><button type="button" data-mobile-action="logout">退出账号</button></footer>';
     document.body.append(nav, dialog);
     all.setAttribute('aria-haspopup','dialog'); all.setAttribute('aria-controls',dialog.id); all.setAttribute('aria-expanded','false');
     const query = dialog.querySelector('input'), list = dialog.querySelector('#mobile-functions-list');
@@ -42,7 +43,7 @@ export function installMobileUX() {
       const filter = query.value.trim().toLocaleLowerCase(); list.replaceChildren();
       let count = 0;
       for (const group of new Set(pages.map(page => page.group))) {
-        const matches = pages.filter(page => page.group === group && (page.title+' '+page.group).toLocaleLowerCase().includes(filter));
+        const matches = pages.filter(page => page.group === group && (page.title+' '+page.group+' '+page.keywords).toLocaleLowerCase().includes(filter));
         if (!matches.length) continue;
         const section = document.createElement('section'), heading = document.createElement('h3'), grid = document.createElement('div');
         heading.textContent = group; grid.className = 'mobile-functions-grid'; section.append(heading,grid);
@@ -147,30 +148,6 @@ export function installMobileUX() {
       memoSave.classList.add('mobile-memo-save'); memoHead.append(tools,memoSave); document.body.append(actions);
     }
 
-    const transfers = document.getElementById('panel-transfers');
-    if (transfers) {
-      const actions = document.createElement('div'); actions.className = 'mobile-transfer-actions'; actions.setAttribute('aria-label','快传操作');
-      actions.innerHTML = '<button type="button" id="mobile-upload">＋ 传文件</button><button type="button" id="mobile-send-text">＋ 发文字</button>';
-      actions.querySelector('#mobile-upload').addEventListener('click',()=>document.getElementById('ft-choose')?.click());
-      actions.querySelector('#mobile-send-text').addEventListener('click',()=>{if(document.getElementById('tc-board')?.hidden)document.getElementById('tc-toggle')?.click();document.getElementById('tc-jump')?.click();});
-      transfers.prepend(actions);
-      const connectionDialog = document.createElement('dialog'); connectionDialog.id = 'mobile-share-connection'; connectionDialog.className = 'mobile-functions'; connectionDialog.setAttribute('aria-labelledby','mobile-share-title');
-      connectionDialog.innerHTML = '<header><h2 id="mobile-share-title">在其他设备继续</h2><button type="button" aria-label="关闭访问地址">×</button></header><div class="mobile-share-body"><p>在另一台手机或电脑的浏览器打开以下地址，使用同一账号登录，即可找到你的文件和文字。</p><label>当前服务地址<input id="mobile-share-address" readonly></label><button type="button" id="mobile-share-copy">复制访问地址</button><p id="mobile-share-status" role="status">地址不包含账号、密码或登录令牌。</p></div>';
-      connectionDialog.querySelector('header>button').addEventListener('click',()=>connectionDialog.close());
-      connectionDialog.querySelector('#mobile-share-copy').addEventListener('click',async()=>{
-        const input = connectionDialog.querySelector('input'), value = input.value;
-        try { await window.DaynestMobile.copyText(value); connectionDialog.querySelector('#mobile-share-status').textContent = '地址已复制，请在另一台设备打开并登录。'; }
-        catch { input.focus(); input.select(); connectionDialog.querySelector('#mobile-share-status').textContent = '请长按地址复制，再到另一台设备打开。'; }
-      });
-      document.getElementById('ft-connect')?.addEventListener('click',event=>{
-        event.preventDefault();event.stopImmediatePropagation();
-        if (!authenticated()) return;
-        connectionDialog.querySelector('input').value = window.DaynestMobile?.getConnectionInfo?.().server || '';
-        connectionDialog.querySelector('#mobile-share-status').textContent = '地址不包含账号、密码或登录令牌。';
-        connectionDialog.showModal();
-      },true);
-      document.body.append(connectionDialog);
-    }
     window.DaynestMobileUX = {back() {
       if (!window.matchMedia('(max-width:700px)').matches || document.body.dataset.mobileView !== 'memos') return false;
       const workspace = document.querySelector('.memo-workspace');

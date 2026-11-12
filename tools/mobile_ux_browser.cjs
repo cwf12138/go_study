@@ -47,7 +47,7 @@ async function go(view) {
   });
   await page.addInitScript(({ server, token }) => { localStorage.setItem('daynest.mobile.connection.v1', JSON.stringify({ server, httpAcknowledged: false })); localStorage.setItem('studyflow.token', token); }, { server: chosen, token: account.token });
   await page.goto('http://127.0.0.1:' + webPort); await page.waitForFunction(() => !!window.DaynestAccount?.current?.() && !document.getElementById('mobile-tabs').hidden);
-  const views = await page.locator('.nav-link[data-view]').evaluateAll(nodes => nodes.map(node => node.dataset.view));
+  const views = await page.locator('.nav-link[data-view]').evaluateAll(nodes => [...new Set(nodes.map(node => node.dataset.view))]);
   for (const width of [360, 390]) {
     await page.setViewportSize({ width, height: 800 });
     for (const view of views) {
@@ -59,7 +59,7 @@ async function go(view) {
   }
   await page.setViewportSize({ width: 360, height: 800 });
   await page.click('[data-mobile-view=all]'); await page.waitForFunction(() => document.getElementById('mobile-functions').open);
-  assert.equal(await page.locator('[data-mobile-target]').count(), views.length);
+  assert.equal(await page.locator('[data-mobile-target]').count(), await page.locator('.daynest-nav .nav-link[data-view]').count());
   await page.fill('#mobile-functions-query', '运动'); assert.equal(await page.locator('[data-mobile-target]').count(), 1);
   await page.click('[data-mobile-target=fitness]'); await page.waitForFunction(() => document.body.dataset.mobileView === 'fitness');
   assert.equal(await page.locator('dialog[open]').count(), 0); pass('all_functions_search_and_actual_page_navigation');
@@ -93,22 +93,22 @@ async function go(view) {
   await page.evaluate(() => window.__nativeEvents.backButton({ canGoBack: true })); await page.waitForFunction(() => !document.body.classList.contains('mobile-memo-editor'));
   assert.equal(await page.inputValue('#memo-content'), '保留正在编辑的内容，并通过独立服务端回读。'); pass('android_back_returns_to_memo_list_without_clearing_editor');
   await page.screenshot({ path: path.join(out, 'memo-list.png') });
-  for (const [view, open] of [['bookmarks','bookmark-new'],['ledger','ledger-new'],['subscriptions','sub-new'],['care','care-new'],['fitness','fit-log-open']]) {
+  for (const [view, open] of [['ledger','ledger-new'],['subscriptions','sub-new'],['care','care-new'],['fitness','fit-log-open']]) {
     await go(view); await page.click('#' + open); const dialog = page.locator('dialog[open]').last(); await dialog.waitFor();
     await contained(dialog, view + ' dialog');
     await page.evaluate(() => window.__nativeEvents.backButton({ canGoBack: true }));
     await page.waitForFunction(() => document.querySelectorAll('dialog[open]').length === 0);
     pass('dialog_' + view + '_fits_and_back_closes');
   }
-  await go('transfers'); const chooser = page.waitForEvent('filechooser'); await page.click('#mobile-upload'); await chooser;
-  pass('file_upload_shortcut_opens_system_file_chooser');
-  await page.click('#ft-connect'); assert.equal(await page.inputValue('#mobile-share-address'), chosen);
-  await page.click('#mobile-share-copy'); await page.waitForFunction(() => window.__nativeCopied.length === 1);
-  assert.equal(await page.evaluate(() => window.__nativeCopied[0]), chosen);
-  await page.evaluate(() => window.__nativeEvents.backButton({ canGoBack: true }));
-  pass('cross_device_address_uses_selected_server_and_native_clipboard_without_credentials');
-  await page.click('#mobile-send-text'); await page.waitForFunction(() => !document.getElementById('tc-board').hidden);
-  assert.equal(await page.locator('#tc-text').isVisible(), true); pass('text_transfer_shortcut_opens_composer');
+  await go('calendar'); assert(await page.locator('#panel-calendar #daily-trigger').isVisible());
+  assert.equal(await page.locator('.topbar #daily-trigger').count(),0);
+  await page.click('#daily-trigger'); await page.locator('#daily-dialog[open]').waitFor();
+  await page.evaluate(() => window.__nativeEvents.backButton({canGoBack:true})); pass('daily_card_lives_in_calendar');
+  assert.equal(await page.locator('#panel-transfers,#panel-bookmarks,[data-explore-tab=challenge]').count(),0);
+  await go('focus'); await page.locator('#panel-focus .workspace-extra>summary').click(); assert(await page.locator('#sound-start').isVisible()); pass('sound_inside_focus');
+  await go('toolkit'); await page.locator('#panel-toolkit .workspace-extra>summary').click(); assert(await page.locator('#choice-spin').isVisible()); pass('choice_inside_tools');
+  await page.click('#mobile-menu'); await page.click('[data-mobile-target=goals]'); assert(await page.locator('[data-workspace-views] button[data-view=vocabulary]').isVisible());
+  await page.locator('[data-workspace-views] button[data-view=vocabulary]').click(); await page.waitForFunction(()=>document.body.dataset.mobileView==='vocabulary'); pass('learning_workspace_subpages');
   await page.click('#theme-toggle'); assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
   await page.click('[data-mobile-view=all]'); await contained(page.locator('#mobile-functions'), 'dark function list');
   await page.screenshot({ path: path.join(out, 'functions-dark.png') }); pass('dark_mode_function_list');

@@ -43,7 +43,6 @@
     <link rel="stylesheet" href="/static/daynest.css?v=20260925-1">
     <link rel="stylesheet" href="/static/inventory.css?v=20260929-1">
     <link rel="stylesheet" href="/static/shopping.css?v=20261007-1">
-    <link rel="stylesheet" href="/static/bookmarks.css?v=20261007-1">
     <link rel="stylesheet" href="/static/toolkit.css?v=20261009-1">
     <link rel="stylesheet" href="/static/toolkit-pocket.css?v=20261009-2">
     <link rel="stylesheet" href="/static/holiday.css?v=20261009-1">
@@ -55,8 +54,6 @@
     <link rel="stylesheet" href="/static/fitness-nutrition.css?v=20261018-1">
     <link rel="stylesheet" href="/static/care.css?v=20261020-1">
     <link rel="stylesheet" href="/static/content-search.css?v=20261020-1">
-    <link rel="stylesheet" href="/static/transfers.css?v=20261021-1">
-    <link rel="stylesheet" href="/static/text-clips.css?v=20261029-1">
     <link rel="stylesheet" href="/static/gentle-reminders.css?v=20261022-motion-2">
     <link rel="stylesheet" href="/static/important-days.css?v=20261022-1">
     <link rel="stylesheet" href="/static/parcels.css?v=20261026-1">
@@ -68,6 +65,7 @@
     <link rel="stylesheet" href="/static/data-center.css?v=20261101-1">
     <link rel="stylesheet" href="/static/save-status.css?v=20261105-1">
     <link rel="stylesheet" href="/static/todo-drafts.css?v=20261109-1">
+    <link rel="stylesheet" href="/static/product-scope.css?v=20261112-1">
     <link rel="stylesheet" href="/static/layout.css?v=20260922-1">
   </head>
   <body>
@@ -128,35 +126,24 @@
         <nav class="nav daynest-nav" aria-label="主导航">
           <div class="nav-group" role="group" aria-label="今天"><p class="nav-group-label">今天</p>
             <button class="nav-link active" type="button" data-view="dashboard"><span aria-hidden="true">◫</span>今天</button>
-            <button class="nav-link" type="button" data-view="calendar"><span aria-hidden="true">▦</span>智能日历</button>
-            <button class="nav-link" type="button" data-view="todo"><span aria-hidden="true">☑</span>待办清单</button>
-            <button class="nav-link" type="button" data-view="planner"><span aria-hidden="true">▦</span>智能规划</button>
-            <button class="nav-link" type="button" data-view="toolkit"><span aria-hidden="true">⊞</span>随身工具</button>
+            <button class="nav-link" type="button" data-view="calendar" data-search-keywords="今日签"><span aria-hidden="true">▦</span>智能日历</button>
+            <button class="nav-link" type="button" data-view="todo" data-search-keywords="学习任务"><span aria-hidden="true">☑</span>待办清单</button>
+            <button class="nav-link" type="button" data-view="toolkit" data-search-keywords="选择 下一件小事"><span aria-hidden="true">⊞</span>随身工具</button>
             <button class="nav-link" type="button" data-view="meals"><span aria-hidden="true">♨</span>今天吃什么</button>
             <button class="nav-link" type="button" data-view="fitness"><span aria-hidden="true">↗</span>运动日常</button>
             <button class="nav-link" type="button" data-view="care"><span aria-hidden="true">✳</span>生活保养站</button>
           </div>
           <div class="nav-group" role="group" aria-label="记录"><p class="nav-group-label">记录</p>
             <button class="nav-link" type="button" data-view="memos"><span aria-hidden="true">▤</span>备忘录</button>
-            <button class="nav-link" type="button" data-view="transfers"><span aria-hidden="true">⇅</span>文件快传</button>
             <button class="nav-link" type="button" data-view="moods"><span aria-hidden="true">☺</span>心情日记</button>
             <button class="nav-link" type="button" data-view="ledger"><span aria-hidden="true">¥</span>生活账本</button>
             <button class="nav-link" type="button" data-view="subscriptions"><span aria-hidden="true">↻</span>订阅管家</button>
             <button class="nav-link" type="button" data-view="inventory"><span aria-hidden="true">▣</span>物品管家</button>
-            <button class="nav-link" type="button" data-view="bookmarks"><span aria-hidden="true">▱</span>随手收藏</button>
-            <button class="nav-link" type="button" data-view="timeline"><span aria-hidden="true">↟</span>生活足迹</button>
+            <button class="nav-link" type="button" data-view="timeline" data-search-keywords="时光邮局 人生地图 私人博物馆"><span aria-hidden="true">↟</span>足迹与回忆</button>
           </div>
           <div class="nav-group" role="group" aria-label="成长"><p class="nav-group-label">成长</p>
-            <button class="nav-link" type="button" data-view="focus"><span aria-hidden="true">◷</span>专注会话</button>
-            <button class="nav-link" type="button" data-view="goals"><span aria-hidden="true">◎</span>学习目标</button>
-            <button class="nav-link" type="button" data-view="tasks"><span aria-hidden="true">✓</span>学习任务</button>
-            <button class="nav-link" type="button" data-view="vocabulary"><span aria-hidden="true">Aa</span>单词学习</button>
-            <button class="nav-link" type="button" data-view="english"><span aria-hidden="true">En</span>英语精读</button>
-            <button class="nav-link" type="button" data-view="literature"><span aria-hidden="true">阅</span>阅读书房</button>
-            <button class="nav-link" type="button" data-view="insights"><span aria-hidden="true">⌁</span>学习洞察</button>
-          </div>
-          <div class="nav-group" role="group" aria-label="探索"><p class="nav-group-label">探索</p>
-            <button class="nav-link" type="button" data-view="explore"><span aria-hidden="true">✉</span>探索生活</button>
+            <button class="nav-link" type="button" data-view="focus" data-search-keywords="声音 白噪音"><span aria-hidden="true">◷</span>专注会话</button>
+            <button class="nav-link" type="button" data-view="goals" data-search-keywords="规划 单词 英语 阅读 复盘"><span aria-hidden="true">◎</span>学习与阅读</button>
           </div>
         </nav>
         <div class="sidebar-footer" data-state="loading"><span class="status-dot" aria-hidden="true"></span><span id="sidebar-connection">连接待检查</span></div>
@@ -168,7 +155,7 @@
           <div><p id="page-kicker" class="eyebrow">DAYNEST · YOUR EVERYDAY</p><h2 id="page-title">今天</h2></div>
             <div id="topbar-glance" class="topbar-glance user-actions" role="group" aria-label="天气、节假日、今日签与轻提醒">
             <button id="holiday-trigger" class="holiday-widget" type="button" aria-haspopup="dialog" aria-controls="holiday-dialog"><span class="holiday-icon" aria-hidden="true">▦</span><span class="holiday-copy"><strong id="holiday-name">下个节假日</strong><small id="holiday-caption">正在查看假期…</small></span><span class="holiday-count"><b id="holiday-days">—</b><small>天</small></span></button>
-            <button id="daily-trigger" class="daily-trigger" type="button" aria-haspopup="dialog" aria-controls="daily-dialog" aria-label="打开今日签"><span aria-hidden="true">签</span><b id="daily-trigger-label">今日签</b></button>
+
             <button id="gr-trigger" class="gr-trigger" type="button" aria-haspopup="dialog" aria-controls="gr-dialog" disabled><span class="gr-trigger-icon" aria-hidden="true">◷</span><span class="gr-trigger-copy"><b>轻提醒</b><small id="gr-caption">照顾一下自己</small></span><i id="gr-dot" hidden></i></button>
           </div>
           <div class="user-actions"><button id="content-search-trigger" class="content-search-trigger" type="button" aria-label="搜索全部内容" title="全局内容搜索 · Ctrl+Shift+F 或 /"><span aria-hidden="true">⌕</span><span>搜索内容</span></button><button id="command-trigger" class="command-trigger" type="button" aria-label="打开快捷命令"><span>⌕</span><kbd>Ctrl K</kbd></button><button id="diagnostics-open" class="icon-button diagnostics-trigger" type="button" aria-label="设置与诊断" title="设置与诊断" aria-haspopup="dialog" aria-controls="dg-dialog"><span aria-hidden="true">⚙</span></button><button id="theme-toggle" class="theme-toggle" type="button" aria-label="切换至夜间模式" title="切换主题"><span aria-hidden="true">☾</span><span id="theme-toggle-label">夜间</span></button><span id="user-name"></span><button id="logout" class="quiet" type="button">退出</button></div>
@@ -177,37 +164,11 @@
 
         <div id="main-content" class="content" tabindex="-1" role="main" aria-labelledby="page-title">
           <aside id="auth-expiry" class="auth-expiry" role="status" aria-live="polite" hidden><span aria-hidden="true">!</span><div><strong>登录已过期，先留住正在写的内容。</strong><p>编辑区仍在，已保留的本机草稿不会清除。请先导出文字或核对草稿，再重新登录。</p></div><button id="auth-expiry-login" class="quiet" type="button">重新登录</button></aside>
-          <span id="page-announcement" class="product-sr-only" role="status" aria-live="polite" aria-atomic="true"></span>
-          <section id="panel-transfers" class="panel ft-space" aria-label="文件快传">
-            <section class="tc-space" aria-labelledby="tc-heading">
-              <header class="tc-heading"><div><p>WORDS, WITHIN REACH</p><h2 id="tc-heading">文字，换个设备继续。</h2><span>电脑发一段，手机复制。常用的，置顶留在手边。</span></div><button id="tc-toggle" type="button" aria-expanded="false" aria-controls="tc-board">打开文字快传 ↗</button></header>
-              <div id="tc-board" hidden>
-                <div class="tc-toolbar"><div id="tc-tabs" class="tc-tabs" role="group" aria-label="文字视图"><button type="button" data-tc-tab="active" aria-pressed="true">中转站</button><button type="button" data-tc-tab="pinned" aria-pressed="false">已置顶</button><button type="button" data-tc-tab="expired" aria-pressed="false">已过期</button><button type="button" data-tc-tab="trash" aria-pressed="false">回收站</button></div><div class="tc-toolbar-actions"><button id="tc-jump" type="button">＋ 发文字</button><button id="tc-refresh" type="button">↻ 同步</button></div></div>
-                <p id="tc-status" class="tc-status" role="status" aria-live="polite"></p>
-                <div id="tc-recovery" class="tc-recovery" hidden><strong>这次操作尚未确认</strong><p>文字已保留。先核对服务器，或用同一请求重试，避免重复发送。</p><div><button id="tc-retry" type="button">原样重试</button><button id="tc-reconcile" type="button">核对服务器</button><button id="tc-abandon" type="button">结束重试</button></div><div id="tc-conflict" hidden><p>服务器上的当前内容</p><pre id="tc-remote"></pre><button id="tc-rebase" type="button">基于此版本继续编辑我的草稿</button></div></div>
-                <div class="tc-workspace">
-                  <div class="tc-inbox"><label class="tc-search"><span aria-hidden="true">⌕</span><input id="tc-query" type="search" maxlength="100" aria-label="搜索文字或标题" placeholder="搜索文字或标题…"></label><div class="tc-list-caption"><span id="tc-count">展开后读取你的文字</span><label><span class="tc-sr">排序</span><select id="tc-sort"><option value="updated">最近更新</option><option value="created">最近发送</option></select></label></div><div id="tc-list" class="tc-list"></div><div class="tc-pagination"><button id="tc-prev" type="button">上一页</button><span id="tc-page">1 / 1</span><button id="tc-next" type="button">下一页</button></div></div>
-                  <section class="tc-composer" aria-labelledby="tc-editor-heading">
-                    <header><div><p>A LITTLE HANDOFF</p><h3 id="tc-editor-heading">发一段文字</h3></div><button id="tc-new" type="button">＋ 新建</button></header>
-                    <form id="tc-form">
-                      <label><span>标题 <small>选填</small></span><input id="tc-title" maxlength="80" placeholder="例如：收件地址、会议链接"></label>
-                      <label class="tc-text-label">文字内容<button id="tc-paste" type="button">从剪贴板粘贴</button><textarea id="tc-text" rows="7" maxlength="24000" required spellcheck="false" placeholder="粘贴或写下一段文字。&#10;在另一台设备登录同一账号，即可找到并复制。"></textarea></label>
-                      <p class="tc-editor-meta"><span id="tc-char-count">0 / 12000 字</span><span id="tc-draft-state">尚未发送</span></p>
-                      <div class="tc-options"><label>有效期<select id="tc-ttl"><option value="1">1 小时</option><option value="24" selected>1 天</option><option value="168">7 天</option><option value="0">一直保留</option></select></label><label class="tc-pin"><input id="tc-pinned" type="checkbox">置顶这段文字</label></div>
-                      <p id="tc-expiry-hint" class="tc-help">从发送成功时开始计时；到期移入“已过期”，可续期或清理。</p>
-                      <div class="tc-form-actions"><button id="tc-draft-copy" type="button">复制当前文字</button><button id="tc-save" class="tc-primary" type="submit">发送到中转站</button></div>
-                    </form>
-                  </section>
-                </div>
-                <footer class="tc-footer"><span>↔ 同账号跨设备 · 最多 100 条 · 每条 12000 字</span><p>只在你点击时读写剪贴板，不自动采集。记录以明文保存在电脑及备份中，请勿存放密码或验证码；过期不等于从备份中擦除。</p></footer>
-              </div>
-            </section>
-            <header class="ft-hero"><div><p class="ft-eyebrow">A LITTLE CLOSER</p><h2>文件换个设备，<br>不用绕一大圈。</h2><p>照片、文档、临时要用的资料。<br>放在这里，在另一台设备登录同一账号拿走。</p><button id="ft-connect" type="button">在另一台设备打开 ↗</button></div><div class="ft-upload-card"><div id="ft-drop" class="ft-drop"><span class="ft-upload-icon" aria-hidden="true">⇧</span><h3>把文件放到这里</h3><p>拖入文件，或点击选择<br>支持多选，单个文件最多 32 MiB</p><button id="ft-choose" type="button" class="ft-primary">＋ 选择文件</button><input id="ft-input" type="file" multiple hidden></div><label class="ft-retention">文件有效期<select id="ft-ttl"><option value="24">24 小时</option><option value="168">7 天</option><option value="0">长期保留</option></select></label><small>过期后暂停下载，不会自动删除；可延长或手动清理。</small></div></header>
-            <div class="ft-overview"><article><span>随时可取</span><strong id="ft-active-count">0</strong><small>当前账号的有效文件</small></article><article><span>等待整理</span><strong id="ft-clean-count">0</strong><small>已过期 / 回收站</small></article><article class="ft-storage"><div><span>已用空间</span><b id="ft-storage-value">0 / 256 MiB</b></div><progress id="ft-storage-bar" value="0" max="268435456"></progress><small>过期和回收站文件仍占空间，永久清理后释放。</small></article></div>
-            <section id="ft-queue-section" class="ft-queue-section" hidden aria-label="上传任务"><header><div><p class="ft-eyebrow">ON ITS WAY</p><h3>正在传送的小东西</h3></div><button id="ft-clear-queue" type="button">移除已完成任务</button></header><div id="ft-queue"></div><p>取消或断网不一定代表服务端未收到。可刷新核对，重试会沿用原上传标识，不重复保存。</p></section>
-            <section class="ft-library"><div class="ft-library-head"><div><p class="ft-eyebrow">YOUR TRANSFER SHELF</p><h3>文件收纳架</h3></div><button id="ft-refresh" type="button">↻ 刷新</button></div><div class="ft-controls"><div id="ft-tabs" role="group" aria-label="文件状态"><button type="button" data-ft-tab="active" aria-pressed="true">可下载</button><button type="button" data-ft-tab="expired" aria-pressed="false">已过期</button><button type="button" data-ft-tab="trash" aria-pressed="false">回收站</button></div><label class="ft-search"><span aria-hidden="true">⌕</span><input id="ft-query" type="search" placeholder="搜索文件名" aria-label="搜索文件名" maxlength="180"></label><select id="ft-kind" aria-label="文件类型"><option value="">所有类型</option><option value="image">图片</option><option value="document">文档</option><option value="media">影音</option><option value="archive">压缩包</option><option value="other">其他</option></select><select id="ft-sort" aria-label="文件排序"><option value="newest">最新上传</option><option value="oldest">最早上传</option><option value="size">文件大小</option></select></div><p id="ft-status" class="ft-status" role="status" aria-live="polite"></p><div id="ft-list" class="ft-list"></div><div class="ft-pagination"><button id="ft-prev" type="button">上一页</button><span id="ft-page">1 / 1</span><button id="ft-next" type="button">下一页</button></div></section>
-            <p class="ft-footnote">仅当前账号可见 · 不创建公开下载链接 · 文件单独存放于本机 data/transfers（或 DATA_FILE 同级目录） · 不提供病毒扫描，请确认文件来源安全。</p>
-          </section>
+          <nav class="workspace-tabs" data-workspace-views="todo tasks" aria-label="工作区栏目"><button class="nav-link" type="button" data-view="todo">日常待办</button><button class="nav-link" type="button" data-view="tasks">学习任务</button></nav>
+<nav class="workspace-tabs" data-workspace-views="goals planner vocabulary english literature insights" aria-label="工作区栏目"><button class="nav-link" type="button" data-view="goals">学习目标</button><button class="nav-link" type="button" data-view="planner">安排计划</button><button class="nav-link" type="button" data-view="vocabulary">单词</button><button class="nav-link" type="button" data-view="english">英语精读</button><button class="nav-link" type="button" data-view="literature">阅读</button><button class="nav-link" type="button" data-view="insights">复盘与统计</button></nav>
+<nav class="workspace-tabs" data-workspace-views="timeline explore" aria-label="工作区栏目"><button class="nav-link" type="button" data-view="timeline">生活足迹</button><button class="nav-link" type="button" data-view="explore">回忆收藏</button></nav>
+<span id="page-announcement" class="product-sr-only" role="status" aria-live="polite" aria-atomic="true"></span>
+
           <section id="panel-care" class="panel care-space" aria-label="生活保养站">
             <header class="care-hero"><div><p class="care-eyebrow">SMALL CARE, BETTER DAYS</p><h2>让生活的小事，<br><em>按时被照顾。</em></h2><p>不是每天都要打卡。<br>把容易忘记的维护与整理，交给一个合适的周期。</p><div class="care-hero-actions"><button id="care-new" class="care-primary" type="button">＋ 添加保养事项</button><button id="care-presets-open" type="button">从生活灵感开始 ↗</button></div></div><aside><span class="care-orbit" aria-hidden="true">✳</span><small>下一件，值得照顾的小事</small><strong id="care-next-title">从一件小事开始</strong><span id="care-next-caption">你决定节奏，不必追求完美。</span></aside></header>
             <div class="care-stats"><button type="button" data-care-view="now"><span>已过计划日</span><b id="care-overdue">0</b><small>可以推迟，也可以现在开始</small></button><button type="button" data-care-view="now"><span>今天照顾</span><b id="care-today">0</b><small>把今天留给少数重要的事</small></button><button type="button" data-care-view="soon"><span>接下来 7 天</span><b id="care-soon">0</b><small>提前知道，不必提前焦虑</small></button><article><span>近 7 天完成记录</span><b id="care-done">0</b><small>每一次照顾，都有迹可循</small></article></div>
@@ -319,7 +280,7 @@
             </div>
           </section>
 
-          <section id="panel-toolkit" class="panel">
+          <section id="panel-toolkit" class="panel"><details class="workspace-extra"><summary>下一件小事</summary><section id="choice-room" class="playroom"><header><p class="eyebrow">下一件小事</p><h3>从手边的小事开始。</h3><p>写下现在想做的几件小事，转一下选一个开始。</p></header><div class="playroom-layout"><article class="surface choice-stage"><div class="choice-wheel-shell"><i aria-hidden="true"></i><canvas id="choice-wheel" width="600" height="600" aria-label="选择转盘，结果在下方以文字显示"></canvas></div><p id="choice-result" role="status" aria-live="polite">准备好选项，再转一下。</p><button id="choice-spin" class="primary" type="button">开始抽选</button><p id="choice-status" class="playroom-note" role="status" aria-live="polite"></p></article><aside class="surface"><div class="sound-preset-row"><button type="button" data-choice-preset="food">短暂休息</button><button type="button" data-choice-preset="weekend">推进一点</button></div><label>选项，每行一项（2–40 项）<textarea id="choice-options" rows="8" maxlength="3240" placeholder="散步&#10;看电影&#10;在家做饭"></textarea></label><label class="playroom-check"><input id="choice-unique" type="checkbox">不重复抽取，直到这一轮抽完</label><button id="choice-reset" class="quiet" type="button">重新开始这一轮</button><p class="playroom-note">每项最多 80 字，重复项自动合并。修改选项会重置这一轮；清单与最近 30 次结果仅保存于本浏览器的当前账号。</p><div class="choice-history-head"><h3>最近的决定</h3><button id="choice-clear" class="quiet" type="button">清空记录</button></div><ol id="choice-history"></ol></aside></div></section></details>
             <header class="toolkit-heading"><div><p class="eyebrow">SMALL TOOLS. EVERYDAY MAGIC.</p><h2>生活里的小事，顺手解决。</h2><p>算一笔账，等一壶水，记录一次用时。熟悉的小工具，现在就在手边。</p></div><span class="toolkit-local">● 本机运算 · 无需外部接口</span></header>
             <div class="toolkit-tabs" role="tablist" aria-label="选择随身工具"><button id="toolkit-tab-calc" type="button" role="tab" aria-controls="toolkit-calc" aria-selected="true" data-tool="calc"><b aria-hidden="true">＋</b><span>计算器<small>随手算一算</small></span></button><button id="toolkit-tab-timer" type="button" role="tab" aria-controls="toolkit-timer" aria-selected="false" tabindex="-1" data-tool="timer"><b aria-hidden="true">◴</b><span>倒计时<small>把等待交给时间</small></span></button><button id="toolkit-tab-watch" type="button" role="tab" aria-controls="toolkit-watch" aria-selected="false" tabindex="-1" data-tool="watch"><b aria-hidden="true">◷</b><span>秒表<small>每一段都算数</small></span></button><button id="toolkit-tab-convert" type="button" role="tab" aria-controls="toolkit-convert" aria-selected="false" tabindex="-1" data-tool="convert"><b aria-hidden="true">⇄</b><span>单位换算<small>熟悉另一种尺度</small></span></button><button id="toolkit-tab-clock" type="button" role="tab" aria-controls="toolkit-clock" aria-selected="false" tabindex="-1" data-tool="clock"><b aria-hidden="true">◷</b><span>时钟<small>此刻，正好</small></span></button><button id="toolkit-tab-image" type="button" role="tab" aria-controls="toolkit-image" aria-selected="false" tabindex="-1" data-tool="image"><b aria-hidden="true">▧</b><span>图片瘦身<small>轻一点，好分享</small></span></button><button id="toolkit-tab-record" type="button" role="tab" aria-controls="toolkit-record" aria-selected="false" tabindex="-1" data-tool="record"><b aria-hidden="true">●</b><span>随身录音<small>把声音留住</small></span></button><button id="toolkit-tab-text" type="button" role="tab" aria-controls="toolkit-text" aria-selected="false" tabindex="-1" data-tool="text"><b aria-hidden="true">Aa</b><span>文字整理<small>让文字清爽一点</small></span></button></div>
             <p id="toolkit-storage-status" class="toolkit-footnote" role="status"></p>
@@ -347,16 +308,7 @@
             <section id="toolkit-convert" class="toolkit-content" role="tabpanel" aria-labelledby="toolkit-tab-convert" hidden><div class="toolkit-converter"><p class="eyebrow">SAME THING. DIFFERENT SCALE.</p><h3>换一种单位，就懂了。</h3><label>换算类别<select id="toolkit-unit-category"></select></label><div class="toolkit-convert-box"><label>原数值<input id="toolkit-unit-value" type="number" step="any" value="1"></label><label>原单位<select id="toolkit-unit-from"></select></label></div><button id="toolkit-unit-swap" class="quiet toolkit-swap" type="button" aria-label="交换原单位和目标单位">⇅ 交换单位</button><div class="toolkit-convert-box is-result"><div><span>换算结果</span><output id="toolkit-unit-result" aria-live="polite">—</output></div><label>目标单位<select id="toolkit-unit-to"></select></label></div><p id="toolkit-unit-status" role="status"></p><button id="toolkit-unit-copy" type="button" class="quiet">复制结果</button></div><aside class="toolkit-settings"><p class="eyebrow">KEEP IT SIMPLE</p><h3>常用尺度，一次换清。</h3><div class="toolkit-tip"><b>六类日常单位</b><p>长度、重量、温度、面积、容量和时间。输入即换算，支持反向交换。</p></div><div class="toolkit-tip"><b>不依赖网络数据</b><p>使用固定换算比例，不提供汇率；小数结果为近似值，按最多 12 位有效数字显示。</p></div><p class="toolkit-footnote">工具记录仅保留在当前浏览器标签页，不上传服务器、不跨设备同步。退出登录会清空本页工具记录。</p></aside></section>
           </section>
 
-          <section id="panel-bookmarks" class="panel">
-            <header class="bookmark-hero"><div><p class="eyebrow">A LITTLE LIBRARY OF THE INTERNET</p><h2>好东西，留在手边。</h2><p>常用网站、想读的文章、偶然发现的灵感。<br>不必一直开着标签页，下次来这里找。</p><button id="bookmark-new" class="primary" type="button">＋ 收藏一个链接</button></div><div class="bookmark-hero-art" aria-hidden="true"><span>READ<br>LATER.</span><i>↗</i><b>为下次遇见，留个位置</b></div></header>
-            <div class="bookmark-layout"><aside class="bookmark-sidebar"><p class="eyebrow">我的收藏架</p><div id="bookmark-views"></div><div class="bookmark-folder-heading"><h3>文件夹</h3><small>保存时即可新建</small></div><div id="bookmark-folders"></div><p class="bookmark-help">只保存链接和你的备注，不抓取网页。点击原文将在新标签页打开。</p></aside><main class="bookmark-main">
-              <div class="bookmark-toolbar"><label class="bookmark-search"><span class="bookmark-sr">搜索收藏</span><input id="bookmark-search" type="search" placeholder="搜索标题、网址或备注…" maxlength="200"></label><label><span class="bookmark-sr">排序</span><select id="bookmark-sort"><option value="newest">最近收藏</option><option value="oldest">最早收藏</option><option value="title">标题 A–Z</option></select></label><button id="bookmark-refresh" type="button" class="quiet">刷新</button><button id="bookmark-export" type="button" class="quiet">导出</button></div>
-              <div class="bookmark-section-title"><h3 id="bookmark-heading">全部收藏</h3><span id="bookmark-count"></span></div><p id="bookmark-status" role="status" aria-live="polite"></p>
-              <div id="bookmark-recovery" class="bookmark-recovery" hidden><span>保存结果尚未确认，草稿已保留。请先重试或核对服务器记录。</span><button id="bookmark-retry" class="quiet" type="button">原样重试</button><button id="bookmark-draft" class="quiet" type="button">导出草稿</button><button id="bookmark-reconcile" class="quiet" type="button">重新核对</button></div>
-              <div id="bookmark-grid" class="bookmark-grid"></div><footer class="bookmark-pagination"><button id="bookmark-prev" type="button" class="quiet">← 上一页</button><span id="bookmark-page"></span><button id="bookmark-next" type="button" class="quiet">下一页 →</button></footer>
-            </main></div>
-            <dialog id="bookmark-dialog" class="bookmark-dialog" aria-labelledby="bookmark-editor-title"><form id="bookmark-form"><header><div><p class="eyebrow">KEEP SOMETHING GOOD</p><h2 id="bookmark-editor-title">收藏一个链接</h2></div><button id="bookmark-close" type="button" class="quiet" aria-label="关闭收藏编辑">×</button></header><fieldset id="bookmark-fields"><label>网址<input id="bookmark-url" required maxlength="2048" placeholder="粘贴网址，例如 example.com" autocomplete="url"></label><label>标题 <small>可留空，自动使用网站域名</small><input id="bookmark-title" maxlength="160" placeholder="给它起一个好找的名字"></label><label>文件夹<input id="bookmark-folder" maxlength="30" list="bookmark-folder-options" placeholder="未分类，或输入新文件夹名称"></label><datalist id="bookmark-folder-options"></datalist><label>留一句备注<textarea id="bookmark-note" rows="3" maxlength="2000" placeholder="为什么收藏它？下次想用它做什么？"></textarea></label><div class="bookmark-checks"><label><input id="bookmark-pinned" type="checkbox"> 置顶常用</label><label><input id="bookmark-read" type="checkbox"> 已读</label></div></fieldset><p id="bookmark-form-status" role="status"></p><footer><small>请勿收藏含密码、访问令牌的私密链接。</small><button id="bookmark-save" class="primary" type="submit">保存收藏</button></footer></form></dialog>
-          </section>
+
 
           <section id="panel-inventory" class="panel">
             <div class="shopping-tabs" role="tablist" aria-label="物品管家"><button id="collection-tab" type="button" role="tab" aria-selected="true" aria-controls="inventory-collection">物品档案</button><button id="shopping-tab" type="button" role="tab" aria-selected="false" aria-controls="shopping-space" tabindex="-1">买点什么</button></div>
@@ -430,6 +382,7 @@
           </section>
 
           <section id="panel-calendar" class="panel">
+<div class="calendar-daily-entry"><button id="daily-trigger" class="daily-trigger" type="button" aria-haspopup="dialog" aria-controls="daily-dialog" aria-label="打开今日签"><span aria-hidden="true">签</span><b id="daily-trigger-label">今日签</b></button></div>
             <header class="organizer-heading"><div><p class="eyebrow">THE ART OF EVERYDAY · 四时有序</p><h3>把日子，过成喜欢的节奏。</h3><p>安排重要的事，也为生活留一点空白。</p></div><div class="organizer-emblem" aria-hidden="true"><i></i><span>日有小暖<br>岁有从容</span></div></header>
             <div class="calendar-shell">
               <div class="calendar-toolbar">
@@ -543,10 +496,10 @@
 
           <section id="panel-explore" class="panel">
             <header class="explore-heading"><div><p class="eyebrow">LITTLE ADVENTURES · 日常之外</p><h3>生活不止待办，还有值得期待的小事。</h3><p>给未来寄一封信，为今天拆一份惊喜。不打分，也不必追求效率。</p></div><span aria-hidden="true">✺</span></header>
-            <div class="explore-tabs" role="group" aria-label="探索栏目"><button data-explore-tab="letter" type="button" aria-pressed="true">✉ 时光邮局</button><button data-explore-tab="challenge" type="button" aria-pressed="false">✦ 生活盲盒</button><button data-explore-tab="place" type="button" aria-pressed="false">◎ 人生地图</button><button data-explore-tab="exhibit" type="button" aria-pressed="false">▥ 私人博物馆</button><button data-explore-tab="sound" type="button" aria-pressed="false">♫ 声音小屋</button><button data-explore-tab="choice" type="button" aria-pressed="false">◉ 选择实验室</button><button id="explore-refresh" class="quiet" type="button">刷新记录</button></div>
+            <div class="explore-tabs" role="group" aria-label="探索栏目"><button data-explore-tab="letter" type="button" aria-pressed="true">✉ 时光邮局</button><button data-explore-tab="place" type="button" aria-pressed="false">◎ 人生地图</button><button data-explore-tab="exhibit" type="button" aria-pressed="false">▥ 私人博物馆</button><button id="explore-refresh" class="quiet" type="button">刷新记录</button></div>
             <p id="explore-status" role="status" aria-live="polite">进入后加载当前账号的记录。</p>
-            <section id="sound-room" class="playroom hidden"><header><p class="eyebrow">SOUND CABIN · 把世界调轻一点</p><h3>留一间，听得见安静的小屋。</h3><p>本地合成环境声，不是实地录音。请从较低音量开始。</p></header><div class="playroom-layout"><article class="surface"><div class="sound-preset-row"><button type="button" data-sound-preset="rain">窗边雨夜</button><button type="button" data-sound-preset="coast">海边小憩</button><button type="button" data-sound-preset="quiet">柔和底噪</button></div><div id="sound-tracks"></div><label>总音量 <output id="sound-master-label">35%</output><input id="sound-master" type="range" min="0" max="100" value="35"></label><div class="playroom-actions"><button id="sound-start" class="primary" type="button">▶ 开始聆听</button><button id="sound-stop" class="quiet" type="button" disabled>停止</button><label>定时停止<select id="sound-timer"><option value="0">不限时</option><option value="15">15 分钟</option><option value="30">30 分钟</option><option value="60">60 分钟</option></select></label></div><p id="sound-status" role="status" aria-live="polite">声音不会自动播放。</p></article><aside class="surface"><p class="eyebrow">MY SOUNDSCAPES</p><h3>收藏我的声音配方</h3><form id="sound-scene-form"><label>场景名称<input id="sound-scene-name" required maxlength="30" placeholder="例如：周末的书桌"></label><button class="primary" type="submit">保存当前混音</button></form><div id="sound-scenes"></div><p class="playroom-note">最多 8 个自定义场景，同名保存会更新。仅在本浏览器按账号保存；不会上传音频。切换页面继续播放，右下角可随时停止；退出账号自动停止。设备休眠或浏览器限制可能中断播放。</p></aside></div></section>
-            <section id="choice-room" class="playroom hidden"><header><p class="eyebrow">CHOICE LAB · 把小纠结交给偶然</p><h3>有些选择，不妨转一下。</h3><p>晚饭吃什么、周末做什么？每个有效选项等概率，不替你做重要决定。</p></header><div class="playroom-layout"><article class="surface choice-stage"><div class="choice-wheel-shell"><i aria-hidden="true"></i><canvas id="choice-wheel" width="600" height="600" aria-label="选择转盘，结果在下方以文字显示"></canvas></div><p id="choice-result" role="status" aria-live="polite">准备好选项，再转一下。</p><button id="choice-spin" class="primary" type="button">开始抽选</button><p id="choice-status" class="playroom-note" role="status" aria-live="polite"></p></article><aside class="surface"><div class="sound-preset-row"><button type="button" data-choice-preset="food">吃点什么</button><button type="button" data-choice-preset="weekend">周末灵感</button></div><label>选项，每行一项（2–40 项）<textarea id="choice-options" rows="8" maxlength="3240" placeholder="散步&#10;看电影&#10;在家做饭"></textarea></label><label class="playroom-check"><input id="choice-unique" type="checkbox">不重复抽取，直到这一轮抽完</label><button id="choice-reset" class="quiet" type="button">重新开始这一轮</button><p class="playroom-note">每项最多 80 字，重复项自动合并。修改选项会重置这一轮；清单与最近 30 次结果仅保存于本浏览器的当前账号。</p><div class="choice-history-head"><h3>最近的决定</h3><button id="choice-clear" class="quiet" type="button">清空记录</button></div><ol id="choice-history"></ol></aside></div></section>
+
+
             <section id="keepsake-workspace" class="hidden">
               <header class="keepsake-heading"><div><p class="eyebrow" id="keepsake-kicker">MY ATLAS</p><h3 id="keepsake-heading">把足迹，留在自己的地图上。</h3><p id="keepsake-caption">远方可以是一座城，也可以是街角的一家小店。</p></div><button id="keepsake-new" class="primary" type="button">＋ 记录地点</button></header>
               <div class="keepsake-toolbar"><label>搜索<input id="keepsake-search" type="search" placeholder="名称、故事、展柜…"></label><label>主题展柜<select id="keepsake-collection"><option value="">全部主题</option></select></label><label>状态<select id="keepsake-state"><option value="active">当前收藏</option><option value="favorite">特别喜欢</option><option value="archived">已归档</option></select></label><label>类型<select id="keepsake-category"><option value="">全部</option></select></label><button id="keepsake-reload" class="quiet" type="button">刷新</button></div>
@@ -557,7 +510,7 @@
             </section>
             <div class="explore-layout"><article class="surface explore-compose">
               <form id="explore-letter-form"><p class="eyebrow">TO MY FUTURE SELF</p><h3>写给未来的自己</h3><label>信封标题<input id="explore-title" required maxlength="120" placeholder="致一年后的我"></label><label>此刻心情<select id="explore-mood"><option>平静</option><option>期待</option><option>开心</option><option>迷茫</option><option>疲惫</option></select></label><label>解锁时间（当前设备时区）<input id="explore-unlock" type="datetime-local" required></label><label>信的内容<textarea id="explore-body" required rows="8" maxlength="12000" placeholder="最近在意什么？希望未来的自己还记得什么？"></textarea></label><button class="primary" type="submit">封存这封信</button><p class="explore-note">封存后不能修改；到期后在这里打开，不会发送邮件。标题和心情始终可见，正文到期前由服务端隐藏。此功能不是加密保险箱，本地数据快照仍包含正文。</p></form>
-              <form id="explore-challenge-form" class="hidden"><p class="eyebrow">MAKE ROOM FOR SURPRISE</p><h3>给今天一点新鲜感</h3><label>我有多少时间<select id="explore-minutes"><option value="5">5 分钟</option><option value="15" selected>15 分钟</option><option value="30">30 分钟</option><option value="60">1 小时</option></select></label><label>预算上限<select id="explore-budget"><option value="0">不花钱</option><option value="20">20 元以内</option></select></label><label>想待在哪里<select id="explore-place"><option value="any">都可以</option><option value="indoor">室内</option><option value="outdoor">户外</option></select></label><div class="explore-box" aria-hidden="true">✦</div><button class="primary" type="submit">拆开生活盲盒</button><p class="explore-note">从 12 个原创小挑战中抽取，优先选择没遇到过的内容。预算和时间为参考；不需要购买任何东西，也可以不完成。</p></form>
+              <form hidden id="explore-challenge-form" class="hidden"><p class="eyebrow">MAKE ROOM FOR SURPRISE</p><h3>给今天一点新鲜感</h3><label>我有多少时间<select id="explore-minutes"><option value="5">5 分钟</option><option value="15" selected>15 分钟</option><option value="30">30 分钟</option><option value="60">1 小时</option></select></label><label>预算上限<select id="explore-budget"><option value="0">不花钱</option><option value="20">20 元以内</option></select></label><label>想待在哪里<select id="explore-place"><option value="any">都可以</option><option value="indoor">室内</option><option value="outdoor">户外</option></select></label><div class="explore-box" aria-hidden="true">✦</div><button class="primary" type="submit">拆开生活盲盒</button><p class="explore-note">从 12 个原创小挑战中抽取，优先选择没遇到过的内容。预算和时间为参考；不需要购买任何东西，也可以不完成。</p></form>
             </article><section class="surface explore-records"><div class="explore-record-head"><div><p class="eyebrow">YOUR LITTLE COLLECTION</p><h3 id="explore-list-title">我的时光信件</h3></div><select id="explore-filter" aria-label="按记录状态筛选"><option value="all">全部记录</option><option value="waiting">等待中</option><option value="done">已解锁 / 已完成</option></select></div><div id="explore-list"></div><nav class="explore-pages" aria-label="探索记录分页"><button id="explore-prev" class="quiet" type="button">上一页</button><span id="explore-page"></span><button id="explore-next" class="quiet" type="button">下一页</button></nav></section></div>
           </section>
 
@@ -750,7 +703,7 @@
             </section>
           </section>
 
-          <section id="panel-focus" class="panel">
+          <section id="panel-focus" class="panel"><details class="workspace-extra"><summary>背景声音</summary><section id="sound-room" class="playroom"><header><p class="eyebrow">SOUND CABIN · 把世界调轻一点</p><h3>留一间，听得见安静的小屋。</h3><p>本地合成环境声，不是实地录音。请从较低音量开始。</p></header><div class="playroom-layout"><article class="surface"><div class="sound-preset-row"><button type="button" data-sound-preset="rain">窗边雨夜</button><button type="button" data-sound-preset="coast">海边小憩</button><button type="button" data-sound-preset="quiet">柔和底噪</button></div><div id="sound-tracks"></div><label>总音量 <output id="sound-master-label">35%</output><input id="sound-master" type="range" min="0" max="100" value="35"></label><div class="playroom-actions"><button id="sound-start" class="primary" type="button">▶ 开始聆听</button><button id="sound-stop" class="quiet" type="button" disabled>停止</button><label>定时停止<select id="sound-timer"><option value="0">不限时</option><option value="15">15 分钟</option><option value="30">30 分钟</option><option value="60">60 分钟</option></select></label></div><p id="sound-status" role="status" aria-live="polite">声音不会自动播放。</p></article><aside class="surface"><p class="eyebrow">MY SOUNDSCAPES</p><h3>收藏我的声音配方</h3><form id="sound-scene-form"><label>场景名称<input id="sound-scene-name" required maxlength="30" placeholder="例如：周末的书桌"></label><button class="primary" type="submit">保存当前混音</button></form><div id="sound-scenes"></div><p class="playroom-note">最多 8 个自定义场景，同名保存会更新。仅在本浏览器按账号保存；不会上传音频。切换页面继续播放，右下角可随时停止；退出账号自动停止。设备休眠或浏览器限制可能中断播放。</p></aside></div></section></details>
             <header class="focus-studio-header">
               <div><p class="eyebrow">FOCUS STUDIO / 专注空间</p><h3>此刻，只做一件事。</h3><p>让注意力慢慢落定，按自己的节奏向前。</p></div>
               <button id="focus-quiet-toggle" class="quiet" type="button" aria-pressed="false" aria-controls="focus-workspace">简洁模式</button>
@@ -945,7 +898,7 @@
         <nav class="dc-shortcuts" aria-label="数据中心快捷操作"><button id="dc-jump-check" type="button" aria-controls="dc-check-section">检查附件 ↓</button><button id="dc-jump-export" type="button" aria-controls="dc-export-section">导出记录 ↓</button><button id="dc-jump-guide" type="button" aria-controls="dc-guide-section">完整备份 ↓</button></nav>
         <p class="dc-caption dc-persistence-note">当前仍使用周期快照，提交成功不等于本次修改已立即落盘。写盘状态可在「连接与诊断」查看。</p>
         <div class="dc-content-grid"><section class="dc-card dc-records"><header><div><span class="dc-kicker">RECORDS</span><h3>记录分布</h3></div><span>仅当前账号</span></header><p class="dc-caption">展开查看各类数量。这里统计记录对象，不是磁盘字节或任务完成数。</p><div id="dc-collections"></div></section><div class="dc-side">
-          <section class="dc-card dc-storage"><header><div><span class="dc-kicker">FILE SPACE</span><h3>快传空间</h3></div><span class="dc-small-icon" aria-hidden="true">◇</span></header><p id="dc-quota-caption" class="dc-space-value">尚未读取</p><progress id="dc-quota" max="268435456" value="0" aria-label="快传配额占用"></progress><p id="dc-file-states">—</p><p id="dc-file-warning" class="dc-caption">概览不等于附件内容校验。</p><button type="button" data-dc-view="transfers">管理快传文件 ↗</button><p class="dc-footnote">按索引累计，包含过期、回收站及缺失项；不代表整个数据目录的磁盘占用。</p></section>
+          <section class="dc-card dc-storage" hidden><header><div><span class="dc-kicker">FILE SPACE</span><h3>快传空间</h3></div><span class="dc-small-icon" aria-hidden="true">◇</span></header><p id="dc-quota-caption" class="dc-space-value">尚未读取</p><progress id="dc-quota" max="268435456" value="0" aria-label="快传配额占用"></progress><p id="dc-file-states">—</p><p id="dc-file-warning" class="dc-caption">概览不等于附件内容校验。</p><button type="button" data-dc-view="inventory">查看生活物品 ↗</button><p class="dc-footnote">按索引累计，包含过期、回收站及缺失项；不代表整个数据目录的磁盘占用。</p></section>
           <section id="dc-export-section" class="dc-card dc-personal" tabindex="-1"><header><div><span class="dc-kicker">TAKE A COPY</span><h3>导出个人记录</h3></div><span class="dc-small-icon" aria-hidden="true">↓</span></header><p>将当前账号的业务记录导出为 JSON。不含密码、快传附件及其元数据，也不包含浏览器本地草稿。</p><button id="dc-export" class="dc-primary" type="button">↓ 导出个人 JSON</button><p id="dc-export-state" class="dc-footnote" role="status">本次会话尚未导出。</p></section>
         </div></div>
         <section id="dc-check-section" class="dc-card dc-integrity" tabindex="-1"><header><div><span class="dc-kicker">A CLOSER LOOK</span><h3>附件完整性</h3></div><span id="dc-check-badge" class="dg-badge">尚未检查</span></header><p id="dc-check-copy">主动核对附件大小与内容，不修改文件。</p><p id="dc-check-time" class="dc-caption">包含过期与回收站附件；不检查未被索引的文件。</p><div id="dc-checking" class="dc-checking" role="status" hidden><span class="dc-pulse" aria-hidden="true"></span>正在读取并核对内容，请稍候…</div><p id="dc-check-counts" class="dc-check-counts"></p><ul id="dc-issues" class="dc-issues" aria-label="需要核对的附件"></ul><div class="dc-check-actions"><button id="dc-check" class="dc-primary" type="button" disabled>开始附件检查</button><button id="dc-cancel" type="button" hidden>取消等待</button></div><p class="dc-footnote">检查结果只代表当时读取的已索引文件。文件变化、上传进行中或读取失败时需要重查；本功能不创建备份，也不验证备份恢复。</p></section>
@@ -976,6 +929,7 @@
     <script src="/static/data-center-core.js?v=20261101-1&outbox=3&calendar=20261105" defer></script>
     <script src="/static/data-center.js?v=20261103-http" defer></script>
     <script src="/static/navigation-core.js?v=20261027-1" defer></script>
+    <script src="/static/product-scope.js?v=20261112-1" defer></script>
     <script src="/static/navigation.js?v=20261027-1" defer></script>
     <script src="/static/draft-store.js?v=20261109-1" defer></script>
     <script src="/static/record-drafts-core.js?v=20261102-1" defer></script>
@@ -1006,7 +960,6 @@
     <script src="/static/fitness.js?v=20261019-checkin-1&planning=2" defer></script>
     <script src="/static/fitness-nutrition-core.js?v=20261018-1" defer></script>
     <script src="/static/fitness-nutrition.js?v=20261018-1" defer></script>
-    <script src="/static/bookmarks.js?v=20261011-2" defer></script>
     <script src="/static/toolkit-core.js?v=20261009-text" defer></script>
     <script src="/static/toolkit.js?v=20261026-tools" defer></script>
     <script src="/static/toolkit-pocket-core.js?v=20261009-text" defer></script>
@@ -1026,9 +979,7 @@
     <script src="/static/commands.js?v=20260925-daynest" defer></script>
     <script src="/static/content-search.js?v=20261020-1" defer></script>
     <script src="/static/transfers-core.js?v=20261021-1" defer></script>
-    <script src="/static/transfers.js?v=20261021-1" defer></script>
     <script src="/static/text-clips-core.js?v=20261029-1" defer></script>
-    <script src="/static/text-clips.js?v=20261029-1" defer></script>
     <script src="/static/memo-drafts-core.js?v=20261102-2" defer></script>
     <script src="/static/memo-drafts.js?v=20261102-1" defer></script>
     <script src="/static/memos.js?v=20261103-http&actions=20261103&offline=1&save=20261105" defer></script>

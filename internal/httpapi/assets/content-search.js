@@ -1,7 +1,7 @@
 (() => {
  'use strict';
  const $=id=>document.getElementById('content-search-'+id),dialog=$('dialog');if(!dialog)return;
- const sources={memos:{name:'备忘录',view:'memos',icon:'记'},todos:{name:'待办清单',view:'todo',icon:'办'},tasks:{name:'学习任务',view:'tasks',icon:'任'},calendar:{name:'个人日程',view:'calendar',icon:'历'},moods:{name:'心情日记',view:'moods',icon:'心'},inventory:{name:'物品管家',view:'inventory',icon:'物'},bookmarks:{name:'随手收藏',view:'bookmarks',icon:'藏'},care:{name:'生活保养',view:'care',icon:'护'},fitness:{name:'运动日常',view:'fitness',icon:'动'},goals:{name:'学习目标',view:'goals',icon:'目'}};
+ const sources={memos:{name:'备忘录',view:'memos',icon:'记'},todos:{name:'待办清单',view:'todo',icon:'办'},tasks:{name:'学习任务',view:'tasks',icon:'任'},calendar:{name:'个人日程',view:'calendar',icon:'历'},moods:{name:'心情日记',view:'moods',icon:'心'},inventory:{name:'物品管家',view:'inventory',icon:'物'},care:{name:'生活保养',view:'care',icon:'护'},fitness:{name:'运动日常',view:'fitness',icon:'动'},goals:{name:'学习目标',view:'goals',icon:'目'}};
  const token=()=>localStorage.getItem('studyflow.token')||'',esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const state={owner:token(),selectedSources:new Set(Object.keys(sources)),items:[],counts:{},selected:0,page:1,pages:1,total:0,available:0,query:'',loading:false,seq:0,controller:null,timer:null,opener:null,copyText:''};
  function message(text,error=false){$('status').textContent=text;$('status').classList.toggle('content-search-error',error);}

@@ -387,6 +387,8 @@
     state.taskQuery = { text: "", status: "", priority: "", deadline: "", sort: "smart", page: 1, pageSize: 8 };
     state.taskSearchComposing = false;
     state.todoLists = [];
+    $("#todo-list").innerHTML = "";
+    $("#todo-list").disabled = true;
     state.todos = [];
     state.todoView = "today";
     state.todoFilters = { priority: "", tag: "", query: "" };
@@ -446,6 +448,7 @@
 
   const viewScrollPositions = new Map();
   function showView(view, { history = "push" } = {}) {
+    if (view === "transfers" || view === "bookmarks") view = "dashboard";
     if (view === "daily") { document.getElementById("daily-trigger")?.click(); return; }
     const legacyIdeas = view === "lab";
     const legacyKnowledge = view === "knowledge";
@@ -2355,6 +2358,7 @@
     focusTask.value = [...focusTask.options].some(option=>option.value===previousTask) ? previousTask : "";
 
     const todoList = $("#todo-list");
+    todoList.disabled = state.todoLists.length === 0;
     const previousTodoList = todoList.value;
     todoList.innerHTML = state.todoLists.map((list) => `<option value="${list.id}">${escapeHTML(list.name)}${list.kind === "inbox" ? "（收集箱）" : ""}</option>`).join("");
     todoList.value = state.todoLists.some((list) => list.id === previousTodoList) ? previousTodoList : (state.todoLists[0]?.id || "");

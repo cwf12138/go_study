@@ -18,7 +18,7 @@
  function render(){
   panel.querySelectorAll('[data-explore-tab]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.exploreTab===state.tab)));
   const keepsake=state.tab==='place'||state.tab==='exhibit',play=state.tab==='sound'||state.tab==='choice';
-  $('#sound-room').classList.toggle('hidden',state.tab!=='sound');$('#choice-room').classList.toggle('hidden',state.tab!=='choice');
+
   $('#keepsake-workspace').classList.toggle('hidden',!keepsake);panel.querySelector('.explore-layout').classList.toggle('hidden',keepsake||play);$('#explore-status').classList.toggle('hidden',keepsake||play);$('#explore-refresh').classList.toggle('hidden',keepsake||play);
   if(play){document.dispatchEvent(new CustomEvent('studyflow:playrooms'));return;}
   if(keepsake){document.dispatchEvent(new CustomEvent('studyflow:keepsakes',{detail:state.tab}));return;}

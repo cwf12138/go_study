@@ -2,11 +2,11 @@ const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:a
 const root = 'internal/httpapi/assets/';
 const html = fs.readFileSync(root+'index.html','utf8');
 assert(html.includes('<title>日常 · Daynest</title>'));
-for (const name of ['今天','记录','成长','探索']) assert(html.includes(`role="group" aria-label="${name}"`));
+for (const name of ['今天','记录','成长']) assert(html.includes(`role="group" aria-label="${name}"`));
 assert(!html.includes('id="panel-knowledge"') && !html.includes('/static/knowledge.js'));
 for (const match of html.matchAll(/(?:src|href)="\/static\/([^"?]+)(?:\?[^" ]*)?"/g)) assert(fs.existsSync(root+match[1]), `missing asset ${match[1]}`);
 const navs = [...html.matchAll(/class="nav-link[^"]*"[^>]*data-view="([^"]+)"/g)].map(m=>m[1]);
-assert.equal(navs.length,24); assert(navs.includes('transfers')); assert(!navs.includes('whiteboards')); assert(!navs.includes('splits')); assert(navs.includes('care')); assert(navs.includes('fitness')); assert(navs.includes('bookmarks')); assert(navs.includes('toolkit')); assert(navs.includes('subscriptions')); assert(navs.includes('meals')); assert(!navs.includes('projects')); assert(!navs.includes('travel')); for (const name of navs) assert(html.includes(`id="panel-${name}"`));
+assert.equal(new Set(navs).size,22); assert(!navs.includes('transfers')); assert(!navs.includes('whiteboards')); assert(!navs.includes('splits')); assert(navs.includes('care')); assert(navs.includes('fitness')); assert(!navs.includes('bookmarks')); assert(navs.includes('toolkit')); assert(navs.includes('subscriptions')); assert(navs.includes('meals')); assert(!navs.includes('projects')); assert(!navs.includes('travel')); for (const name of navs) assert(html.includes(`id="panel-${name}"`));
 const elements = new Map();
 function el(key) { if (!elements.has(key)) elements.set(key,{value:'',textContent:'',innerHTML:'',disabled:false,classList:{toggle(){},remove(){}},parentElement:{classList:{toggle(){}}}}); return elements.get(key); }
 const context = {Date,Intl,URLSearchParams,AbortController,Headers:class{set(){}has(){return false}},console,

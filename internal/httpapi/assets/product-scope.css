@@ -1,0 +1,9 @@
+.workspace-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 16px;padding:6px;border:1px solid var(--line);border-radius:14px;background:var(--paper)}
+.workspace-tabs[hidden]{display:none}
+.workspace-tabs .nav-link{width:auto;min-height:44px;margin:0;padding:9px 14px;font-size:14px;flex:0 0 auto}
+.workspace-extra{margin-bottom:18px;padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--paper)}
+.workspace-extra>summary{cursor:pointer;min-height:40px;line-height:40px;font-weight:650}
+.calendar-daily-entry{display:flex;justify-content:flex-end;margin-bottom:12px}
+#explore-challenge-form[hidden],.dc-storage[hidden]{display:none!important}
+.daynest-native #meal-ai-open{display:none!important}
+@media(max-width:700px){.workspace-tabs{flex-wrap:nowrap;overflow-x:auto}.workspace-tabs .nav-link{white-space:nowrap}.workspace-extra{padding:12px}}

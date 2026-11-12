@@ -168,7 +168,7 @@ public class CloudDeviceTest {
     }
 
     private void openMobilePage(String view) throws Exception {
-        evaluate("document.querySelector('#mobile-tabs [data-mobile-view=all]').click();document.querySelector('[data-mobile-target=" + view + "]').click()");
+        evaluate("document.querySelector('.nav-link[data-view=" + view + "]').click()");
         waitFor("document.body.dataset.mobileView === " + JSONObject.quote(view), "mobile page " + view);
         SystemClock.sleep(250);
     }
@@ -180,7 +180,7 @@ public class CloudDeviceTest {
         launch();
         waitFor("window.DaynestMobileUX && window.DaynestAccount?.current?.() && document.getElementById('user-name').textContent.includes('MobileQA')", "verified QA session");
         assertEquals("5", evaluate("document.querySelectorAll('#mobile-tabs [data-mobile-view]').length"));
-        JSONArray views = new JSONArray(evaluate("Array.from(document.querySelectorAll('.daynest-nav .nav-link[data-view]')).map(node=>node.dataset.view)"));
+        JSONArray views = new JSONArray(evaluate("Array.from(new Set(Array.from(document.querySelectorAll('.nav-link[data-view]')).map(node=>node.dataset.view)))"));
         for (int index = 0; index < views.length(); index++) {
             String view = views.getString(index);
             openMobilePage(view);
@@ -195,7 +195,7 @@ public class CloudDeviceTest {
         waitFor("!document.getElementById('mobile-functions').open", "Android back closes functions");
         report("function_search_and_native_back");
 
-        String[][] dialogs = {{"bookmarks", "bookmark-new"}, {"ledger", "ledger-new"}, {"subscriptions", "sub-new"}, {"care", "care-new"}, {"fitness", "fit-log-open"}};
+        String[][] dialogs = {{"ledger", "ledger-new"}, {"subscriptions", "sub-new"}, {"care", "care-new"}, {"fitness", "fit-log-open"}};
         for (String[] entry : dialogs) {
             openMobilePage(entry[0]);
             evaluate("document.getElementById(" + JSONObject.quote(entry[1]) + ").click()");
