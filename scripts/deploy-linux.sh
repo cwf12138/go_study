@@ -7,6 +7,8 @@ umask 027
 payload=$(realpath "${1:?Missing payload directory}")
 release_id=${2:?Missing release ID}
 [[ $release_id =~ ^daynest-[0-9]{8}T[0-9]{6}Z-[a-f0-9]{7,40}$ ]] || { echo 'Invalid release ID.' >&2; exit 1; }
+exec 9>/run/lock/daynest-deploy.lock
+flock -n 9 || { echo 'Another Daynest deployment is running.' >&2; exit 1; }
 release_dir=/opt/daynest/releases/$release_id
 [[ -f $payload/bin/daynest && -f $payload/bin/daynest-backup && -f $payload/assets/index.html ]] || { echo 'Incomplete payload.' >&2; exit 1; }
 [[ ! -e $release_dir ]] || { echo 'Release already exists; use a new release ID.' >&2; exit 1; }
@@ -14,6 +16,32 @@ if [[ -d $payload/migration && -e /var/lib/daynest/data ]]; then
   echo 'Refusing to replace existing server data with a migration.' >&2
   exit 1
 fi
+
+previous_release=''
+service_stopped=false
+release_switched=false
+if [[ -L /opt/daynest/current ]]; then
+  previous_release=$(readlink -f /opt/daynest/current)
+fi
+recover_failed_deployment() {
+  result=$?
+  trap - EXIT
+  if (( result != 0 )); then
+    set +e
+    if $release_switched && [[ -n $previous_release && -d $previous_release ]]; then
+      ln -s "$previous_release" "/opt/daynest/.rollback-$release_id"
+      if mv -Tf "/opt/daynest/.rollback-$release_id" /opt/daynest/current; then
+        echo 'Deployment failed; previous executable release restored. Data was not rolled back.' >&2
+      fi
+    fi
+    if $service_stopped || $release_switched; then
+      systemctl daemon-reload
+      systemctl restart daynest.service || echo 'Service recovery failed; inspect daynest.service immediately.' >&2
+    fi
+  fi
+  exit "$result"
+}
+trap recover_failed_deployment EXIT
 
 getent passwd daynest >/dev/null || useradd --system --user-group --home-dir /var/lib/daynest --shell /usr/sbin/nologin daynest
 install -d -m 0755 /opt/daynest /opt/daynest/releases
@@ -53,6 +81,21 @@ EOF
   chmod 0640 /etc/daynest/daynest.env
 fi
 
+http_address=$(sed -n 's/^HTTP_ADDR=//p' /etc/daynest/daynest.env | tail -n 1)
+health_port=${http_address##*:}
+[[ $health_port =~ ^[0-9]+$ ]] || { echo 'Invalid HTTP_ADDR port in server configuration.' >&2; exit 1; }
+health_base=http://127.0.0.1:$health_port
+
+if [[ -n $previous_release ]]; then
+  backup_dir=/var/backups/daynest/pre-deploy-$release_id
+  install -d -m 0700 /var/backups/daynest
+  service_stopped=true
+  systemctl stop daynest.service
+  "$previous_release/bin/daynest-backup" create --data-file /var/lib/daynest/data/studyflow.json --output "$backup_dir" --service-stopped --json
+  "$previous_release/bin/daynest-backup" verify --input "$backup_dir" --json
+  echo "Pre-deployment backup verified: $backup_dir"
+fi
+
 cat > /etc/systemd/system/daynest.service <<'EOF'
 [Unit]
 Description=Daynest personal workspace
@@ -84,19 +127,13 @@ WantedBy=multi-user.target
 EOF
 chmod 0644 /etc/systemd/system/daynest.service
 
-previous_release=''
-if [[ -L /opt/daynest/current ]]; then
-  previous_release=$(readlink -f /opt/daynest/current)
-fi
 ln -s "$release_dir" "/opt/daynest/.current-$release_id"
 mv -Tf "/opt/daynest/.current-$release_id" /opt/daynest/current
+release_switched=true
 systemctl daemon-reload
 systemctl enable daynest.service
 systemctl restart daynest.service
-http_address=$(sed -n 's/^HTTP_ADDR=//p' /etc/daynest/daynest.env | tail -n 1)
-health_port=${http_address##*:}
-[[ $health_port =~ ^[0-9]+$ ]] || { echo 'Invalid HTTP_ADDR port in server configuration.' >&2; exit 1; }
-health_base=http://127.0.0.1:$health_port
+service_stopped=false
 for attempt in $(seq 1 30); do
   if curl --fail --silent --max-time 2 "$health_base/healthz" >/dev/null && curl --fail --silent --max-time 2 "$health_base/readyz" >/dev/null; then
     systemctl --no-pager --full status daynest.service
@@ -106,10 +143,4 @@ for attempt in $(seq 1 30); do
   sleep 1
 done
 journalctl -u daynest.service -n 40 --no-pager >&2
-if [[ -n $previous_release && -d $previous_release && $previous_release != "$release_dir" ]]; then
-  ln -s "$previous_release" /opt/daynest/.rollback
-  mv -Tf /opt/daynest/.rollback /opt/daynest/current
-  systemctl restart daynest.service
-  echo 'Health check failed; previous executable release restored. Data was not rolled back.' >&2
-fi
 exit 1

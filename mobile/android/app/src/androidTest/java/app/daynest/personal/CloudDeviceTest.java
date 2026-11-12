@@ -20,6 +20,12 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.json.JSONObject;
+import org.json.JSONArray;
+import android.graphics.Bitmap;
+import android.view.KeyEvent;
+import android.view.inputmethod.InputMethodManager;
+import java.io.File;
+import java.io.FileOutputStream;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -144,5 +150,93 @@ public class CloudDeviceTest {
         waitFor("document.getElementById('memo-note-list').textContent.includes(" + JSONObject.quote(label) + ")", "memo reloaded from server");
         report("memo_reloaded_after_restart");
         evaluate("document.querySelector('.nav-link[data-view=dashboard]').click()");
+    }
+
+    private void screenshot(String name) throws Exception {
+        instrumentation.waitForIdleSync();
+        SystemClock.sleep(350);
+        File directory = new File(instrumentation.getTargetContext().getCacheDir(), "mobile-ux");
+        assertTrue(directory.isDirectory() || directory.mkdirs());
+        AtomicReference<Boolean> focused = new AtomicReference<>(false);
+        instrumentation.runOnMainSync(() -> focused.set(webView.hasWindowFocus()));
+        assertTrue("Only capture the foreground test app", focused.get());
+        Bitmap bitmap = instrumentation.getUiAutomation().takeScreenshot();
+        assertNotNull(bitmap);
+        try (FileOutputStream output = new FileOutputStream(new File(directory, name + ".png"))) {
+            assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output));
+        } finally { bitmap.recycle(); }
+    }
+
+    private void openMobilePage(String view) throws Exception {
+        evaluate("document.querySelector('#mobile-tabs [data-mobile-view=all]').click();document.querySelector('[data-mobile-target=" + view + "]').click()");
+        waitFor("document.body.dataset.mobileView === " + JSONObject.quote(view), "mobile page " + view);
+        SystemClock.sleep(250);
+    }
+
+    @Test public void nativePagesAndEditorsFitPhone() throws Exception {
+        Bundle args = InstrumentationRegistry.getArguments();
+        String email = args.getString("qaEmail"), label = args.getString("qaLabel");
+        assumeTrue("Requires the isolated QA login test first", email != null && email.endsWith("@example.test") && label != null);
+        launch();
+        waitFor("window.DaynestMobileUX && window.DaynestAccount?.current?.() && document.getElementById('user-name').textContent.includes('MobileQA')", "verified QA session");
+        assertEquals("5", evaluate("document.querySelectorAll('#mobile-tabs [data-mobile-view]').length"));
+        JSONArray views = new JSONArray(evaluate("Array.from(document.querySelectorAll('.daynest-nav .nav-link[data-view]')).map(node=>node.dataset.view)"));
+        for (int index = 0; index < views.length(); index++) {
+            String view = views.getString(index);
+            openMobilePage(view);
+            assertEquals("Page overflow: " + view, "true", evaluate("document.documentElement.scrollWidth <= innerWidth + 1"));
+            screenshot("page-" + view);
+            report("layout_" + view);
+        }
+        evaluate("document.querySelector('#mobile-tabs [data-mobile-view=all]').click();document.getElementById('mobile-functions-query').value='运动';document.getElementById('mobile-functions-query').dispatchEvent(new Event('input',{bubbles:true}))");
+        assertEquals("1", evaluate("document.querySelectorAll('[data-mobile-target]').length"));
+        screenshot("function-search");
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);
+        waitFor("!document.getElementById('mobile-functions').open", "Android back closes functions");
+        report("function_search_and_native_back");
+
+        String[][] dialogs = {{"bookmarks", "bookmark-new"}, {"ledger", "ledger-new"}, {"subscriptions", "sub-new"}, {"care", "care-new"}, {"fitness", "fit-log-open"}};
+        for (String[] entry : dialogs) {
+            openMobilePage(entry[0]);
+            evaluate("document.getElementById(" + JSONObject.quote(entry[1]) + ").click()");
+            waitFor("document.querySelector('dialog[open]')", "dialog " + entry[0]);
+            assertEquals("Dialog bounds: " + entry[0], "true", evaluate("(()=>{const r=document.querySelector('dialog[open]').getBoundingClientRect();return r.left>=-1&&r.right<=innerWidth+1&&r.top>=-1&&r.bottom<=(window.visualViewport?.height||innerHeight)+1})()"));
+            screenshot("dialog-" + entry[0]);
+            instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);
+            waitFor("!document.querySelector('dialog[open]')", "back closes " + entry[0]);
+            report("dialog_" + entry[0]);
+        }
+
+        openMobilePage("memos");
+        evaluate("document.getElementById('memo-new').click()");
+        waitFor("!document.getElementById('memo-new').disabled && document.getElementById('memo-title').value === '新备忘录' && document.body.classList.contains('mobile-memo-editor') && !document.getElementById('memo-editor').classList.contains('hidden') && Math.abs(document.querySelector('.memo-editor-pane').getBoundingClientRect().left)<1", "new memo ready in full screen editor");
+        String title = label + " mobile editor " + SystemClock.elapsedRealtime();
+        evaluate("document.getElementById('memo-title').value=" + JSONObject.quote(title) + ";document.getElementById('memo-title').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('memo-content').value='Native mobile editor save and keyboard verification';document.getElementById('memo-content').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('memo-save').click()");
+        evaluate("window.__qaMemoVerified=false;(async()=>{for(let i=0;i<80;i++){const response=await fetch('/api/v1/memos',{headers:{Authorization:'Bearer '+localStorage.getItem('studyflow.token')}});if(response.ok){const body=JSON.stringify(await response.json());if(body.includes(" + JSONObject.quote(title) + ")&&body.includes('Native mobile editor save and keyboard verification')){window.__qaMemoVerified=true;return;}}await new Promise(resolve=>setTimeout(resolve,250));}})()");
+        waitFor("window.__qaMemoVerified", "saved memo read back from server");
+        assertEquals("true", evaluate("(()=>{const r=document.getElementById('memo-save').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight})()"));
+        screenshot("memo-editor");
+        report("memo_editor_save_control_and_real_save");
+
+        evaluate("document.getElementById('memo-content').focus()");
+        instrumentation.runOnMainSync(() -> {
+            webView.requestFocus();
+            InputMethodManager manager = (InputMethodManager) instrumentation.getTargetContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            manager.showSoftInput(webView, InputMethodManager.SHOW_IMPLICIT);
+        });
+        waitFor("document.body.classList.contains('mobile-keyboard-open')", "real keyboard resize");
+        assertEquals("true", evaluate("(()=>{const r=document.getElementById('memo-save').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=(window.visualViewport?.height||innerHeight)})()"));
+        screenshot("memo-keyboard");
+        report("real_keyboard_preserves_save_action");
+        instrumentation.runOnMainSync(() -> {
+            InputMethodManager manager = (InputMethodManager) instrumentation.getTargetContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            manager.hideSoftInputFromWindow(webView.getWindowToken(), 0);
+        });
+        evaluate("document.activeElement.blur()");
+        waitFor("!document.body.classList.contains('mobile-keyboard-open')", "keyboard closed");
+        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);
+        waitFor("!document.body.classList.contains('mobile-memo-editor')", "back returns to memo list");
+        report("native_back_preserves_memo");
+        openMobilePage("dashboard");
     }
 }

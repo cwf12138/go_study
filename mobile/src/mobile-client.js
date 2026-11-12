@@ -93,7 +93,7 @@ export function boot({ Http, App, Files, defaultServer = '' }) {
     document.body.append(reader);
 
     const $ = id => document.getElementById('mobile-' + id), state = text => { $('state').textContent = text; };
-    const bar = document.createElement('button'); bar.type = 'button'; bar.className = 'mobile-server-bar'; bar.textContent = '服务连接 · 设置'; bar.hidden = true;
+    const bar = document.createElement('button'); bar.type = 'button'; bar.id = 'mobile-server-bar'; bar.className = 'mobile-server-bar'; bar.textContent = '服务连接 · 设置'; bar.hidden = true;
     document.querySelector('.workspace').prepend(bar);
     function controls() { $('connect').disabled = busy; $('connect').textContent = fatal ? '重载界面' : busy ? '正在连接…' : '重新连接'; $('server').disabled = busy; $('consent').disabled = busy; $('close').hidden = !loaded || fatal; $('offline').disabled = !connection; $('http-notice').hidden = !$('server').value.startsWith('http:'); }
     function openSettings() { if (!setup.open) setup.showModal(); controls(); }
@@ -174,6 +174,7 @@ export function boot({ Http, App, Files, defaultServer = '' }) {
       if (top === setup && (!loaded || fatal)) { App.minimizeApp(); return; }
       if (top) { const event = new Event('cancel', { cancelable: true }); if (top.dispatchEvent(event)) top.close(); return; }
       if (document.querySelector('.sidebar.open')) { window.DaynestUI?.setMenu(false); return; }
+      if (window.DaynestMobileUX?.back()) return;
       if (canGoBack) history.back(); else App.minimizeApp();
     });
     await App.addListener('appStateChange', async ({ isActive }) => {

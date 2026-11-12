@@ -11,8 +11,13 @@ let content = fs.readFileSync(manifest, 'utf8');
 content = content.replace(/android:allowBackup="[^"]*"/, 'android:allowBackup="false"');
 content = content.replace(/android:icon="[^"]*"/, 'android:icon="@drawable/daynest_icon"').replace(/android:roundIcon="[^"]*"/, 'android:roundIcon="@drawable/daynest_icon"');
 if (!content.includes('android:networkSecurityConfig=')) content = content.replace('<application', '<application android:networkSecurityConfig="@xml/network_security_config"');
+if (!content.includes('android:windowSoftInputMode=')) content = content.replace('android:launchMode="singleTask"', 'android:launchMode="singleTask"\n            android:windowSoftInputMode="adjustResize"');
 if (!content.includes('android.permission.RECORD_AUDIO')) content = content.replace('</manifest>', '    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n</manifest>');
 if (!content.includes('android.permission.MODIFY_AUDIO_SETTINGS')) content = content.replace('</manifest>', '    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n</manifest>');
+// WebView requests foreground location only after the weather locate button.
+for (const permission of ['ACCESS_COARSE_LOCATION','ACCESS_FINE_LOCATION']) {
+  if (!content.includes('android.permission.'+permission)) content = content.replace('</manifest>', '    <uses-permission android:name="android.permission.'+permission+'" />\n</manifest>');
+}
 fs.writeFileSync(manifest, content);
 const styles = path.join(android, 'app/src/main/res/values/styles.xml');
 let style = fs.readFileSync(styles, 'utf8');

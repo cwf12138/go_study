@@ -3,5 +3,6 @@ import { App } from '@capacitor/app';
 import './core.js';
 import { boot } from './mobile-client.js';
 import appConfig from '../app-config.json';
-if (Capacitor.isNativePlatform()) boot({ Http: CapacitorHttp, App, Files: registerPlugin('DaynestFiles'), defaultServer: appConfig.defaultServer });
+import { installMobileUX } from './mobile-ux.js';
+if (Capacitor.isNativePlatform()) { boot({ Http: CapacitorHttp, App, Files: registerPlugin('DaynestFiles'), defaultServer: appConfig.defaultServer }); installMobileUX(); }
 else document.addEventListener('DOMContentLoaded', () => { document.body.textContent = '这是 Android 打包资源，请通过 Go 服务打开网页版，或在 Android App 中运行。'; });
