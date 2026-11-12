@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -110,6 +111,50 @@ func TestParseWikipediaDateExtract(t *testing.T) {
 	}
 	if events[0].URL == "" || events[1].Text == "" {
 		t.Fatalf("event attribution missing: %#v", events)
+	}
+}
+
+func TestParseBaiduHistorySanitizesAndSelectsTheRequestedDate(t *testing.T) {
+	const payload = `{"02":{"0229":[
+	{"year":"2000","type":"event","title":"一项<a href=\"https://example.com\">历史事件</a> &amp; 记录","link":"https://baike.baidu.com/item/one"},
+	{"year":"2024","type":"event","title":"较新的事件","link":"https://baike.baidu.com/item/two"},
+	{"year":"2025","type":"birth","title":"出生记录","link":"https://baike.baidu.com/item/three"},
+	{"year":"2026","type":"event","title":"无效链接","link":"javascript:alert(1)"},
+	{"year":"invalid","type":"event","title":"无效年份","link":"https://baike.baidu.com/item/four"}
+	]}}`
+	day := time.Date(2024, 2, 29, 0, 0, 0, 0, calendarLocation)
+	result := parseBaiduHistory(strings.NewReader(payload), day)
+	if len(result.Events) != 2 || result.Events[0].Year != 2024 || result.Events[1].Text != "一项历史事件 & 记录" || result.Source == "" {
+		t.Fatalf("unexpected history: %#v", result)
+	}
+	if other := parseBaiduHistory(strings.NewReader(payload), day.AddDate(0, 0, 1)); len(other.Events) != 0 {
+		t.Fatal("history leaked across dates")
+	}
+	if invalid := parseBaiduHistory(strings.NewReader(`<html>upstream failure</html>`), day); len(invalid.Events) != 0 {
+		t.Fatal("invalid upstream response was accepted")
+	}
+	if events, source := offlineHistory(day); len(events) == 0 || events[0].URL == "" || source != "离线精选" {
+		t.Fatal("leap-day fallback must include an attributed event")
+	}
+}
+
+func TestHistoryCachePreservesDataAfterProviderFailure(t *testing.T) {
+	svc := New(store.NewMemory(), nil, nil)
+	now := time.Now()
+	svc.now = func() time.Time { return now }
+	day := time.Date(2026, 11, 13, 0, 0, 0, 0, calendarLocation)
+	svc.historyCache["11-13"] = historyCacheEntry{Events: []domain.HistoricalEvent{{Year: 2000, Text: "cached event"}}, Source: "test source", ExpiresAt: now.Add(time.Hour)}
+	events, source := svc.historyOnThisDay(context.Background(), day)
+	events[0].Text = "mutated"
+	if source != "test source" || svc.historyCache["11-13"].Events[0].Text != "cached event" {
+		t.Fatal("cache result must be copied")
+	}
+	now = now.Add(2 * time.Hour)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	events, source = svc.historyOnThisDay(ctx, day)
+	if len(events) != 1 || events[0].Text != "cached event" || !strings.Contains(source, "缓存") {
+		t.Fatal("provider failure discarded cached history")
 	}
 }
 

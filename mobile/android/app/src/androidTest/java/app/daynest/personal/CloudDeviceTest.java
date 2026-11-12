@@ -152,6 +152,34 @@ public class CloudDeviceTest {
         evaluate("document.querySelector('.nav-link[data-view=dashboard]').click()");
     }
 
+    @Test public void calendarWorksOnPhysicalPhone() throws Exception {
+        launch();
+        waitFor("window.DaynestAccount?.current?.() && document.getElementById('user-name').textContent.includes('MobileQA')", "verified QA session");
+        openMobilePage("calendar");
+        evaluate("document.querySelector('[data-calendar-view=month]').click();document.getElementById('calendar-today').click();document.getElementById('toast-dismiss')?.click();window.scrollTo(0,0)");
+        waitFor("document.querySelectorAll('.calendar-month-grid .calendar-day-cell').length===42", "complete month");
+        assertEquals("true", evaluate("document.querySelector('.calendar-month-grid').getBoundingClientRect().bottom <= document.getElementById('mobile-tabs').getBoundingClientRect().top"));
+        report("calendar_month_fits_first_screen");
+        waitFor("document.querySelectorAll('#calendar-history .calendar-history-item').length > 0 && document.getElementById('calendar-history-source').textContent.length > 5", "live historical events and source");
+        assertEquals("true", evaluate("document.getElementById('calendar-history-source').textContent.includes('百度百科') || document.getElementById('calendar-history-source').textContent.includes('Wikipedia') || document.getElementById('calendar-history-source').textContent.includes('维基')"));
+        screenshot("calendar-month");
+        report("calendar_live_history_and_attribution");
+        evaluate("document.getElementById('calendar-date-open').click()");
+        waitFor("document.getElementById('calendar-tools-dialog').open", "date title opens picker");
+        evaluate("document.getElementById('calendar-tools-done').click();document.querySelector('[data-calendar-view=agenda]').click()");
+        waitFor("document.querySelector('.calendar-list-event')", "saved events appear in agenda");
+        screenshot("calendar-agenda");
+        report("calendar_agenda_reads_saved_events");
+        evaluate("document.querySelector('[data-calendar-view=day]').click()");
+        waitFor("document.querySelector('.calendar-time-column')", "day timeline");
+        assertEquals("true", evaluate("document.querySelector('.calendar-time-grid').scrollWidth <= innerWidth"));
+        evaluate("document.querySelector('.calendar-time-column').click()");
+        waitFor("document.getElementById('calendar-event-dialog').open && !document.getElementById('calendar-event-save').disabled", "time slot opens editor");
+        assertEquals("true", evaluate("document.getElementById('calendar-event-start').value.endsWith('T00:00') && document.getElementById('calendar-event-end').value.endsWith('T00:30')"));
+        report("calendar_time_slot_initializes_editor");
+        evaluate("document.getElementById('calendar-dialog-close').click();document.querySelector('[data-calendar-view=month]').click()");
+    }
+
     private void screenshot(String name) throws Exception {
         instrumentation.waitForIdleSync();
         SystemClock.sleep(350);

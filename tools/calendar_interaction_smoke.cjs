@@ -5,7 +5,7 @@ let token='alice',respond;const winEvents={};
 const ctx={document:{addEventListener(){},querySelector:node,querySelectorAll:()=>[]},localStorage:{getItem:k=>k==='studyflow.token'?token:null,setItem(){}},window:{setTimeout,clearTimeout,setInterval(){},addEventListener(k,f){winEvents[k]=f;}},location:{hash:''},Headers:class{set(){}},AbortController,Intl,URLSearchParams,requestAnimationFrame:f=>f(),fetch:(...a)=>respond(...a)};
 vm.createContext(ctx);
 let source=fs.readFileSync(path.join(root,'calendar.js'),'utf8').replace('      loadHistory(value);','      /* External history excluded from this interaction test. */');
-source=source.replace('  bind();','  window.test={state,loadCalendar,loadDayDetail,itemsByDate,renderCalendar};\n  bind();');
+source=source.replace('  bind();','  window.test={state,loadCalendar,loadDayDetail,loadHistory,itemsByDate,renderCalendar};\n  bind();');
 vm.runInContext(source,ctx);const api=ctx.window.test;
 const ok=data=>({status:200,ok:true,json:async()=>({data})});
 (async()=>{
@@ -31,6 +31,9 @@ const ok=data=>({status:200,ok:true,json:async()=>({data})});
  node('#calendar-tools-close').handlers.click();assert(!node('#calendar-tools-dialog').open);assert(node('#calendar-filter-open').focused);
  winEvents['daynest:calendar-date']({detail:{date:'2026-10-17'}});assert.equal(api.state.selected,'2026-10-17');winEvents['daynest:calendar-date']({detail:{date:'2026-02-30'}});assert.equal(api.state.selected,'2026-10-17');
  node('#panel-calendar').classList.contains=c=>c==='active';api.state.owner=token;const syncQueue=[];respond=url=>url.includes('/days/')?Promise.resolve(ok({date:api.state.selected})):new Promise(r=>syncQueue.push(r));winEvents['daynest:fitness-changed']();winEvents.storage({key:'daynest.fitness.changed'});assert.equal(syncQueue.length,1);syncQueue[0](ok({marker:'before-new-write',fitness_days:[]}));await new Promise(r=>setImmediate(r));assert.equal(syncQueue.length,2,'write during calendar fetch must trigger one fresh read');syncQueue[1](ok({marker:'after-new-write',fitness_days:[{date:api.state.selected,manual_check_in:true,completed_sessions:0,recorded_seconds:0}]}));await new Promise(r=>setImmediate(r));assert.equal(api.state.overview.marker,'after-new-write');assert(node('#calendar-day-agenda').innerHTML.includes('手动打卡'));
+ let historyCalls=0;api.state.detail={date:api.state.selected};respond=url=>{historyCalls++;assert(url.startsWith('/api/v1/calendar/days/'));return Promise.resolve(ok({history:[{year:2020,text:'fixture history'}],history_source:'fixture source'}));};
+ await api.loadHistory(api.state.selected);assert(node('#calendar-history').innerHTML.includes('fixture history'));await api.loadHistory(api.state.selected);assert.equal(historyCalls,1,'usable history should be cached');
+ api.state.detail={date:'2026-10-19'};let finishHistory;respond=()=>new Promise(resolve=>finishHistory=resolve);const lateHistory=api.loadHistory('2026-10-19');api.state.detail={date:'2026-10-20'};finishHistory(ok({history:[{year:2020,text:'stale history'}]}));await lateHistory;assert(!node('#calendar-history').innerHTML.includes('stale history'));
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');for(const id of nodes.keys()){if(id.startsWith('#'))assert(html.includes('id="'+id.slice(1)+'"'),id);}
  console.log('Calendar interactions passed: rapid navigation, stale detail rejection, source/search filtering, keyboard date hooks and account-response guard.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

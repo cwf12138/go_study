@@ -121,13 +121,16 @@
       }
     } catch (error) { status(error.message); }
   }
-  async function open(id = '', selected = C.day(new Date().toISOString())) {
+  async function open(id = '', selected = C.day(new Date().toISOString()), minutes = null) {
     if (!id) { try { if (store(H.capture()).read().some(row=>!row.confirmed||row.missing)) { recovery(); return; } } catch (error) { notify(error.message, true); return; } }
     const turn = begin(id ? '编辑日程' : '留一段时间给它'); if (turn === null) return;
     window.DaynestCalendarDrafts?.begin();
     const context = owner; controller = new AbortController(); status(id ? '正在读取日程原文与版本…' : '先安排时间，再从容准备。');
     try {
-      const event = id ? await read(id, context, controller.signal) : { title: '', description: '', location: '', category: '生活', color: '#5b81ff', start_at: C.iso(C.date(selected) + 'T09:00'), end_at: C.iso(selected + 'T10:00'), all_day: false, repeat_rule: 'none', reminder_minutes: 0 };
+      const startMinutes = Number.isInteger(minutes) ? Math.min(1410, Math.max(0, minutes)) : 540;
+      const start = C.iso(C.date(selected) + 'T' + String(Math.floor(startMinutes / 60)).padStart(2, '0') + ':' + String(startMinutes % 60).padStart(2, '0'));
+      const end = new Date(Date.parse(start) + (minutes === null ? 60 : 30) * 60000).toISOString();
+      const event = id ? await read(id, context, controller.signal) : { title: '', description: '', location: '', category: '生活', color: '#5b81ff', start_at: start, end_at: end, all_day: false, repeat_rule: 'none', reminder_minutes: 0 };
       if (turn !== generation || !current()) return;
       editor = { base: id ? event : null, command: null, remote: null, review: false, missing: false, deleted: false, loading: false, dirty: false, sequence: 0 };
       form.hidden = false; fill(event); status(id ? '保存时核对读取的完整版本；未改动的时间保留原有精度。' : '新建前会在本机保留原提交，结果不明时可核对，避免重复创建。'); $('calendar-event-title').focus();

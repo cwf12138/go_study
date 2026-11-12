@@ -21,7 +21,7 @@
   const state = {
     view: localStorage.getItem("studyflow.calendar.view") || "month",
     anchor: fromDateKey(eventDay(new Date().toISOString())), selected: eventDay(new Date().toISOString()), overview: null, detail: null,
-    saving: false, requestID: 0, detailRequestID: 0, query: '', source: 'all', owner: token(), loading: false, fitnessDirty: false, initialized: false, direction: 1, historyRequestID: 0, historyCache: new Map(),
+    saving: false, requestID: 0, detailRequestID: 0, query: '', source: 'all', owner: token(), loading: false, fitnessDirty: false, initialized: false, direction: 1, historyRequestID: 0, historyCache: new Map(), historyController: null,
   };
   async function api(path, options = {}) {
     if (window.DaynestHTTP) return window.DaynestHTTP.json(path, options);
@@ -48,6 +48,7 @@
     if (state.view === "year") return [new Date(anchor.getFullYear(), 0, 1), new Date(anchor.getFullYear() + 1, 0, 1)];
     if (state.view === "week") { const start = startOfWeek(anchor); return [start, addDays(start, 7)]; }
     if (state.view === "day") { const start = fromDateKey(dateKey(anchor)); return [start, addDays(start, 1)]; }
+    if (state.view === "agenda") { const start = fromDateKey(dateKey(anchor)); return [start, addDays(start, 31)]; }
     const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
     const start = startOfWeek(first);
     return [start, addDays(start, 42)];
@@ -95,6 +96,7 @@
       month: new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long" }).format(anchor),
       week: `${shortDate(startOfWeek(anchor))} – ${shortDate(addDays(startOfWeek(anchor), 6))}`,
       day: new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long", day: "numeric", weekday: "long" }).format(anchor),
+      agenda: `${shortDate(anchor)}起的日程`,
     };
     $("#calendar-title").textContent = titles[state.view];
     $("#calendar-jump").value = state.selected;
@@ -104,6 +106,7 @@
     $("#calendar-filter-open").setAttribute("aria-label", state.source !== "all" ? "筛选与日期跳转，已有来源筛选" : "筛选与日期跳转");
     const count = [...itemsByDate().values()].reduce((n, items) => n + items.length, 0);
     $("#calendar-view-status").textContent = (state.query || state.source !== 'all' ? '筛选后 · ' : '') + '当前日期范围 ' + count + ' 项安排 · 选择日期查看详情';
+    if (state.loading && !state.overview) $("#calendar-view-status").textContent = "正在同步日程…";
     document.querySelectorAll("[data-calendar-view]").forEach(button => {
       button.setAttribute('role', 'tab');
       button.setAttribute('aria-selected', String(button.dataset.calendarView === state.view));
@@ -111,7 +114,7 @@
     $("#panel-calendar").dataset.calendarMode = state.view;
     document.querySelectorAll("[data-calendar-view]").forEach((button) => button.classList.toggle("active", button.dataset.calendarView === state.view));
     $("#calendar-weekdays").classList.toggle("hidden", state.view !== "month");
-    if (state.view === "year") renderYear(); else if (state.view === "month") renderMonth(); else renderTimeView();
+    if (state.view === "year") renderYear(); else if (state.view === "month") renderMonth(); else if (state.view === "agenda") renderListView(); else renderTimeView();
 	if (!state.detail) renderDayPlaceholder();
     renderAgenda();
   }
@@ -192,6 +195,13 @@
     $("#calendar-canvas").innerHTML = `${html}</div>`;
   }
 
+  function renderListView() {
+    const entries = [...itemsByDate()].sort(([a], [b]) => a.localeCompare(b));
+    $("#calendar-canvas").innerHTML = entries.length ? `<div class="calendar-list">${entries.map(([day, items]) => `
+      <section class="calendar-list-day"><button type="button" class="calendar-list-date" data-calendar-date="${day}" aria-label="${day}"><strong>${fromDateKey(day).getDate()}</strong><small>${fromDateKey(day).getMonth()+1}月<br>${new Intl.DateTimeFormat('zh-CN', {weekday: 'short'}).format(fromDateKey(day))}</small></button>
+      <div>${items.map(item => `<button type="button" class="calendar-list-event" title="${escapeHTML(item.title)}" ${item.type === 'event' ? `data-calendar-event="${escapeHTML(item.id)}"` : `data-calendar-date="${day}"`} style="--item-color:${item.color}"><time>${escapeHTML(item.time)}</time><span><b>${calendarItemTitle(item)}</b><small>${escapeHTML(typeLabel(item.type))}</small></span></button>`).join('')}</div></section>`).join('')}</div>` : `<div class="empty-state">${state.loading ? '正在同步日程…' : '未来 31 天没有符合条件的安排。'}</div>`;
+  }
+
   function renderTimeView() {
     const start = state.view === "week" ? startOfWeek(state.anchor) : fromDateKey(dateKey(state.anchor));
     const count = state.view === "week" ? 7 : 1;
@@ -203,15 +213,45 @@
       const day = addDays(start, index), key = dateKey(day);
       heads += `<span>${["日", "一", "二", "三", "四", "五", "六"][day.getDay()]}<br><b>${day.getMonth() + 1}/${day.getDate()}</b></span>`;
       const currentLine = isToday(key) ? `<i class="calendar-current-line" style="top:${(Number(clock(new Date()).slice(0,2)) * 60 + Number(clock(new Date()).slice(3,5))) * .8}px"></i>` : "";
-      columns += `<div class="calendar-time-column" data-calendar-date="${key}">${currentLine}${(events.get(key) || []).filter((item) => (item.type === "event" || item.type === "plan")&&!item.raw.all_day).map(item=>timedEventHTML(item,key)).join("")}</div>`;
+      const timed = (events.get(key) || []).filter(item => ['event', 'plan'].includes(item.type) && !item.raw.all_day);
+      columns += `<div class="calendar-time-column" data-calendar-date="${key}">${currentLine}${timedLayouts(timed, key).map(layout => timedEventHTML(layout.item, key, layout)).join("")}</div>`;
     }
     const fitnessDays=Array.from({length:count},(_,i)=>dateKey(addDays(start,i)));
     const fitnessStrip=fitnessDays.some(day=>(events.get(day)||[]).some(item=>['fitness','care'].includes(item.type)))?`<div class="calendar-fitness-strip"><span>记录</span>${fitnessDays.map(day=>{const entries=(events.get(day)||[]).filter(item=>['fitness','care'].includes(item.type));return `<div>${entries.slice(0,3).map(item=>item.type==='fitness'?`<button type="button" data-calendar-fitness="${day}" title="${escapeHTML(fitnessDescription(item.raw))}">✓ 已锻炼</button>`:`<button type="button" data-calendar-care="${escapeHTML(item.raw.item_id)}">${escapeHTML(item.title)}</button>`).join('')}${entries.length>3?`<button type="button" data-calendar-date="${day}">另 ${entries.length-3} 条</button>`:''}</div>`;}).join('')}</div>`:'';
     const allDay=fitnessDays.some(day=>(events.get(day)||[]).some(item=>item.type==='event'&&item.raw.all_day))?`<div class="calendar-all-day-strip"><span>全天</span>${fitnessDays.map(day=>`<div>${(events.get(day)||[]).filter(item=>item.type==='event'&&item.raw.all_day).map(item=>`<button type="button" data-calendar-event="${escapeHTML(item.id)}" style="--item-color:${item.color}">${escapeHTML(item.title)}</button>`).join('')}</div>`).join('')}</div>`:'';
-    $("#calendar-canvas").innerHTML = `<div class="calendar-time-view" style="--day-count:${count}"><div class="calendar-time-head">${heads}</div>${allDay}${fitnessStrip}<div class="calendar-time-grid">${columns}</div></div>`;
+    $("#calendar-canvas").innerHTML = `<div class="calendar-time-scroll"><div class="calendar-time-view" style="--day-count:${count}"><div class="calendar-time-head">${heads}</div>${allDay}${fitnessStrip}<div class="calendar-time-grid">${columns}</div></div></div>`;
+    const selectedItems = events.get(state.selected) || [];
+    const first = selectedItems.find(item => ['event', 'plan'].includes(item.type) && !item.raw.all_day);
+    const hour = first ? Number(first.time.slice(0, 2)) : 8;
+    requestAnimationFrame(() => {
+      const scroll = $("#calendar-canvas").querySelector('.calendar-time-scroll');
+      if (scroll) scroll.scrollTop = Math.max(0, hour * 48 - 40);
+    });
   }
 
-  function timedEventHTML(item, day) {
+  function timedLayouts(items, day) {
+    const midnight = E ? Date.parse(E.iso(day, true)) : fromDateKey(day).getTime();
+    const rows = items.map(item => {
+      const start = Math.max(0, (Date.parse(item.raw.occurrence_start || item.raw.start_at) - midnight) / 60000);
+      const end = Math.min(1440, (Date.parse(item.raw.occurrence_end || item.raw.end_at) - midnight) / 60000);
+      return {item, start, end: Math.max(start + 30, end), lane: 0, lanes: 1};
+    }).sort((a, b) => a.start - b.start || b.end - a.end);
+    let group = [], ends = [], groupEnd = 0;
+    function finish() { for (const row of group) row.lanes = ends.length; }
+    for (const row of rows) {
+      if (row.start >= groupEnd) { finish(); group = []; ends = []; }
+      let lane = ends.findIndex(end => end <= row.start);
+      if (lane < 0) lane = ends.length;
+      ends[lane] = row.end;
+      row.lane = lane;
+      group.push(row);
+      groupEnd = Math.max(...ends);
+    }
+    finish();
+    return rows;
+  }
+
+  function timedEventHTML(item, day, layout) {
     const rawStart = item.raw.occurrence_start || item.raw.start_at;
     const rawEnd = item.raw.occurrence_end || item.raw.end_at;
     const start = new Date(rawStart), end = new Date(rawEnd);
@@ -219,7 +259,7 @@
     const minutes=Math.max(0,(start.getTime()-midnight)/60000),endMinutes=Math.min(1440,(end.getTime()-midnight)/60000);
     const top=Math.min(1128,minutes*.8),height=Math.min(1152-top,Math.max(24,(endMinutes-minutes)*.8));
     const eventAttribute = item.type === "event" ? `data-calendar-event="${escapeHTML(item.id)}"` : "";
-    return `<button type="button" class="calendar-timed-event" ${eventAttribute} style="top:${top}px;height:${height}px;--item-color:${item.color}"><b>${escapeHTML(item.title)}</b><br>${escapeHTML(item.time)}</button>`;
+    return `<button type="button" class="calendar-timed-event" ${eventAttribute} title="${escapeHTML(item.title)} · ${escapeHTML(item.time)}" style="top:${top}px;height:${height}px;--item-color:${item.color};left:calc(4px + (100% - 8px) * ${layout.lane} / ${layout.lanes});width:calc((100% - 8px) / ${layout.lanes} - 3px);right:auto"><b>${escapeHTML(item.title)}</b><br>${escapeHTML(item.time)}</button>`;
   }
 
   async function selectDay(value, updateAnchor = false) {
@@ -242,6 +282,8 @@
   async function loadDayDetail(value) {
     const requestID = ++state.detailRequestID, owner = token();
     state.detail = null;
+    state.historyRequestID++;
+    state.historyController?.abort();
     renderDayPlaceholder();
     renderAgenda();
     $("#calendar-history").textContent = "正在切换日期…";
@@ -260,77 +302,37 @@
   }
 
   async function loadHistory(value) {
-	const requestID = ++state.historyRequestID;
-	const cacheKey = value.slice(5);
-	const cached = state.historyCache.get(cacheKey);
-	if (cached) {
-	  if (state.detail?.date === value) { state.detail.history = cached.events; state.detail.history_source = cached.source; renderHistory(); }
-	  return;
-	}
-	$("#calendar-history").innerHTML = '<div class="empty-state">正在从中文维基百科读取历史事件…</div>';
-	$("#calendar-history-source").textContent = "";
-	const controller = new AbortController();
-	const timeoutID = window.setTimeout(() => controller.abort(), 8500);
-	try {
-	  const result = await firstUsefulHistory([
-		api(`/api/v1/calendar/days/${value}?history=true`, { signal: controller.signal }).then((detail) => ({ events: detail.history || [], source: detail.history_source || "Wikipedia / CC BY-SA" })),
-		fetchWikipediaHistory(value, controller.signal),
-	  ]);
-	  controller.abort();
-	  if (requestID !== state.historyRequestID || state.detail?.date !== value) return;
-	  state.historyCache.set(cacheKey, result);
-	  state.detail.history = result.events;
-	  state.detail.history_source = result.source;
-	  renderHistory();
-	} catch {
-	  if (requestID !== state.historyRequestID || state.detail?.date !== value) return;
-	  $("#calendar-history").innerHTML = '<div class="empty-state">历史数据源暂时无法连接。<button class="text-button" type="button" data-history-retry>重新加载</button></div>';
-	  $("#calendar-history-source").textContent = "核心日历与个人日程不受影响";
-	} finally {
-	  window.clearTimeout(timeoutID);
-	}
-  }
-
-  function firstUsefulHistory(promises) {
-	return new Promise((resolve, reject) => {
-	  let remaining = promises.length;
-	  promises.forEach((promise) => Promise.resolve(promise).then((result) => {
-		if (result?.events?.length) { resolve(result); return; }
-		remaining -= 1;
-		if (remaining === 0) reject(new Error("no history data"));
-	  }).catch(() => {
-		remaining -= 1;
-		if (remaining === 0) reject(new Error("history providers unavailable"));
-	  }));
-	});
-  }
-
-  async function fetchWikipediaHistory(value, signal) {
-	const date = fromDateKey(value), title = `${date.getMonth() + 1}月${date.getDate()}日`;
-	const query = new URLSearchParams({ action: "query", prop: "extracts", explaintext: "1", redirects: "1", format: "json", formatversion: "2", titles: title, origin: "*" });
-	const response = await fetch(`https://zh.wikipedia.org/w/api.php?${query}`, { signal, headers: { Accept: "application/json" } });
-	if (!response.ok) throw new Error(`Wikipedia ${response.status}`);
-	const payload = await response.json();
-	const extract = payload?.query?.pages?.[0]?.extract || "";
-	return { events: parseWikipediaHistory(extract, `https://zh.wikipedia.org/wiki/${encodeURIComponent(title)}`), source: "中文维基百科日期条目 / CC BY-SA" };
-  }
-
-  function parseWikipediaHistory(extract, pageURL) {
-	const simplified = "== 大事记 ==", traditional = "== 大事記 ==";
-	let start = extract.indexOf(simplified), headerLength = simplified.length;
-	if (start < 0) { start = extract.indexOf(traditional); headerLength = traditional.length; }
-	if (start < 0) return [];
-	let section = extract.slice(start + headerLength);
-	const end = section.indexOf("\n== ");
-	if (end >= 0) section = section.slice(0, end);
-	const pattern = /^\s*(?:[*#]\s*)?(?:(?:公元前|前)(\d{1,5})|(\d{1,5}))年\s*[：:—－-]+\s*(.+?)\s*$/gm;
-	const events = [];
-	for (const match of section.matchAll(pattern)) {
-	  const year = match[1] ? -Number(match[1]) : Number(match[2]);
-	  const text = match[3].trim();
-	  if (text) events.push({ year, text: text.length > 420 ? `${text.slice(0, 420)}…` : text, url: pageURL });
-	}
-	return events.sort((left, right) => right.year - left.year).slice(0, 6);
+    const requestID = ++state.historyRequestID, owner = token();
+    state.historyController?.abort();
+    const cached = state.historyCache.get(value.slice(5));
+    if (cached && Date.now() - cached.at < 86400000) {
+      if (state.detail?.date === value) {
+        state.detail.history = cached.events;
+        state.detail.history_source = cached.source;
+        renderHistory();
+      }
+      return;
+    }
+    $("#calendar-history").innerHTML = '<div class="empty-state">\u6b63\u5728\u8bfb\u53d6\u5386\u53f2\u4e8b\u4ef6\u2026</div>';
+    $("#calendar-history-source").textContent = "";
+    const controller = new AbortController();
+    state.historyController = controller;
+    const timeoutID = window.setTimeout(() => controller.abort(), 8000);
+    try {
+      const detail = await api(`/api/v1/calendar/days/${value}?history=true`, { signal: controller.signal });
+      if (requestID !== state.historyRequestID || state.detail?.date !== value || owner !== token()) return;
+      state.detail.history = detail.history || [];
+      state.detail.history_source = detail.history_source || "";
+      if (detail.history?.length) state.historyCache.set(value.slice(5), {events: detail.history, source: detail.history_source, at: Date.now()});
+      renderHistory();
+    } catch {
+      if (requestID !== state.historyRequestID || state.detail?.date !== value || owner !== token()) return;
+      $("#calendar-history").innerHTML = '<div class="empty-state">\u5386\u53f2\u4e8b\u4ef6\u6682\u672a\u52a0\u8f7d\u3002<button class="text-button" type="button" data-history-retry>\u91cd\u65b0\u52a0\u8f7d</button></div>';
+      $("#calendar-history-source").textContent = "";
+    } finally {
+      window.clearTimeout(timeoutID);
+      if (state.historyController === controller) state.historyController = null;
+    }
   }
 
   function renderDayDetail() {
@@ -360,7 +362,7 @@
     $("#calendar-history").innerHTML = detail.history?.length ? detail.history.map((item) => {
       const content = `<b>${historyYearLabel(item.year)}</b><span>${escapeHTML(item.text)}</span>`;
       return item.url?.startsWith("https://") ? `<a class="calendar-history-item" href="${escapeHTML(item.url)}" target="_blank" rel="noreferrer">${content}</a>` : `<div class="calendar-history-item">${content}</div>`;
-    }).join("") : '<div class="empty-state">暂未取得这一天的历史条目，核心日历不受影响。</div>';
+    }).join("") : '<div class="empty-state">\u6682\u672a\u53d6\u5f97\u8fd9\u4e00\u5929\u7684\u5386\u53f2\u6761\u76ee\u3002<button class="text-button" type="button" data-history-retry>\u91cd\u65b0\u52a0\u8f7d</button></div>';
     $("#calendar-history-source").textContent = detail.history_source ? `内容来源：${detail.history_source}` : "";
   }
 
@@ -369,6 +371,7 @@
   function renderAgenda() {
     const items = itemsByDate().get(state.selected) || [];
     const agenda = $("#calendar-day-agenda");
+    $("#calendar-agenda-title").textContent = `${shortDate(fromDateKey(state.selected))} · ${items.length} 项安排`;
     agenda.classList.toggle("empty-state", !items.length);
     agenda.innerHTML = items.length ? items.map((item) => `<div class="calendar-agenda-item" ${item.type === "event" ? `role="button" tabindex="0" aria-label="编辑 ${escapeHTML(item.title)}" data-calendar-event="${escapeHTML(item.id)}"` : ""}><span class="calendar-agenda-time">${escapeHTML(item.time)}</span><i class="calendar-agenda-color" style="--item-color:${item.color}"></i><span><b>${calendarItemTitle(item)}</b><small>${escapeHTML(item.type === "event" ? item.raw.category : item.type === "fitness" ? fitnessDescription(item.raw) : item.type === "focus" ? `${item.raw.actual_minutes} 分钟 · 已完成` : typeLabel(item.type))}</small>${(item.type === "todo" || (item.type === "focus" && item.raw.todo_id)) ? `<button type="button" class="calendar-fitness-link" ${item.raw.memo_action_id ? `data-action-link="${escapeHTML(item.raw.memo_action_id)}"` : `data-action-todo-context="${escapeHTML(item.type === "todo" ? item.id : item.raw.todo_id)}"`}>查看待办与专注 ↗</button>` : ""}${item.type === "fitness" ? `<button type="button" class="calendar-fitness-link" data-calendar-fitness="${escapeHTML(item.raw.date)}">查看运动记录 ↗</button>` : item.type === "care" ? `<button type="button" class="calendar-fitness-link" data-calendar-care="${escapeHTML(item.raw.item_id)}">查看保养事项 ↗</button>` : ""}</span></div>`).join("") : "这一天还没有安排。";
   }
@@ -378,6 +381,7 @@
     const anchor = new Date(state.anchor);
     if (state.view === "year") anchor.setFullYear(anchor.getFullYear() + direction);
     else if (state.view === "month") anchor.setMonth(anchor.getMonth() + direction, 1);
+    else if (state.view === "agenda") anchor.setDate(anchor.getDate() + 31 * direction);
     else if (state.view === "week") anchor.setDate(anchor.getDate() + 7 * direction);
     else anchor.setDate(anchor.getDate() + direction);
     state.anchor = anchor;
@@ -386,19 +390,38 @@
   }
 
   function setView(view) {
-    if (!["year", "month", "week", "day"].includes(view) || state.view === view) return;
+    if (!["year", "month", "week", "day", "agenda"].includes(view) || state.view === view) return;
     state.view = view;
     try { localStorage.setItem("studyflow.calendar.view", view); } catch {}
     state.anchor = fromDateKey(state.selected);
     loadCalendar(true);
   }
 
-  function openEventDialog(eventID = "", selectedDate = state.selected) {
-    if (window.DaynestCalendarEvents) return window.DaynestCalendarEvents.open(eventID,selectedDate);
+  function openEventDialog(eventID = "", selectedDate = state.selected, minutes = null) {
+    if (window.DaynestCalendarEvents) return window.DaynestCalendarEvents.open(eventID,selectedDate,minutes);
     notify("日程编辑模块未加载，请刷新页面并核对服务版本。",true);
   }
 
   function bind() {
+    let gesture = null, suppressDateClick = false;
+    const canvas = $("#calendar-canvas");
+    canvas.addEventListener('pointerdown', event => {
+      if (!['month', 'year'].includes(state.view) || event.isPrimary === false || event.button > 0) return;
+      gesture = {x: event.clientX, y: event.clientY, at: Date.now()};
+    });
+    canvas.addEventListener('pointercancel', () => { gesture = null; });
+    canvas.addEventListener('pointerup', event => {
+      if (!gesture) return;
+      const dx = event.clientX - gesture.x, dy = event.clientY - gesture.y, elapsed = Date.now() - gesture.at;
+      gesture = null;
+      if (Math.abs(dx) < 54 || Math.abs(dx) < Math.abs(dy) * 1.6 || elapsed > 900) return;
+      suppressDateClick = true;
+      window.setTimeout(() => { suppressDateClick = false; }, 400);
+      navigate(dx < 0 ? 1 : -1);
+    });
+    canvas.addEventListener('click', event => {
+      if (suppressDateClick) { suppressDateClick = false; event.preventDefault(); event.stopImmediatePropagation(); }
+    }, true);
     document.addEventListener("daynest:account-ready",()=>{if(token()&&$("#panel-calendar").classList.contains("active")){state.initialized=true;loadCalendar();}else state.initialized=false;});
     window.addEventListener('daynest:fitness-changed',fitnessChanged);
     document.addEventListener('daynest:focus-changed',fitnessChanged);
@@ -418,13 +441,17 @@
     }
     $("#calendar-search-open").addEventListener("click", () => openTools("search"));
     $("#calendar-filter-open").addEventListener("click", () => openTools("filter"));
+    $("#calendar-date-open").addEventListener("click", () => { openTools("filter"); toolsTrigger = $("#calendar-date-open"); $("#calendar-jump").focus(); });
     ["close", "done"].forEach(id => $("#calendar-tools-" + id).addEventListener("click", () => tools.close()));
     tools.addEventListener("close", () => toolsTrigger?.focus());
+    tools.addEventListener('click', event => {
+      if (event.target.closest('#calendar-recovery-open, #calendar-offline-open')) tools.close();
+    });
     $("#calendar-search").addEventListener("keydown", event => { if (event.key === "Enter" && !event.isComposing) { event.preventDefault(); tools.close(); } });
-    if (!["year","month","week","day"].includes(state.view)) state.view = "month";
+    if (!["year","month","week","day","agenda"].includes(state.view)) state.view = "month";
     $("#calendar-jump").addEventListener("change", () => {
       const value = $("#calendar-jump").value;
-      if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) return;
+      if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value) || value < '2000-01-01' || value > '2100-12-31' || dateKey(fromDateKey(value)) !== value) return;
       state.anchor = fromDateKey(value); state.selected = value; loadCalendar(true);
     });
     const filter = () => {
@@ -453,6 +480,7 @@
     const resetOwner = () => {
       if (state.owner === token()) return;
       state.owner = token(); state.requestID++; state.detailRequestID++; state.historyRequestID++;
+      state.historyController?.abort();
       state.initialized = false;
       state.overview = null; state.detail = null; state.loading = false;
       state.selected = eventDay(new Date().toISOString()); state.anchor = fromDateKey(state.selected);
@@ -490,6 +518,12 @@
       const fitnessButton=event.target.closest("[data-calendar-fitness]");if(fitnessButton){openFitness(fitnessButton.dataset.calendarFitness);return;}
       const careButton=event.target.closest('[data-calendar-care]');if(careButton){openCare(careButton.dataset.calendarCare);return;}
       const eventButton = event.target.closest("[data-calendar-event]"); if (eventButton) { event.stopPropagation(); openEventDialog(eventButton.dataset.calendarEvent); return; }
+      const timeColumn = event.target.closest('.calendar-time-column');
+      if (timeColumn && !event.target.closest('button')) {
+        const minutes = Math.min(1410, Math.max(0, Math.floor((event.clientY - timeColumn.getBoundingClientRect().top) / 24) * 30));
+        openEventDialog('', timeColumn.dataset.calendarDate, minutes);
+        return;
+      }
       const month = event.target.closest("[data-calendar-month]"); if (month) { state.anchor = new Date(state.anchor.getFullYear(), Number(month.dataset.calendarMonth), 1); state.selected = dateKey(state.anchor); setView("month"); return; }
       const day = event.target.closest("[data-calendar-date]"); if (day) { await selectDay(day.dataset.calendarDate, state.view === "day"); }
     });
@@ -551,7 +585,7 @@
     const mood = calendarMood(item.raw?.mood);
     return `<img class="calendar-mood-icon" src="/static/mood-art/${mood.value}-flat-v2.png" width="20" height="20" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><span class="calendar-mood-label">${escapeHTML(item.title)}</span>`;
   }
-  function typeLabel(value) { return ({ plan: "学习计划", task: "学习任务", todo: "待办事项", mood: "心情日记", fitness: "运动日常", care: "生活保养站", focus: "已完成专注" })[value] || value; }
+  function typeLabel(value) { return ({ event: "个人日程", plan: "学习计划", task: "学习任务", todo: "待办事项", mood: "心情日记", fitness: "运动日常", care: "生活保养站", focus: "已完成专注" })[value] || value; }
 
   bind();
 })();

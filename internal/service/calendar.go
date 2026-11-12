@@ -6,11 +6,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"net/url"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -417,8 +419,9 @@ func dailyQuote(day time.Time) (string, string) {
 }
 
 type historyCacheEntry struct {
-	Events []domain.HistoricalEvent
-	Source string
+	Events    []domain.HistoricalEvent
+	Source    string
+	ExpiresAt time.Time
 }
 
 type historyProviderResult struct {
@@ -431,30 +434,37 @@ func (s *Service) historyOnThisDay(ctx context.Context, day time.Time) ([]domain
 	s.historyMu.RLock()
 	cached, ok := s.historyCache[key]
 	s.historyMu.RUnlock()
-	if ok && len(cached.Events) > 0 {
+	if ok && s.now().Before(cached.ExpiresAt) {
 		return append([]domain.HistoricalEvent(nil), cached.Events...), cached.Source
 	}
 
 	events, source := fetchOnThisDay(ctx, day)
-	if len(events) > 0 {
+	if len(events) == 0 && len(cached.Events) > 0 {
+		return append([]domain.HistoricalEvent(nil), cached.Events...), cached.Source + "（缓存）"
+	}
+	if ctx.Err() == nil {
+		ttl := 30 * time.Second
+		if len(events) > 0 {
+			ttl = 24 * time.Hour
+		}
 		s.historyMu.Lock()
 		if s.historyCache == nil {
 			s.historyCache = make(map[string]historyCacheEntry)
 		}
-		s.historyCache[key] = historyCacheEntry{Events: append([]domain.HistoricalEvent(nil), events...), Source: source}
+		s.historyCache[key] = historyCacheEntry{Events: append([]domain.HistoricalEvent(nil), events...), Source: source, ExpiresAt: s.now().Add(ttl)}
 		s.historyMu.Unlock()
 	}
 	return events, source
 }
 
-// fetchOnThisDay races two independent Wikimedia interfaces. The structured
-// Wikifeeds response is rich but large, while the Action API date extract is
-// much smaller. Whichever returns usable Chinese content first wins.
+// Fetch through the server so the phone does not depend on cross-origin access.
+// The providers use different networks and the first usable response wins.
 func fetchOnThisDay(ctx context.Context, day time.Time) ([]domain.HistoricalEvent, string) {
-	requestCtx, cancel := context.WithTimeout(ctx, 7*time.Second)
+	requestCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	results := make(chan historyProviderResult, 2)
+	results := make(chan historyProviderResult, 3)
 	providers := []func(context.Context, time.Time) historyProviderResult{
+		fetchBaiduHistory,
 		fetchWikipediaDateExtract,
 		fetchWikifeedsHistory,
 	}
@@ -476,10 +486,73 @@ func fetchOnThisDay(ctx context.Context, day time.Time) ([]domain.HistoricalEven
 				return result.Events, result.Source
 			}
 		case <-requestCtx.Done():
-			return fallbackHistory(day), "离线精选"
+			return offlineHistory(day)
 		}
 	}
-	return fallbackHistory(day), "离线精选"
+	return offlineHistory(day)
+}
+
+func offlineHistory(day time.Time) ([]domain.HistoricalEvent, string) {
+	events := fallbackHistory(day)
+	if len(events) > 0 {
+		return events, "离线精选"
+	}
+	return nil, "历史数据源暂不可用"
+}
+
+func fetchBaiduHistory(ctx context.Context, day time.Time) historyProviderResult {
+	endpoint := fmt.Sprintf("https://baike.baidu.com/cms/home/eventsOnHistory/%02d.json", day.Month())
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return historyProviderResult{}
+	}
+	request.Header.Set("User-Agent", "Daynest/0.5.0 (personal calendar)")
+	request.Header.Set("Referer", "https://baike.baidu.com/calendar/")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return historyProviderResult{}
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return historyProviderResult{}
+	}
+	return parseBaiduHistory(io.LimitReader(response.Body, 4<<20), day)
+}
+
+var historyHTMLTags = regexp.MustCompile(`<[^>]*>`)
+
+func parseBaiduHistory(reader io.Reader, day time.Time) historyProviderResult {
+	var payload map[string]map[string][]struct {
+		Year  string `json:"year"`
+		Title string `json:"title"`
+		Link  string `json:"link"`
+		Type  string `json:"type"`
+	}
+	if json.NewDecoder(reader).Decode(&payload) != nil {
+		return historyProviderResult{}
+	}
+	rows := payload[day.Format("01")][day.Format("0102")]
+	events := make([]domain.HistoricalEvent, 0, 6)
+	for _, row := range rows {
+		if row.Type != "event" {
+			continue
+		}
+		year, err := strconv.Atoi(row.Year)
+		text := strings.TrimSpace(html.UnescapeString(historyHTMLTags.ReplaceAllString(row.Title, "")))
+		if err != nil || text == "" {
+			continue
+		}
+		link, err := url.Parse(row.Link)
+		if err != nil || link.Scheme != "https" || link.Host != "baike.baidu.com" {
+			continue
+		}
+		events = append(events, domain.HistoricalEvent{Year: year, Text: text, URL: link.String()})
+	}
+	sort.SliceStable(events, func(i, j int) bool { return events[i].Year > events[j].Year })
+	if len(events) > 6 {
+		events = events[:6]
+	}
+	return historyProviderResult{Events: events, Source: "百度百科 · 历史上的今天"}
 }
 
 func fetchWikifeedsHistory(ctx context.Context, day time.Time) historyProviderResult {
@@ -620,6 +693,9 @@ func truncateRunes(value string, limit int) string {
 }
 
 func fallbackHistory(day time.Time) []domain.HistoricalEvent {
+	if day.Month() == time.February && day.Day() == 29 {
+		return []domain.HistoricalEvent{{Year: 1940, Text: "第十二届奥斯卡金像奖颁奖典礼举行，海蒂·麦克丹尼尔凭《乱世佳人》获最佳女配角奖。", URL: "https://www.oscars.org/oscars/ceremonies/1940"}}
+	}
 	if day.Month() == time.October && day.Day() == 1 {
 		return []domain.HistoricalEvent{{Year: 1949, Text: "中华人民共和国中央人民政府成立。"}}
 	}

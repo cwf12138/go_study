@@ -41,7 +41,7 @@ const scriptPath = path.join(__dirname, "..", "internal", "httpapi", "assets", "
 let source = fs.readFileSync(scriptPath, "utf8");
 const instrumented = source.replace(
   /\n  bind\(\);\r?\n\}\)\(\);\s*$/,
-  "\n  window.__calendarTest = { parseWikipediaHistory, state, renderCalendar, calendarItemTitle, itemsByDate };\n  bind();\n})();\n",
+  "\n  window.__calendarTest = { timedLayouts, state, renderCalendar, calendarItemTitle, itemsByDate };\n  bind();\n})();\n",
 );
 if (instrumented === source) throw new Error("calendar test instrumentation point was not found");
 vm.runInNewContext(instrumented, context, { filename: scriptPath });
@@ -54,22 +54,16 @@ if (!canvas.innerHTML.includes("calendar-month-grid") || cells !== 42) {
 if (getElement("#calendar-title").textContent === "日历" || !getElement("#calendar-title").textContent) {
   throw new Error(`calendar title was not initialized: ${getElement("#calendar-title").textContent}`);
 }
-const history = context.window.__calendarTest.parseWikipediaHistory([
-  "== 大事记 ==",
-  "=== 20世纪 ===",
-  "* 1985年：泰坦尼克号残骸被发现。",
-  "* 公元前5509年：拜占庭历的创世纪日期。",
-  "=== 21世纪 ===",
-  "* 2004年：别斯兰人质危机发生。",
-  "== 出生 ==",
-  "* 1875年：埃德加·赖斯·巴勒斯出生。",
-].join("\n"), "https://zh.wikipedia.org/wiki/9月1日");
-if (history.length !== 3 || history[0].year !== 2004 || history[2].year !== -5509) {
-  throw new Error(`history parser failed: ${JSON.stringify(history)}`);
-}
-
-console.log(`calendar UI smoke ok: ${cells} day cells, title=${getElement("#calendar-title").textContent}, history=${history.length}`);
-for (const view of ['year', 'month', 'week', 'day']) {
+console.log(`calendar UI smoke ok: ${cells} day cells, title=${getElement("#calendar-title").textContent}`);
+const layout = context.window.__calendarTest.timedLayouts([
+ {id:'a', raw:{start_at:'2026-09-01T09:00:00+08:00',end_at:'2026-09-01T10:00:00+08:00'}},
+ {id:'b', raw:{start_at:'2026-09-01T09:30:00+08:00',end_at:'2026-09-01T11:00:00+08:00'}},
+ {id:'c', raw:{start_at:'2026-09-01T12:00:00+08:00',end_at:'2026-09-01T13:00:00+08:00'}}
+], '2026-09-01');
+assert.equal(layout[0].lanes, 2);
+assert.equal(layout[1].lane, 1);
+assert.equal(layout[2].lanes, 1);
+for (const view of ['year', 'month', 'week', 'day', 'agenda']) {
   context.window.__calendarTest.state.view = view;
   context.window.__calendarTest.renderCalendar();
   if (getElement('#panel-calendar').dataset.calendarMode !== view) throw new Error(`calendar mode missing: ${view}`);

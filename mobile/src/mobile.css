@@ -98,7 +98,7 @@ body.daynest-native{padding-top:env(safe-area-inset-top);padding-bottom:env(safe
   .daynest-native #panel-focus .focus-timer-inner{inset:36px}
   .daynest-native #panel-focus .focus-session-card{padding:16px;min-width:0}
   .daynest-native #panel-calendar .calendar-nav-actions{gap:6px}
-  .daynest-native #panel-calendar .calendar-month-grid{min-height:420px;grid-template-rows:repeat(6,minmax(64px,1fr))}
+  .daynest-native #panel-calendar .calendar-month-grid{min-height:0;grid-template-rows:repeat(6,54px)}
   .daynest-native .calendar-day-cell{padding:5px 3px}
   .daynest-native .calendar-solar-day{font-size:14px;min-width:24px;height:24px}
   .daynest-native .calendar-cell-item{padding:3px 2px;font-size:10px}
