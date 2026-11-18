@@ -38,7 +38,8 @@
         element('enabled').checked = !!store?.enabled(); element('list').replaceChildren();
         for (const record of result.records) {
           const button = document.createElement('button'); button.type = 'button';
-          button.textContent = `${record.value.title || `未命名${kind}`}\n${new Date(record.savedAt).toLocaleString('zh-CN')}${record.submitted ? ' · 已提交副本' : ''}`;
+          const label = record.submitted ? ' · 已提交副本' : record.base ? '' : ' · 新建草稿';
+          button.textContent = `${record.value.title || `未命名${kind}`}\n${new Date(record.savedAt).toLocaleString('zh-CN')}${label}`;
           button.setAttribute('aria-current', String(selected?.id === record.id));
           button.addEventListener('click', () => preview(record)); element('list').append(button);
         }
@@ -46,12 +47,12 @@
         else if (!result.records.length) message(`还没有${kind}编辑草稿。`);
       } catch (error) { message('本机存储不可用，请在编辑器中导出当前文字。'); }
     }
-    function capture(base, value, submitted = false) {
+    function capture(base, value, submitted = false, details = {}) {
       try {
         const store = sync(); if (!store?.enabled()) { hooks?.notice('本机草稿保留已关闭，当前文字可在编辑器导出。'); return; }
-        if (!active || active.base?.id !== base.id) active = { id: core.writerID() };
+        if (!active || active.base?.id !== base?.id) active = { id: core.writerID() };
         const record = { version: 1, id: active.id, generation: ++generation, savedAt: Date.now(), base,
-          ...metadata(base), value, submitted };
+          ...metadata(base), ...details, value, submitted };
         store.put(record); active = record; render(); hooks?.notice(submitted ? '服务已接收，本机副本继续保留。' : '本机草稿已保留。'); return record;
       } catch (error) {
         hooks?.notice('本机草稿未能保存，请先导出当前文字。' + error.message);
@@ -63,9 +64,24 @@
       render();
       element('preview').hidden = false; element('heading').textContent = record.value.title || `未命名${kind}`;
       element('local').value = core.readable(record); element('remote').value = '';
+      element('restore').textContent = record.base ? '恢复并核对' : '继续新建';
+      element('remote').parentElement.hidden = !record.base;
+      if (!record.base) {
+        loading = false;
+        try {
+          const linked = hooks.hasSubmission(record);
+          element('restore').textContent = linked ? '查看原提交' : '继续新建';
+          element('restore').disabled = false;
+          message(linked ? '这份草稿已有提交记录。可以核对原提交，或导出当前草稿内容。' : '可以回到新建表单，继续编辑这份草稿。');
+        } catch (error) {
+          element('restore').disabled = true;
+          message(error.message);
+        }
+        return;
+      }
       element('restore').disabled = true; loading = true; message(`正在读取原${sourceName}进行对照。`);
       try {
-        const remote = await hooks.read(record.base.id);
+        const remote = await (hooks.readDraft ? hooks.readDraft(record) : hooks.read(record.base.id));
         if (currentTurn !== turn || store !== sync()) return;
         element('remote').value = editorCore.describe(remote);
         element('restore').disabled = false;
@@ -118,7 +134,14 @@
     document.addEventListener('daynest:account-ready', render);
     document.addEventListener('daynest:account-leaving', () => { turn++; account = ''; storage = null; active = selected = null; dialog.close(); element('local').value = element('remote').value = ''; element('heading').textContent = ''; message(''); element('list').replaceChildren(); });
     window.addEventListener('storage', () => { render(); });
-    return { capture, begin() { active = null; }, connect(value) { hooks = value; render(); } };
+    return { capture, begin() { active = null; }, connect(value) { hooks = value; render(); },
+      removeMatching(predicate) {
+        const store = sync();
+        for (const record of store?.list().records || []) {
+          if (predicate(record)) store.remove(record);
+        }
+        render();
+      } };
   }
   window.DaynestEditorDrafts = { create };
 })();

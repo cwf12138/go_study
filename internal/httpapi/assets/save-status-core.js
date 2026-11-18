@@ -1,7 +1,16 @@
 (function(root,factory){'use strict';const core=factory();if(typeof module==='object'&&module.exports)module.exports=core;else root.DaynestSaveCore=core;})(typeof window==='undefined'?globalThis:window,function(){
   'use strict';
   const families={memos:'备忘录','memo-folders':'备忘录文件夹',todos:'待办','todo-lists':'待办分类','todo-imports':'离线待办','calendar/events':'日程','calendar/event-commands':'新建日程'};
-  function route(path){const clean=String(path).split('?')[0];for(const [prefix,label] of Object.entries(families)){const base='/api/v1/'+prefix;if(clean===base||clean.startsWith(base+'/'))return{label,topic:prefix,resource:clean.slice(base.length+1).split('/')[0]||''};}return null;}
+  function route(path) {
+    const clean = String(path).split('?')[0];
+    const occurrence = /^\/api\/v1\/calendar\/events\/([^/]+)\/occurrences\/([^/]+)$/.exec(clean);
+    if (occurrence) return { label: '本次日程', topic: 'calendar/events', resource: `${occurrence[1]}/occurrences/${occurrence[2]}`, recordID: occurrence[1] };
+    for (const [prefix, label] of Object.entries(families)) {
+      const base = '/api/v1/' + prefix;
+      if (clean === base || clean.startsWith(base + '/')) return { label, topic: prefix, resource: clean.slice(base.length + 1).split('/')[0] || '' };
+    }
+    return null;
+  }
   function tracked(path,method='GET'){return ['POST','PUT','PATCH','DELETE'].includes(String(method).toUpperCase())&&!!route(path);}
   const same=(a,b)=>!!a&&!!b&&a.token===b.token&&a.server===b.server&&a.userID===b.userID&&a.session===b.session;
   const validReceipt=value=>typeof value==='string'&&/^w1\.[a-f0-9]{32}\.[1-9][0-9]{0,19}\.[A-Za-z0-9_-]{43}$/.test(value);
@@ -15,7 +24,7 @@
     if(info.topic==='todo-imports')return typeof data.created==='boolean'&&!!data.receipt&&(data.todo===null||!!cores.DaynestTodoEditorCore?.valid(data.todo,context.userID));
     if(info.topic==='memos'&&path.endsWith('/actions'))return typeof data.created==='boolean'&&typeof data.matches_request==='boolean'&&!!cores.DaynestActionCore?.validContext(data.context,context.userID);
     if(typeof data.id!=='string'||data.user_id!==context.userID)return false;
-    if(info.resource&&!(info.topic==='memos'&&path.endsWith('/duplicate'))&&data.id!==info.resource)return false;
+    if(info.resource&&!(info.topic==='memos'&&path.endsWith('/duplicate'))&&data.id!==(info.recordID || info.resource))return false;
     if(info.topic==='todos')return !!cores.DaynestTodoEditorCore?.valid(data,context.userID);
     if(info.topic==='calendar/events')return !!cores.DaynestCalendarEditorCore?.valid(data,context.userID);
     if(info.topic==='memos')return typeof data.content==='string'&&typeof data.title==='string'&&Number.isFinite(Date.parse(data.updated_at));
@@ -37,7 +46,7 @@
       row.state=event.accepted?(row.receipt?'waiting_snapshot':'received'):event.uncertain?'needs_review':'rejected';
       const result=event.data;
       // Keep only record identifiers; never retain titles, request bodies or replies.
-      if(event.accepted){const id=result?.event?.id||result?.todo?.id||result?.context?.todo?.id||result?.id;if(typeof id==='string'&&id.length<=160){if(row.topic==='calendar/event-commands')row.topic='calendar/events';row.resource=id;}}
+      if(event.accepted&&!row.recordID){const id=result?.event?.id||result?.todo?.id||result?.context?.todo?.id||result?.id;if(typeof id==='string'&&id.length<=160){if(row.topic==='calendar/event-commands')row.topic='calendar/events';row.resource=id;}}
       return true;
     }
     function apply(context,proofs){

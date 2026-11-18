@@ -98,10 +98,11 @@
       }
       return rows.sort((a, b) => Number(a.confirmed&&!a.missing) - Number(b.confirmed&&!b.missing) || b.created_at.localeCompare(a.created_at));
     }
-    function put(body) {
+    function put(body, draftRequestID) {
       if (read().length >= MAX_ROWS) throw Error('已有 20 项日程待核对，请先核对或导出清理。');
       const bytes = new Uint8Array(24); crypto.getRandomValues(bytes);
-      const request_id = typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+      const request_id = draftRequestID ?? (typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Array.from(bytes, b => b.toString(16).padStart(2, '0')).join(''));
+      if (typeof request_id !== 'string' || !/^[\w-]{16,100}$/.test(request_id)) throw Error('本机草稿提交标识无效，请导出后重新填写。');
       const row = { schema_version: 1, server: R.origin(context.server), userID: context.userID, request_id, body: normalize(body), fingerprint: fingerprint(body), created_at: new Date().toISOString() };
       const raw = JSON.stringify(row), key = prefix + request_id; if (R.bytes(raw) > MAX_BYTES || storage.getItem(key)) throw Error('无法安全保留新提交。');
       storage.setItem(key, raw); if (storage.getItem(key) !== raw) throw Error('未能保留原始提交，已停止发送。'); return row;

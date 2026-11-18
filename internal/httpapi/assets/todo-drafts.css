@@ -64,6 +64,9 @@
   display:block;
   margin-bottom:12px
 }
+.td-layout label[hidden] {
+  display: none;
+}
 .td-layout textarea {
   display:block;
   box-sizing:border-box;

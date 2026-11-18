@@ -126,6 +126,11 @@ func (s *Service) UpdateCalendarEvent(ctx context.Context, userID, eventID strin
 	if err := validateCalendarEvent(&event); err != nil {
 		return domain.CalendarEvent{}, err
 	}
+	for _, override := range event.OccurrenceOverrides {
+		if !hasCalendarSlot(event, override.OriginalStart) {
+			return domain.CalendarEvent{}, fmt.Errorf("%w: series change would remove adjusted occurrences", domain.ErrInvalidState)
+		}
+	}
 	event.UpdatedAt = s.nextRecordTime(previous)
 	writer, err := s.calendarWriter()
 	if err != nil {
@@ -268,26 +273,29 @@ func expandCalendarEvents(events []domain.CalendarEvent, start, end time.Time) [
 	occurrences := make([]domain.CalendarOccurrence, 0)
 	for _, event := range events {
 		duration := event.EndAt.Sub(event.StartAt)
-		location := calendarLocation
-		if event.AllDay {
-			location = calendarWallLocation
-		}
-		current := event.StartAt.In(location)
 		if event.RepeatRule == domain.CalendarRepeatNone {
 			if event.EndAt.After(start) && event.StartAt.Before(end) {
 				occurrences = append(occurrences, makeOccurrence(event, event.StartAt, event.EndAt))
 			}
 			continue
 		}
-		for i := 0; i < 5000 && current.Before(end); i++ {
+		overridden := make(map[time.Time]bool, len(event.OccurrenceOverrides))
+		for _, override := range event.OccurrenceOverrides {
+			overridden[override.OriginalStart.UTC()] = true
+			if override.EndAt.After(start) && override.StartAt.Before(end) {
+				effective := applyOccurrenceOverride(event, override)
+				occurrences = append(occurrences, makeRecurringOccurrence(effective, override.OriginalStart, override.StartAt, override.EndAt, true))
+			}
+		}
+		base := recurrenceBase(event)
+		for i, current := 0, base; i < maxCalendarOccurrences && current.Before(end); i, current = i+1, recurrenceAt(base, event.RepeatRule, i+1) {
 			currentEnd := current.Add(duration)
-			if event.RepeatUntil != nil && current.After(event.RepeatUntil.In(location)) {
+			if event.RepeatUntil != nil && current.After(*event.RepeatUntil) {
 				break
 			}
-			if currentEnd.After(start) {
-				occurrences = append(occurrences, makeOccurrence(event, current.UTC(), currentEnd.UTC()))
+			if currentEnd.After(start) && !overridden[current.UTC()] {
+				occurrences = append(occurrences, makeRecurringOccurrence(event, current, current, currentEnd, false))
 			}
-			current = recurrenceAt(event.StartAt.In(location), event.RepeatRule, i+1)
 		}
 	}
 	sort.Slice(occurrences, func(i, j int) bool { return occurrences[i].OccurrenceStart.Before(occurrences[j].OccurrenceStart) })
@@ -321,7 +329,16 @@ func recurrenceAt(base time.Time, rule domain.CalendarRepeatRule, occurrence int
 }
 
 func makeOccurrence(event domain.CalendarEvent, start, end time.Time) domain.CalendarOccurrence {
+	event.OccurrenceOverrides = nil
 	return domain.CalendarOccurrence{CalendarEvent: event, OccurrenceID: event.ID + "@" + start.UTC().Format("20060102T150405Z"), OccurrenceStart: start, OccurrenceEnd: end}
+}
+
+func makeRecurringOccurrence(event domain.CalendarEvent, original, start, end time.Time, overridden bool) domain.CalendarOccurrence {
+	original = original.UTC()
+	row := makeOccurrence(event, start.UTC(), end.UTC())
+	row.OccurrenceID = event.ID + "@" + original.Format("20060102T150405Z")
+	row.OriginalStart, row.Overridden = &original, overridden
+	return row
 }
 
 func (s *Service) CalendarDay(ctx context.Context, dateValue string, includeHistory bool) (domain.CalendarDayDetail, error) {

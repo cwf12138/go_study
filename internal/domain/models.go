@@ -189,28 +189,45 @@ const (
 )
 
 type CalendarEvent struct {
-	ID              string             `json:"id"`
-	UserID          string             `json:"user_id"`
-	Title           string             `json:"title"`
-	Description     string             `json:"description"`
-	Location        string             `json:"location"`
-	Category        string             `json:"category"`
-	Color           string             `json:"color"`
-	StartAt         time.Time          `json:"start_at"`
-	EndAt           time.Time          `json:"end_at"`
-	AllDay          bool               `json:"all_day"`
-	RepeatRule      CalendarRepeatRule `json:"repeat_rule"`
-	RepeatUntil     *time.Time         `json:"repeat_until,omitempty"`
-	ReminderMinutes int                `json:"reminder_minutes"`
-	CreatedAt       time.Time          `json:"created_at"`
-	UpdatedAt       time.Time          `json:"updated_at"`
+	ID                  string                       `json:"id"`
+	UserID              string                       `json:"user_id"`
+	Title               string                       `json:"title"`
+	Description         string                       `json:"description"`
+	Location            string                       `json:"location"`
+	Category            string                       `json:"category"`
+	Color               string                       `json:"color"`
+	StartAt             time.Time                    `json:"start_at"`
+	EndAt               time.Time                    `json:"end_at"`
+	AllDay              bool                         `json:"all_day"`
+	RepeatRule          CalendarRepeatRule           `json:"repeat_rule"`
+	RepeatUntil         *time.Time                   `json:"repeat_until,omitempty"`
+	ReminderMinutes     int                          `json:"reminder_minutes"`
+	CreatedAt           time.Time                    `json:"created_at"`
+	UpdatedAt           time.Time                    `json:"updated_at"`
+	OccurrenceOverrides []CalendarOccurrenceOverride `json:"occurrence_overrides,omitempty"`
+}
+
+// OriginalStart identifies the scheduled slot even if its replacement moves to another date.
+type CalendarOccurrenceOverride struct {
+	OriginalStart   time.Time `json:"original_start"`
+	StartAt         time.Time `json:"start_at"`
+	EndAt           time.Time `json:"end_at"`
+	Title           string    `json:"title"`
+	Description     string    `json:"description"`
+	Location        string    `json:"location"`
+	Category        string    `json:"category"`
+	Color           string    `json:"color"`
+	AllDay          bool      `json:"all_day"`
+	ReminderMinutes int       `json:"reminder_minutes"`
 }
 
 type CalendarOccurrence struct {
 	CalendarEvent
-	OccurrenceID    string    `json:"occurrence_id"`
-	OccurrenceStart time.Time `json:"occurrence_start"`
-	OccurrenceEnd   time.Time `json:"occurrence_end"`
+	OccurrenceID    string     `json:"occurrence_id"`
+	OccurrenceStart time.Time  `json:"occurrence_start"`
+	OccurrenceEnd   time.Time  `json:"occurrence_end"`
+	OriginalStart   *time.Time `json:"original_start,omitempty"`
+	Overridden      bool       `json:"overridden,omitempty"`
 }
 
 type CalendarDaySummary struct {

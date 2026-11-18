@@ -13,6 +13,7 @@ func cloneCalendarEvent(event domain.CalendarEvent) domain.CalendarEvent {
 		value := *event.RepeatUntil
 		event.RepeatUntil = &value
 	}
+	event.OccurrenceOverrides = append([]domain.CalendarOccurrenceOverride(nil), event.OccurrenceOverrides...)
 	return event
 }
 

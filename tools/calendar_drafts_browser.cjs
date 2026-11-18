@@ -15,8 +15,13 @@ let api,browser,page,release;const report={schema_version:1,started_at:new Date(
  await context.addInitScript(token=>{if(window!==top||!location.href.startsWith('http://'))return;try{if(!localStorage.getItem('studyflow.token'))localStorage.setItem('studyflow.token',token);}catch{}},a.token);
  page=await context.newPage();await page.goto(origin+'/#calendar');await page.waitForFunction(()=>!!window.DaynestAccount?.current?.());await page.locator(`[data-calendar-event="${timed.id}"]`).first().waitFor();
  const open=async(p,id)=>{await p.evaluate(id=>DaynestCalendarEvents.open(id),id);await p.waitForFunction(()=>!document.getElementById('calendar-event-form').hidden);},close=async p=>{await p.click('#calendar-dialog-close');await p.waitForFunction(()=>!document.getElementById('calendar-event-dialog').open);};
+ async function openDrafts(p = page) {
+   await p.click('#calendar-filter-open');
+   await p.click('#calendar-drafts-open');
+   assert(await p.locator('#calendar-tools-dialog').isHidden());
+ }
  async function preview() {
-   await page.click('#calendar-drafts-open');
+   await openDrafts();
    await page.locator('#cd-list button').first().click();
    await page.waitForFunction(()=>!document.getElementById('cd-restore').disabled);
  }
@@ -24,6 +29,82 @@ let api,browser,page,release;const report={schema_version:1,started_at:new Date(
    await page.click('#cd-restore');
    await page.waitForFunction(()=>document.getElementById('calendar-event-dialog').open&&!document.getElementById('calendar-editor-review').hidden);
  }
+ const commandPath='/api/v1/calendar/event-commands';
+ const draftPage=await context.newPage();
+ await page.click('#calendar-create');
+ await page.fill('#calendar-event-description','只有说明的未完成表单');
+ await page.check('#calendar-event-all-day');
+ await page.fill('#calendar-event-end',later);
+ await page.reload();await page.waitForFunction(()=>!!window.DaynestAccount?.current?.());
+ await preview();
+ assert.equal(await page.textContent('#cd-restore'),'继续新建');
+ assert(await page.locator('#cd-remote').isHidden());
+ await page.click('#cd-restore');
+ await page.locator('#calendar-event-description').waitFor();
+ assert.equal(await page.inputValue('#calendar-event-title'),'');
+ assert.equal(await page.inputValue('#calendar-event-description'),'只有说明的未完成表单');
+ assert(await page.isChecked('#calendar-event-all-day'));
+ assert.equal(await page.inputValue('#calendar-event-end'),later);
+ assert.equal(await page.evaluate(()=>DaynestCalendarEditorCore.commands(localStorage,DaynestHTTP.capture()).read().length),0);
+ pass('incomplete_create_form_survives_reload_without_a_submission');
+
+ await page.fill('#calendar-event-title','新建草稿转为提交');
+ await page.evaluate(()=>{window.__originalSet=Storage.prototype.setItem;Storage.prototype.setItem=function(key,value){if(key.startsWith('daynest.calendar-command.v1:'))throw Error('fixture command quota');return window.__originalSet.call(this,key,value);};});
+ let posts=0;
+ await page.route('**'+commandPath,async route=>{
+   if(route.request().method()!=='POST')return route.continue();
+   posts++;
+   await route.fetch();
+   await route.abort('failed');
+ });
+ await page.click('#calendar-event-save');
+ await page.waitForFunction(()=>document.getElementById('calendar-editor-status').textContent.includes('fixture command quota'));
+ assert.equal(posts,0);
+ assert.equal(await page.inputValue('#calendar-event-title'),'新建草稿转为提交');
+ await page.evaluate(()=>Storage.prototype.setItem=window.__originalSet);
+ pass('command_storage_failure_leaves_create_draft_and_stops_dispatch');
+
+ await draftPage.goto(origin+'/#calendar');await draftPage.waitForFunction(()=>!!window.DaynestAccount?.current?.());
+ await openDrafts(draftPage);
+ await draftPage.locator('#cd-list button').first().click();
+ await draftPage.click('#cd-restore');
+ await draftPage.locator('#calendar-event-description').waitFor();
+ await draftPage.fill('#calendar-event-description','另一个窗口的修改');
+ await page.click('#calendar-event-save');
+ await page.waitForFunction(()=>document.getElementById('calendar-editor-status').textContent.includes('可能已处理'));
+ assert.equal(posts,1);
+ const command=await page.evaluate(()=>DaynestCalendarEditorCore.commands(localStorage,DaynestHTTP.capture()).read()[0]);
+ assert.equal(command.body.title,'新建草稿转为提交');
+ let peerPosts=0;
+ draftPage.on('request',request=>{if(request.method()==='POST'&&new URL(request.url()).pathname===commandPath)peerPosts++;});
+ await draftPage.click('#calendar-event-save');
+ await draftPage.waitForFunction(()=>document.getElementById('calendar-editor-status').textContent.includes('已有提交记录'));
+ assert.equal(peerPosts,0);
+ assert.equal(await draftPage.inputValue('#calendar-event-description'),'另一个窗口的修改');
+ await close(draftPage);
+ pass('competing_restored_window_keeps_its_fields_and_uses_one_submission_identity');
+
+ await page.reload();await page.waitForFunction(()=>!!window.DaynestAccount?.current?.());
+ await openDrafts();
+ await page.locator('#cd-list button').filter({hasText:'新建草稿转为提交'}).first().click();
+ assert((await page.inputValue('#cd-local')).includes('另一个窗口的修改'));
+ assert.equal(await page.textContent('#cd-restore'),'查看原提交');
+ await page.click('#cd-restore');
+ await page.click('#calendar-event-check');
+ await page.waitForFunction(()=>document.getElementById('calendar-editor-status').textContent.includes('已找到原日程'));
+ const receipt=await json(commandPath+'/'+command.request_id,a.token);
+ assert.equal(receipt.event.description,'只有说明的未完成表单');
+ assert.equal(posts,1);
+ const linkedCopies=await page.evaluate(id=>{
+   const context=DaynestHTTP.capture(), core=DaynestCalendarDraftCore;
+   return core.create(localStorage,core.scope(context.server,context.userID)).list().records
+     .filter(record=>record.requestID===id).map(record=>record.value);
+ },command.request_id);
+ assert(linkedCopies.some(value=>value.description==='另一个窗口的修改'));
+ assert(!linkedCopies.some(value=>value.title==='新建草稿转为提交'&&value.description==='只有说明的未完成表单'));
+ await close(page);await draftPage.close();
+ pass('lost_create_response_switches_draft_to_receipt_lookup_without_resending');
+
  await open(page,timed.id);
  await page.fill('#calendar-event-description','刷新后找回的说明');
  await page.fill('#calendar-event-location','图书馆');
@@ -76,7 +157,7 @@ let api,browser,page,release;const report={schema_version:1,started_at:new Date(
  pass('deleted_event_keeps_exportable_draft_and_blocks_restore');
  await page.evaluate(token=>{localStorage.setItem('studyflow.token',token);dispatchEvent(new StorageEvent('storage',{key:'studyflow.token'}));},b.token);
  await page.waitForFunction(id=>window.DaynestAccount?.current?.()?.userID===id,b.user.id);
- await page.click('#calendar-drafts-open');assert.equal(await page.locator('#cd-list button').count(),0);assert.equal(await page.inputValue('#cd-local'),'');
+ await openDrafts();assert.equal(await page.locator('#cd-list button').count(),0);assert.equal(await page.inputValue('#cd-local'),'');
  pass('account_change_clears_preview_and_isolates_drafts');
  assert.deepEqual(errors,[]);report.passed=true;
 })().catch(async error=>{report.passed=false;report.failure=error.message;console.error(error);process.exitCode=1;if(page)await page.screenshot({path:path.join(out,'calendar-drafts-failure.png'),fullPage:true}).catch(()=>{});}).finally(async()=>{release?.();if(browser)await browser.close();if(api){api.kill();await Promise.race([new Promise(r=>api.once('exit',r)),new Promise(r=>setTimeout(r,2000))]);}report.finished_at=new Date().toISOString();fs.writeFileSync(path.join(out,'calendar-drafts-browser-report.json'),JSON.stringify(report,null,2)+'\n');console.log('Report: .local/checks/calendar-drafts-browser-report.json. Fixture data only; no APK/device.');});

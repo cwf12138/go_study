@@ -2187,7 +2187,7 @@ paths:
       tags: [Calendar]
       security: [{ bearerAuth: [] }]
       summary: 更新原日程或整组重复系列，支持版本条件
-      description: 新版前端发送完整强 If-Match，保留所有纳秒。旧客户端可省略条件，但服务端仍在同一锁中以读取版本比较写入。没有单次实例例外编辑。
+      description: 新版前端发送完整强 If-Match，保留所有纳秒。旧客户端可省略条件。整组修改会保留仍属于该系列的单次调整，移除已调整日期的操作返回 409。
       parameters:
         - { in: path, name: event_id, required: true, schema: { type: string } }
         - $ref: "#/components/parameters/CalendarIfMatch"
@@ -2221,6 +2221,53 @@ paths:
         "204": { description: Deleted }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/calendar/events/{event_id}/occurrences/{original_start}:
+    parameters:
+      - { in: path, name: event_id, required: true, schema: { type: string } }
+      - in: path
+        name: original_start
+        required: true
+        description: 保留精度并进行 URL 编码的原定开始时间。改期后继续使用相同值。
+        schema: { type: string, format: date-time }
+    get:
+      tags: [Calendar]
+      security: [{ bearerAuth: [] }]
+      summary: 读取本次日程和共用的整组版本
+      responses:
+        '200': { $ref: '#/components/responses/CalendarOccurrenceResult' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Calendar]
+      security: [{ bearerAuth: [] }]
+      summary: 保存单次日程的时间和内容
+      parameters:
+        - { in: header, name: If-Match, required: true, schema: { type: string }, description: 读取本次日程时返回的强 ETag。 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/CalendarEventInput'
+                - properties:
+                    repeat_rule: { const: none }
+                    repeat_until: { type: 'null' }
+      responses:
+        '200': { $ref: '#/components/responses/CalendarOccurrenceResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Calendar]
+      security: [{ bearerAuth: [] }]
+      summary: 移除本次的单独调整并返回恢复后的日程
+      parameters:
+        - { in: header, name: If-Match, required: true, schema: { type: string }, description: 读取本次日程时返回的强 ETag。 }
+      responses:
+        '200': { $ref: '#/components/responses/CalendarOccurrenceResult' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /api/v1/calendar/event-commands:
     post:
       tags: [Calendar]
@@ -3941,6 +3988,21 @@ components:
       required: true
       schema: { type: string }
   responses:
+    CalendarOccurrenceResult:
+      description: 本次日程及该系列的最新版本。
+      headers:
+        ETag: { schema: { type: string } }
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data, meta]
+            properties:
+              data: { $ref: '#/components/schemas/CalendarOccurrence' }
+              meta:
+                type: object
+                properties:
+                  write_contract: { const: calendar-occurrence-if-match-v1 }
     BadRequest:
       description: Invalid input
       content:
@@ -4705,6 +4767,27 @@ components:
             user_id: { type: string }
             created_at: { type: string, format: date-time }
             updated_at: { type: string, format: date-time }
+            occurrence_overrides:
+              type: array
+              maxItems: 100
+              items:
+                allOf:
+                  - $ref: '#/components/schemas/CalendarEventInput'
+                  - type: object
+                    required: [original_start]
+                    properties:
+                      original_start: { type: string, format: date-time }
+    CalendarOccurrence:
+      allOf:
+        - $ref: '#/components/schemas/CalendarEvent'
+        - type: object
+          required: [occurrence_id, occurrence_start, occurrence_end]
+          properties:
+            occurrence_id: { type: string }
+            occurrence_start: { type: string, format: date-time }
+            occurrence_end: { type: string, format: date-time }
+            original_start: { type: string, format: date-time, description: 重复日程的原定开始时间。 }
+            overridden: { type: boolean, default: false }
     CalendarDaySummary:
       type: object
       properties:
@@ -4720,7 +4803,7 @@ components:
         start: { type: string, format: date }
         end: { type: string, format: date }
         days: { type: array, items: { $ref: "#/components/schemas/CalendarDaySummary" } }
-        events: { type: array, items: { $ref: "#/components/schemas/CalendarEvent" } }
+        events: { type: array, items: { $ref: "#/components/schemas/CalendarOccurrence" } }
         plan_blocks: { type: array, items: { $ref: "#/components/schemas/StudyPlanBlock" } }
         tasks: { type: array, items: { $ref: "#/components/schemas/StudyTask" } }
         todos: { type: array, items: { $ref: "#/components/schemas/TodoItem" } }

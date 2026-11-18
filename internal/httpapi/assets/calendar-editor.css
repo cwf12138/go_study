@@ -5,3 +5,12 @@
 #calendar-dialog-close{width:44px;height:44px;border-radius:50%;font-size:23px;padding:0;flex:none}@media(max-width:600px){#calendar-event-dialog .calendar-dialog-actions button{min-width:85px}}
 
 #calendar-event-form[hidden],#calendar-command-list[hidden]{display:none}
+
+#calendar-event-dialog .calendar-form-row[hidden] { display: none; }
+.calendar-scope-actions { display: flex; gap: 8px; margin: -8px 0 18px; }
+.calendar-scope-actions[hidden], .calendar-scope-actions button[hidden] { display: none; }
+.calendar-scope-actions button, .calendar-occurrence-overrides summary { min-height: 44px; }
+.calendar-occurrence-overrides { margin: 0 0 18px; border: 1px solid var(--line); border-radius: 12px; }
+.calendar-occurrence-overrides summary { padding: 12px 14px; cursor: pointer; }
+#calendar-occurrence-list { display: grid; gap: 6px; max-height: 240px; overflow: auto; padding: 0 10px 10px; }
+#calendar-occurrence-list button { text-align: left; overflow-wrap: anywhere; min-height: 44px; }
