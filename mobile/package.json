@@ -1,7 +1,7 @@
 {
   "name": "daynest-android",
-  "version": "0.5.0",
-  "daynestAndroidVersionCode": 5,
+  "version": "0.6.0",
+  "daynestAndroidVersionCode": 6,
   "private": true,
   "description": "Daynest Android app connected to the personal cloud server",
   "engines": { "node": ">=22" },

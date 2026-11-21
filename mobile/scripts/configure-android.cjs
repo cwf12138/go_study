@@ -3,7 +3,7 @@ const root = path.resolve(__dirname, '..'), android = path.join(root, 'android')
 if (!fs.existsSync(path.join(android, 'app/src/main/AndroidManifest.xml'))) throw Error('先执行 npm run android:init 创建 Android 工程。');
 const java = path.join(android, 'app/src/main/java/app/daynest/personal'), xml = path.join(android, 'app/src/main/res/xml');
 fs.mkdirSync(java, { recursive: true }); fs.mkdirSync(xml, { recursive: true });
-for (const file of ['MainActivity.java', 'DaynestFilesPlugin.java']) fs.copyFileSync(path.join(root, 'native', file), path.join(java, file));
+for (const file of ['MainActivity.java', 'DaynestFilesPlugin.java', 'DaynestRemindersPlugin.java', 'CalendarReminderReceiver.java']) fs.copyFileSync(path.join(root, 'native', file), path.join(java, file));
 fs.copyFileSync(path.join(root, 'native/network_security_config.xml'), path.join(xml, 'network_security_config.xml'));
 fs.copyFileSync(path.join(root, 'native/daynest_icon.xml'), path.join(android, 'app/src/main/res/drawable/daynest_icon.xml'));
 const manifest = path.join(android, 'app/src/main/AndroidManifest.xml');
@@ -17,6 +17,20 @@ if (!content.includes('android.permission.MODIFY_AUDIO_SETTINGS')) content = con
 // WebView requests foreground location only after the weather locate button.
 for (const permission of ['ACCESS_COARSE_LOCATION','ACCESS_FINE_LOCATION']) {
   if (!content.includes('android.permission.'+permission)) content = content.replace('</manifest>', '    <uses-permission android:name="android.permission.'+permission+'" />\n</manifest>');
+}
+for (const permission of ['POST_NOTIFICATIONS', 'RECEIVE_BOOT_COMPLETED', 'SCHEDULE_EXACT_ALARM']) {
+  if (!content.includes('android.permission.' + permission)) content = content.replace('</manifest>', '    <uses-permission android:name="android.permission.' + permission + '" />\n</manifest>');
+}
+if (!content.includes('android:name=".CalendarReminderReceiver"')) content = content.replace('</application>', `    <receiver android:name=".CalendarReminderReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+    </application>`);
+if (!content.includes('android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED')) {
+  content = content.replace('<action android:name="android.intent.action.MY_PACKAGE_REPLACED" />', '<action android:name="android.intent.action.MY_PACKAGE_REPLACED" />\n                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />');
 }
 fs.writeFileSync(manifest, content);
 const styles = path.join(android, 'app/src/main/res/values/styles.xml');

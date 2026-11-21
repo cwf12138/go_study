@@ -22,6 +22,12 @@ export function boot({ Http, App, Files, defaultServer = '' }) {
     const body = response.status === 204 ? null : typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
     return new Response(body, { status: response.status, headers: response.headers || {} });
   }
+  async function checkServer(origin, signal) {
+    const response = await nativeRequest(origin, '/api/v1/mobile-info', { signal });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !C.metadata(result?.data)) throw Error('服务暂时不可用或版本不兼容，请稍后重试。');
+    if (result.data.requires_secure_secret) throw Error('服务仍使用公开开发密钥，请配置专用 JWT_SECRET 后再连接。');
+  }
   window.fetch = function(input, options = {}) {
     const url = new URL(typeof input === 'string' || input instanceof URL ? String(input) : input.url, window.location.href);
     if (!url.pathname.startsWith('/api/v1/')) return originalFetch(input, options);
@@ -85,8 +91,10 @@ export function boot({ Http, App, Files, defaultServer = '' }) {
 
   document.addEventListener('DOMContentLoaded', async () => {
     document.body.classList.add('daynest-native');
+    const authView = document.getElementById('auth-view');
+    const authVisible = () => !authView.classList.contains('hidden');
     const setup = document.createElement('dialog'); setup.id = 'mobile-connection'; setup.className = 'mobile-connection'; setup.setAttribute('aria-labelledby', 'mobile-title');
-    setup.innerHTML = `<header><span class="mobile-mark" aria-hidden="true">D</span><button id="mobile-close" type="button" aria-label="关闭连接设置" hidden>×</button></header><p class="mobile-eyebrow">DAYNEST · ANDROID</p><h1 id="mobile-title">把日常，带在身边。</h1><p>日程、待办与心情，随时回到你的日常。</p><form id="mobile-form"><details id="mobile-advanced"><summary>连接设置</summary><label>服务地址<input id="mobile-server" type="url" inputmode="url" placeholder="https://111.230.184.144" maxlength="500" required autocomplete="off" spellcheck="false"></label><label id="mobile-http-notice" class="mobile-consent"><input id="mobile-consent" type="checkbox"><span>使用局域网 HTTP 时，我确认只连接可信网络；登录信息和记录不会加密传输。</span></label><p>默认已配置个人云端服务，无需电脑保持开机。只有连接自己的其他服务时，才需要修改地址。</p></details><button id="mobile-connect" type="submit">重新连接</button></form><button id="mobile-offline" type="button" class="mobile-offline-button">离线资料与本机收集 ↗</button><p id="mobile-state" role="status" aria-live="polite"></p><p class="mobile-footnote">账号与记录保存在所连接的服务中。网络恢复后可继续使用，本机草稿会保留供你核对。</p>`;
+    setup.innerHTML = `<header><h2 id="mobile-title">服务连接</h2><button id="mobile-close" type="button" aria-label="关闭连接设置">×</button></header><form id="mobile-form"><details id="mobile-advanced"><summary>编辑服务地址</summary><label>服务地址<input id="mobile-server" type="url" inputmode="url" placeholder="https://example.com" maxlength="500" required autocomplete="off" spellcheck="false"></label><label id="mobile-http-notice" class="mobile-consent"><input id="mobile-consent" type="checkbox"><span>我确认正在使用可信的局域网。通过 HTTP 传输的登录信息和记录不会加密。</span></label></details><p id="mobile-state" role="status" aria-live="polite"></p><button id="mobile-connect" type="submit">连接服务</button></form><button id="mobile-offline" type="button" class="mobile-offline-button">离线资料与本机收集</button>`;
     document.body.append(setup);
     const reader=document.createElement('dialog');reader.id='mobile-offline-reader';reader.className='mobile-offline-reader';reader.setAttribute('aria-label','离线资料与本机收集');
     reader.innerHTML='<button id="mobile-offline-close" type="button" aria-label="关闭离线资料与本机收集">‹ 返回应用</button><iframe id="mobile-offline-frame" title="离线资料与本机收集"></iframe>';
@@ -95,13 +103,24 @@ export function boot({ Http, App, Files, defaultServer = '' }) {
     const $ = id => document.getElementById('mobile-' + id), state = text => { $('state').textContent = text; };
     const bar = document.createElement('button'); bar.type = 'button'; bar.id = 'mobile-server-bar'; bar.className = 'mobile-server-bar'; bar.textContent = '服务连接 · 设置'; bar.hidden = true;
     document.querySelector('.workspace').prepend(bar);
-    function controls() { $('connect').disabled = busy; $('connect').textContent = fatal ? '重载界面' : busy ? '正在连接…' : '重新连接'; $('server').disabled = busy; $('consent').disabled = busy; $('close').hidden = !loaded || fatal; $('offline').disabled = !connection; $('http-notice').hidden = !$('server').value.startsWith('http:'); }
+    let foregroundCheck;
+    function updateConnectionStatus(online) {
+      bar.dataset.connectionState = online ? 'online' : 'offline';
+      bar.textContent = online ? '已连接服务 · 连接设置' : '服务暂不可达 · 检查连接';
+    }
+    function controls() { $('connect').disabled = busy; $('connect').textContent = fatal ? '重新加载' : busy ? '正在连接…' : '连接服务'; $('server').disabled = busy; $('consent').disabled = busy; $('close').disabled = busy; $('close').hidden = fatal && !authVisible(); $('offline').disabled = !connection; $('http-notice').hidden = !$('server').value.startsWith('http:'); }
     function openSettings() { if (!setup.open) setup.showModal(); controls(); }
     window.DaynestMobile.openConnectionSettings=openSettings;
     window.DaynestMobile.getConnectionInfo=()=>({server:connection?.server||''});
     async function closeReader(){const guard=$('offline-frame').contentWindow?.DaynestLocalInbox;if(guard&&!(await guard.prepareClose()))return;reader.close();$('offline-frame').src='about:blank';}
     window.DaynestMobile.openOfflineReader=section=>{if(!connection){state('请先登录一次，在原账号准备离线资料或本机收集。');return;}$('offline-frame').src='/static/offline-reader.html?server='+encodeURIComponent(connection.server)+(['todos','agenda','capture'].includes(section)?'#'+section:'');if(!reader.open)reader.showModal();};
     $('offline').addEventListener('click',window.DaynestMobile.openOfflineReader);
+    const auth = installMobileAuth({
+      openSettings,
+      retry: () => fatal ? location.reload() : connect(),
+      offline: () => window.DaynestMobile.openOfflineReader(),
+    });
+    window.DaynestMobile.showAuthError = auth.showError;
     $('offline-close').addEventListener('click',closeReader);
     reader.addEventListener('cancel',event=>{event.preventDefault();closeReader();});reader.addEventListener('close',()=>{const frame=$('offline-frame'),guard=frame.contentWindow?.DaynestLocalInbox;Promise.resolve(guard?.beforeDetach?.()).finally(()=>{if(!reader.open)frame.src='about:blank';});});
     window.addEventListener('message',event=>{if(event.origin===location.origin&&event.source===$('offline-frame').contentWindow&&event.data?.type==='daynest:offline-close')closeReader();});
@@ -115,7 +134,8 @@ export function boot({ Http, App, Files, defaultServer = '' }) {
           const src = placeholder.dataset.mobileSrc; if (!src.startsWith('/static/')) throw Error('安装包脚本路径无效');
           await new Promise((resolve, reject) => { const script = document.createElement('script'); script.src = src; script.onload = resolve; script.onerror = () => reject(Error('安装包资源不完整，请重载或重新打包。')); document.body.append(script); });
         }
-        loaded = true; bar.hidden = false; bar.dataset.connectionState = 'online'; bar.textContent = '已连接服务 · 连接设置';
+        loaded = true; bar.hidden = false;
+        document.dispatchEvent?.(new Event('daynest:mobile-ready'));
         window.DaynestUI?.registerGuard?.('mobile-files', () => fileBusy || pending.size > 0);
         const transferIntro = document.querySelector('#ft-drop p'); if (transferIntro) transferIntro.textContent = '支持多选 · 当前 App 单文件最多 8 MiB，电脑网页为 32 MiB';
       } catch (error) { fatal = true; state(error.message); throw error; }
@@ -123,31 +143,43 @@ export function boot({ Http, App, Files, defaultServer = '' }) {
     }
     async function connect(event) {
       event?.preventDefault(); if (busy) return; if (fatal) { location.reload(); return; } busy = true; controls();
+      foregroundCheck?.abort();
+      if (!loaded || authVisible()) auth.connection('connecting');
       let credentialsChanged = false;
+      let origin, checking = false;
       try {
-        const origin = C.server($('server').value);
+        origin = C.server($('server').value);
         if (origin.startsWith('http:') && !$('consent').checked) throw Error('请先确认 HTTP 的明文传输提示，或改用可信 HTTPS。');
-        state('正在安全连接你的 Daynest…');
-        const response = await nativeRequest(origin, '/api/v1/mobile-info');
-        const out = await response.json().catch(() => null);
-        if (!response.ok || !C.metadata(out?.data)) throw Error('服务暂时不可用或版本不兼容，请稍后重试。');
-        if (out.data.requires_secure_secret) throw Error('服务仍使用公开开发密钥，请配置专用 JWT_SECRET 后再连接。');
+        state('正在检查服务连接…');
+        checking = true;
+        await checkServer(origin);
+        checking = false;
         const changed = !connection || connection.server !== origin;
         if (changed && pending.size) throw Error('请先完成或取消正在进行的文件操作，再切换服务。');
-        if (loaded && changed && !window.confirm('切换服务需要重新登录，请先保存当前编辑。原服务上的记录会保留。确定切换吗？')) return;
-        if (changed) { localStorage.removeItem('studyflow.token'); credentialsChanged = true; localStorage.removeItem('studyflow.focus'); await Files.setSession({ token: '' }); }
-        await Files.configure({ server: origin });
+        if (loaded && changed && !window.confirm('切换服务需要重新登录，请先保存当前编辑。原服务上的记录会保留。确定切换吗？')) { auth.connection('ready', '', !!connection); return; }
+        if (changed) {
+          await window.DaynestMobileReminders?.clearForAccount();
+          localStorage.removeItem('studyflow.token'); credentialsChanged = true; localStorage.removeItem('studyflow.focus'); await Files.setSession({ token: '' });
+        }
+        if (changed || !loaded) await Files.configure({ server: origin });
         const next = { server: origin, httpAcknowledged: $('consent').checked };
         localStorage.setItem(configKey, JSON.stringify(next));
         if (primaryServer) localStorage.setItem(primaryKey, primaryServer);
-        connection = next; generation++;
+        connection = next;
+        if (changed) generation++;
         if (loaded && changed) { history.replaceState(null, '', '/#dashboard'); location.reload(); return; }
-        state('已连接，正在准备你的日常…'); await activate(); setup.close();
-      } catch (error) { if (credentialsChanged && loaded) fatal = true; state((error.message || '暂时无法连接，请检查手机网络后重试。') + (fatal ? ' 请点击按钮重载界面后重试。' : '')); }
+        await activate(); updateConnectionStatus(true); state('已连接'); auth.connection('ready', '', !!connection); setup.close();
+      } catch (error) {
+        if (credentialsChanged && loaded) fatal = true;
+        const message = (error.message || '暂时无法连接，请检查手机网络后重试。') + (fatal ? ' 请重新加载后再试。' : '');
+        state(message);
+        if (checking && origin === connection?.server) updateConnectionStatus(false);
+        auth.connection(loaded && !fatal ? 'ready' : 'offline', message, !!connection);
+      }
       finally { busy = false; controls(); }
     }
     $('form').addEventListener('submit', connect); bar.addEventListener('click', openSettings); $('close').addEventListener('click', () => setup.close());
-    setup.addEventListener('cancel', event => { if (!loaded || busy || fatal) event.preventDefault(); });
+    setup.addEventListener('cancel', event => { if (busy || (fatal && !authVisible())) event.preventDefault(); });
     $('server').addEventListener('input', () => { $('consent').checked = false; controls(); });
     try {
       const saved = JSON.parse(localStorage.getItem(configKey) || 'null');
@@ -157,7 +189,11 @@ export function boot({ Http, App, Files, defaultServer = '' }) {
         $('server').value = connection.server; $('consent').checked = connection.httpAcknowledged;
       } else if (primaryServer) { $('server').value = primaryServer; }
     } catch (_) { state('已忽略无效的本机连接设置，请重新选择服务。'); if (primaryServer) $('server').value = primaryServer; }
-    openSettings(); if (connection || primaryServer) connect();
+    if (connection || primaryServer) connect();
+    else {
+      auth.connection('offline', $('state').textContent || '填写服务地址后即可登录。');
+      $('advanced').open = true; openSettings();
+    }
 
     function syncSession() { const next = token(); if (next !== session) { session = next; for (const id of pending) Files.cancel({ id }).catch(() => {}); pending.clear(); Files.setSession({ token: next }).catch(() => {}); } }
     document.addEventListener('daynest:account-ready', syncSession);
@@ -171,17 +207,156 @@ export function boot({ Http, App, Files, defaultServer = '' }) {
     new MutationObserver(records => { for (const record of records) if (record.target.tagName === 'DIALOG') { const index = dialogs.indexOf(record.target); if (index >= 0) dialogs.splice(index, 1); if (record.target.open) dialogs.push(record.target); } }).observe(document.body, { attributes: true, attributeFilter: ['open'], subtree: true });
     await App.addListener('backButton', ({ canGoBack }) => {
       const top = dialogs.filter(dialog => dialog.open).at(-1) || [...document.querySelectorAll('dialog[open]')].at(-1);
-      if (top === setup && (!loaded || fatal)) { App.minimizeApp(); return; }
+      if (top === setup && fatal && !authVisible()) { App.minimizeApp(); return; }
       if (top) { const event = new Event('cancel', { cancelable: true }); if (top.dispatchEvent(event)) top.close(); return; }
+      if (authVisible() && auth.back()) return;
       if (document.querySelector('.sidebar.open')) { window.DaynestUI?.setMenu(false); return; }
       if (window.DaynestMobileUX?.back()) return;
       if (canGoBack) history.back(); else App.minimizeApp();
     });
     await App.addListener('appStateChange', async ({ isActive }) => {
-      if (!isActive) { window.dispatchEvent(new Event('daynest:mobile-pause')); return; }
-      if (!loaded || !connection || busy || fatal) return;
-      try { const res = await nativeRequest(connection.server, '/api/v1/mobile-info'); if (!res.ok) throw Error(); bar.dataset.connectionState = 'online'; bar.textContent = '已连接服务 · 连接设置'; if (token()) document.getElementById('app-sync-retry')?.click(); }
-      catch (_) { bar.dataset.connectionState = 'offline'; bar.textContent = '服务暂不可达 · 检查连接'; }
+      if (!isActive) { foregroundCheck?.abort(); window.dispatchEvent(new Event('daynest:mobile-pause')); return; }
+      if (busy || fatal || setup.open || reader.open) return;
+      if (!loaded) {
+        const expected = connection?.server || primaryServer;
+        if (expected && $('server').value === expected) await connect();
+        return;
+      }
+      if (!connection || (foregroundCheck && !foregroundCheck.signal.aborted)) return;
+      const check = new AbortController();
+      foregroundCheck = check;
+      try {
+        await checkServer(connection.server, check.signal);
+        if (check.signal.aborted) return;
+        updateConnectionStatus(true);
+        if (token()) document.getElementById('app-sync-retry')?.click();
+      } catch (_) {
+        if (!check.signal.aborted) updateConnectionStatus(false);
+      } finally {
+        if (foregroundCheck === check) foregroundCheck = undefined;
+      }
     });
   });
+}
+
+function installMobileAuth(actions) {
+  const root = document.getElementById('auth-view');
+  const hero = root.querySelector('.hero'), card = root.querySelector('.auth-card');
+  const tabs = card.querySelector('.tabs');
+  const login = document.getElementById('login-form'), register = document.getElementById('register-form');
+  const forms = [login, register];
+  hero.innerHTML = `<div class="auth-brand"><span class="auth-brand-mark" aria-hidden="true">✓</span><span>Daynest</span></div>
+    <div class="auth-hero-art" aria-hidden="true"><i></i><i></i><i></i></div>
+    <p>安排日程，记录生活。</p>`;
+  const intro = document.createElement('header');
+  intro.innerHTML = '<h1 id="mobile-auth-heading">欢迎回来</h1><p id="mobile-auth-description">使用邮箱登录你的 Daynest 账号。</p>';
+  card.prepend(intro);
+  root.setAttribute('aria-labelledby', 'mobile-auth-heading');
+  tabs.removeAttribute('role');
+  const note = document.createElement('span'); tabs.prepend(note);
+  card.append(tabs);
+  card.querySelector('.hint')?.remove();
+  const oldOffline = document.getElementById('auth-offline-open');
+  if (oldOffline) oldOffline.hidden = true;
+  const status = document.createElement('section');
+  status.className = 'mobile-auth-connection';
+  status.innerHTML = '<p role="status"></p><button type="button" class="quiet" hidden>重试连接</button>';
+  intro.after(status);
+  const help = document.createElement('footer');
+  help.className = 'mobile-auth-help';
+  help.innerHTML = '<button type="button" id="mobile-auth-settings">连接设置</button><button type="button" id="mobile-auth-offline" hidden>离线资料</button>';
+  card.append(help);
+  const retry = status.querySelector('button'), settings = help.firstElementChild, offline = help.lastElementChild;
+  retry.addEventListener('click', actions.retry);
+  settings.addEventListener('click', actions.openSettings);
+  offline.addEventListener('click', actions.offline);
+
+  const hidePasswords = forms.map(form => {
+    const password = form.querySelector('input[type="password"]');
+    form.querySelector('input[type="email"]').enterKeyHint = 'next';
+    password.enterKeyHint = form === login ? 'go' : 'done';
+    const group = document.createElement('div'); group.className = 'mobile-auth-password-field';
+    const field = document.createElement('div'); field.className = 'mobile-auth-password';
+    const visibility = document.createElement('button'); visibility.type = 'button';
+    visibility.setAttribute('aria-controls', password.id);
+    const toggle = show => {
+      password.type = show ? 'text' : 'password';
+      visibility.textContent = show ? '隐藏' : '显示';
+      visibility.setAttribute('aria-label', show ? '隐藏密码' : '显示密码');
+    };
+    const label = password.closest('label'); label.htmlFor = password.id;
+    label.before(group); group.append(label, field); field.append(password, visibility); toggle(false);
+    visibility.addEventListener('click', () => toggle(password.type === 'password'));
+    visibility.addEventListener('pointerdown', event => { if (document.activeElement === password) event.preventDefault(); });
+    const submit = form.querySelector('[type="submit"]');
+    submit.textContent = form === login ? '登录' : '创建账号';
+    const error = document.createElement('p');
+    error.className = 'mobile-auth-error'; error.id = form.id + '-error'; error.setAttribute('role', 'alert'); error.hidden = true;
+    submit.before(error);
+    form.addEventListener('input', () => { error.hidden = true; });
+    form.addEventListener('submit', () => { error.hidden = true; });
+    document.addEventListener('daynest:account-ready', () => { toggle(false); error.hidden = true; });
+    return () => { if (password.type !== 'password') toggle(false); };
+  });
+  const heading = intro.querySelector('h1'), description = intro.querySelector('p');
+  heading.tabIndex = -1;
+  tabs.addEventListener('click', event => {
+    if (event.target.closest('[data-auth-tab]')) requestAnimationFrame(() => heading.focus({ preventScroll: true }));
+  });
+  const submitButtons = forms.map(form => form.querySelector('[type="submit"]'));
+  function render() {
+    const registering = !register.classList.contains('hidden');
+    const restoring = !card.querySelector('#auth-connection').hidden;
+    const pending = submitButtons.some(button => button.disabled);
+    const ready = root.dataset.mobileConnection === 'ready';
+    heading.textContent = registering ? '创建 Daynest 账号' : '欢迎回来';
+    description.textContent = registering ? '填写昵称、邮箱和密码。' : '使用邮箱登录你的 Daynest 账号。';
+    note.textContent = registering ? '已有账号？' : '第一次使用？';
+    for (const [index, button] of [...tabs.querySelectorAll('button')].entries()) {
+      button.hidden = (index === 1) === registering;
+      button.disabled = pending;
+    }
+    settings.disabled = pending || root.dataset.mobileConnection === 'connecting';
+    offline.disabled = pending;
+    tabs.hidden = !ready || restoring;
+    for (const [index, form] of forms.entries()) {
+      form.inert = !ready || restoring;
+      form.setAttribute('aria-busy', String(submitButtons[index].disabled));
+      submitButtons[index].textContent = submitButtons[index].disabled ? (index ? '正在创建…' : '正在登录…') : (index ? '创建账号' : '登录');
+      if (form.classList.contains('hidden')) {
+        hidePasswords[index]();
+        form.querySelector('.mobile-auth-error').hidden = true;
+      }
+    }
+  }
+  const observer = new MutationObserver(render);
+  for (const form of forms) observer.observe(form, { attributes: true, attributeFilter: ['class'] });
+  for (const button of submitButtons) observer.observe(button, { attributes: true, attributeFilter: ['disabled'] });
+  observer.observe(card.querySelector('#auth-connection'), { attributes: true, attributeFilter: ['hidden'] });
+  return {
+    back() {
+      if (submitButtons.some(button => button.disabled)) return true;
+      if (register.classList.contains('hidden')) return false;
+      tabs.querySelector('[data-auth-tab="login"]').click();
+      return true;
+    },
+    connection(phase, message = '', canReadOffline = false) {
+      root.dataset.mobileConnection = phase;
+      status.hidden = phase === 'ready';
+      status.querySelector('p').textContent = phase === 'connecting' ? '正在检查服务连接…' : message;
+      retry.hidden = phase !== 'offline';
+      offline.hidden = !canReadOffline;
+      render();
+    },
+    showError(formID, error) {
+      const slot = document.getElementById(formID + '-error');
+      if (!slot) return false;
+      slot.textContent = error.status === 401 ? '邮箱或密码不正确，请检查后重试。'
+        : error.status === 409 ? '此邮箱已注册，请登录。'
+        : error.status === 429 ? '操作太频繁，请稍后再试。'
+        : error.status >= 500 || !error.status ? '暂时无法完成请求，请检查连接后重试。' : error.message;
+      slot.hidden = false;
+      return true;
+    },
+  };
 }

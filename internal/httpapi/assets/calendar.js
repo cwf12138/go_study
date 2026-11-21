@@ -561,7 +561,7 @@
   }
 
   function checkReminders() {
-	if (!state.overview || !("Notification" in window) || Notification.permission !== "granted") return;
+	if (window.DaynestMobileReminders || !state.overview || !("Notification" in window) || Notification.permission !== "granted") return;
 	const now = Date.now();
 	(state.overview.events || []).forEach((item) => {
 	  if (!item.reminder_minutes) return;

@@ -122,6 +122,7 @@
         renderMoodForm({...r.value,tags:r.value.tags.split(/[,，]/).map(t=>t.trim()).filter(Boolean)});
         state.moodBase=result.record;state.moodDraftRevision=++state.moodDraftSequence;showView("moods");
         updateMoodDraftStatus("草稿已恢复到原日期 · 请点击保存这一天");
+        document.dispatchEvent(new CustomEvent("daynest:mood-date-selected"));
       } else {
         weeklyRequestVersion++;state.weeklyReviewWeekStart=r.key;state.weeklyReview=result.context;state.weeklyLoading=false;state.weeklyLoadError="";state.weeklyDraftRevision=0;renderWeeklyReview();
         $("#weekly-satisfaction").value=r.value.satisfaction?String(r.value.satisfaction):"";$("#weekly-wins").value=r.value.wins;$("#weekly-challenges").value=r.value.challenges;$("#weekly-lessons").value=r.value.lessons;$("#weekly-priorities").value=r.value.priorities;
@@ -1375,6 +1376,14 @@
     return `${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
   }
 
+  function setPlannerBlockDefaultDate(date) {
+    const field = $("#planner-block-date");
+    // Updating the reset value must preserve a date the user chose in the form.
+    const followsDefault = field.value === field.defaultValue;
+    field.defaultValue = date;
+    if (followsDefault) field.value = date;
+  }
+
   function renderPlanner() {
     const week = state.plannerWeek;
     if (!week) return;
@@ -1394,8 +1403,7 @@
     renderPlannerDetail();
     renderPlannerUnscheduled();
     if (state.plannerSettingsOpen && !state.plannerDraftRevision) renderPlannerPreferences();
-    const blockDate = $("#planner-block-date");
-    if (!blockDate.value || blockDate.value < week.week_start || blockDate.value > week.week_end) blockDate.value = week.week_start;
+    setPlannerBlockDefaultDate(week.week_start);
   }
 
   function renderPlannerCalendar() {
@@ -2385,7 +2393,7 @@
   const priorityLabel = (priority) => ({ high: "高", medium: "中", low: "低" }[priority] || priority);
 
   const savingForms = new Set();
-  async function submitForm(event, action, success) {
+  async function submitForm(event, action, success, { sync = refresh } = {}) {
     event.preventDefault();
     const form = event.currentTarget;
     if (savingForms.has(form) || form.reportValidity?.() === false) return;
@@ -2400,8 +2408,8 @@
       if (state.token !== owner) return;
       const changed = snapshot() !== before;
       if (!changed) form.reset();
-      try { await refresh(); }
-      catch (_) { notify(`${success} 页面同步暂未完成，请刷新核对。`, "error"); return; }
+      try { await sync(); }
+      catch (_) { if (state.token === owner) notify(`${success} 页面同步暂未完成，请刷新核对。`, "error"); return; }
       if (state.token === owner) notify(changed ? `${success} 你刚输入的新内容已保留。` : success);
     } catch (error) {
       if (state.token === owner) notify(error.message, "error");
@@ -2412,6 +2420,10 @@
   }
 
   function bindEvents() {
+    document.addEventListener("daynest:planner-day", (event) => {
+      const date = event.detail?.date, week = state.plannerWeek;
+      if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date) && week && date >= week.week_start && date <= week.week_end) setPlannerBlockDefaultDate(date);
+    });
     document.addEventListener("daynest:todos-changed",()=>{if(state.user)refresh({background:true}).catch(()=>undefined);});
     document.addEventListener("daynest:todo-imported",event=>{if(state.user?.id===event.detail?.userID&&event.detail.server===(window.DaynestMobile?.getConnectionInfo?.().server||location.origin))refresh({background:true}).catch(()=>undefined);});
     document.addEventListener("daynest:actions-changed",()=>{if(state.user)refresh({background:true}).catch(()=>undefined);});
@@ -2545,6 +2557,7 @@
         if (moodDay.dataset.moodDate !== state.moodSelectedDate && !canLeaveMoodDraft()) return;
         state.moodSelectedDate = moodDay.dataset.moodDate;
         renderMoods();
+        document.dispatchEvent(new CustomEvent("daynest:mood-date-selected"));
       }
       const moodChoice = event.target.closest("[data-mood-choice]");
       if (moodChoice) {
@@ -2781,11 +2794,15 @@
       notify(`每日专注目标已设置为 ${state.dailyFocusGoalMinutes} 分钟。`);
     });
 
+    let authSubmitting = false;
+    function handleAuthError(form, error) {
+      if (!window.DaynestMobile?.showAuthError?.(form.id, error)) notify(error.message, "error");
+    }
     $("#login-form").addEventListener("submit", async (event) => {
       event.preventDefault();
       const form = event.currentTarget, button = form.querySelector("button[type=submit]");
-      if (savingForms.has(form) || restoringSession) return;
-      savingForms.add(form); button.disabled = true;
+      if (authSubmitting || restoringSession) return;
+      authSubmitting = true; button.disabled = true;
       try {
         const result = await api("/api/v1/auth/login", { method: "POST", body: JSON.stringify({ email: $("#login-email").value, password: $("#login-password").value }) });
         state.token = result.token;
@@ -2793,14 +2810,14 @@
         $("#login-password").value = "";
         enterApp(result.user);
         notify(`欢迎回来，${result.user.name}`);
-      } catch (error) { notify(error.message, "error"); }
-      finally { savingForms.delete(form); button.disabled = false; }
+      } catch (error) { handleAuthError(form, error); }
+      finally { authSubmitting = false; button.disabled = false; }
     });
     $("#register-form").addEventListener("submit", async (event) => {
       event.preventDefault();
       const form = event.currentTarget, button = form.querySelector("button[type=submit]");
-      if (savingForms.has(form) || restoringSession) return;
-      savingForms.add(form); button.disabled = true;
+      if (authSubmitting || restoringSession) return;
+      authSubmitting = true; button.disabled = true;
       try {
         const result = await api("/api/v1/auth/register", { method: "POST", body: JSON.stringify({ name: $("#register-name").value, email: $("#register-email").value, password: $("#register-password").value }) });
         state.token = result.token;
@@ -2808,8 +2825,8 @@
         $("#register-password").value = "";
         enterApp(result.user);
         notify("账号创建成功，开始你的学习计划吧。");
-      } catch (error) { notify(error.message, "error"); }
-      finally { savingForms.delete(form); button.disabled = false; }
+      } catch (error) { handleAuthError(form, error); }
+      finally { authSubmitting = false; button.disabled = false; }
     });
 
     $("#goal-form").addEventListener("submit", (event) => {
@@ -2819,33 +2836,17 @@
     $("#task-form").addEventListener("submit", createTask);
     $("#todo-list-form").addEventListener("submit", (event) => submitForm(event, () => api("/api/v1/todo-lists", { method: "POST", body: JSON.stringify({ name: $("#todo-list-name").value, color: $("#todo-list-color").value }) }), "分类已创建。"));
     $("#todo-form").addEventListener("submit", (event) => submitForm(event, () => api("/api/v1/todos", { method: "POST", body: JSON.stringify({ list_id: $("#todo-list").value, title: $("#todo-title").value, notes: $("#todo-notes").value, priority: $("#todo-priority").value, due_at: toISO($("#todo-due").value), my_day_date: $("#todo-my-day").checked ? localDateKey(new Date()) : "", repeat_rule: $("#todo-repeat").value, tags: $("#todo-tags").value.split(",").map((tag) => tag.trim()).filter(Boolean), steps: $("#todo-steps").value.split("\n").map((step) => step.trim()).filter(Boolean) }) }), "待办已加入清单。"));
-    $("#planner-block-form").addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const form = event.currentTarget;
-      const button = form.querySelector("button[type=submit]");
-      button.disabled = true;
-      try {
-        const kind = $("#planner-block-kind").value;
-        const date = $("#planner-block-date").value;
-        const startAt = plannerWallTimeToISO(date, $("#planner-block-start").value);
-        const endAt = plannerWallTimeToISO(date, $("#planner-block-end").value);
-        await api("/api/v1/plan-blocks", { method: "POST", body: JSON.stringify({
-          kind, source_id: kind === "task" || kind === "todo" ? $("#planner-block-source").value : "",
-          title: $("#planner-block-title").value, notes: $("#planner-block-notes").value,
-          start_at: startAt, end_at: endAt, priority: $("#planner-block-priority").value, locked: $("#planner-block-locked").checked,
-        }) });
-        form.reset();
-        $("#planner-block-start").value = "19:00";
-        $("#planner-block-end").value = "19:50";
-        $("#planner-block-locked").checked = true;
-        await refreshPlannerWeek();
-        notify("时间块已加入本周计划。");
-      } catch (error) {
-        notify(error.message, "error");
-      } finally {
-        button.disabled = false;
-      }
-    });
+    $("#planner-block-form").addEventListener("submit", (event) => submitForm(event, () => {
+      const kind = $("#planner-block-kind").value;
+      const date = $("#planner-block-date").value;
+      const startAt = plannerWallTimeToISO(date, $("#planner-block-start").value);
+      const endAt = plannerWallTimeToISO(date, $("#planner-block-end").value);
+      return api("/api/v1/plan-blocks", { method: "POST", body: JSON.stringify({
+        kind, source_id: kind === "task" || kind === "todo" ? $("#planner-block-source").value : "",
+        title: $("#planner-block-title").value, notes: $("#planner-block-notes").value,
+        start_at: startAt, end_at: endAt, priority: $("#planner-block-priority").value, locked: $("#planner-block-locked").checked,
+      }) });
+    }, "时间块已保存。", { sync: refreshPlannerWeek }));
     $("#planner-preferences-form").addEventListener("submit", async (event) => {
       event.preventDefault();
       const form = event.currentTarget;

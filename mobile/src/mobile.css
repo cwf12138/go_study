@@ -33,6 +33,10 @@ body.daynest-native{padding-top:env(safe-area-inset-top);padding-bottom:env(safe
 
 .mobile-offline-reader[open]{display:grid;grid-template-rows:auto minmax(0,1fr);position:fixed;inset:0}.mobile-offline-reader>button{text-align:left}.mobile-offline-reader iframe{height:100%}
 .mobile-connection details label{margin-top:14px}.mobile-connection .mobile-footnote{font-size:12px}.mobile-connection .mobile-consent[hidden]{display:none}
+#mobile-calendar-reminders header h2{margin:0;font-size:21px}
+.mobile-reminder-actions{display:flex;flex-wrap:wrap;gap:8px}
+.mobile-reminder-actions button{min-height:44px}
+#mobile-reminder-status{min-height:42px;color:var(--ink)}
 
 :root{--mobile-viewport-height:100dvh}
 .mobile-tabs,.mobile-transfer-actions{display:none}

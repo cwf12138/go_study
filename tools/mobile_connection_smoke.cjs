@@ -1,6 +1,10 @@
 const fs = require('node:fs'), vm = require('node:vm'), assert = require('node:assert/strict');
 const core = fs.readFileSync('mobile/src/core.js', 'utf8');
-const client = fs.readFileSync('mobile/src/mobile-client.js', 'utf8').replace('export function boot', 'function boot') + '\nwindow.testBoot=boot;';
+const client = fs.readFileSync('mobile/src/mobile-client.js', 'utf8').replace('export function boot', 'function boot') + `
+  window.testBoot=boot;
+  // Auth presentation is covered by the WebView test. Track the bridge's connection state here.
+  installMobileAuth=()=>({ back: () => false, connection(phase) { document.getElementById('auth-view').dataset.phase=phase; } });
+`;
 const key = 'daynest.mobile.connection.v1', origin = 'http://192.168.1.10:8080';
 const settle = async () => { for (let i = 0; i < 12; i++) await new Promise(resolve => setImmediate(resolve)); };
 class Event {
@@ -23,7 +27,7 @@ function harness(saved, existingToken = '', defaultServer = '', primaryMarker) {
   if (primaryMarker) store.set('daynest.mobile.primary-server.v1', primaryMarker);
   let reloads = 0, minimized = 0, backs = 0, answer, failStorage = false, confirm = true, scriptFailure = false;
   class Node {
-    constructor(tag = 'div') { this.tagName = tag.toUpperCase(); this.events = {}; this.dataset = {}; this.value = ''; this.checked = false; this.open = false; this.hidden = false; this.disabled = false; this.textContent = ''; this.classList = { add() {} }; }
+    constructor(tag = 'div') { this.tagName = tag.toUpperCase(); this.events = {}; this.dataset = {}; this.value = ''; this.checked = false; this.open = false; this.hidden = false; this.disabled = false; this.textContent = ''; this.classList = new Set(); this.classList.contains = this.classList.has.bind(this.classList); }
     set innerHTML(html) { for (const [, id] of html.matchAll(/id="([^"]+)"/g)) nodes.set(id, new Node()); }
     setAttribute() {}
     addEventListener(type, handler) { (this.events[type] ||= []).push(handler); }
@@ -35,6 +39,7 @@ function harness(saved, existingToken = '', defaultServer = '', primaryMarker) {
     close() { this.open = false; }
   }
   const body = new Node('body'), workspace = new Node(), placeholders = ['/static/ui-core.js', '/static/app.js'].map(src => ({ dataset: { mobileSrc: src } }));
+  nodes.set('auth-view', new Node());
   nodes.set('logout', new Node()); nodes.set('app-sync-retry', { click() { nodes.set('refreshed', true); } });
   const document = {
     body, createElement: tag => new Node(tag), getElementById: id => nodes.get(id),
@@ -47,7 +52,7 @@ function harness(saved, existingToken = '', defaultServer = '', primaryMarker) {
   const Http = { async request(options) { requests.push(options); if (answer) return answer(options); return { status: 200, data: { data: { application: 'daynest', mobile_protocol: 1, requires_secure_secret: false, ai_requires_loopback: true } }, headers: {}, url: options.url }; } };
   const Files = { async setSession(value) { files.push(['session', value]); }, async configure(value) { files.push(['configure', value]); } };
   const App = { async addListener(type, handler) { appEvents[type] = handler; }, minimizeApp() { minimized++; } };
-  const ctx = vm.createContext({ window, document, location, console, URL, Request: class {}, Headers, Response, Event, queueMicrotask,
+  const ctx = vm.createContext({ window, document, location, console, URL, Request: class {}, Headers, Response, Event, DOMException, AbortController, queueMicrotask,
     localStorage: { getItem: k => store.get(k) || null, setItem(k, value) { if (failStorage) throw Error('存储空间不足'); store.set(k, value); }, removeItem: k => store.delete(k) },
     history: { replaceState() {}, back() { backs++; } }, MutationObserver: class { observe() {} }
   });
@@ -55,6 +60,7 @@ function harness(saved, existingToken = '', defaultServer = '', primaryMarker) {
   return { nodes, store, requests, files, scripts, appEvents,
     init: async () => { for (const handler of events.DOMContentLoaded) await handler(); await settle(); },
     submit: () => nodes.get('mobile-form').fire('submit'),
+    fetch: input => window.fetch(input),
     server: (value, ack = true) => { nodes.get('mobile-server').value = value; nodes.get('mobile-consent').checked = ack; },
     get reloads() { return reloads; }, get minimized() { return minimized; }, get backs() { return backs; },
     set answer(value) { answer = value; }, set failStorage(value) { failStorage = value; }, set confirm(value) { confirm = value; }, set scriptFailure(value) { scriptFailure = value; }
@@ -64,6 +70,7 @@ function harness(saved, existingToken = '', defaultServer = '', primaryMarker) {
   const cloudOrigin = 'https://111.230.184.144';
   const cloud = harness(undefined, 'unassigned-token', cloudOrigin); await cloud.init();
   assert.equal(cloud.scripts.length, 2); assert(!cloud.nodes.get('mobile-connection').open);
+  assert.equal(cloud.nodes.get('auth-view').dataset.phase, 'ready');
   assert.equal(cloud.store.get('studyflow.token'), undefined);
   assert.equal(JSON.parse(cloud.store.get(key)).server, cloudOrigin);
   assert(cloud.requests.every(request => request.url.startsWith(cloudOrigin + '/')));
@@ -79,7 +86,9 @@ function harness(saved, existingToken = '', defaultServer = '', primaryMarker) {
   assert.equal(chosenServer.files.find(call=>call[0]==='configure')[1].server, origin);
   const h = harness('{bad JSON', 'orphaned-token'); await h.init();
   assert(h.nodes.get('mobile-connection').open); assert.equal(h.scripts.length, 0); assert.match(h.nodes.get('mobile-state').textContent, /已忽略/);
-  h.appEvents.backButton({ canGoBack: false }); assert.equal(h.minimized, 1, 'setup screen can leave app via Android back');
+  h.appEvents.backButton({ canGoBack: false }); assert(!h.nodes.get('mobile-connection').open, 'setup returns to the connection recovery screen');
+  assert.equal(h.nodes.get('auth-view').dataset.phase, 'offline');
+  h.appEvents.backButton({ canGoBack: false }); assert.equal(h.minimized, 1);
   h.server('http://localhost:8080'); await h.submit(); assert.equal(h.requests.length, 0);
   h.server(origin, false); await h.submit(); assert.equal(h.requests.length, 0); assert.match(h.nodes.get('mobile-state').textContent, /明文传输/);
   h.server(origin); h.answer = () => ({ status: 200, data: { data: { application: 'daynest', mobile_protocol: 1, requires_secure_secret: true } } });
@@ -92,27 +101,49 @@ function harness(saved, existingToken = '', defaultServer = '', primaryMarker) {
 
   const restore = harness(JSON.stringify({ server: origin, httpAcknowledged: true }), 'same-server-token'); await restore.init();
   assert.equal(restore.scripts.length, 2); assert.equal(restore.store.get('studyflow.token'), 'same-server-token');
+  const validProbe = { status: 200, data: { data: { application: 'daynest', mobile_protocol: 1, requires_secure_secret: false } } };
+  let finishRead;
+  restore.answer = options => options.url.endsWith('/mobile-info') ? validProbe : new Promise(resolve => { finishRead = resolve; });
+  const pendingRead = restore.fetch('/api/v1/todos');
+  await restore.submit();
+  finishRead({ status: 200, data: { data: [] } });
+  assert.equal((await pendingRead).ok, true, 'same-server verification must not invalidate a pending API result');
+  restore.answer = null;
   await restore.nodes.get('server-bar').fire('click'); restore.server('http://192.168.1.11:8080'); restore.confirm = false; await restore.submit();
   assert.equal(restore.files.filter(f => f[0] === 'configure').length, 1); assert.equal(restore.store.get('studyflow.token'), 'same-server-token'); assert.equal(restore.reloads, 0);
   restore.confirm = true; await restore.submit(); assert.equal(restore.store.get('studyflow.token'), undefined); assert.equal(restore.reloads, 1); assert.equal(JSON.parse(restore.store.get(key)).server, 'http://192.168.1.11:8080');
 
   const offline = harness(JSON.stringify({ server: origin, httpAcknowledged: true }), 'retain-token'); offline.answer = () => { throw Error('无法连接电脑'); }; await offline.init();
   assert.equal(offline.scripts.length, 0); assert.equal(offline.store.get('studyflow.token'), 'retain-token'); assert.match(offline.nodes.get('mobile-state').textContent, /无法连接电脑/);
+  assert.equal(offline.nodes.get('auth-view').dataset.phase, 'offline'); assert(!offline.nodes.get('mobile-connection').open);
   const probeCount=offline.requests.length;
   assert.equal(offline.nodes.get('mobile-offline').disabled,false);await offline.nodes.get('mobile-offline').fire('click');
   assert(offline.nodes.get('mobile-offline-reader').open);assert.equal(offline.scripts.length,0);assert.equal(offline.requests.length,probeCount);
   assert.equal(offline.nodes.get('mobile-offline-frame').src,'/static/offline-reader.html?server='+encodeURIComponent(origin));
   await offline.nodes.get('mobile-offline-close').fire('click');assert(!offline.nodes.get('mobile-offline-reader').open);assert.equal(offline.nodes.get('mobile-offline-frame').src,'about:blank');
-  offline.answer = null; await offline.submit(); assert.equal(offline.scripts.length, 2); assert.equal(offline.store.get('studyflow.token'), 'retain-token');
+  offline.answer = null; await offline.appEvents.appStateChange({ isActive: true }); assert.equal(offline.scripts.length, 2); assert.equal(offline.store.get('studyflow.token'), 'retain-token');
   offline.answer = () => { throw Error('offline'); }; await offline.appEvents.appStateChange({ isActive: true }); assert.match(offline.nodes.get('server-bar').textContent, /暂不可达/); assert.equal(offline.store.get('studyflow.token'), 'retain-token');
+  let rejectOldProbe;
+  offline.answer = () => new Promise((_, reject) => { rejectOldProbe = reject; });
+  const oldProbe = offline.appEvents.appStateChange({ isActive: true });
+  const whilePending = offline.requests.length;
+  await offline.appEvents.appStateChange({ isActive: true });
+  assert.equal(offline.requests.length, whilePending, 'foreground checks do not overlap');
+  await offline.appEvents.appStateChange({ isActive: false });
+  offline.answer = null;
+  await offline.appEvents.appStateChange({ isActive: true });
+  rejectOldProbe(Error('stale connection result'));
+  await oldProbe; await settle();
+  assert.equal(offline.nodes.get('server-bar').dataset.connectionState, 'online');
 
   const storage = harness(JSON.stringify({ server: origin, httpAcknowledged: true }), 'first-server-token'); await storage.init();
+  storage.nodes.get('auth-view').classList.add('hidden');
   await storage.nodes.get('server-bar').fire('click'); storage.server('http://192.168.1.12:8080'); storage.failStorage = true; await storage.submit();
-  assert.equal(storage.store.get('studyflow.token'), undefined); assert(storage.nodes.get('mobile-close').hidden); assert.equal(storage.nodes.get('mobile-connect').textContent, '重载界面');
+  assert.equal(storage.store.get('studyflow.token'), undefined); assert(storage.nodes.get('mobile-close').hidden); assert.equal(storage.nodes.get('mobile-connect').textContent, '重新加载');
   const cancel = new Event('cancel', { cancelable: true }); assert.equal(storage.nodes.get('mobile-connection').dispatchEvent(cancel), false);
   storage.appEvents.backButton({ canGoBack: false }); assert.equal(storage.minimized, 1); await storage.submit(); assert.equal(storage.reloads, 1);
 
   const partial = harness(); await partial.init(); partial.scriptFailure = true; partial.server(origin); await partial.submit();
-  assert.match(partial.nodes.get('mobile-state').textContent, /安装包资源不完整/); assert(partial.nodes.get('mobile-close').hidden); await partial.submit(); assert.equal(partial.reloads, 1); assert.equal(partial.scripts.length, 1, 'partial script initialization must require a clean reload');
+  assert.match(partial.nodes.get('mobile-state').textContent, /安装包资源不完整/); assert.equal(partial.nodes.get('auth-view').dataset.phase, 'offline'); await partial.submit(); assert.equal(partial.reloads, 1); assert.equal(partial.scripts.length, 1, 'partial script initialization must require a clean reload');
   console.log('Android connection flows passed: setup/back, consent, development-key refusal, orphaned-token clearing, same-server restore, confirmed switch, offline retry, storage failure, partial-script failure. Mocked native bridge/DOM; no device test.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

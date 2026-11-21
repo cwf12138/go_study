@@ -1,0 +1,161 @@
+.daynest-native #auth-view {
+  --auth-ink: #192924;
+  --auth-muted: #54665e;
+  --auth-paper: #fffefa;
+  --auth-line: #d6e0da;
+  --auth-accent: #17634f;
+  --auth-on-accent: #fff;
+  --auth-field: #f6f8f5;
+  --auth-error: #9b222f;
+  --auth-error-paper: #fff0ed;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  align-content: start;
+  align-items: stretch;
+  gap: 0;
+  width: 100%;
+  max-width: none;
+  min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  margin: 0;
+  padding: 0;
+  color: var(--auth-ink);
+  background: #163d32;
+}
+[data-theme="dark"] .daynest-native #auth-view {
+  --auth-ink: #edf4ef;
+  --auth-muted: #b2c6bb;
+  --auth-paper: #14221e;
+  --auth-line: #456058;
+  --auth-accent: #a9e1ce;
+  --auth-on-accent: #14342a;
+  --auth-field: #1d3029;
+  --auth-error: #ffb4ba;
+  --auth-error-paper: #40272c;
+}
+.daynest-native #auth-view.hidden { display: none; }
+.daynest-native #auth-view .hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: grid;
+  align-content: center;
+  gap: 10px;
+  min-height: clamp(132px, 24dvh, 210px);
+  padding: 24px max(24px, calc((100vw - 402px) / 2)) 35px;
+  color: #f5fcf7;
+  background: linear-gradient(135deg, #143b32 14%, #215d48);
+}
+.daynest-native #auth-view .hero > p { margin: 0; color: #c6e0d5; font-size: 15px; }
+.auth-brand { display: flex; align-items: center; gap: 11px; font-size: 28px; font-weight: 740; letter-spacing: -.045em; }
+.auth-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 43px;
+  height: 43px;
+  border-radius: 14px;
+  color: #123d2e;
+  background: #c3ead9;
+  font-size: 24px;
+}
+.auth-hero-art { position: absolute; z-index: -1; right: -24px; bottom: -46px; width: 188px; height: 188px; transform: rotate(-22deg); pointer-events: none; }
+.auth-hero-art i { position: absolute; inset: 0; border: 1px solid #c2e9cf45; border-radius: 43px; }
+.auth-hero-art i:nth-child(2) { inset: 20px; background: #badfc610; }
+.auth-hero-art i:nth-child(3) { inset: 40px; background: #badfc617; }
+.daynest-native #auth-view .auth-card {
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  margin-top: -14px;
+  padding: clamp(24px, 5vw, 36px) max(24px, calc((100vw - 402px) / 2)) 18px;
+  border: 0;
+  border-radius: 26px 26px 0 0;
+  background: var(--auth-paper);
+  color: var(--auth-ink);
+  box-shadow: none;
+}
+.daynest-native #auth-view [hidden], .daynest-native #auth-view .hidden { display: none !important; }
+#mobile-auth-heading { margin: 0; font-size: clamp(27px,7.8vw,34px); line-height: 1.25; letter-spacing: -.035em; }
+#mobile-auth-description { margin: 8px 0 22px; color: var(--auth-muted); font-size: 15px; line-height: 1.5; }
+.daynest-native #auth-view .auth-form { display: grid; gap: 16px; min-width: 0; }
+.daynest-native #auth-view :is(.auth-form[inert], .auth-form.hidden) { display: none; }
+.daynest-native #auth-view .auth-form label { display: grid; gap: 6px; color: var(--auth-ink); font-size: 14px; font-weight: 630; }
+.daynest-native #auth-view .auth-form input {
+  width: 100%;
+  margin: 0;
+  min-height: 52px;
+  border: 1px solid var(--auth-line);
+  border-radius: 12px;
+  background: var(--auth-field);
+  color: var(--auth-ink);
+  padding: 12px 14px;
+  font-size: 16px;
+  font-weight: 450;
+}
+.daynest-native #auth-view input:focus { border-color: var(--auth-accent); outline: 2px solid var(--auth-accent); outline-offset: 1px; }
+.daynest-native #auth-view input::placeholder { color: var(--auth-muted); opacity: .86; }
+.mobile-auth-password-field { display: grid; gap: 6px; }
+.mobile-auth-password { display: grid; position: relative; min-width: 0; }
+.daynest-native #auth-view .mobile-auth-password input { padding-inline-end: 65px; }
+.mobile-auth-password > button {
+  position: absolute;
+  inset: 4px 4px auto auto;
+  height: 44px;
+  padding-inline: 8px;
+  min-width: 53px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--auth-accent);
+  font: inherit;
+}
+.daynest-native #auth-view .auth-form > .primary {
+  min-height: 52px;
+  margin-top: 2px;
+  border: 0;
+  border-radius: 13px;
+  background: var(--auth-accent);
+  color: var(--auth-on-accent);
+  box-shadow: none;
+  font-size: 16px;
+  font-weight: 700;
+}
+.daynest-native #auth-view .auth-card > .tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 48px;
+  margin: 10px 0 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--auth-muted);
+  font-size: 14px;
+}
+.daynest-native #auth-view :is(.tabs .tab,.mobile-auth-help button) { min-height: 44px; border: 0; background: transparent; color: var(--auth-accent); font: inherit; font-weight: 680; }
+.daynest-native #auth-view .tabs .tab { flex: none; padding-inline: 6px; }
+.daynest-native #auth-view .mobile-auth-help { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 10px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--auth-line); font-size: 13px; }
+.daynest-native #auth-view .mobile-auth-help button { color: var(--auth-muted); font-weight: 540; }
+.mobile-auth-error, .mobile-auth-connection { margin: 0; padding: 12px; border-radius: 12px; }
+.mobile-auth-error { color: var(--auth-error); background: var(--auth-error-paper); font-size: 14px; line-height: 1.5; }
+.mobile-auth-connection { background: var(--auth-field); color: var(--auth-muted); margin-bottom: 18px; }
+.mobile-auth-connection p { margin: 0; overflow-wrap: anywhere; }
+.mobile-auth-connection button { margin-top: 8px; min-height: 44px; }
+.daynest-native #mobile-connection form { margin-top: 10px; gap: 12px; }
+.daynest-native #mobile-connection header h2 { margin: 0; font-size: 22px; }
+.daynest-native #mobile-connection #mobile-state { min-height: 0; margin: 0; }
+.daynest-native #mobile-connection #mobile-state:empty { display: none; }
+
+@media (min-width: 760px) {
+  .daynest-native #auth-view { grid-template-columns: minmax(0, 1fr) minmax(390px, 480px); grid-template-rows: 1fr; }
+  .daynest-native #auth-view .hero { padding: 36px; }
+  .daynest-native #auth-view .auth-card { justify-content: center; margin: 0; padding: 26px 36px; border-radius: 0; }
+  .daynest-native #auth-view .mobile-auth-help { margin-top: 16px; }
+}
+@media (max-height: 520px) {
+  .daynest-native #auth-view .hero { min-height: 0; padding-top: 16px; padding-bottom: 24px; }
+}

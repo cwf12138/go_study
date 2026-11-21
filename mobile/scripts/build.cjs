@@ -8,15 +8,15 @@ fs.mkdirSync(path.join(out, 'static'), { recursive: true });
 // Public frontend assets only; never package data/, .env or signing credentials.
 fs.cpSync(assets, path.join(out, 'static'), { recursive: true, filter: source => {if(fs.lstatSync(source).isSymbolicLink())throw Error('公开资源不能包含符号链接');return !/[/\\](?:\.env[^/\\]*|data|node_modules|\.git|\.local)(?:[/\\]|$)/.test(source)&&!/[.](?:jks|keystore|pem|key)$/i.test(source);} });
 let html = fs.readFileSync(path.join(assets, 'index.html'), 'utf8');
-html = html.replace('本界面直接连接当前 Go 服务，不依赖 Node、npm 或前端构建工具。', '登录你的账号，随时继续日程、待办与记录。');
 html = html.replace(/type="email"/g, 'type="email" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false"');
 html = html.replace('支持多选，单个文件最多 32 MiB', '支持多选，手机单个文件最多 8 MiB');
 html = html.replace('<head>', '<head>\n    <script src="/mobile-bridge.js"></script>');
-html = html.replace('</head>', '    <link rel="stylesheet" href="/mobile.css">\n  </head>');
+const stylesheets = ['mobile.css', 'mobile-product.css', 'mobile-auth.css'];
+html = html.replace('</head>', stylesheets.map(name => `    <link rel="stylesheet" href="/${name}">`).join('\n') + '\n  </head>');
 html = html.replace('width=device-width, initial-scale=1', 'width=device-width, initial-scale=1, viewport-fit=cover');
 html = html.replace(/<script src="([^"]+)" defer><\/script>/g, '<script type="text/daynest-deferred" data-mobile-src="$1"></script>');
 fs.writeFileSync(path.join(out, 'index.html'), html);
-fs.copyFileSync(path.join(root, 'src/mobile.css'), path.join(out, 'mobile.css'));
+for (const name of stylesheets) fs.copyFileSync(path.join(root, 'src', name), path.join(out, name));
 require('esbuild').buildSync({ entryPoints: [path.join(root, 'src/native-entry.js')], outfile: path.join(out, 'mobile-bridge.js'), bundle: true, format: 'iife', target: 'es2022', platform: 'browser', sourcemap: false, legalComments: 'eof' });
 const meta=require('./build-info.cjs').metadata(path.dirname(root),out,JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8')));
 fs.writeFileSync(path.join(out,'client-build.json'),JSON.stringify(meta,null,2)+'\n');
