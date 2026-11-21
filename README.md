@@ -4,7 +4,7 @@
 
 ## Android 手机端（连接个人云端）
 
-`mobile/` Capacitor Android 客户端当前版本为 **0.6.0 / versionCode 6**，默认通过 `https://111.230.184.144` 连接个人服务器，手机与网页共用账号和记录。本版更新登录与连接体验，底栏直达心情日历，智能日历支持系统通知和稍后提醒。[0.6.0 发布记录](docs/android-0.6.0-release.md)
+`mobile/` Capacitor Android 客户端当前版本为 **0.6.1 / versionCode 7**，默认通过 `https://111.230.184.144` 连接个人服务器。服务器可以为指定账号启用「今天吃什么」智谱推荐。[智谱配置说明](docs/ai-kitchen.md) · [0.6.0 发布记录](docs/android-0.6.0-release.md)
 
 构建需要 **Node.js 22+、JDK 21、Android SDK 36**。已使用实际配置的 SDK 生成新版 APK 并覆盖安装到已连接 Android 15 手机。构建、使用与验收方式见 [Android 使用与构建说明](mobile/README.md)，服务器操作见 [部署说明](docs/deployment.md)。网页版仍无需 Node 依赖。
 

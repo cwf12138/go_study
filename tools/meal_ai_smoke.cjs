@@ -36,5 +36,12 @@ const submit=()=>E('form').events.submit({preventDefault(){}}),action=async(data
  E('engine').value='ai';E('channel').value='delivery';submit();await flush();
  assert(E('results').innerHTML.includes('food-card-primary'));
  assert.equal(JSON.parse(requests.at(-1).body).model,'glm-4.5-flash');
+ context.window.DaynestMobile={};requests=[];
+ vm.runInContext(settings,context);
+ S('open').events.click();await flush();
+ assert.deepEqual(requests.map(r=>r.path),['/api/v1/meals/ai/status']);
+ assert(context.window.DaynestMealAI.ready());
+ await context.window.DaynestMealAI.recommend({...defaults,prompt:'测试晚饭'});
+ assert.equal(requests.at(-1).path,'/api/v1/meals/ai/recommend');
  console.log('Food decisions passed, including ChatGPT and BigModel selection, strict preferences, manual local fallback and account cleanup.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -128,7 +128,7 @@ func bigModelTransportFailure(req *http.Request, err error) *RequestFailure {
 	case errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &netErr) && netErr.Timeout()):
 		failure.Format, failure.Hint = "timeout", "连接或等待智谱响应超时，请检查当前网络，再手动重试。"
 	default:
-		failure.Format, failure.Hint = "connection", "连接在收到 HTTP 响应前失败。本机可以用 Windows 系统代理启动 Daynest 后重试。"
+		failure.Format, failure.Hint = "connection", "连接在收到 HTTP 响应前失败，请检查当前 Daynest 服务的外部网络或代理。"
 	}
 	return failure
 }

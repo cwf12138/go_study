@@ -136,3 +136,36 @@ func TestFoodAIStatusUsesServerConfiguration(t *testing.T) {
 		t.Fatal("configured BigModel must handle the recommendation route", w.Code)
 	}
 }
+
+func TestHostedMealAIRestrictsInferenceToConfiguredAccount(t *testing.T) {
+	t.Setenv("BIGMODEL_API_KEY", "fixture-key")
+	t.Setenv("BIGMODEL_REMOTE_OWNER_ID", "owner-id")
+	tokens := security.NewTokenManager("hosted-test-secret-long-enough", "test", time.Hour)
+	bus := event.NewBus()
+	handler := NewHandler(service.New(store.NewMemory(), tokens, bus), tokens, bus, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	for _, tc := range []struct {
+		user, method, path, body, contains string
+		status                             int
+	}{
+		{"", "GET", "status", "", "", 401},
+		{"anyone-else", "GET", "status", "", `"connected":false`, 200},
+		{"owner-id", "GET", "status", "", `"connected":true`, 200},
+		{"anyone-else", "POST", "recommend", `{}`, "尚未启用", 403},
+		{"owner-id", "POST", "recommend", `{}`, "", 400},
+		{"owner-id", "POST", "recommend", `{"model":"unconfigured","prompt":"吃什么","meal":"dinner","channel":"any","flavor":"any","hunger":"any"}`, "本机智谱配置", 502},
+	} {
+		request := httptest.NewRequest(tc.method, "https://daynest.example.test/api/v1/meals/ai/"+tc.path, strings.NewReader(tc.body))
+		if tc.user != "" {
+			token, err := tokens.Issue(tc.user, "student")
+			if err != nil {
+				t.Fatal(err)
+			}
+			request.Header.Set("Authorization", "Bearer "+token)
+		}
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != tc.status || !strings.Contains(response.Body.String(), tc.contains) || strings.Contains(response.Body.String(), "fixture-key") {
+			t.Fatalf("unexpected response for %s %s (%s): %d", tc.method, tc.path, tc.user, response.Code)
+		}
+	}
+}

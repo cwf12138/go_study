@@ -5,5 +5,4 @@
 .workspace-extra>summary{cursor:pointer;min-height:40px;line-height:40px;font-weight:650}
 .calendar-daily-entry{display:flex;justify-content:flex-end;margin-bottom:12px}
 #explore-challenge-form[hidden],.dc-storage[hidden]{display:none!important}
-.daynest-native #meal-ai-open{display:none!important}
 @media(max-width:700px){.workspace-tabs{flex-wrap:nowrap;overflow-x:auto}.workspace-tabs .nav-link{white-space:nowrap}.workspace-extra{padding:12px}}

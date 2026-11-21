@@ -15,7 +15,8 @@ export function boot({ Http, App, Files, defaultServer = '' }) {
   async function nativeRequest(origin, path, options = {}) {
     if (options.signal?.aborted) throw abortError();
     const headers = Object.fromEntries(new Headers(options.headers || {}));
-    const response = await race(Http.request({ url: origin + path, method: options.method || 'GET', headers, data: options.body, connectTimeout: 8000, readTimeout: 25000, disableRedirects: true, responseType: 'text' }), options.signal);
+    const readTimeout = path === '/api/v1/meals/ai/recommend' ? 65000 : 25000;
+    const response = await race(Http.request({ url: origin + path, method: options.method || 'GET', headers, data: options.body, connectTimeout: 8000, readTimeout, disableRedirects: true, responseType: 'text' }), options.signal);
     if (response.status >= 300 && response.status < 400) throw Error('服务返回重定向，请填写最终服务地址；不会自动转发登录令牌。');
     if (response.url && new URL(response.url).origin !== origin) throw Error('服务地址改变，已拒绝展示跨地址响应。');
     if (!Number.isInteger(response.status) || response.status < 200 || response.status > 599) throw Error('服务暂时无法响应，请稍后重试。');

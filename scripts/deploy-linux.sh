@@ -108,6 +108,7 @@ User=daynest
 Group=daynest
 WorkingDirectory=/opt/daynest/current
 EnvironmentFile=/etc/daynest/daynest.env
+EnvironmentFile=-/etc/daynest/meal-ai.env
 ExecStart=/opt/daynest/current/bin/daynest
 Restart=on-failure
 RestartSec=3s
