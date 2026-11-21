@@ -23,7 +23,7 @@ type Server struct {
 	assets             fs.FS
 	chatGPT            *chatgpt.Manager
 	bigModel           *chatgpt.BigModel
-	mealAIOwner        string
+	remoteMealAI       bool
 	transfers          *transfers.Store
 	localOnlyTransfers bool
 	snapshotInterval   time.Duration
@@ -46,9 +46,7 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 	}
 	s.chatGPT = chatgpt.New(filepath.Join(filepath.Dir(dataFile), "chatgpt-registration.json"))
 	s.bigModel = chatgpt.NewBigModel(os.Getenv("BIGMODEL_API_KEY"), os.Getenv("BIGMODEL_MODEL"))
-	if !tokens.UsesDevelopmentSecret() {
-		s.mealAIOwner = os.Getenv("BIGMODEL_REMOTE_OWNER_ID")
-	}
+	s.remoteMealAI = !tokens.UsesDevelopmentSecret() && os.Getenv("BIGMODEL_REMOTE_ENABLED") == "1"
 	s.transfers = transfers.New(filepath.Join(filepath.Dir(dataFile), "transfers"))
 	s.localOnlyTransfers = tokens.UsesDevelopmentSecret()
 	root := http.NewServeMux()

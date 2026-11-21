@@ -862,7 +862,7 @@ paths:
     post:
       tags: [AI, Meals]
       security: [{ bearerAuth: [] }]
-      summary: 为服务器指定的账号生成智谱用餐推荐
+      summary: 为已登录用户生成智谱用餐推荐
       requestBody:
         $ref: "#/paths/~1api~1v1~1ai~1meals~1recommend/post/requestBody"
       responses:
@@ -870,7 +870,7 @@ paths:
           $ref: "#/paths/~1api~1v1~1ai~1meals~1recommend/post/responses/200"
         "400": { description: Invalid meal preferences }
         "401": { description: Authentication required }
-        "403": { description: Meal AI unavailable to this account }
+        "403": { description: Meal AI is disabled on the server }
         "502": { description: Upstream model or network failure }
   /api/v1/ai/meals/status:
     get:

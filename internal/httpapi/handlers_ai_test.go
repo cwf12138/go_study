@@ -137,9 +137,9 @@ func TestFoodAIStatusUsesServerConfiguration(t *testing.T) {
 	}
 }
 
-func TestHostedMealAIRestrictsInferenceToConfiguredAccount(t *testing.T) {
+func TestHostedMealAIAvailableToSignedInAccountsWhenEnabled(t *testing.T) {
 	t.Setenv("BIGMODEL_API_KEY", "fixture-key")
-	t.Setenv("BIGMODEL_REMOTE_OWNER_ID", "owner-id")
+	t.Setenv("BIGMODEL_REMOTE_ENABLED", "1")
 	tokens := security.NewTokenManager("hosted-test-secret-long-enough", "test", time.Hour)
 	bus := event.NewBus()
 	handler := NewHandler(service.New(store.NewMemory(), tokens, bus), tokens, bus, slog.New(slog.NewTextHandler(io.Discard, nil)))
@@ -148,9 +148,10 @@ func TestHostedMealAIRestrictsInferenceToConfiguredAccount(t *testing.T) {
 		status                             int
 	}{
 		{"", "GET", "status", "", "", 401},
-		{"anyone-else", "GET", "status", "", `"connected":false`, 200},
+		{"anyone-else", "GET", "status", "", `"connected":true`, 200},
 		{"owner-id", "GET", "status", "", `"connected":true`, 200},
-		{"anyone-else", "POST", "recommend", `{}`, "尚未启用", 403},
+		{"", "POST", "recommend", `{}`, "", 401},
+		{"anyone-else", "POST", "recommend", `{}`, "", 400},
 		{"owner-id", "POST", "recommend", `{}`, "", 400},
 		{"owner-id", "POST", "recommend", `{"model":"unconfigured","prompt":"吃什么","meal":"dinner","channel":"any","flavor":"any","hunger":"any"}`, "本机智谱配置", 502},
 	} {
@@ -167,5 +168,24 @@ func TestHostedMealAIRestrictsInferenceToConfiguredAccount(t *testing.T) {
 		if response.Code != tc.status || !strings.Contains(response.Body.String(), tc.contains) || strings.Contains(response.Body.String(), "fixture-key") {
 			t.Fatalf("unexpected response for %s %s (%s): %d", tc.method, tc.path, tc.user, response.Code)
 		}
+	}
+}
+
+func TestHostedMealAIDisabledWithoutExplicitEnablement(t *testing.T) {
+	t.Setenv("BIGMODEL_API_KEY", "fixture-key")
+	t.Setenv("BIGMODEL_REMOTE_ENABLED", "")
+	tokens := security.NewTokenManager("hosted-test-secret-long-enough", "test", time.Hour)
+	token, err := tokens.Issue("signed-in-user", "student")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bus := event.NewBus()
+	handler := NewHandler(service.New(store.NewMemory(), tokens, bus), tokens, bus, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	request := httptest.NewRequest("POST", "https://daynest.example.test/api/v1/meals/ai/recommend", strings.NewReader("{}"))
+	request.Header.Set("Authorization", "Bearer "+token)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusForbidden {
+		t.Fatal("hosted inference should require explicit enablement", response.Code)
 	}
 }

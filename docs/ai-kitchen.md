@@ -26,9 +26,9 @@ Windows 用户可从项目目录运行以下命令。首次输入会被遮盖，
 
 ## Android 与远程网页的智谱推荐
 
-升级到 Android 0.6.1 和支持 `/api/v1/meals/ai/` 的服务器后，在服务器上以管理员身份运行 `sudo python3 configure-meal-ai.py`。设置程序依据已经保存的 Daynest 账号邮箱查找账号 ID，并将模型密钥保存到权限为 0600 的 `/etc/daynest/meal-ai.env`。部署脚本会将它加载到 Go 进程。若服务已部署，完成后重启 `daynest.service`。
+升级到 Android 0.6.1 和支持 `/api/v1/meals/ai/` 的服务器后，在服务器上以管理员身份运行 `sudo python3 configure-meal-ai.py`。设置程序从云端试调智谱，并把密钥与 `BIGMODEL_REMOTE_ENABLED=1` 保存到权限为 0600 的 `/etc/daynest/meal-ai.env`。部署脚本会将它加载到 Go 进程。若服务已部署，完成后重启 `daynest.service`。
 
-只有已登录的指定账号可以发起远程推荐。手机和远程网页从「今天吃什么 → AI 推荐设置」查看状态。ChatGPT 授权入口继续由现有回环限制保护。
+启用后，所有已登录的 Daynest 用户共享服务器的智谱 Key 和额度。手机和远程网页从「今天吃什么 → AI 推荐设置」查看状态。ChatGPT 授权入口继续由现有回环限制保护。
 
 ## 使用 ChatGPT Plus 授权
 

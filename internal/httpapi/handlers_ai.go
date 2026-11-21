@@ -86,29 +86,29 @@ func (s *Server) mealAIStatus(w http.ResponseWriter, r *http.Request) {
 	}{"chatgpt", s.chatGPT.Status(claimsFromContext(r.Context()).Subject)}})
 }
 
-func (s *Server) remoteMealAIAllowed(w http.ResponseWriter, r *http.Request) bool {
+func (s *Server) remoteMealAIAllowed(w http.ResponseWriter) bool {
 	w.Header().Del("Access-Control-Allow-Origin")
 	w.Header().Set("Cache-Control", "no-store")
-	return s.bigModel != nil && s.mealAIOwner != "" && claimsFromContext(r.Context()).Subject == s.mealAIOwner
+	return s.bigModel != nil && s.remoteMealAI
 }
 
 func (s *Server) remoteMealAIStatus(w http.ResponseWriter, r *http.Request) {
-	if !s.remoteMealAIAllowed(w, r) {
+	if !s.remoteMealAIAllowed(w) {
 		writeJSON(w, http.StatusOK, envelope{"data": envelope{
 			"provider": "bigmodel", "connected": false,
-			"message": "此账号尚未启用智谱推荐，可以先使用本地推荐。",
+			"message": "服务器尚未启用智谱推荐，可以先使用本地推荐。",
 		}})
 		return
 	}
 	writeJSON(w, http.StatusOK, envelope{"data": envelope{
 		"provider": "bigmodel", "connected": true, "model": s.bigModel.Model(),
-		"message": "当前账号已启用智谱推荐。",
+		"message": "服务器已启用智谱推荐。",
 	}})
 }
 
 func (s *Server) remoteMealAIRecommend(w http.ResponseWriter, r *http.Request) {
-	if !s.remoteMealAIAllowed(w, r) {
-		writeJSON(w, http.StatusForbidden, envelope{"error": envelope{"message": "此账号尚未启用智谱推荐。"}})
+	if !s.remoteMealAIAllowed(w) {
+		writeJSON(w, http.StatusForbidden, envelope{"error": envelope{"message": "服务器尚未启用智谱推荐。"}})
 		return
 	}
 	s.aiMealRecommend(w, r)
