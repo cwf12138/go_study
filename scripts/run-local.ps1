@@ -1,14 +1,22 @@
 param(
     [switch]$UseSystemProxy,
-    [string]$Proxy = ""
+    [string]$Proxy = "",
+    [switch]$UseBigModel,
+    [switch]$UpdateBigModelKey
 )
 
 $ErrorActionPreference = "Stop"
 if ($UseSystemProxy -and $Proxy) { throw "Choose either -UseSystemProxy or -Proxy, not both." }
+. (Join-Path $PSScriptRoot 'bigmodel-key.ps1')
+$savedBigModelKey = Test-Path -LiteralPath (Get-DaynestBigModelKeyPath) -PathType Leaf
 
 # Process-only network settings. No registry changes, no saved credentials.
 if ($UseSystemProxy) {
-    $authEndpoint = [uri]"https://auth.openai.com/.well-known/openid-configuration"
+    $authEndpoint = if ($UseBigModel -or $UpdateBigModelKey -or $env:BIGMODEL_API_KEY -or $savedBigModelKey) {
+        [uri]"https://open.bigmodel.cn/api/paas/v4/chat/completions"
+    } else {
+        [uri]"https://auth.openai.com/.well-known/openid-configuration"
+    }
     $systemProxy = [System.Net.WebRequest]::DefaultWebProxy.GetProxy($authEndpoint)
     if (-not $systemProxy -or $systemProxy.AbsoluteUri -eq $authEndpoint.AbsoluteUri) {
         throw "No existing system proxy found. Configure an authorized network connection or pass -Proxy explicitly."
@@ -32,11 +40,32 @@ if ($Proxy) {
 }
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
+$previousBigModelKey = $env:BIGMODEL_API_KEY
 Push-Location -LiteralPath $projectRoot
 try {
-    Write-Host "Starting Daynest. For a new authorization attempt, use Continue with ChatGPT in the app."
+    $secret = $null
+    try {
+        if ($UpdateBigModelKey -or ($UseBigModel -and -not $previousBigModelKey -and -not $savedBigModelKey)) {
+            $secret = Read-Host 'Enter your BigModel API key' -AsSecureString
+            Save-DaynestBigModelKey -Key $secret
+            Write-Host 'Saved the BigModel key for this Windows user.'
+        } elseif (-not $previousBigModelKey -and $savedBigModelKey) {
+            $secret = Get-DaynestBigModelKey
+        }
+        if ($secret) {
+            $env:BIGMODEL_API_KEY = [System.Net.NetworkCredential]::new('', $secret).Password
+        }
+    } finally {
+        if ($secret) { $secret.Dispose() }
+    }
+    if ($env:BIGMODEL_API_KEY) {
+        Write-Host "Starting Daynest with BigModel for local meal recommendations."
+    } else {
+        Write-Host "Starting Daynest."
+    }
     & go run ./cmd/api
     if ($LASTEXITCODE -ne 0) { throw "Go service exited with code $LASTEXITCODE" }
 } finally {
+    $env:BIGMODEL_API_KEY = $previousBigModelKey
     Pop-Location
 }

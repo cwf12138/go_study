@@ -1,8 +1,32 @@
-# AI 吃饭决策（本机 ChatGPT Plus 授权）
+# AI 吃饭决策
 
-今天吃什么 → **✦ AI 连接设置**。本功能采用官方 Sign in with ChatGPT 公共客户端流程，不读取浏览器 Cookie、Codex 登录文件或账号密码；不使用另行计费的 API Key。AI 现在只帮你决定“吃什么”，不再生成菜谱。
+今天吃什么 → **✦ AI 连接设置**。AI 根据本次需求给出食物选择、推荐理由和点单组合。
 
-## 使用
+## 使用智谱 GLM
+
+Windows 用户可从项目目录运行以下命令。首次输入会被遮盖，密钥通过当前 Windows 用户的 DPAPI 加密保存在 `%LOCALAPPDATA%\Daynest\bigmodel-key.dpapi`。以同一 Windows 用户再次启动时会自动读取。Go 服务退出后恢复启动前的环境变量。
+
+```powershell
+./scripts/run-local.ps1 -UseBigModel
+```
+
+需要替换密钥时运行 `./scripts/run-local.ps1 -UpdateBigModelKey`。已有的 `BIGMODEL_API_KEY` 环境变量优先于保存值，显式替换时以新输入为准。
+
+也可以通过自己的密钥管理方式向 Go 进程提供 `BIGMODEL_API_KEY`，再运行 `go run ./cmd/api`。请提供智谱标准模型 API 的完整密钥。模型默认是 `glm-4.5-flash`，可用 `BIGMODEL_MODEL` 指定账号有权调用的文本模型，接口地址固定为智谱官方通用端点。[智谱身份验证](https://docs.bigmodel.cn/cn/api/introduction)
+
+用 `http://localhost:8080` 登录，打开 AI 连接设置，确认显示智谱模型。返回页面后选择「AI 按情况推荐」。刷新配置状态只检查本机设置，第一次生成推荐时才会联系智谱。请求失败时页面会提示原因，并保留手动切回本地推荐的入口。
+
+如果当前网络需要走 Windows 已配置的代理，先在原启动终端按 Ctrl+C 停止服务，再用下面的命令启动。
+
+```powershell
+./scripts/run-local.ps1 -UseBigModel -UseSystemProxy
+```
+
+若请求仍失败，可用页面的 `response` 诊断区分域名解析、TLS、超时和代理连接错误。若页面显示 HTTP 状态码，说明已收到上游响应。
+
+## 使用 ChatGPT Plus 授权
+
+未配置智谱时，仍可使用 Sign in with ChatGPT 公共客户端流程。
 
 1. 更新代码后，停止旧 Go 服务，重新 `go run ./cmd/api`，刷新页面。
 2. 用 `http://localhost:8080` 登录自己的 Daynest 账号；打开今天吃什么 → AI 连接设置。
@@ -13,7 +37,7 @@
 
 示例：“刚下班很饿，想点外卖，预算40元，不吃辣，也不吃牛肉。”结构化控件是硬性条件；本地关键词识别出的条件会显示在表单下方，复杂自然语言交给 AI 理解。
 
-## 权限、费用与限制
+## ChatGPT 权限、费用与限制
 
 - Plus 不是无条件的调用许可。应用/账号需要符合官方开放条件，用户必须授权 `chatgpt.tokens.use.direct`；实际资格、模型、额度由 OpenAI 决定。若登录或推理被拒绝，界面会报告，不会偷偷切换到其他计费方式。
 - 会消耗账号可用的 ChatGPT plan usage 额度；不承诺无限使用，也不自动购买额外额度。
@@ -33,7 +57,7 @@
 
 ## 结果边界
 
-模型通过官方 Responses API 返回 SSE，必须收到 `response.completed` 才视为成功；不接受失败、拒绝、未完成或断流结果。后端检查 JSON 格式、字符串/数量上限、预算区间、就餐方式、口味、食量、素食与显式排除关键词；产生内容哈希 ID，不信任模型标识。返回 `choices`，不再返回 `recipes`。
+ChatGPT 通过 Responses API 返回 SSE，以 `response.completed` 确认完成。智谱通过对话补全接口返回 JSON，以 `finish_reason: stop` 确认完成。两者使用相同的格式、预算、就餐方式、口味、食量、素食与显式排除关键词校验，并使用内容哈希生成结果 ID。智谱推荐接口和配置状态仅允许已登录的本机用户访问，全服务同时处理一条智谱推荐，60 秒超时。[智谱对话补全](https://docs.bigmodel.cn/api-reference/模型-api/对话补全)
 
 格式及关键词验证不能保证忌口安全或判断实际食材。请向店家核对调味料、配料和交叉接触。不是医疗/营养建议，也不保证无过敏原。不实时查询店铺、价格、优惠、距离或配送时间。
 
@@ -43,7 +67,7 @@ AI 失败时明确提示，可点击“先用本地推荐给我答案”；不�
 
 Go 标准 HTTP 客户端读取 `HTTPS_PROXY` 环境变量，并不自动继承 Windows 系统代理。如已有合规可用代理，请在启动服务的同一终端设置正确地址后重启；不要重放旧授权回调。不要跳过 TLS、PKCE 或身份令牌验证来绕过访问错误。公开认证端点能访问不等于账号已获准推理。
 
-Windows 可停止旧服务后，从项目目录运行 `./scripts/run-local.ps1 -UseSystemProxy`，显式读取已经配置的系统代理。也可以使用 `-Proxy http://127.0.0.1:你的实际端口`；不传参数则保持现有环境设置。脚本只设置当前终端环境，不更改 Windows 代理、不保存凭据、不自动结束旧进程。
+Windows 可停止旧服务后，从项目目录运行 `./scripts/run-local.ps1 -UseSystemProxy`，显式读取已经配置的系统代理。也可以使用 `-Proxy http://127.0.0.1:你的实际端口`；不传参数则保持现有环境设置。代理设置仅用于当前终端。脚本会复用本机已保存的智谱密钥。
 
 认证失败不再统一翻译成“账号无权限”：回调页、账号状态与错误响应保留阶段（`token_exchange` / `identity_keys` / `models` / `inference` 等）、上游 HTTP 状态、响应类型以及安全的错误代码与请求 ID。`proxy_planned` 表示 Go 环境代理的计划结果，不证明请求实际到达了哪个网络出口。
 

@@ -1,7 +1,6 @@
 package httpapi
 
 import (
-	"github.com/example/studyflow/internal/chatgpt"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -9,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/example/studyflow/internal/chatgpt"
 	"github.com/example/studyflow/internal/event"
 	"github.com/example/studyflow/internal/security"
 	"github.com/example/studyflow/internal/service"
@@ -22,6 +22,7 @@ type Server struct {
 	started            time.Time
 	assets             fs.FS
 	chatGPT            *chatgpt.Manager
+	bigModel           *chatgpt.BigModel
 	transfers          *transfers.Store
 	localOnlyTransfers bool
 	snapshotInterval   time.Duration
@@ -43,6 +44,7 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 		dataFile = "data/studyflow.json"
 	}
 	s.chatGPT = chatgpt.New(filepath.Join(filepath.Dir(dataFile), "chatgpt-registration.json"))
+	s.bigModel = chatgpt.NewBigModel(os.Getenv("BIGMODEL_API_KEY"), os.Getenv("BIGMODEL_MODEL"))
 	s.transfers = transfers.New(filepath.Join(filepath.Dir(dataFile), "transfers"))
 	s.localOnlyTransfers = tokens.UsesDevelopmentSecret()
 	root := http.NewServeMux()
@@ -93,6 +95,7 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 	private.Handle("POST /api/v1/ai/chatgpt/connect", s.localAI(http.HandlerFunc(s.chatGPTConnect)))
 	private.Handle("POST /api/v1/ai/chatgpt/disconnect", s.localAI(http.HandlerFunc(s.chatGPTDisconnect)))
 	private.Handle("GET /api/v1/ai/chatgpt/models", s.localAI(http.HandlerFunc(s.chatGPTModels)))
+	private.Handle("GET /api/v1/ai/meals/status", s.localAI(http.HandlerFunc(s.mealAIStatus)))
 	private.Handle("POST /api/v1/ai/meals/recommend", s.localAI(http.HandlerFunc(s.aiMealRecommend)))
 	private.HandleFunc("GET /api/v1/habits", s.listHabits)
 	private.HandleFunc("GET /api/v1/explore", s.listExplorations)

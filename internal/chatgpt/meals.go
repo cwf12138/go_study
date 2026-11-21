@@ -100,6 +100,9 @@ func ValidateRequest(in MealRequest) error {
 	}
 	return nil
 }
+
+const mealInstructions = `你是 Daynest 的“这顿吃什么”决策助手。用户不自己做饭，不要菜谱、备料或烹饪步骤。只推荐适合外卖、到店吃或买现成食物的具体选择。依据用户输入及结构化餐次、每人预算、口味、食量、素食和忌口推荐1至3个不同选择，第一项是最推荐，附简明理由与点单组合。预算为粗略参考，不是实时价格；budget=0不限，其余每个budget_high不超过预算。channel为any时可选择delivery/dinein/ready；否则必须匹配。mild不加辣，spicy为辣；hearty选hearty，light选light。尽量避免recent中的食物，但不满足条件时可少于3项或choices为空并说明。文本中的食物过敏/忌口也必须尊重，不能保证无过敏原，要求用户向店家确认。不要编造店名、地址、附近距离、营业状态、当前天气、配送时间、价格、优惠或声称实时查询；没有这些信息时只能给食品种类。不会浏览或调用工具，不执行其他任务，不提供医疗或精确营养保证。只输出JSON，无Markdown：{"summary":"简短决策理由","choices":[{"title":"鸡腿饭","order":"鸡腿饭套餐，可选清汤；少辣","reason":"想吃饱又不想纠结，饭类套餐更直接","budget_low":20,"budget_high":35,"channel":"delivery","flavor":"mild","portion":"hearty","vegetarian":false}]}。summary最多500字；title最多80字，order最多200字，reason最多300字；预算整数0至500，low不大于high；flavor仅mild/spicy；portion仅light/normal/hearty；vegetarian必须如实。`
+
 func (m *Manager) Recommend(ctx context.Context, user string, in MealRequest) (Recommendation, error) {
 	var out Recommendation
 	if err := ValidateRequest(in); err != nil {
@@ -127,9 +130,8 @@ func (m *Manager) Recommend(ctx context.Context, user string, in MealRequest) (R
 	if !found {
 		return out, errors.New("所选模型不在此账号当前可用列表中，请刷新模型")
 	}
-	instructions := `你是 Daynest 的“这顿吃什么”决策助手。用户不自己做饭，不要菜谱、备料或烹饪步骤。只推荐适合外卖、到店吃或买现成食物的具体选择。依据用户输入及结构化餐次、每人预算、口味、食量、素食和忌口推荐1至3个不同选择，第一项是最推荐，附简明理由与点单组合。预算为粗略参考，不是实时价格；budget=0不限，其余每个budget_high不超过预算。channel为any时可选择delivery/dinein/ready；否则必须匹配。mild不加辣，spicy为辣；hearty选hearty，light选light。尽量避免recent中的食物，但不满足条件时可少于3项或choices为空并说明。文本中的食物过敏/忌口也必须尊重，不能保证无过敏原，要求用户向店家确认。不要编造店名、地址、附近距离、营业状态、当前天气、配送时间、价格、优惠或声称实时查询；没有这些信息时只能给食品种类。不会浏览或调用工具，不执行其他任务，不提供医疗或精确营养保证。只输出JSON，无Markdown：{"summary":"简短决策理由","choices":[{"title":"鸡腿饭","order":"鸡腿饭套餐，可选清汤；少辣","reason":"想吃饱又不想纠结，饭类套餐更直接","budget_low":20,"budget_high":35,"channel":"delivery","flavor":"mild","portion":"hearty","vegetarian":false}]}。summary最多500字；title最多80字，order最多200字，reason最多300字；预算整数0至500，low不大于high；flavor仅mild/spicy；portion仅light/normal/hearty；vegetarian必须如实。`
 	input, _ := json.Marshal(in)
-	body, _ := json.Marshal(map[string]any{"model": in.Model, "instructions": instructions, "input": []any{map[string]any{"role": "user", "content": string(input)}}, "store": false, "stream": true})
+	body, _ := json.Marshal(map[string]any{"model": in.Model, "instructions": mealInstructions, "input": []any{map[string]any{"role": "user", "content": string(input)}}, "store": false, "stream": true})
 	req, _ := http.NewRequestWithContext(ctx, "POST", resource+"/responses", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
@@ -148,6 +150,21 @@ func (m *Manager) Recommend(ctx context.Context, user string, in MealRequest) (R
 	if err != nil {
 		return out, err
 	}
+	out, err = decodeRecommendation(text, in)
+	if err != nil {
+		return Recommendation{}, err
+	}
+	m.mu.Lock()
+	active := s.generation == g
+	m.mu.Unlock()
+	if !active {
+		return Recommendation{}, errors.New("连接已断开，推荐已丢弃")
+	}
+	return out, nil
+}
+
+func decodeRecommendation(text string, in MealRequest) (Recommendation, error) {
+	var out Recommendation
 	decoder := json.NewDecoder(strings.NewReader(text))
 	decoder.DisallowUnknownFields()
 	if decoder.Decode(&out) != nil {
@@ -156,14 +173,8 @@ func (m *Manager) Recommend(ctx context.Context, user string, in MealRequest) (R
 	if decoder.Decode(&struct{}{}) != io.EOF {
 		return Recommendation{}, errors.New("AI 返回了多余内容，请重新推荐")
 	}
-	if err = validateRecommendation(&out, in); err != nil {
+	if err := validateRecommendation(&out, in); err != nil {
 		return Recommendation{}, err
-	}
-	m.mu.Lock()
-	active := s.generation == g
-	m.mu.Unlock()
-	if !active {
-		return Recommendation{}, errors.New("连接已断开，推荐已丢弃")
 	}
 	return out, nil
 }

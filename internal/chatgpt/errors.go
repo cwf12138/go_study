@@ -23,7 +23,7 @@ type RequestFailure struct {
 }
 
 func (e *RequestFailure) Error() string {
-	label := map[string]string{"token_exchange": "交换授权码", "token_refresh": "续期授权", "identity_keys": "获取身份验证公钥", "identity_discovery": "获取认证配置", "models": "加载模型列表", "inference": "生成食物推荐", "revocation": "撤销授权"}[e.Stage]
+	label := map[string]string{"token_exchange": "交换授权码", "token_refresh": "续期授权", "identity_keys": "获取身份验证公钥", "identity_discovery": "获取认证配置", "models": "加载模型列表", "inference": "生成食物推荐", "bigmodel_inference": "请求智谱推荐", "revocation": "撤销授权"}[e.Stage]
 	if label == "" {
 		label = "访问认证服务"
 	}

@@ -850,11 +850,20 @@ paths:
         "401": { description: Authentication required }
         "403": { description: Loopback and same-origin access required }
         "502": { description: 未授权、权限/网络/额度错误或有在途请求 }
+  /api/v1/ai/meals/status:
+    get:
+      tags: [AI, Meals]
+      security: [{ bearerAuth: [] }]
+      summary: 查询本机推荐服务配置
+      responses:
+        "200": { description: "data.provider 为 bigmodel 或 chatgpt。智谱模式返回已配置模型，并在首次推荐时验证调用权限。" }
+        "401": { description: Authentication required }
+        "403": { description: Loopback and same-origin access required }
   /api/v1/ai/meals/recommend:
     post:
       tags: [AI, Meals]
       security: [{ bearerAuth: [] }]
-      summary: 用 ChatGPT plan usage 决定吃什么，不返回菜谱，不自动保存或下单
+      summary: 用本机配置的智谱 GLM 或已授权的 ChatGPT 推荐食物和点单组合
       requestBody:
         required: true
         content:

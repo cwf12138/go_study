@@ -53,6 +53,7 @@ func TestAIErrorExposesSafeDiagnostic(t *testing.T) {
 }
 
 func TestFoodDecisionHTTPContract(t *testing.T) {
+	t.Setenv("BIGMODEL_API_KEY", "")
 	tokens := security.NewTokenManager("food-decision-secret-long-enough", "test", time.Hour)
 	token, err := tokens.Issue("test-food-user", "user")
 	if err != nil {
@@ -87,5 +88,51 @@ func TestFoodDecisionHTTPContract(t *testing.T) {
 	handler.ServeHTTP(w, r)
 	if !strings.Contains(w.Body.String(), "food-form") || !strings.Contains(w.Body.String(), "meal-legacy-template") {
 		t.Fatal("new page not embedded")
+	}
+}
+
+func TestFoodAIStatusUsesServerConfiguration(t *testing.T) {
+	const fixtureKey = "fixture-credential.status-test"
+	t.Setenv("BIGMODEL_API_KEY", fixtureKey)
+	t.Setenv("BIGMODEL_MODEL", "")
+
+	tokens := security.NewTokenManager("food-decision-secret-long-enough", "test", time.Hour)
+	token, err := tokens.Issue("test-food-user", "user")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bus := event.NewBus()
+	handler := NewHandler(service.New(store.NewMemory(), tokens, bus), tokens, bus, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	for _, test := range []struct {
+		remote, auth string
+		status       int
+	}{
+		{"127.0.0.1:1234", "", 401},
+		{"192.168.1.10:1234", token, 403},
+		{"127.0.0.1:1234", token, 200},
+	} {
+		r := httptest.NewRequest("GET", "http://localhost:8080/api/v1/ai/meals/status", nil)
+		r.RemoteAddr = test.remote
+		if test.auth != "" {
+			r.Header.Set("Authorization", "Bearer "+test.auth)
+		}
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, r)
+		body := w.Body.String()
+		if w.Code != test.status || strings.Contains(body, fixtureKey) {
+			t.Fatal("unexpected status response or credential disclosure", w.Code)
+		}
+		if w.Code == 200 && (!strings.Contains(body, `"provider":"bigmodel"`) || !strings.Contains(body, `"model":"glm-4.5-flash"`)) {
+			t.Fatal("configured model missing from public status", body)
+		}
+	}
+	body := `{"model":"wrong-model","prompt":"推荐晚餐","meal":"dinner","channel":"any","flavor":"any","hunger":"any"}`
+	r := httptest.NewRequest("POST", "http://localhost:8080/api/v1/ai/meals/recommend", strings.NewReader(body))
+	r.RemoteAddr = "127.0.0.1:1234"
+	r.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+	if w.Code != 502 || !strings.Contains(w.Body.String(), "本机智谱配置") {
+		t.Fatal("configured BigModel must handle the recommendation route", w.Code)
 	}
 }
