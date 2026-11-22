@@ -1,4 +1,4 @@
-export function boot({ Http, App, Files, defaultServer = '' }) {
+export function boot({ Http, App, Files, defaultServer = '', appVersion = '' }) {
   const C = window.DaynestMobileCore, originalFetch = window.fetch.bind(window);
   const configKey = 'daynest.mobile.connection.v1';
   const primaryKey = 'daynest.mobile.primary-server.v1', primaryServer = defaultServer ? C.server(defaultServer) : '';
@@ -25,9 +25,19 @@ export function boot({ Http, App, Files, defaultServer = '' }) {
   }
   async function checkServer(origin, signal) {
     const response = await nativeRequest(origin, '/api/v1/mobile-info', { signal });
+    if (response.status === 404 || response.status === 405) throw Error('这个地址没有提供 Daynest 移动接口。请核对地址或更新 Go 服务。');
+    if (response.status === 401 || response.status === 403) throw Error('服务拒绝了连接检查，请检查反向代理是否允许访问移动接口。');
+    if (!response.ok) throw Error(`服务暂时无法完成连接检查（HTTP ${response.status}）。`);
     const result = await response.json().catch(() => null);
-    if (!response.ok || !C.metadata(result?.data)) throw Error('服务暂时不可用或版本不兼容，请稍后重试。');
-    if (result.data.requires_secure_secret) throw Error('服务仍使用公开开发密钥，请配置专用 JWT_SECRET 后再连接。');
+    const data = result?.data, info = C.serviceInfo(data);
+    let issue = '';
+    if (info?.protocol == null) issue = '未能读取 Daynest 的连接信息，请核对服务地址和版本。';
+    else if (info.protocol > C.protocol) issue = `服务使用协议 ${info.protocol}，请安装支持该协议的新版 Daynest App。`;
+    else if (info.protocol < C.protocol) issue = `服务使用协议 ${info.protocol}，请更新 Go 服务后再连接。`;
+    else if (!C.metadata(data)) issue = '服务的连接信息不完整，请更新 Daynest 服务。';
+    else if (data.requires_secure_secret) issue = '服务仍使用公开开发密钥，请配置专用 JWT_SECRET 后再连接。';
+    if (issue) throw Object.assign(Error(issue), { serviceInfo: info });
+    return info;
   }
   window.fetch = function(input, options = {}) {
     const url = new URL(typeof input === 'string' || input instanceof URL ? String(input) : input.url, window.location.href);
@@ -95,13 +105,46 @@ export function boot({ Http, App, Files, defaultServer = '' }) {
     const authView = document.getElementById('auth-view');
     const authVisible = () => !authView.classList.contains('hidden');
     const setup = document.createElement('dialog'); setup.id = 'mobile-connection'; setup.className = 'mobile-connection'; setup.setAttribute('aria-labelledby', 'mobile-title');
-    setup.innerHTML = `<header><h2 id="mobile-title">服务连接</h2><button id="mobile-close" type="button" aria-label="关闭连接设置">×</button></header><form id="mobile-form"><details id="mobile-advanced"><summary>编辑服务地址</summary><label>服务地址<input id="mobile-server" type="url" inputmode="url" placeholder="https://example.com" maxlength="500" required autocomplete="off" spellcheck="false"></label><label id="mobile-http-notice" class="mobile-consent"><input id="mobile-consent" type="checkbox"><span>我确认正在使用可信的局域网。通过 HTTP 传输的登录信息和记录不会加密。</span></label></details><p id="mobile-state" role="status" aria-live="polite"></p><button id="mobile-connect" type="submit">连接服务</button></form><button id="mobile-offline" type="button" class="mobile-offline-button">离线资料与本机收集</button>`;
+    setup.innerHTML = `
+      <header><h2 id="mobile-title">服务连接</h2><button id="mobile-close" type="button" aria-label="关闭连接设置">×</button></header>
+      <dl class="mobile-compatibility">
+        <div><dt>App 版本</dt><dd id="mobile-compat-app"></dd></div>
+        <div><dt>服务版本</dt><dd id="mobile-compat-build">待检查</dd></div>
+        <div><dt>连接协议</dt><dd id="mobile-compat-protocol"></dd></div>
+        <div><dt>检查地址</dt><dd id="mobile-compat-origin">—</dd></div>
+      </dl>
+      <form id="mobile-form">
+        <details id="mobile-advanced">
+          <summary>编辑服务地址</summary>
+          <label>服务地址<input id="mobile-server" type="url" inputmode="url" placeholder="https://example.com" maxlength="500" required autocomplete="off" spellcheck="false"></label>
+          <label id="mobile-http-notice" class="mobile-consent"><input id="mobile-consent" type="checkbox"><span>我确认正在使用可信的局域网。通过 HTTP 传输的登录信息和记录不会加密。</span></label>
+        </details>
+        <p id="mobile-state" role="status" aria-live="polite"></p>
+        <button id="mobile-connect" type="submit">连接服务</button>
+      </form>
+      <button id="mobile-offline" type="button" class="mobile-offline-button">离线资料与本机收集</button>`;
     document.body.append(setup);
     const reader=document.createElement('dialog');reader.id='mobile-offline-reader';reader.className='mobile-offline-reader';reader.setAttribute('aria-label','离线资料与本机收集');
     reader.innerHTML='<button id="mobile-offline-close" type="button" aria-label="关闭离线资料与本机收集">‹ 返回应用</button><iframe id="mobile-offline-frame" title="离线资料与本机收集"></iframe>';
     document.body.append(reader);
 
     const $ = id => document.getElementById('mobile-' + id), state = text => { $('state').textContent = text; };
+    $('compat-app').textContent = appVersion || '未提供';
+    $('compat-protocol').textContent = `App ${C.protocol}`;
+    function renderProbe(origin, info) {
+      $('compat-origin').textContent = origin;
+      $('compat-build').textContent = info?.version || (info ? '未提供' : '未读取');
+      $('compat-protocol').textContent = `App ${C.protocol}${info?.protocol == null ? '' : ` · 服务 ${info.protocol}`}`;
+    }
+    async function probe(origin, signal) {
+      try {
+        const info = await checkServer(origin, signal);
+        if (!signal?.aborted) renderProbe(origin, info);
+      } catch (error) {
+        if (!signal?.aborted) renderProbe(origin, error.serviceInfo);
+        throw error;
+      }
+    }
     const bar = document.createElement('button'); bar.type = 'button'; bar.id = 'mobile-server-bar'; bar.className = 'mobile-server-bar'; bar.textContent = '服务连接 · 设置'; bar.hidden = true;
     document.querySelector('.workspace').prepend(bar);
     let foregroundCheck;
@@ -159,7 +202,7 @@ export function boot({ Http, App, Files, defaultServer = '' }) {
         if (origin.startsWith('http:') && !$('consent').checked) throw Error('请先确认 HTTP 的明文传输提示，或改用可信 HTTPS。');
         state('正在检查服务连接…');
         checking = true;
-        await checkServer(origin);
+        await probe(origin);
         checking = false;
         const changed = !connection || connection.server !== origin;
         if (changed && pending.size) throw Error('请先完成或取消正在进行的文件操作，再切换服务。');
@@ -233,12 +276,16 @@ export function boot({ Http, App, Files, defaultServer = '' }) {
       const check = new AbortController();
       foregroundCheck = check;
       try {
-        await checkServer(connection.server, check.signal);
+        await probe(connection.server, check.signal);
         if (check.signal.aborted) return;
         updateConnectionStatus(true);
+        state('已连接');
         if (token()) document.getElementById('app-sync-retry')?.click();
-      } catch (_) {
-        if (!check.signal.aborted) updateConnectionStatus(false);
+      } catch (error) {
+        if (!check.signal.aborted) {
+          updateConnectionStatus(false);
+          state(error.message || '暂时无法连接，请检查手机网络后重试。');
+        }
       } finally {
         if (foregroundCheck === check) foregroundCheck = undefined;
       }

@@ -150,6 +150,24 @@
 .daynest-native #mobile-connection header h2 { margin: 0; font-size: 22px; }
 .daynest-native #mobile-connection #mobile-state { min-height: 0; margin: 0; }
 .daynest-native #mobile-connection #mobile-state:empty { display: none; }
+.mobile-compatibility {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0 2px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--canvas);
+  color: var(--ink);
+  font-size: 13px;
+}
+.mobile-compatibility div {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 8px;
+}
+.mobile-compatibility dt { color: var(--muted); }
+.mobile-compatibility dd { margin: 0; overflow-wrap: anywhere; }
 
 @media (min-width: 760px) {
   .daynest-native #auth-view { grid-template-columns: minmax(0, 1fr) minmax(390px, 480px); grid-template-rows: 1fr; }

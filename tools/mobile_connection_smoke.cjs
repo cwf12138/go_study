@@ -61,7 +61,7 @@ function harness(saved, existingToken = '', defaultServer = '', primaryMarker) {
     localStorage: { getItem: k => store.get(k) || null, setItem(k, value) { if (failStorage) throw Error('存储空间不足'); store.set(k, value); }, removeItem: k => store.delete(k) },
     history: { replaceState() {}, back() { backs++; } }, MutationObserver: class { observe() {} }
   });
-  vm.runInContext(core, ctx); vm.runInContext(client, ctx); window.testBoot({ Http, Files, App, defaultServer });
+  vm.runInContext(core, ctx); vm.runInContext(client, ctx); window.testBoot({ Http, Files, App, defaultServer, appVersion: '0.9.1' });
   return { nodes, store, requests, files, scripts, appEvents,
     init: async () => { for (const handler of events.DOMContentLoaded) await handler(); await settle(); },
     submit: () => nodes.get('mobile-form').fire('submit'),
@@ -81,6 +81,29 @@ function harness(saved, existingToken = '', defaultServer = '', primaryMarker) {
   assert.equal(cloud.store.get('studyflow.token'), undefined);
   assert.equal(JSON.parse(cloud.store.get(key)).server, cloudOrigin);
   assert(cloud.requests.every(request => request.url.startsWith(cloudOrigin + '/')));
+  assert.equal(cloud.nodes.get('mobile-compat-app').textContent, '0.9.1');
+  assert.equal(cloud.nodes.get('mobile-compat-build').textContent, '未提供');
+  assert.equal(cloud.nodes.get('mobile-compat-protocol').textContent, 'App 1 · 服务 1');
+  assert.equal(cloud.nodes.get('mobile-compat-origin').textContent, cloudOrigin);
+  for (const [protocol, expected] of [[2, /安装支持该协议的新版 Daynest App/], [0, /更新 Go 服务/]]) {
+    const mismatch = harness(JSON.stringify({ server: cloudOrigin, httpAcknowledged: false }), 'retained-session', cloudOrigin);
+    mismatch.answer = () => ({ status: 200, data: { data: {
+      application: 'daynest', mobile_protocol: protocol, requires_secure_secret: false,
+      build: { version: 'daynest-fixture-v2' },
+    } } });
+    await mismatch.init();
+    assert.match(mismatch.nodes.get('mobile-state').textContent, expected);
+    assert.equal(mismatch.nodes.get('mobile-compat-build').textContent, 'daynest-fixture-v2');
+    assert.equal(mismatch.nodes.get('mobile-compat-protocol').textContent, `App 1 · 服务 ${protocol}`);
+    assert.equal(mismatch.store.get('studyflow.token'), 'retained-session');
+    assert.equal(mismatch.scripts.length, 0, 'incompatible server must not launch the authenticated UI');
+    assert.equal(mismatch.files.length, 0, 'compatibility failure must not change the native session');
+  }
+  const noEndpoint = harness(JSON.stringify({ server: cloudOrigin, httpAcknowledged: false }));
+  noEndpoint.answer = () => ({ status: 404, data: '<html>other service</html>' });
+  await noEndpoint.init();
+  assert.match(noEndpoint.nodes.get('mobile-state').textContent, /没有提供 Daynest 移动接口/);
+  assert.equal(noEndpoint.nodes.get('mobile-compat-build').textContent, '未读取');
   const migrated = harness(JSON.stringify({server:origin,httpAcknowledged:true}), 'old-local-server-token', cloudOrigin);
   migrated.store.set('keep-local-draft', 'original writing'); await migrated.init();
   assert.equal(migrated.store.get('studyflow.token'), undefined);

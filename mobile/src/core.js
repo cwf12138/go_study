@@ -20,9 +20,19 @@
     if (url.origin !== origin || url.hash || /[\\\u0000-\u001f]/.test(String(value)) || !url.pathname.startsWith('/api/v1/')) throw Error('拒绝向未选择的地址发送应用请求。');
     return url.pathname + url.search;
   }
+  const protocol = 1;
+  function serviceInfo(value) {
+    if (value?.application !== 'daynest') return null;
+    const acceptedProtocol = Number.isSafeInteger(value.mobile_protocol) && value.mobile_protocol >= 0 ? value.mobile_protocol : null;
+    const version = value.build?.version;
+    return {
+      protocol: acceptedProtocol,
+      version: typeof version === 'string' && /^[A-Za-z0-9][A-Za-z0-9._+-]{0,79}$/.test(version) ? version : '',
+    };
+  }
   function metadata(value) {
-    return value && value.application === 'daynest' && value.mobile_protocol === 1 && typeof value.requires_secure_secret === 'boolean';
+    return serviceInfo(value)?.protocol === protocol && typeof value.requires_secure_secret === 'boolean';
   }
   function filename(value) { return String(value || 'daynest-file').replace(/[\x00-\x1f\x7f/\\:*?"<>|]/g, '-').slice(0,160) || 'daynest-file'; }
-  window.DaynestMobileCore = { privateIP, server, apiPath, metadata, filename };
+  window.DaynestMobileCore = { privateIP, server, apiPath, metadata, protocol, serviceInfo, filename };
 })();

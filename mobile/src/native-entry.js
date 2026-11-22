@@ -3,12 +3,13 @@ import { App } from '@capacitor/app';
 import './core.js';
 import { boot } from './mobile-client.js';
 import appConfig from '../app-config.json';
+import { version as appVersion } from '../package.json';
 import { installMobileUX } from './mobile-ux.js';
 import { installMobileReminders } from './mobile-reminders.js';
 import { installMobileToday } from './mobile-today.js';
 import { installMobileCommute } from './mobile-commute.js';
 if (Capacitor.isNativePlatform()) {
-  boot({ Http: CapacitorHttp, App, Files: registerPlugin('DaynestFiles'), defaultServer: appConfig.defaultServer });
+  boot({ Http: CapacitorHttp, App, Files: registerPlugin('DaynestFiles'), defaultServer: appConfig.defaultServer, appVersion });
   installMobileUX();
   installMobileToday();
   installMobileCommute();
