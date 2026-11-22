@@ -86,14 +86,14 @@ func (s *Server) mealAIStatus(w http.ResponseWriter, r *http.Request) {
 	}{"chatgpt", s.chatGPT.Status(claimsFromContext(r.Context()).Subject)}})
 }
 
-func (s *Server) remoteMealAIAllowed(w http.ResponseWriter) bool {
+func (s *Server) remoteBigModelAllowed(w http.ResponseWriter) bool {
 	w.Header().Del("Access-Control-Allow-Origin")
 	w.Header().Set("Cache-Control", "no-store")
-	return s.bigModel != nil && s.remoteMealAI
+	return s.bigModel != nil && s.remoteBigModelAI
 }
 
 func (s *Server) remoteMealAIStatus(w http.ResponseWriter, r *http.Request) {
-	if !s.remoteMealAIAllowed(w) {
+	if !s.remoteBigModelAllowed(w) {
 		writeJSON(w, http.StatusOK, envelope{"data": envelope{
 			"provider": "bigmodel", "connected": false,
 			"message": "服务器尚未启用智谱推荐，可以先使用本地推荐。",
@@ -107,11 +107,33 @@ func (s *Server) remoteMealAIStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) remoteMealAIRecommend(w http.ResponseWriter, r *http.Request) {
-	if !s.remoteMealAIAllowed(w) {
+	if !s.remoteBigModelAllowed(w) {
 		writeJSON(w, http.StatusForbidden, envelope{"error": envelope{"message": "服务器尚未启用智谱推荐。"}})
 		return
 	}
 	s.aiMealRecommend(w, r)
+}
+
+func (s *Server) suggestTodoSteps(w http.ResponseWriter, r *http.Request) {
+	if !s.remoteBigModelAllowed(w) {
+		writeJSON(w, http.StatusForbidden, envelope{"error": envelope{"message": "当前服务尚未启用 AI 拆解。"}})
+		return
+	}
+	var in chatgpt.TodoStepRequest
+	if err := decodeJSON(w, r, &in); err != nil {
+		writeError(w, invalidJSON(err))
+		return
+	}
+	out, err := s.bigModel.SuggestTodoSteps(r.Context(), in)
+	if errors.Is(err, chatgpt.ErrTodoTitle) {
+		writeJSON(w, http.StatusBadRequest, envelope{"error": envelope{"message": err.Error()}})
+		return
+	}
+	if err != nil {
+		aiError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{"data": out})
 }
 
 func (s *Server) aiMealRecommend(w http.ResponseWriter, r *http.Request) {

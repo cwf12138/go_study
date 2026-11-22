@@ -9,6 +9,7 @@
     todayCalendarDate: "",
     todayCalendarError: false,
     todayTodosError: false,
+    todayTodosDate: "",
     goals: [],
     goalPage: [],
     goalMeta: { count: 0, total: 0, page: 1, page_size: 8, total_pages: 0 },
@@ -370,6 +371,7 @@
     state.todayCalendarDate = "";
     state.todayCalendarError = false;
     state.todayTodosError = false;
+    state.todayTodosDate = "";
     $("#today-note").value = "";
     $("#today-note-status").textContent = "保存后可在备忘录继续编辑。";
     state.goals = [];
@@ -560,7 +562,7 @@
     setSyncStatus(background ? "正在同步当前页面…" : "正在同步核心模块…", true);
     const todoRead = path => window.DaynestHTTP ? window.DaynestHTTP.json(path) : api(path);
     const todoListsRequest = wants(6) ? todoRead("/api/v1/todo-lists") : Promise.resolve(skipped);
-    const todosRequest = wants(7) ? todoListsRequest.then(() => todoRead(`/api/v1/todos?view=all&date=${localDateKey(new Date())}`)) : Promise.resolve(skipped);
+    const todosRequest = wants(7) ? todoListsRequest.then(() => todoRead(`/api/v1/todos?view=all&date=${today}`)) : Promise.resolve(skipped);
     const vocabularyRequest = wants(8) ? api("/api/v1/word-books").then(async (books = []) => {
       const selectedBookID = books.some((book) => book.id === state.vocabularyBookID)
         ? state.vocabularyBookID
@@ -613,7 +615,10 @@
     state.tasks = tasks;
     state.todoLists = todoLists || [];
     state.todos = todos || [];
-    if (wants(7)) state.todayTodosError = results[7].status === "rejected";
+    if (wants(7)) {
+      state.todayTodosError = results[7].status === "rejected";
+      state.todayTodosDate = today;
+    }
     if (vocabVersion === vocabularyVersion && vocabLibraryVersion === vocabularyLibraryVersion && !state.vocabularyLoading && !state.vocabularyReviewing && !state.vocabularyInstalling) {
     state.wordBooks = vocabulary.books || [];
     state.vocabularyBookID = vocabulary.selectedBookID || "";
@@ -712,6 +717,16 @@
     const now = new Date(), today = localDateKey(now);
     $("#today-date").textContent = now.toLocaleDateString("zh-CN", { month: "long", day: "numeric", weekday: "long" });
     const calendar = state.todayCalendarDate === today ? state.todayCalendar : null;
+    if (window.DaynestMobileToday) {
+      const status = (date, failed) => date !== today ? "loading" : failed ? "error" : "ready";
+      window.DaynestMobileToday.render({
+        day: today, now, calendar, todos: state.todos,
+        calendarState: status(state.todayCalendarDate, state.todayCalendarError),
+        todoState: status(state.todayTodosDate, state.todayTodosError),
+        retry: () => refresh({ background: true }),
+      });
+      return;
+    }
     const agenda = [...(calendar?.events || []).map(item => ({ title: item.title, time: item.occurrence_start, allDay: item.all_day })),
       ...(calendar?.plan_blocks || []).map(item => ({ title: item.title, time: item.start_at, allDay: false }))]
       .sort((a, b) => Number(b.allDay) - Number(a.allDay) || new Date(a.time) - new Date(b.time));
@@ -733,10 +748,11 @@
     button.disabled = true;
     $("#today-note-status").textContent = "正在保存…";
     try {
-      await api("/api/v1/memos", { method: "POST", body: JSON.stringify({ title: content.split(/\r?\n/)[0].slice(0, 80), content, color: "default", tags: [] }) });
+      const saved = await api("/api/v1/memos", { method: "POST", body: JSON.stringify({ title: content.split(/\r?\n/)[0].slice(0, 80), content, color: "default", tags: [] }) });
       if (token !== state.token) return;
       if (input.value === original) input.value = "";
       $("#today-note-status").textContent = "已存入备忘录，可以继续记录。";
+      window.DaynestMobileToday?.memoSaved(saved);
     } catch (error) {
       if (token === state.token) $("#today-note-status").textContent = `保存失败：${error.message}；文字已保留，可重试。`;
     } finally { button.disabled = false; }
@@ -2927,7 +2943,7 @@
   }
 
   function visibleTodo(id) {
-    return (state.currentView === "dashboard" ? state.todayTodos : state.todos)?.find(todo => todo.id === id);
+    return state.todos.find(todo => todo.id === id);
   }
 
   async function changeTodoCompletion(id, completed) {

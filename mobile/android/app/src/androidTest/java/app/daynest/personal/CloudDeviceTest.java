@@ -21,6 +21,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry;
 import androidx.test.runner.lifecycle.Stage;
+import java.util.Calendar;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -90,7 +91,12 @@ public class CloudDeviceTest {
     private void waitFor(String condition, String label) throws Exception {
         long deadline = SystemClock.elapsedRealtime() + 60000;
         while (SystemClock.elapsedRealtime() < deadline) {
-            if ("true".equals(evaluate("Boolean(" + condition + ")"))) return;
+            try {
+                if ("true".equals(evaluate("Boolean(" + condition + ")"))) return;
+            } catch (AssertionError error) {
+                // Android can discard an evaluation callback while replacing the document.
+                if (!"WebView evaluation timed out".equals(error.getMessage())) throw error;
+            }
             SystemClock.sleep(200);
         }
         fail("Timed out: " + label + "; status=" + evaluate("['toast-message','calendar-editor-status'].map(id=>document.getElementById(id)?.textContent).join(' | ')"));
@@ -325,6 +331,167 @@ public class CloudDeviceTest {
         launch();
     }
 
+    private void clickOfflineControl(String selector) throws Exception {
+        String element = "document.querySelector(" + JSONObject.quote(selector) + ")";
+        waitFor("(()=>{const target=" + element + ";return target?.getClientRects().length && !target.disabled})()",
+            "visible offline control " + selector);
+        evaluate(element + ".click()");
+    }
+
+    @Test public void commuteClockWorksOnPhysicalPhone() throws Exception {
+        assumeTrue("Requires a dedicated commute fixture", "true".equals(InstrumentationRegistry.getArguments().getString("qaCommuteFixture")));
+        Bundle args = openIsolatedFixture();
+        evaluate("document.getElementById('login-email').value=" + JSONObject.quote(args.getString("qaEmail")) +
+            ";document.getElementById('login-password').value=" + JSONObject.quote(args.getString("qaPassword")) +
+            ";document.getElementById('login-form').requestSubmit()");
+        waitFor("window.DaynestAccount?.current?.() && !document.getElementById('mobile-tabs').hidden", "commute fixture login");
+        openMobilePage("dashboard");
+        clickOfflineControl("#commute-open");
+        String dialog = "document.getElementById('commute-dialog')";
+        waitFor(dialog + ".open && " + dialog + ".querySelectorAll('[data-stamp]:enabled').length === 4", "four commute buttons available");
+        assertEquals("true", evaluate(dialog + ".getBoundingClientRect().width <= innerWidth"));
+        clickOfflineControl("#commute-dialog [data-stamp=leave]");
+        waitFor(dialog + ".querySelector('[data-stamp=leave]').dataset.recorded === 'true'", "one-tap departure is saved");
+        clickOfflineControl("#commute-dialog [data-stamp=leave]");
+        waitFor("!" + dialog + ".querySelector('[data-editor]').hidden", "existing timestamp opens its editor");
+        clickOfflineControl("#commute-dialog [data-cancel]");
+        report("commute_tap_records_once_and_existing_time_opens_editor");
+
+        String historical = evaluate("(()=>{const d=new Date();d.setDate(d.getDate()-2);return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')})()");
+        String selectPast = "{const input=" + dialog + ".querySelector('[data-date]');input.value=" + historical +
+            ";input.dispatchEvent(new Event('change',{bubbles:true}))}";
+        evaluate(selectPast);
+        String[][] rows = {{"leave", "21:45", "0"}, {"work", "22:15", "0"},
+                           {"finish", "01:05", "1440"}, {"home", "01:35", "1440"}};
+        for (String[] row : rows) {
+            clickOfflineControl("#commute-dialog [data-stamp=" + row[0] + "]");
+            waitFor("!" + dialog + ".querySelector('[data-editor]').hidden", "historical time editor");
+            evaluate("{const form=" + dialog + ".querySelector('[data-editor]');form.elements.clock.value=" + JSONObject.quote(row[1]) +
+                ";form.elements.offset.value=" + JSONObject.quote(row[2]) + ";form.requestSubmit()}");
+            waitFor(dialog + ".querySelector('[data-stamp=" + row[0] + "]').dataset.recorded === 'true'", "historical stamp saved");
+        }
+        waitFor(dialog + ".querySelector('[data-duration]').textContent.includes('2 小时 50 分钟') && " +
+            dialog + ".querySelector('[data-stamp=home] strong').textContent === '次日 01:35'", "overnight elapsed durations");
+        report("commute_overnight_correction_calculates_duration");
+
+        clickOfflineControl("#commute-dialog [data-close]");
+        waitFor("!" + dialog + ".open", "close commute sheet");
+        evaluate("window.__commuteFixture = true; setTimeout(()=>location.reload(),0); true");
+        waitFor("typeof window.__commuteFixture === 'undefined' && window.DaynestAccount?.current?.()", "reload verified app session");
+        openMobilePage("dashboard");
+        clickOfflineControl("#commute-open");
+        waitFor(dialog + ".open && " + dialog + ".querySelector('[data-stamp=leave]').dataset.recorded === 'true'", "today's timestamp persisted");
+        evaluate(selectPast);
+        waitFor(dialog + ".querySelector('[data-stamp=home] strong').textContent === '次日 01:35'", "historical note restored from device");
+        clickOfflineControl("#commute-dialog summary");
+        clickOfflineControl("#commute-dialog [data-span='30']");
+        waitFor(dialog + ".querySelector('[data-sample]').textContent.includes('2 天有记录') && " +
+            dialog + ".querySelector('[data-history]').textContent.includes('次日 01:35')", "rolling statistics and history restored");
+        report("commute_records_persist_and_stats_include_both_days");
+    }
+
+    @Test public void todayWorkspaceWorksOnPhysicalPhone() throws Exception {
+        assumeTrue("Requires a dedicated Today workspace fixture", "true".equals(InstrumentationRegistry.getArguments().getString("qaTodayFixture")));
+        Bundle args = openIsolatedFixture();
+        String label = args.getString("qaLabel");
+        String todo = JSONObject.quote(label + " pending");
+        String late = JSONObject.quote(label + " overdue");
+        String appointment = JSONObject.quote(label + " appointment");
+        String note = JSONObject.quote(label + " note");
+        evaluate("document.getElementById('login-email').value=" + JSONObject.quote(args.getString("qaEmail")) +
+            ";document.getElementById('login-password').value=" + JSONObject.quote(args.getString("qaPassword")) +
+            ";document.getElementById('login-form').requestSubmit()");
+        waitFor("window.DaynestAccount?.current?.() && !document.getElementById('mobile-tabs').hidden", "Today fixture login");
+        openMobilePage("dashboard");
+        String summary = "document.querySelectorAll('.mobile-today-filter')";
+        waitFor(summary + "[0]?.textContent.startsWith('1') && " + summary + "[1]?.textContent.startsWith('1')", "Today loaded counts");
+        assertEquals("true", evaluate("document.querySelector('.mobile-today-overview').getBoundingClientRect().right <= innerWidth"));
+        assertEquals("true", evaluate("document.querySelector('.mobile-agenda-lead').textContent.includes(" + appointment + ")"));
+        clickOfflineControl(".mobile-agenda-lead");
+        waitFor("document.getElementById('calendar-event-dialog').open && document.getElementById('calendar-event-title').value === " + appointment, "Today opens the selected schedule item");
+        clickOfflineControl("#calendar-dialog-close");
+        report("today_counts_and_agenda_open_the_right_record");
+
+        evaluate(summary + "[1].click()");
+        waitFor("document.getElementById('today-todos').textContent.includes(" + late + ")", "overdue filter");
+        assertEquals("false", evaluate("document.getElementById('today-todos').textContent.includes(" + todo + ")"));
+        evaluate(summary + "[0].click()");
+        clickOfflineControl("#today-todos [data-todo-completed='true']");
+        waitFor(summary + "[0]?.textContent.startsWith('0') && " + summary + "[2]?.textContent.startsWith('1')", "completion updates the Today counts");
+        evaluate(summary + "[2].click()");
+        waitFor("document.getElementById('today-todos').textContent.includes(" + todo + ")", "completed filter retains the same task");
+        report("today_completion_moves_one_task_to_completed");
+
+        evaluate("document.getElementById('today-note').value=" + note + ";document.getElementById('today-note-form').requestSubmit()");
+        clickOfflineControl(".mobile-today-note-action");
+        waitFor("document.getElementById('action-dialog').open && document.getElementById('action-todo-title').value === " + note, "saved note opens the linked action form");
+        evaluate("document.getElementById('action-create-form').requestSubmit()");
+        waitFor("document.getElementById('action-dialog').textContent.includes('打开原备忘录')", "action links back to its saved note");
+        report("today_saved_note_creates_a_linked_todo_explicitly");
+    }
+
+    @Test public void offlineTodoCaptureWorksOnPhysicalPhone() throws Exception {
+        assumeTrue("Requires an isolated offline capture fixture", "true".equals(InstrumentationRegistry.getArguments().getString("qaOfflineTodoFixture")));
+        Bundle args = openIsolatedFixture();
+        String title = JSONObject.quote(args.getString("qaLabel") + " offline todo");
+        String frame = "document.getElementById('mobile-offline-frame').contentDocument";
+        String inboxReady = "document.getElementById('mobile-offline-reader').open && " +
+            frame + "?.getElementById('todo-outbox')?.hidden === false && " +
+            frame + ".getElementById('ob-new').disabled === false";
+        evaluate("document.getElementById('login-email').value=" + JSONObject.quote(args.getString("qaEmail")) +
+            ";document.getElementById('login-password').value=" + JSONObject.quote(args.getString("qaPassword")) +
+            ";document.getElementById('login-form').requestSubmit()");
+        waitFor("window.DaynestAccount?.current?.() && !document.getElementById('mobile-tabs').hidden", "fixture login");
+        evaluate("document.querySelector('.nav-link[data-view=dashboard]').click()");
+        clickOfflineControl("#mobile-page-action");
+        clickOfflineControl("[data-capture=local-todo]");
+        waitFor(inboxReady, "verified account can use the new quick capture entry");
+        clickOfflineControl("#mobile-offline-close");
+        waitFor("!document.getElementById('mobile-offline-reader').open", "local capture closes");
+        report("local_capture_ready_after_first_verified_login");
+
+        fixtureControl(args, "offline");
+        evaluate("setTimeout(()=>location.reload(),0); true");
+        waitFor("document.getElementById('auth-view').dataset.mobileConnection === 'offline'", "offline cold launch");
+        clickOfflineControl("#mobile-auth-local-todo");
+        waitFor(inboxReady, "offline entry opens previously verified inbox");
+        evaluate(frame + ".getElementById('ob-new').click()");
+        waitFor(frame + "?.getElementById('ob-editor')?.hidden === false", "open a local draft");
+        evaluate("{const d=" + frame + ";const input=d.getElementById('ob-title');input.value=" + title +
+            ";input.dispatchEvent(new Event('input',{bubbles:true}));d.getElementById('ob-save').click()}");
+        waitFor(frame + ".getElementById('ob-items').textContent.includes(" + title + ") && " +
+            frame + ".getElementById('ob-record-state').textContent.includes('本机已保存')", "local write is committed");
+        report("offline_draft_is_committed_before_leaving");
+        clickOfflineControl("#mobile-offline-close");
+        waitFor("!document.getElementById('mobile-offline-reader').open && " +
+            "document.getElementById('mobile-offline-frame').getAttribute('src') === 'about:blank'", "close and detach offline reader after writing");
+        clickOfflineControl("#mobile-auth-local-todo");
+        waitFor(inboxReady, "reopened offline reader has verified identity");
+        waitFor(inboxReady + " && " + frame + ".getElementById('ob-items').textContent.includes(" + title + ")", "draft reopens offline");
+        report("offline_cold_launch_can_save_and_reopen_draft");
+
+        fixtureControl(args, "online");
+        clickOfflineControl("#mobile-offline-close");
+        waitFor("!document.getElementById('mobile-offline-reader').open", "leave reader before retrying connection");
+        clickOfflineControl("[data-mobile-retry]");
+        waitFor("window.DaynestAccount?.current?.() && !document.getElementById('mobile-tabs').hidden", "session verified again");
+        evaluate("document.querySelector('.nav-link[data-view=dashboard]').click()");
+        clickOfflineControl("#mobile-page-action");
+        clickOfflineControl("[data-capture=local-todo]");
+        waitFor(inboxReady + " && " + frame + ".getElementById('ob-items').textContent.includes(" + title + ")", "draft retained after reconnect");
+        evaluate(frame + ".querySelector('[data-outbox-id]').click()");
+        waitFor(frame + ".getElementById('ob-editor').hidden === false && " +
+            frame + ".getElementById('ob-title').value === " + title + " && " +
+            frame + ".getElementById('ob-send').disabled === false", "saved draft loaded and explicit send available");
+        evaluate(frame + ".getElementById('ob-send').click()");
+        try {
+            waitFor(frame + ".getElementById('ob-record-state').textContent.includes('已确认提交')", "manual submission confirmed");
+        } catch (AssertionError error) {
+            throw new AssertionError("Offline submission status: " + evaluate(frame + "?.getElementById('ob-status')?.textContent"), error);
+        }
+        report("reconnected_and_manually_submitted_local_draft");
+    }
+
     @Test public void mobileReliabilityWorksOnPhysicalPhone() throws Exception {
         assumeTrue("Requires the dedicated reliability fixture", "true".equals(InstrumentationRegistry.getArguments().getString("qaReliabilityFixture")));
         Bundle args = openIsolatedFixture();
@@ -515,6 +682,55 @@ public class CloudDeviceTest {
         }
         assertEquals(0, CalendarReminderReceiver.count(context));
         report("fixture_reminders_cleared");
+    }
+
+    private int localMinute(long time) {
+        Calendar local = Calendar.getInstance();
+        local.setTimeInMillis(time);
+        return local.get(Calendar.HOUR_OF_DAY) * 60 + local.get(Calendar.MINUTE);
+    }
+
+    @Test public void quietHoursSkipDueNotificationsAfterSimulatedBoot() throws Exception {
+        assumeTrue("Requires an explicit isolated quiet-hours run", "true".equals(InstrumentationRegistry.getArguments().getString("qaQuietHours")));
+        Context context = instrumentation.getTargetContext();
+        assumeTrue("Existing opted-in device reminders must be left alone",
+            !CalendarReminderReceiver.enabled(context) && CalendarReminderReceiver.count(context) == 0);
+        assertTrue(CalendarReminderReceiver.allowed(context));
+        NotificationManager notifications = context.getSystemService(NotificationManager.class);
+        CalendarReminderReceiver receiver = new CalendarReminderReceiver();
+        CalendarReminderReceiver.QuietHours previous = CalendarReminderReceiver.quietHours(context);
+        long now = System.currentTimeMillis(), minute = 60000L, dueAt = now - 10 * minute;
+        var store = context.getSharedPreferences("calendar-reminders", Context.MODE_PRIVATE);
+        Intent boot = new Intent(Intent.ACTION_BOOT_COMPLETED);
+        JSONObject due = rebootFixtureEntry("quiet-due", dueAt, now + 15 * minute);
+        JSONObject future = rebootFixtureEntry("quiet-future", now + 20 * minute, now + 40 * minute);
+        try {
+            CalendarReminderReceiver.setEnabled(context, true);
+            long[][] windows = {
+                { now - 2 * minute, now + 2 * minute }, // The OS delivered an earlier alarm during quiet hours.
+                { dueAt - 2 * minute, dueAt + 2 * minute } // Boot resumed after a quiet-hours alarm.
+            };
+            for (long[] window : windows) {
+                CalendarReminderReceiver.setQuietHours(context, new CalendarReminderReceiver.QuietHours(
+                    true, localMinute(window[0]), localMinute(window[1])));
+                assertTrue(store.edit().putString("pending", new JSONArray().put(due).put(future).toString()).commit());
+                receiver.onReceive(context, boot);
+                JSONArray pending = new JSONArray(store.getString("pending", "[]"));
+                assertEquals(1, pending.length());
+                assertEquals("quiet-future", pending.getJSONObject(0).getString("id"));
+                assertEquals(0, notifications.getActiveNotifications().length);
+            }
+            report("quiet_hours_skip_delayed_and_missed_alarms_without_removing_future_alarms");
+            CalendarReminderReceiver.setQuietHours(context, new CalendarReminderReceiver.QuietHours(false, 1320, 480));
+            assertTrue(store.edit().putString("pending", new JSONArray().put(due).toString()).commit());
+            receiver.onReceive(context, boot);
+            waitForCalendarNotification(notifications, now - 1);
+            assertEquals(0, CalendarReminderReceiver.count(context));
+            report("alarm_resumes_when_quiet_hours_are_disabled");
+        } finally {
+            CalendarReminderReceiver.setEnabled(context, false);
+            CalendarReminderReceiver.setQuietHours(context, previous);
+        }
     }
 
     private Notification postCalendarFixture(Context context, JSONObject... rows) throws Exception {

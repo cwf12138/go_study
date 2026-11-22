@@ -247,6 +247,7 @@
     min-height: 52px; display: flex; align-items: center; justify-content: space-between;
     border: 0; border-radius: 12px; padding-inline: 14px; background: var(--dn-background); color: var(--ink); font: inherit; font-weight: 650;
   }
+  .mobile-capture-options button small { margin-inline-start: 6px; color: var(--muted); font-size: 12px; font-weight: 550; }
   #mobile-todo-create .todo-create-card, #mobile-todo-options .todo-nav-card { padding: 16px var(--dn-gutter) 24px; border: 0; box-shadow: none; background: var(--paper); }
   #mobile-todo-create .todo-create-card > div:first-child, #mobile-todo-options .todo-nav-head { display: none; }
   #mobile-todo-create .form-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }

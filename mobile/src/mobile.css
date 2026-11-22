@@ -37,6 +37,15 @@ body.daynest-native{padding-top:env(safe-area-inset-top);padding-bottom:env(safe
 .mobile-reminder-actions{display:flex;flex-wrap:wrap;gap:8px}
 .mobile-reminder-actions button{min-height:44px}
 #mobile-reminder-status{min-height:42px;color:var(--ink)}
+.mobile-reminder-quiet{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.mobile-reminder-quiet[hidden],.mobile-reminder-quiet [hidden]{display:none}
+.mobile-reminder-quiet fieldset{min-width:0;margin:0;padding:0;border:0}
+.mobile-reminder-quiet legend{padding:0;font-weight:700;color:var(--ink)}
+.mobile-connection .mobile-reminder-quiet-switch{display:flex;align-items:center;gap:10px;min-height:44px}
+.mobile-connection .mobile-reminder-quiet-switch input{width:18px;height:18px;margin:0;padding:0}
+.mobile-reminder-quiet-times{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.mobile-reminder-quiet-times input{min-width:0}
+.mobile-reminder-quiet button{min-height:44px}
 
 :root{--mobile-viewport-height:100dvh}
 .mobile-tabs,.mobile-transfer-actions{display:none}

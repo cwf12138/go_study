@@ -25,9 +25,19 @@ async function go(view) {
   for (let i = 0; i < 100; i++) { try { if ((await fetch(origin + '/healthz')).ok) { ready = true; break; } } catch {} await new Promise(resolve => setTimeout(resolve, 100)); }
   assert(ready, 'isolated API starts');
   const account = (await (await fetch(origin + '/api/v1/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Mobile UX', email: 'mobile-ux@example.test', password: crypto.randomBytes(24).toString('hex') }) })).json()).data;
-  const bridge = fs.readFileSync(path.join(root, 'mobile/src/core.js'), 'utf8') + '\n' + fs.readFileSync(path.join(root, 'mobile/src/mobile-client.js'), 'utf8').replace('export function boot', 'function boot') + '\n' + fs.readFileSync(path.join(root, 'mobile/src/mobile-ux.js'), 'utf8').replace('export function installMobileUX', 'function installMobileUX') + `
+  const bridge = fs.readFileSync(path.join(root, 'mobile/src/core.js'), 'utf8') + '\n' + fs.readFileSync(path.join(root, 'mobile/src/mobile-client.js'), 'utf8').replace('export function boot', 'function boot') + '\n' + fs.readFileSync(path.join(root, 'mobile/src/mobile-ux.js'), 'utf8').replace('export function installMobileUX', 'function installMobileUX') + '\n' +
+    fs.readFileSync(path.join(root, 'mobile/src/mobile-reminders.js'), 'utf8').replaceAll('export function ', 'function ') + `
     window.__nativeEvents={}; window.__nativeSaved=[]; window.__nativeCopied=[]; let exportName='',parts=[];
-    boot({Http:{request:options=>window.__nativeHTTP(options)},Files:{configure:async()=>{},setSession:async()=>{},cancel:async()=>{},writeClipboard:async value=>window.__nativeCopied.push(value.text),beginExport:async value=>{exportName=value.filename;parts=[];return{id:'ux-export'};},appendExport:async value=>parts.push(value.data),finishExport:async()=>window.__nativeSaved.push({name:exportName,data:parts.join('')})},App:{addListener:async(name,handler)=>{window.__nativeEvents[name]=handler;},minimizeApp:async()=>{}}}); installMobileUX();`;
+    boot({Http:{request:options=>window.__nativeHTTP(options)},Files:{configure:async()=>{},setSession:async()=>{},cancel:async()=>{},writeClipboard:async value=>window.__nativeCopied.push(value.text),beginExport:async value=>{exportName=value.filename;parts=[];return{id:'ux-export'};},appendExport:async value=>parts.push(value.data),finishExport:async()=>window.__nativeSaved.push({name:exportName,data:parts.join('')})},App:{addListener:async(name,handler)=>{window.__nativeEvents[name]=handler;},minimizeApp:async()=>{}}}); installMobileUX();
+    let reminders = {enabled:false,permitted:true,exact:true,count:0,quietEnabled:false,quietStart:1320,quietEnd:480};
+    installMobileReminders({addListener(){}},{
+      async status() { return {...reminders}; }, async takeOpenDate() { return {}; }, addListener(){}, async clear(){},
+      async setQuietHours(hours) {
+        window.__quietSettings = hours;
+        reminders = {...reminders,quietEnabled:hours.enabled,quietStart:hours.start,quietEnd:hours.end};
+        return {...reminders};
+      }
+    });`;
   server = http.createServer((request, response) => {
     const url = new URL(request.url, 'http://localhost');
     if (url.pathname === '/mobile-bridge.js') { response.writeHead(200, { 'Content-Type': 'text/javascript' }); response.end(bridge); return; }
@@ -40,10 +50,20 @@ async function go(view) {
   browser = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE });
   page = await browser.newPage({ viewport: { width: 360, height: 800 }, isMobile: true, hasTouch: true, timezoneId: 'Asia/Shanghai' });
   page.on('pageerror', error => report.errors.push(error.message)); page.on('dialog', dialog => dialog.dismiss());
-  let planWriteGate, planWrites = 0;
+  let planWriteGate, planWrites = 0, todoAIGate, todoAIReceived;
+  const todoAIRequests = [];
   await page.exposeFunction('__nativeHTTP', async options => {
     const url = new URL(options.url); assert.equal(url.origin, chosen);
     if (url.pathname === '/api/v1/plan-blocks' && options.method === 'POST') { planWrites++; await planWriteGate; }
+    if (url.pathname === '/api/v1/todo-assist/steps') {
+      assert.equal(options.method, 'POST');
+      assert.equal(options.readTimeout, 65000);
+      assert.equal(options.headers.authorization, 'Bearer ' + account.token);
+      todoAIRequests.push(JSON.parse(options.data));
+      todoAIReceived?.();
+      await todoAIGate;
+      return { status: 200, data: JSON.stringify({ data: { steps: ['保留我手写的步骤', '核对日期', '联系相关人员'] } }), url: options.url };
+    }
     const response = await fetch(origin + url.pathname + url.search, { method: options.method, headers: options.headers, body: options.data });
     return { status: response.status, data: response.status === 204 ? '' : await response.text(), headers: Object.fromEntries(response.headers.entries()), url: options.url };
   });
@@ -79,10 +99,34 @@ async function go(view) {
   await page.locator('#mobile-todo-create[open]').waitFor({ state: 'detached' });
   await page.click('#mobile-page-action');
   assert.equal(await page.inputValue('#todo-title'), '手机随手记待办');
+  await page.fill('#todo-steps', '保留我手写的步骤');
+  await page.fill('#todo-notes', '这条备注属于草稿');
+  let unpauseTodoAI;
+  const firstTodoAI = new Promise(resolve => { todoAIReceived = resolve; });
+  todoAIGate = new Promise(resolve => { unpauseTodoAI = resolve; });
+  await page.locator('[data-todo-ai-generate]').click();
+  await page.waitForFunction(() => document.querySelector('.todo-ai [role="status"]').textContent.includes('正在生成建议'));
+  await firstTodoAI;
+  await page.fill('#todo-title', '手机随手记待办已修改');
+  unpauseTodoAI();
+  todoAIGate = undefined;
+  assert.equal(await page.locator('[data-todo-ai-preview]').isVisible(), false);
+  await page.fill('#todo-title', '手机随手记待办');
+  await page.locator('[data-todo-ai-generate]').click();
+  await page.locator('[data-todo-ai-preview]').waitFor();
+  assert.deepEqual(todoAIRequests, [{ title: '手机随手记待办' }, { title: '手机随手记待办' }]);
+  assert.equal(await page.inputValue('#todo-steps'), '保留我手写的步骤');
+  await page.getByLabel('联系相关人员', { exact: true }).uncheck();
+  await page.screenshot({ path: path.join(out, 'todo-ai-steps.png') });
+  await page.locator('[data-todo-ai-apply]').click();
+  assert.equal(await page.inputValue('#todo-steps'), '保留我手写的步骤\n核对日期');
+  assert.equal(await page.locator('[data-todo-ai-preview]').isVisible(), false);
+  pass('todo_ai_sends_title_only_and_applies_selected_steps_without_overwriting_draft');
   await page.check('#todo-my-day');
   await page.locator('#todo-form button[type=submit]').click();
   await page.locator('#mobile-todo-create[open]').waitFor({ state: 'detached' });
   await page.locator('#todo-items').getByText('手机随手记待办').waitFor();
+  await page.locator('#todo-items').getByText('核对日期', { exact: true }).waitFor();
   const firstView = await page.locator('.todo-view-list button').first().boundingBox();
   const secondView = await page.locator('.todo-view-list button').nth(1).boundingBox();
   assert(firstView && secondView && secondView.x > firstView.x && secondView.x + secondView.width <= 360);
@@ -217,6 +261,23 @@ async function go(view) {
   await page.click('#calendar-tools-done');
   await page.waitForFunction(()=>document.querySelector('[data-calendar-date="2026-11-13"][aria-pressed=true]'));
   pass('calendar_title_opens_direct_date_jump');
+  await page.click('#calendar-date-open');
+  await page.getByRole('button', { name: '手机日程提醒', exact: true }).click();
+  const quietDialog = page.locator('#mobile-calendar-reminders[open]');
+  await quietDialog.getByLabel('启用免打扰').check();
+  assert.equal(await quietDialog.getByLabel('开始', { exact: true }).inputValue(), '22:00');
+  await quietDialog.getByLabel('开始', { exact: true }).fill('23:15');
+  await quietDialog.getByLabel('结束', { exact: true }).fill('07:30');
+  await quietDialog.getByRole('button', { name: '保存免打扰设置' }).click();
+  await quietDialog.getByText('免打扰设置已保存到此设备。').waitFor();
+  assert.deepEqual(await page.evaluate(() => window.__quietSettings), { enabled: true, start: 1395, end: 450 });
+  await page.screenshot({ path: path.join(out, 'calendar-quiet-hours.png') });
+  await quietDialog.getByRole('button', { name: '关闭手机日程提醒' }).click();
+  await page.getByRole('button', { name: '手机日程提醒', exact: true }).click();
+  assert.equal(await quietDialog.getByLabel('结束', { exact: true }).inputValue(), '07:30');
+  await quietDialog.getByRole('button', { name: '关闭手机日程提醒' }).click();
+  await page.click('#calendar-tools-done');
+  pass('calendar_quiet_hours_accepts_cross_midnight_and_restores_saved_settings');
   await page.click('[data-calendar-view=day]');
   await page.waitForFunction(()=>!!document.querySelector('.calendar-time-column'));
   await page.locator('.calendar-time-column').evaluate(node=>node.click());

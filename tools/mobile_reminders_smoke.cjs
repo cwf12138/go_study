@@ -1,7 +1,11 @@
 const assert = require('node:assert/strict');
 
 (async () => {
-  const { calendarReminderEntries } = await import('../mobile/src/mobile-reminders.js');
+  const { calendarReminderEntries, quietHoursInput } = await import('../mobile/src/mobile-reminders.js');
+  assert.deepEqual(quietHoursInput(true, '22:15', '08:00'), { enabled: true, start: 1335, end: 480 });
+  assert.deepEqual(quietHoursInput(false, '00:00', '00:00'), { enabled: false, start: 0, end: 0 });
+  assert.throws(() => quietHoursInput(true, '08:00', '08:00'), /请选择不同/);
+  assert.throws(() => quietHoursInput(true, '24:00', '08:00'), /请选择不同/);
   const now = Date.parse('2026-11-20T15:55:00Z');
   const start = '2026-11-20', end = '2026-12-26';
   const event = (id, occurrence, reminder) => ({

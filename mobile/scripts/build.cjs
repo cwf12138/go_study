@@ -11,7 +11,7 @@ let html = fs.readFileSync(path.join(assets, 'index.html'), 'utf8');
 html = html.replace(/type="email"/g, 'type="email" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false"');
 html = html.replace('支持多选，单个文件最多 32 MiB', '支持多选，手机单个文件最多 8 MiB');
 html = html.replace('<head>', '<head>\n    <script src="/mobile-bridge.js"></script>');
-const stylesheets = ['mobile.css', 'mobile-product.css', 'mobile-auth.css'];
+const stylesheets = ['mobile.css', 'mobile-product.css', 'mobile-auth.css', 'mobile-today.css', 'mobile-commute.css'];
 html = html.replace('</head>', stylesheets.map(name => `    <link rel="stylesheet" href="/${name}">`).join('\n') + '\n  </head>');
 html = html.replace('width=device-width, initial-scale=1', 'width=device-width, initial-scale=1, viewport-fit=cover');
 html = html.replace(/<script src="([^"]+)" defer><\/script>/g, '<script type="text/daynest-deferred" data-mobile-src="$1"></script>');

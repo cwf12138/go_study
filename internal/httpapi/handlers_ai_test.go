@@ -189,3 +189,37 @@ func TestHostedMealAIDisabledWithoutExplicitEnablement(t *testing.T) {
 		t.Fatal("hosted inference should require explicit enablement", response.Code)
 	}
 }
+
+func TestTodoAIRouteRequiresLoginAndHostedConfiguration(t *testing.T) {
+	t.Setenv("BIGMODEL_API_KEY", "fixture-todo-key")
+	tokens := security.NewTokenManager("hosted-test-secret-long-enough", "test", time.Hour)
+	token, err := tokens.Issue("signed-in-user", "student")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bus := event.NewBus()
+	for _, tc := range []struct {
+		enable, auth, body string
+		want               int
+	}{
+		{"1", "", `{"title":"搬家"}`, http.StatusUnauthorized},
+		{"", token, `{"title":"搬家"}`, http.StatusForbidden},
+		{"1", token, `{"title":"  "}`, http.StatusBadRequest},
+		{"1", token, `{"title":"搬家","notes":"仅保留在本机"}`, http.StatusBadRequest},
+	} {
+		t.Setenv("BIGMODEL_REMOTE_ENABLED", tc.enable)
+		handler := NewHandler(service.New(store.NewMemory(), tokens, bus), tokens, bus, slog.New(slog.NewTextHandler(io.Discard, nil)))
+		request := httptest.NewRequest("POST", "https://daynest.example.test/api/v1/todo-assist/steps", strings.NewReader(tc.body))
+		if tc.auth != "" {
+			request.Header.Set("Authorization", "Bearer "+tc.auth)
+		}
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, request)
+		if w.Code != tc.want || strings.Contains(w.Body.String(), "fixture-todo-key") {
+			t.Fatalf("expected status %d, got %d", tc.want, w.Code)
+		}
+		if tc.auth != "" && w.Header().Get("Cache-Control") != "no-store" {
+			t.Fatal("AI response must be non-cacheable")
+		}
+	}
+}

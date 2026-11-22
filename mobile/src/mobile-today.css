@@ -1,0 +1,114 @@
+#panel-dashboard.mobile-today-ready .today-heading { display: none; }
+.mobile-today-overview {
+  margin: 0 0 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--dn-radius);
+  padding: 15px;
+  background: linear-gradient(145deg, var(--dn-accent-soft), var(--paper));
+}
+.mobile-today-ready .mobile-today-overview #today-date {
+  margin: 0 0 13px;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 720;
+  letter-spacing: normal;
+}
+.mobile-today-segments {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.mobile-today-filter {
+  display: grid;
+  min-width: 0;
+  min-height: 64px;
+  gap: 3px;
+  align-content: center;
+  padding: 7px 4px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+}
+.mobile-today-filter strong {
+  font-size: 24px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.mobile-today-filter[aria-pressed="true"] { border-color: var(--dn-accent); color: var(--dn-accent); }
+.mobile-today-filter:nth-child(2) strong { color: var(--dn-record-mark); }
+.mobile-today-filter:disabled { opacity: .65; }
+.mobile-today-ready .today-todos { scroll-margin-block-start: 16px; }
+.mobile-today-ready :is(#today-agenda, #today-todos) { display: grid; gap: 6px; }
+.mobile-agenda-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 56px;
+  width: 100%;
+  border: 0;
+  border-radius: 11px;
+  padding: 9px 11px;
+  background: var(--canvas);
+  color: var(--ink);
+  font: inherit;
+  text-align: start;
+}
+.mobile-agenda-lead { min-height: 72px; background: var(--dn-accent-soft); }
+.mobile-agenda-label, .mobile-today-detail { display: grid; min-width: 0; gap: 4px; }
+.mobile-agenda-label strong, .mobile-today-detail strong { font-size: 15px; overflow-wrap: anywhere; }
+.mobile-agenda-label small, .mobile-today-detail small { color: var(--muted); font-size: 12px; }
+.mobile-agenda-kind {
+  max-width: 88px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  text-align: end;
+}
+.mobile-agenda-lead .mobile-agenda-kind { color: var(--dn-accent); }
+.mobile-today-todo {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 4px;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+}
+.mobile-today-todo:last-child { border-bottom: 0; }
+.mobile-today-check {
+  display: grid;
+  place-items: center;
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--dn-accent);
+  font: inherit;
+}
+.mobile-today-check::after {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--dn-accent);
+  border-radius: 50%;
+  content: '';
+}
+.mobile-today-detail {
+  justify-items: start;
+  min-height: 49px;
+  border: 0;
+  padding: 7px 4px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: start;
+}
+.mobile-today-empty { margin: 0; padding: 9px 4px 5px; color: var(--muted); font-size: 14px; }
+.mobile-today-empty button { margin-inline-start: 8px; min-height: 44px; }
+.mobile-today-more { min-height: 44px; justify-self: start; }
+.mobile-today-note-action { margin-top: 9px; min-height: 44px; }
+.mobile-today-note-action[hidden] { display: none; }

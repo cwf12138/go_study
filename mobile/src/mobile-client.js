@@ -15,7 +15,7 @@ export function boot({ Http, App, Files, defaultServer = '' }) {
   async function nativeRequest(origin, path, options = {}) {
     if (options.signal?.aborted) throw abortError();
     const headers = Object.fromEntries(new Headers(options.headers || {}));
-    const readTimeout = path === '/api/v1/meals/ai/recommend' ? 65000 : 25000;
+    const readTimeout = path === '/api/v1/meals/ai/recommend' || path === '/api/v1/todo-assist/steps' ? 65000 : 25000;
     const response = await race(Http.request({ url: origin + path, method: options.method || 'GET', headers, data: options.body, connectTimeout: 8000, readTimeout, disableRedirects: true, responseType: 'text' }), options.signal);
     if (response.status >= 300 && response.status < 400) throw Error('服务返回重定向，请填写最终服务地址；不会自动转发登录令牌。');
     if (response.url && new URL(response.url).origin !== origin) throw Error('服务地址改变，已拒绝展示跨地址响应。');
@@ -114,12 +114,18 @@ export function boot({ Http, App, Files, defaultServer = '' }) {
     window.DaynestMobile.openConnectionSettings=openSettings;
     window.DaynestMobile.getConnectionInfo=()=>({server:connection?.server||''});
     async function closeReader(){const guard=$('offline-frame').contentWindow?.DaynestLocalInbox;if(guard&&!(await guard.prepareClose()))return;reader.close();$('offline-frame').src='about:blank';}
-    window.DaynestMobile.openOfflineReader=section=>{if(!connection){state('请先登录一次，在原账号准备离线资料或本机收集。');return;}$('offline-frame').src='/static/offline-reader.html?server='+encodeURIComponent(connection.server)+(['todos','agenda','capture'].includes(section)?'#'+section:'');if(!reader.open)reader.showModal();};
+    window.DaynestMobile.openOfflineReader=section=>{
+      if(!connection){state('请先在线登录一次，再使用离线资料或本机收集。');return;}
+      if(reader.open)return;
+      $('offline-frame').src='/static/offline-reader.html?server='+encodeURIComponent(connection.server)+(['todos','agenda','capture'].includes(section)?'#'+section:'');
+      reader.showModal();
+    };
     $('offline').addEventListener('click',window.DaynestMobile.openOfflineReader);
     const auth = installMobileAuth({
       openSettings,
       retry: () => fatal ? location.reload() : connect(),
       offline: () => window.DaynestMobile.openOfflineReader(),
+      localTodo: () => window.DaynestMobile.openOfflineReader('capture'),
     });
     window.DaynestMobile.showAuthError = auth.showError;
     $('offline-close').addEventListener('click',closeReader);
@@ -145,7 +151,7 @@ export function boot({ Http, App, Files, defaultServer = '' }) {
     async function connect(event) {
       event?.preventDefault(); if (busy) return; if (fatal) { location.reload(); return; } busy = true; controls();
       foregroundCheck?.abort();
-      if (!loaded || authVisible()) auth.connection('connecting');
+      if (!loaded || authVisible()) auth.connection('connecting', '', !!connection);
       let credentialsChanged = false;
       let origin, checking = false;
       try {
@@ -261,16 +267,18 @@ function installMobileAuth(actions) {
   if (oldOffline) oldOffline.hidden = true;
   const status = document.createElement('section');
   status.className = 'mobile-auth-connection';
-  status.innerHTML = '<p role="status"></p><button type="button" class="quiet" hidden>重试连接</button>';
+  status.innerHTML = '<p role="status"></p><div class="mobile-auth-connection-actions"><button type="button" class="quiet" data-mobile-retry hidden>重试连接</button><button id="mobile-auth-local-todo" type="button" class="quiet" hidden>打开本机待办</button></div>';
   intro.after(status);
   const help = document.createElement('footer');
   help.className = 'mobile-auth-help';
   help.innerHTML = '<button type="button" id="mobile-auth-settings">连接设置</button><button type="button" id="mobile-auth-offline" hidden>离线资料</button>';
   card.append(help);
-  const retry = status.querySelector('button'), settings = help.firstElementChild, offline = help.lastElementChild;
+  const retry = status.querySelector('[data-mobile-retry]'), settings = help.firstElementChild, offline = help.lastElementChild;
+  const localTodo = status.querySelector('#mobile-auth-local-todo');
   retry.addEventListener('click', actions.retry);
   settings.addEventListener('click', actions.openSettings);
   offline.addEventListener('click', actions.offline);
+  localTodo.addEventListener('click', actions.localTodo);
 
   const hidePasswords = forms.map(form => {
     const password = form.querySelector('input[type="password"]');
@@ -346,6 +354,7 @@ function installMobileAuth(actions) {
       status.hidden = phase === 'ready';
       status.querySelector('p').textContent = phase === 'connecting' ? '正在检查服务连接…' : message;
       retry.hidden = phase !== 'offline';
+      localTodo.hidden = phase === 'ready' || !canReadOffline;
       offline.hidden = !canReadOffline;
       render();
     },

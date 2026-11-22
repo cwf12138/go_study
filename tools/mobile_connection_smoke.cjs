@@ -3,7 +3,12 @@ const core = fs.readFileSync('mobile/src/core.js', 'utf8');
 const client = fs.readFileSync('mobile/src/mobile-client.js', 'utf8').replace('export function boot', 'function boot') + `
   window.testBoot=boot;
   // Auth presentation is covered by the WebView test. Track the bridge's connection state here.
-  installMobileAuth=()=>({ back: () => false, connection(phase) { document.getElementById('auth-view').dataset.phase=phase; } });
+  installMobileAuth=actions=>{
+    window.testAuthActions=actions;
+    return { back: () => false, connection(phase, message, canReadOffline) {
+      Object.assign(document.getElementById('auth-view').dataset, {phase, canReadOffline});
+    } };
+  };
 `;
 const key = 'daynest.mobile.connection.v1', origin = 'http://192.168.1.10:8080';
 const settle = async () => { for (let i = 0; i < 12; i++) await new Promise(resolve => setImmediate(resolve)); };
@@ -61,6 +66,8 @@ function harness(saved, existingToken = '', defaultServer = '', primaryMarker) {
     init: async () => { for (const handler of events.DOMContentLoaded) await handler(); await settle(); },
     submit: () => nodes.get('mobile-form').fire('submit'),
     fetch: input => window.fetch(input),
+    openLocalTodo: () => window.testAuthActions.localTodo(),
+    openOffline: () => window.testAuthActions.offline(),
     server: (value, ack = true) => { nodes.get('mobile-server').value = value; nodes.get('mobile-consent').checked = ack; },
     get reloads() { return reloads; }, get minimized() { return minimized; }, get backs() { return backs; },
     set answer(value) { answer = value; }, set failStorage(value) { failStorage = value; }, set confirm(value) { confirm = value; }, set scriptFailure(value) { scriptFailure = value; }
@@ -84,6 +91,20 @@ function harness(saved, existingToken = '', defaultServer = '', primaryMarker) {
   const chosenServer = harness(JSON.stringify({server:origin,httpAcknowledged:true}), 'chosen-session', cloudOrigin, cloudOrigin); await chosenServer.init();
   assert.equal(chosenServer.store.get('studyflow.token'), 'chosen-session');
   assert.equal(chosenServer.files.find(call=>call[0]==='configure')[1].server, origin);
+  const disconnected = harness(JSON.stringify({server:origin,httpAcknowledged:true}), 'disconnected-session');
+  disconnected.answer = () => { throw Error('fixture offline'); };
+  await disconnected.init();
+  assert.equal(disconnected.nodes.get('auth-view').dataset.phase, 'offline');
+  assert.equal(disconnected.nodes.get('auth-view').dataset.canReadOffline, true);
+  const probes = disconnected.requests.length;
+  disconnected.openLocalTodo();
+  assert(disconnected.nodes.get('mobile-offline-reader').open);
+  const frame = disconnected.nodes.get('mobile-offline-frame');
+  const localCapture = '/static/offline-reader.html?server=' + encodeURIComponent(origin) + '#capture';
+  assert.equal(frame.src, localCapture);
+  disconnected.openOffline();
+  assert.equal(frame.src, localCapture, 'an already-open offline editor must not reload');
+  assert.equal(disconnected.requests.length, probes, 'opening local capture must not send a request');
   const h = harness('{bad JSON', 'orphaned-token'); await h.init();
   assert(h.nodes.get('mobile-connection').open); assert.equal(h.scripts.length, 0); assert.match(h.nodes.get('mobile-state').textContent, /已忽略/);
   h.appEvents.backButton({ canGoBack: false }); assert(!h.nodes.get('mobile-connection').open, 'setup returns to the connection recovery screen');

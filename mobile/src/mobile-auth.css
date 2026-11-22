@@ -145,6 +145,7 @@
 .mobile-auth-connection { background: var(--auth-field); color: var(--auth-muted); margin-bottom: 18px; }
 .mobile-auth-connection p { margin: 0; overflow-wrap: anywhere; }
 .mobile-auth-connection button { margin-top: 8px; min-height: 44px; }
+.mobile-auth-connection-actions { display: flex; flex-wrap: wrap; gap: 0 8px; }
 .daynest-native #mobile-connection form { margin-top: 10px; gap: 12px; }
 .daynest-native #mobile-connection header h2 { margin: 0; font-size: 22px; }
 .daynest-native #mobile-connection #mobile-state { min-height: 0; margin: 0; }

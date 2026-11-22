@@ -2,7 +2,7 @@
  'use strict';
  const O=window.DaynestTodoOutbox,H=window.DaynestHTTP;
  const actor=()=>H.authExpired()?null:window.DaynestAccount?.current?.();
- function remember(){const account=actor();if(!account)return;try{if(localStorage.getItem(O.identityKey(account.server)))O.identify(localStorage,account,document.getElementById('user-name')?.textContent);}catch(_){} }
+ function remember(){const account=actor();if(!account)return;try{if(window.DaynestMobile?.native||localStorage.getItem(O.identityKey(account.server)))O.identify(localStorage,account,document.getElementById('user-name')?.textContent);}catch(_){} }
  function open(){const account=actor();if(!account){window.DaynestUI?.notify('请先在线核验账号，再打开本机收集。','error');return;}try{O.identify(localStorage,account,document.getElementById('user-name')?.textContent);window.DaynestReadCache?.prepareOfflineShell?.().catch(()=>{});if(window.DaynestMobile?.openOfflineReader)window.DaynestMobile.openOfflineReader('capture');else window.open('/offline/#capture','_blank','noopener,noreferrer');}catch(error){window.DaynestUI?.notify(error.message,'error');}}
  document.getElementById('todo-local-open')?.addEventListener('click',open);
  document.addEventListener('daynest:account-ready',remember);

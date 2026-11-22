@@ -23,7 +23,7 @@ type Server struct {
 	assets             fs.FS
 	chatGPT            *chatgpt.Manager
 	bigModel           *chatgpt.BigModel
-	remoteMealAI       bool
+	remoteBigModelAI   bool
 	transfers          *transfers.Store
 	localOnlyTransfers bool
 	snapshotInterval   time.Duration
@@ -46,7 +46,7 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 	}
 	s.chatGPT = chatgpt.New(filepath.Join(filepath.Dir(dataFile), "chatgpt-registration.json"))
 	s.bigModel = chatgpt.NewBigModel(os.Getenv("BIGMODEL_API_KEY"), os.Getenv("BIGMODEL_MODEL"))
-	s.remoteMealAI = !tokens.UsesDevelopmentSecret() && os.Getenv("BIGMODEL_REMOTE_ENABLED") == "1"
+	s.remoteBigModelAI = !tokens.UsesDevelopmentSecret() && os.Getenv("BIGMODEL_REMOTE_ENABLED") == "1"
 	s.transfers = transfers.New(filepath.Join(filepath.Dir(dataFile), "transfers"))
 	s.localOnlyTransfers = tokens.UsesDevelopmentSecret()
 	root := http.NewServeMux()
@@ -151,6 +151,7 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 	private.HandleFunc("GET /api/v1/todo-lists", s.listTodoLists)
 	private.HandleFunc("DELETE /api/v1/todo-lists/{list_id}", s.deleteTodoList)
 	private.HandleFunc("POST /api/v1/todos", s.createTodo)
+	private.HandleFunc("POST /api/v1/todo-assist/steps", s.suggestTodoSteps)
 	private.HandleFunc("GET /api/v1/todos", s.listTodos)
 	private.HandleFunc("DELETE /api/v1/todos/{todo_id}", s.deleteTodo)
 	private.HandleFunc("GET /api/v1/todos/{todo_id}", s.getTodo)

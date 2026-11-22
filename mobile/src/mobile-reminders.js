@@ -5,6 +5,22 @@ function beijingDate(time) {
   return new Date(time + 8 * 3_600_000).toISOString().slice(0, 10);
 }
 
+export function quietHoursInput(enabled, from, to) {
+  const toMinute = value => {
+    if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value)) return NaN;
+    return Number(value.slice(0, 2)) * 60 + Number(value.slice(3));
+  };
+  const start = toMinute(from), end = toMinute(to);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || (enabled && start === end)) {
+    throw Error('请选择不同的免打扰开始和结束时间。');
+  }
+  return { enabled, start, end };
+}
+
+function timeValue(minute) {
+  return [Math.floor(minute / 60), minute % 60].map(n => String(n).padStart(2, '0')).join(':');
+}
+
 export function calendarReminderEntries(overview, start, end, now) {
   if (overview?.start !== start || overview.end !== end || !Object.hasOwn(overview, 'events') ||
       (overview.events !== null && !Array.isArray(overview.events))) throw Error('日程提醒数据不完整。');
@@ -39,7 +55,19 @@ export function installMobileReminders(App, native) {
       <div class="mobile-reminder-actions"><button id="mobile-reminder-toggle" type="button" class="primary" disabled>启用提醒</button>
       <button id="mobile-reminder-sync" type="button" class="quiet" hidden>重新同步</button>
       <button id="mobile-reminder-settings" type="button" class="quiet" hidden>Android 通知设置</button>
-      <button id="mobile-reminder-exact" type="button" class="quiet" hidden>准时提醒设置</button></div>`;
+      <button id="mobile-reminder-exact" type="button" class="quiet" hidden>准时提醒设置</button></div>
+      <form class="mobile-reminder-quiet" hidden>
+        <fieldset disabled><legend>免打扰</legend>
+          <label class="mobile-reminder-quiet-switch"><input type="checkbox" name="quiet">启用免打扰</label>
+          <div class="mobile-reminder-quiet-times">
+            <label>开始<input name="from" type="time" required></label>
+            <label>结束<input name="to" type="time" required></label>
+          </div>
+          <p>按手机时间计算，支持跨午夜。时段内到点的通知会跳过，日程仍保留在日历中。</p>
+          <button type="submit" class="quiet">保存免打扰设置</button>
+        </fieldset>
+        <p data-quiet-status role="status" hidden></p>
+      </form>`;
     document.body.append(dialog);
     const makeOpen = label => {
       const button = document.createElement('button');
@@ -54,6 +82,10 @@ export function installMobileReminders(App, native) {
     const toggle = dialog.querySelector('#mobile-reminder-toggle'), reload = dialog.querySelector('#mobile-reminder-sync');
     const settings = dialog.querySelector('#mobile-reminder-settings'), exactSettings = dialog.querySelector('#mobile-reminder-exact');
     const status = dialog.querySelector('#mobile-reminder-status');
+    const quietForm = dialog.querySelector('.mobile-reminder-quiet');
+    const quietFields = quietForm.querySelector('fieldset'), quietStatus = quietForm.querySelector('[data-quiet-status]');
+    const { quiet, from, to } = quietForm.elements;
+    let quietDirty = false, quietSaving = false;
     let sequence = 0, request, queue = Promise.resolve(), changing = false, snapshot, appReady = false;
     function withNative(task) {
       const result = queue.then(task);
@@ -67,6 +99,15 @@ export function installMobileReminders(App, native) {
       reload.hidden = !data?.enabled || !data?.permitted;
       settings.hidden = data?.permitted !== false;
       exactSettings.hidden = !data?.enabled || !data?.permitted || data.exact;
+      if (typeof data?.quietEnabled === 'boolean') {
+        quietForm.hidden = false;
+        quietFields.disabled = quietSaving;
+        if (!quietDirty && !quietSaving) {
+          quiet.checked = data.quietEnabled;
+          from.value = timeValue(data.quietStart);
+          to.value = timeValue(data.quietEnd);
+        }
+      }
       status.textContent = message ?? (data?.enabled && data.permitted ? `已安排 ${data.count} 条通知。${data.exact ? '已开启准时提醒。' : '当前为普通提醒，系统可能延迟投递。'}`
         : data?.permitted === false ? '请允许 Daynest 发送通知。' : '手机日程提醒已关闭。');
     }
@@ -114,6 +155,35 @@ export function installMobileReminders(App, native) {
       } catch (_) { /* The date is optional when launching the app. */ }
     }
     dialog.querySelector('header button').addEventListener('click', () => dialog.close());
+    function showQuietStatus(message = '') {
+      quietStatus.textContent = message;
+      quietStatus.hidden = !message;
+    }
+    dialog.addEventListener('close', () => {
+      quietDirty = false;
+      showQuietStatus();
+    });
+    quietForm.addEventListener('input', () => {
+      quietDirty = true;
+      showQuietStatus();
+    });
+    quietForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (quietSaving) return;
+      try {
+        const settings = quietHoursInput(quiet.checked, from.value, to.value);
+        quietSaving = quietFields.disabled = true;
+        showQuietStatus('正在保存…');
+        const data = await withNative(() => native.setQuietHours(settings));
+        quietDirty = false;
+        if (snapshot) snapshot = { ...snapshot, quietEnabled: data.quietEnabled, quietStart: data.quietStart, quietEnd: data.quietEnd };
+        if (dialog.open) showQuietStatus('免打扰设置已保存到此设备。');
+      } catch (error) {
+        showQuietStatus(error.message || '无法保存免打扰设置，请重试。');
+      } finally {
+        quietSaving = quietFields.disabled = false;
+      }
+    });
     reload.addEventListener('click', sync);
     settings.addEventListener('click', () => native.openSettings().catch(error => render(snapshot, error.message)));
     exactSettings.addEventListener('click', () => native.openExactSettings().catch(error => render(snapshot, error.message)));

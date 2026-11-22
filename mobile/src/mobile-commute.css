@@ -1,0 +1,152 @@
+.commute-entry {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  width: 100%;
+  gap: 10px;
+  min-height: 54px;
+  margin: 0 0 14px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  text-align: start;
+}
+.commute-entry span:first-child {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--dn-accent-soft);
+  color: var(--dn-accent);
+  font-size: 22px;
+}
+.commute-entry span:last-child { color: var(--muted); font-size: 24px; }
+.commute-dialog {
+  width: min(460px, calc(100vw - 28px));
+  max-height: calc(var(--mobile-viewport-height, 100dvh) - 28px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--paper);
+  color: var(--ink);
+  overflow: hidden;
+}
+.commute-dialog[open] { display: flex; flex-direction: column; }
+.commute-dialog::backdrop { background: rgba(20, 29, 40, .65); }
+.commute-dialog > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.commute-dialog h2 { margin: 0; font-size: 22px; }
+.commute-dialog header button, .commute-date button, .commute-ranges button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--dn-background);
+  color: var(--ink);
+  font: inherit;
+}
+.commute-dialog header button, .commute-date button[data-direction] { font-size: 22px; }
+.commute-body { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 14px 16px; }
+.commute-date {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px 48px;
+  gap: 6px;
+}
+.commute-date label { min-width: 0; }
+.commute-date input, .commute-edit-fields :is(input, select) {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}
+.commute-previous {
+  min-height: 44px;
+  border: 0;
+  padding: 4px 0;
+  background: transparent;
+  color: var(--dn-accent);
+  font: inherit;
+}
+.commute-tiles, .commute-edit-fields, .commute-averages {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.commute-tiles { margin-top: 12px; }
+.commute-tiles button {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 0;
+  min-height: 97px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--dn-background);
+  color: var(--ink);
+  font: inherit;
+  text-align: start;
+}
+.commute-tiles [data-recorded="true"] {
+  border-color: transparent;
+  background: var(--dn-accent-soft);
+  color: var(--dn-accent);
+}
+.commute-tiles button strong { font-size: 23px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.commute-tiles small { color: var(--muted); font-size: 12px; }
+.commute-dialog button:disabled { opacity: .53; }
+.commute-duration, .commute-storage, .commute-status, .commute-summary p { font-size: 13px; line-height: 1.45; }
+.commute-duration, .commute-status { margin: 10px 0 0; }
+.commute-duration { color: var(--muted); }
+.commute-status { color: var(--dn-accent); }
+.commute-status:empty { display: none; }
+.commute-status[data-error="true"] { color: var(--dn-record-mark); }
+.commute-editor {
+  margin-top: 12px;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.commute-editor h3 { margin: 0 0 9px; font-size: 16px; }
+.commute-edit-fields label { display: grid; gap: 4px; font-size: 13px; }
+.commute-actions, .commute-ranges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.commute-actions button { min-height: 44px; }
+.commute-summary { margin-top: 14px; padding-top: 6px; border-top: 1px solid var(--line); }
+.commute-summary summary { min-height: 44px; padding: 10px 0; cursor: pointer; font-weight: 650; }
+.commute-summary p, .commute-storage { color: var(--muted); }
+.commute-ranges button { padding: 0 12px; font-size: 13px; }
+.commute-ranges [aria-pressed="true"] { background: var(--dn-accent-soft); color: var(--dn-accent); }
+.commute-averages { margin: 8px 0 12px; }
+.commute-averages div { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.commute-averages dd { margin: 0; font-weight: 650; font-variant-numeric: tabular-nums; }
+.commute-history { display: grid; gap: 5px; }
+.commute-history button {
+  display: grid;
+  gap: 4px;
+  min-height: 44px;
+  padding: 8px 9px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--dn-background);
+  color: var(--ink);
+  text-align: start;
+}
+.commute-history small { color: var(--muted); line-height: 1.5; }
+.commute-storage { margin: 10px 0 0; }
+.commute-dialog [hidden] { display: none; }

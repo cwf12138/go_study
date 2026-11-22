@@ -12,6 +12,7 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.service.notification.StatusBarNotification;
 import androidx.core.app.NotificationManagerCompat;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.UUID;
 import org.json.JSONArray;
@@ -32,6 +33,38 @@ public class CalendarReminderReceiver extends BroadcastReceiver {
     }
 
     static boolean enabled(Context context) { return store(context).getBoolean("enabled", false); }
+
+    static final class QuietHours {
+        final boolean enabled;
+        final int start, end;
+
+        QuietHours(boolean enabled, int start, int end) {
+            this.enabled = enabled;
+            this.start = start;
+            this.end = end;
+        }
+
+        boolean contains(long time) {
+            if (!enabled || start == end) return false;
+            Calendar local = Calendar.getInstance();
+            local.setTimeInMillis(time);
+            int minute = local.get(Calendar.HOUR_OF_DAY) * 60 + local.get(Calendar.MINUTE);
+            return start < end ? minute >= start && minute < end : minute >= start || minute < end;
+        }
+    }
+
+    static QuietHours quietHours(Context context) {
+        SharedPreferences prefs = store(context);
+        return new QuietHours(prefs.getBoolean("quietEnabled", false),
+            prefs.getInt("quietStart", 22 * 60), prefs.getInt("quietEnd", 8 * 60));
+    }
+
+    static synchronized void setQuietHours(Context context, QuietHours hours) {
+        if (!store(context).edit().putBoolean("quietEnabled", hours.enabled)
+                .putInt("quietStart", hours.start).putInt("quietEnd", hours.end).commit()) {
+            throw new IllegalStateException("无法保存免打扰设置。");
+        }
+    }
 
     static boolean exact(Context context) {
         return Build.VERSION.SDK_INT < 31 || context.getSystemService(AlarmManager.class).canScheduleExactAlarms();
@@ -115,7 +148,7 @@ public class CalendarReminderReceiver extends BroadcastReceiver {
                 clearDelivered(editor);
             } else if (matching.length() != delivered.length()) {
                 editor.putString("delivered", matching.toString());
-                if (canSnooze(matching, now)) token = store(context).getString("snoozeToken", null);
+                if (canSnooze(matching, now, quietHours(context))) token = store(context).getString("snoozeToken", null);
                 else editor.remove("snoozeToken");
             }
         }
@@ -180,6 +213,7 @@ public class CalendarReminderReceiver extends BroadcastReceiver {
         if (!enabled(context) || !allowed(context)) { clear(context); return; }
 
         long snoozeAt = System.currentTimeMillis() + SNOOZE_MS;
+        if (quietHours(context).contains(snoozeAt)) return;
         JSONArray rows = readRows(context, "pending");
         int previousCount = rows.length();
         JSONArray delivered = readRows(context, "delivered");
@@ -197,7 +231,8 @@ public class CalendarReminderReceiver extends BroadcastReceiver {
         }
     }
 
-    private static boolean canSnooze(JSONArray rows, long now) {
+    private static boolean canSnooze(JSONArray rows, long now, QuietHours hours) {
+        if (hours.contains(now + SNOOZE_MS)) return false;
         for (int i = 0; i < rows.length(); i++) {
             if (rows.optJSONObject(i).optLong("start") > now + SNOOZE_MS) return true;
         }
@@ -208,17 +243,20 @@ public class CalendarReminderReceiver extends BroadcastReceiver {
         if (!enabled(context) || !allowed(context)) { clear(context); return; }
         JSONArray rows = readRows(context, "pending"), future = new JSONArray(), due = new JSONArray();
         long now = System.currentTimeMillis();
+        QuietHours hours = quietHours(context);
+        boolean quietNow = hours.contains(now);
         for (int i = 0; i < rows.length(); i++) {
             JSONObject row = rows.optJSONObject(i);
             if (row == null || row.optLong("start") <= now) continue;
-            if (triggerAt(row) > now) future.put(row);
-            else due.put(row);
+            long at = triggerAt(row);
+            if (at > now) future.put(row);
+            else if (!quietNow && !hours.contains(at)) due.put(row);
         }
         if (due.length() == 0) {
             replace(context, future);
             return;
         }
-        String token = canSnooze(due, now) ? UUID.randomUUID().toString() : null;
+        String token = canSnooze(due, now, hours) ? UUID.randomUUID().toString() : null;
         SharedPreferences.Editor editor = clearDelivered(store(context).edit()).putString("delivered", due.toString());
         if (token != null) editor.putString("snoozeToken", token);
         saveAndSchedule(context, future, editor);

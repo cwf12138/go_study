@@ -45,22 +45,30 @@ func (b *BigModel) Recommend(ctx context.Context, in MealRequest) (Recommendatio
 	if in.Model != b.model {
 		return Recommendation{}, errors.New("所选模型与本机智谱配置不同，请刷新 AI 状态")
 	}
+	content, err := b.complete(ctx, mealInstructions, in, 2048)
+	if err != nil {
+		return Recommendation{}, err
+	}
+	return decodeRecommendation(content, in)
+}
+
+func (b *BigModel) complete(ctx context.Context, instructions string, in any, maxTokens int) (string, error) {
 	if strings.ContainsAny(b.apiKey, " \t\r\n") {
-		return Recommendation{}, errors.New("本机智谱密钥含空格或换行，请重新启动服务并只粘贴完整的 API Key")
+		return "", errors.New("智谱密钥含空格或换行，请检查服务配置")
 	}
 	select {
 	case b.active <- struct{}{}:
 		defer func() { <-b.active }()
 	default:
-		return Recommendation{}, errors.New("智谱正在处理另一条推荐，请等待完成后再试")
+		return "", errors.New("智谱正在处理另一条请求，请稍后重试")
 	}
 
 	input, _ := json.Marshal(in)
 	payload := map[string]any{
-		"model": b.model, "stream": false, "max_tokens": 2048, "temperature": 0.4,
+		"model": b.model, "stream": false, "max_tokens": maxTokens, "temperature": 0.4,
 		"response_format": map[string]string{"type": "json_object"},
 		"messages": []map[string]string{
-			{"role": "system", "content": mealInstructions},
+			{"role": "system", "content": instructions},
 			{"role": "user", "content": string(input)},
 		},
 	}
@@ -70,23 +78,23 @@ func (b *BigModel) Recommend(ctx context.Context, in MealRequest) (Recommendatio
 	body, _ := json.Marshal(payload)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, bigModelEndpoint, bytes.NewReader(body))
 	if err != nil {
-		return Recommendation{}, errors.New("无法创建智谱推荐请求")
+		return "", errors.New("无法创建智谱请求")
 	}
 	req.Header.Set("Authorization", "Bearer "+b.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 	res, err := b.client.Do(req)
 	if err != nil {
-		return Recommendation{}, bigModelTransportFailure(req, err)
+		return "", bigModelTransportFailure(req, err)
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return Recommendation{}, bigModelFailure(res.StatusCode)
+		return "", bigModelFailure(res.StatusCode)
 	}
 
 	const maxResponse = 256 << 10
 	raw, err := io.ReadAll(io.LimitReader(res.Body, maxResponse+1))
 	if err != nil || len(raw) > maxResponse {
-		return Recommendation{}, errors.New("智谱响应中断或超出大小限制")
+		return "", errors.New("智谱响应中断或超出大小限制")
 	}
 	var result struct {
 		Choices []struct {
@@ -97,13 +105,13 @@ func (b *BigModel) Recommend(ctx context.Context, in MealRequest) (Recommendatio
 		} `json:"choices"`
 	}
 	if json.Unmarshal(raw, &result) != nil || len(result.Choices) != 1 {
-		return Recommendation{}, errors.New("智谱未返回有效的推荐响应")
+		return "", errors.New("智谱未返回有效响应")
 	}
 	choice := result.Choices[0]
 	if choice.FinishReason != "stop" {
-		return Recommendation{}, errors.New("智谱没有完成这次推荐，可以简化描述后重试")
+		return "", errors.New("智谱没有完成这次生成，可以简化描述后重试")
 	}
-	return decodeRecommendation(choice.Message.Content, in)
+	return choice.Message.Content, nil
 }
 
 func bigModelTransportFailure(req *http.Request, err error) *RequestFailure {
@@ -116,7 +124,7 @@ func bigModelTransportFailure(req *http.Request, err error) *RequestFailure {
 	var operation *net.OpError
 	switch {
 	case errors.Is(err, context.Canceled):
-		failure.Format, failure.Hint = "cancelled", "本次推荐已取消。"
+		failure.Format, failure.Hint = "cancelled", "本次请求已取消。"
 	case errors.As(err, &certificate):
 		failure.Format, failure.Hint = "tls_certificate", "无法验证智谱连接的证书，请检查电脑时间及当前网络的证书设置。"
 	case errors.As(err, &tlsRecord):
@@ -144,6 +152,6 @@ func bigModelFailure(status int) error {
 	case http.StatusTooManyRequests:
 		return errors.New("智谱请求受限（HTTP 429），请稍后再试或检查账号额度")
 	default:
-		return fmt.Errorf("智谱服务暂不可用（HTTP %d），可先使用本地推荐", status)
+		return fmt.Errorf("智谱服务暂不可用（HTTP %d），请稍后重试", status)
 	}
 }

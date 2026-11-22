@@ -43,9 +43,25 @@ public class DaynestRemindersPlugin extends Plugin {
     }
 
     @PluginMethod public void status(PluginCall call) {
+        CalendarReminderReceiver.QuietHours hours = CalendarReminderReceiver.quietHours(getContext());
         call.resolve(new JSObject().put("enabled", CalendarReminderReceiver.enabled(getContext()))
             .put("permitted", CalendarReminderReceiver.allowed(getContext()))
-            .put("exact", CalendarReminderReceiver.exact(getContext())).put("count", CalendarReminderReceiver.count(getContext())));
+            .put("exact", CalendarReminderReceiver.exact(getContext())).put("count", CalendarReminderReceiver.count(getContext()))
+            .put("quietEnabled", hours.enabled).put("quietStart", hours.start).put("quietEnd", hours.end));
+    }
+
+    @PluginMethod public void setQuietHours(PluginCall call) {
+        Boolean enabled = call.getBoolean("enabled");
+        Integer start = call.getInt("start"), end = call.getInt("end");
+        if (enabled == null || start == null || end == null || start < 0 || start >= 1440 || end < 0 || end >= 1440
+                || (enabled && start.equals(end))) {
+            call.reject("请选择不同的免打扰开始和结束时间。");
+            return;
+        }
+        try {
+            CalendarReminderReceiver.setQuietHours(getContext(), new CalendarReminderReceiver.QuietHours(enabled, start, end));
+            status(call);
+        } catch (RuntimeException error) { call.reject("无法保存免打扰设置。"); }
     }
 
     @PluginMethod public void enable(PluginCall call) {

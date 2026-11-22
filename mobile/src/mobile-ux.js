@@ -121,6 +121,7 @@ export function installMobileUX() {
     capture.id = 'mobile-capture'; capture.className = 'mobile-product-sheet'; capture.setAttribute('aria-labelledby', 'mobile-capture-title');
     capture.innerHTML = `<header><h2 id="mobile-capture-title">随手记</h2><button type="button" aria-label="关闭随手记">×</button></header>
       <div class="mobile-capture-options"><button type="button" data-capture="todo">添加待办 <span>›</span></button>
+      <button type="button" data-capture="local-todo"><span>本机待办 <small>可离线</small></span><span aria-hidden="true">›</span></button>
       <button type="button" data-capture="calendar">新建日程 <span>›</span></button><button type="button" data-capture="memos">新建备忘录 <span>›</span></button>
       <button type="button" data-capture="moods">记录心情 <span>›</span></button></div>`;
     capture.querySelector('header button').addEventListener('click', () => capture.close());
@@ -144,6 +145,7 @@ export function installMobileUX() {
       const view = event.target.closest('[data-capture]')?.dataset.capture;
       if (!view) return;
       capture.close();
+      if (view === 'local-todo') { window.DaynestMobile?.openOfflineReader('capture'); return; }
       if (go(view)) requestAnimationFrame(() => launchAction(view));
     });
     // Home shortcuts open the same composers as the destination page actions.

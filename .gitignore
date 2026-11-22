@@ -8,6 +8,7 @@ coverage.out
 data/
 .env
 /key
+/secret
 .local/
 
 # Editors / operating systems

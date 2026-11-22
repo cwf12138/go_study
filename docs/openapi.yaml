@@ -858,6 +858,42 @@ paths:
       responses:
         "200": { description: 已登录账号的 connected 状态。启用时返回配置模型。 }
         "401": { description: Authentication required }
+  /api/v1/todo-assist/steps:
+    post:
+      tags: [AI, Todos]
+      security: [{ bearerAuth: [] }]
+      summary: 用智谱根据待办标题生成子步骤草稿
+      description: 仅将标题发送给配置的智谱服务。此接口不创建或更新待办。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, minLength: 1, maxLength: 200 }
+      responses:
+        "200":
+          description: 可选的子步骤草稿
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    required: [steps]
+                    properties:
+                      steps:
+                        type: array
+                        minItems: 1
+                        maxItems: 6
+                        items: { type: string, maxLength: 120 }
+        "400": { description: Invalid title }
+        "401": { description: Authentication required }
+        "403": { description: Hosted AI is disabled on the server }
+        "502": { description: Upstream model or network failure }
   /api/v1/meals/ai/recommend:
     post:
       tags: [AI, Meals]
