@@ -3,6 +3,10 @@
   "appName": "日常 Daynest",
   "webDir": "www",
   "server": { "hostname": "localhost", "androidScheme": "https" },
-  "android": { "allowMixedContent": false, "webContentsDebuggingEnabled": false },
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false,
+    "appendUserAgent": "Daynest/Android (+https://github.com/cwf12138/go_study)"
+  },
   "plugins": { "CapacitorHttp": { "enabled": false } }
 }

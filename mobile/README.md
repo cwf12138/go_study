@@ -1,12 +1,18 @@
 # 日常 Daynest · Android
 
-当前构建版本为 **0.9.1 / versionCode 12**。App 内置公开网页资源，默认通过可信 HTTPS 连接 `https://111.230.184.144`，手机与网页使用同一服务端账号和记录。服务端启用智谱后，所有已登录账号均可使用 AI 用餐推荐和待办拆解。[智谱配置说明](../docs/ai-kitchen.md)
+当前构建版本为 **0.11.3 / versionCode 17**。App 内置公开网页资源，默认通过可信 HTTPS 连接 `https://111.230.184.144`，手机与网页使用同一服务端账号和记录。服务端启用智谱后，所有已登录账号均可使用 AI 用餐推荐和待办拆解。[智谱配置说明](../docs/ai-kitchen.md)
 
 ## 使用
 
 「今天」页顶部显示今天待做、已逾期和今日完成。点击任一数字会定位到对应列表，勾选可完成或重新打开，点击标题可查看这条待办。今日安排突出正在进行或下一项日程，可展开查看全天。随手记保存到备忘录后，可选择关联待办，后续从待办回查原文。
 
 「今天 → 通勤打卡」提供出门、上班、下班、到家四个按钮。点击空白项记录当前时间，点击已记录项可修改，选择日期可补录。跨午夜可在编辑时选「次日」。展开「统计与历史」可查看近 7 天或 30 天的平均打卡时间。记录按账号保存在当前手机。
+
+「全部 → 生活足迹 → 商场足迹」记录去过的商场。只填名称即可记今天的到访，也可填写城市或补录过去的日期。相同名称和城市的记录按商场汇总，同一天记一次。可搜索、按最近或次数排序，并展开单个商场查看或删除一次到访。记录按账号保存在当前手机。
+
+点「编辑记录」可以修改商场名称、城市和到访日期。改到同一商场已有记录的日期时会提示冲突。每次到访最多保存三张照片，可从手机选择，或在匹配商场时尝试自动找一张公开照片。照片会压缩后保存在本机，可放大查看、移除或筛选有照片的到访。联网找图会发送商场名称和城市，采用有明确授权的 Wikimedia Commons 照片并保留署名和许可链接。[Wikimedia 图片接口](https://www.mediawiki.org/wiki/API:Imageinfo)
+
+点「联网查位置」会使用商场名和选填城市查询 Photon。唯一的同名匹配会绑定地址和坐标，同名候选可在列表或高德地图上确认。配置高德 Android Key 后，「高德选点」会打开全屏地图，可点商场标记，也可手动选点。点「在高德查看」可直接打开高德 App 并标出已绑定的位置，手机无法打开高德 App 时会使用网页版。该入口无需 Android Key。每次到访可补充或编辑 1–5 分的个人评分和备注，列表可按平均评分排序和搜索备注。[Photon 接口](https://github.com/komoot/photon/blob/master/docs/api-v1.md) · [OpenStreetMap 数据署名](https://www.openstreetmap.org/copyright) · [高德 App 地图标注](https://lbs.amap.com/api/amap-mobile/guide/android/marker)
 
 0.5.0 重新调整手机日历，月历首屏完整展示，点击月份打开日期跳转，月历支持左右滑动。新增「日程」列表查看未来 31 天安排，日视图时间轴可点击空白处选时新建，重叠日程并排显示。今日签保留在工具栏，农历黄历可展开查看，提交记录与离线资料收在筛选工具中。历史事件通过服务器获取并显示来源，验证范围见 [0.5.0 发布记录](../docs/android-0.5.0-release.md)。
 
@@ -37,6 +43,10 @@
 ## 构建
 
 需要 Node.js 22+、JDK 21、SDK Platform 36、所需 Build Tools 与 Platform Tools。`android/local.properties` 的 `sdk.dir` 应指向实际 SDK；预检现在与 Gradle 一样读取该文件，再回退到环境变量或系统默认位置。
+
+内置高德地图需要在高德开放平台创建 **Android** Key，包名填写 `app.daynest.personal`，SHA-1 填写对应 APK 签名证书的指纹。可以在 `mobile/android` 运行 `gradlew signingReport` 查询。将 Key 单独写入项目根目录下的 `.local/amap-android.key`，或在构建进程设置 `DAYNEST_AMAP_ANDROID_KEY`。环境变量优先。Key 绑定签名并随 APK 打包，本地配置文件由 Git 忽略。缺少 Key 时仍可查位置、保存记录并在高德查看。[高德 Android Key 申请说明](https://lbs.amap.com/api/maps-sdk-for-android/guide/create-project/get-key)
+
+首次打开内置高德地图时会显示使用说明和高德隐私政策，由用户决定是否启用。选点不申请 GPS 定位，评分和备注保存在手机。已有位置作为 WGS84 读取，在地图显示前交由高德转换，新选的位置保存为 GCJ-02。[高德坐标转换](https://lbs.amap.com/api/android-sdk/guide/computing-equipment/coordinate-transformation)
 
 已有依赖时，在 `mobile/` 运行：
 

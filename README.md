@@ -4,7 +4,7 @@
 
 ## Android 手机端（连接个人云端）
 
-`mobile/` Capacitor Android 客户端当前构建版本为 **0.9.1 / versionCode 12**，默认通过 `https://111.230.184.144` 连接个人服务器。App 的「今天」页支持待办、日程、随手记和通勤打卡。[Android 使用说明](mobile/README.md) · [智谱配置说明](docs/ai-kitchen.md)
+`mobile/` Capacitor Android 客户端当前构建版本为 **0.11.3 / versionCode 17**，默认通过 `https://111.230.184.144` 连接个人服务器。「今天」页支持待办、日程、随手记和通勤打卡，「商场足迹」可记录照片和评分、联网查位置并打开高德地图。App 内选点需在构建时配置高德 Android Key。[Android 使用说明](mobile/README.md) · [智谱配置说明](docs/ai-kitchen.md)
 
 构建需要 **Node.js 22+、JDK 21、Android SDK 36**。已使用实际配置的 SDK 生成新版 APK 并覆盖安装到已连接 Android 15 手机。构建、使用与验收方式见 [Android 使用与构建说明](mobile/README.md)，服务器操作见 [部署说明](docs/deployment.md)。网页版仍无需 Node 依赖。
 

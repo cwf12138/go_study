@@ -12,6 +12,8 @@ content = content.replace(/android:allowBackup="[^"]*"/, 'android:allowBackup="f
 content = content.replace(/android:icon="[^"]*"/, 'android:icon="@drawable/daynest_icon"').replace(/android:roundIcon="[^"]*"/, 'android:roundIcon="@drawable/daynest_icon"');
 if (!content.includes('android:networkSecurityConfig=')) content = content.replace('<application', '<application android:networkSecurityConfig="@xml/network_security_config"');
 if (!content.includes('android:windowSoftInputMode=')) content = content.replace('android:launchMode="singleTask"', 'android:launchMode="singleTask"\n            android:windowSoftInputMode="adjustResize"');
+if (!content.includes('android:name=".MallMapActivity"')) content = content.replace('</application>', `    <activity android:name=".MallMapActivity" android:exported="false" android:theme="@style/AppTheme.NoActionBar" />
+    </application>`);
 if (!content.includes('android.permission.RECORD_AUDIO')) content = content.replace('</manifest>', '    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n</manifest>');
 if (!content.includes('android.permission.MODIFY_AUDIO_SETTINGS')) content = content.replace('</manifest>', '    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n</manifest>');
 // WebView requests foreground location only after the weather locate button.

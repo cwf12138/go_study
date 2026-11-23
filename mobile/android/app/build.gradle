@@ -1,5 +1,12 @@
 apply plugin: 'com.android.application'
 
+def amapKeyFile = rootProject.file('../../.local/amap-android.key')
+def amapKey = (providers.environmentVariable('DAYNEST_AMAP_ANDROID_KEY').orNull ?:
+        (amapKeyFile.isFile() ? amapKeyFile.getText('UTF-8') : '')).replaceFirst('^\uFEFF', '').trim()
+if (amapKey && !(amapKey ==~ /[a-fA-F0-9]{32}/)) {
+    throw new GradleException('高德 Android Key 必须为 32 位十六进制字符')
+}
+
 android {
     namespace = "app.daynest.personal"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +14,9 @@ android {
         applicationId "app.daynest.personal"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 12
-        versionName "0.9.1"
+        versionCode 17
+        versionName "0.11.3"
+        resValue 'string', 'daynest_amap_android_key', amapKey
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,6 +24,7 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    sourceSets.main.java.srcDir rootProject.file('../native/maps')
     buildTypes {
         release {
             minifyEnabled false
@@ -35,6 +44,7 @@ dependencies {
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation 'com.amap.api:3dmap-location-search:11.3.100_loc11.3.101_sea9.8.1'
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"

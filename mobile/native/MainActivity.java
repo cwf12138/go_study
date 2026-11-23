@@ -7,6 +7,7 @@ public class MainActivity extends BridgeActivity {
     @Override public void onCreate(Bundle savedInstanceState) {
         registerPlugin(DaynestFilesPlugin.class);
         registerPlugin(DaynestRemindersPlugin.class);
+        registerPlugin(DaynestMapsPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

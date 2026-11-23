@@ -338,6 +338,150 @@ public class CloudDeviceTest {
         evaluate(element + ".click()");
     }
 
+    @Test public void mallVisitsWorkOnPhysicalPhone() throws Exception {
+        assumeTrue("Requires a dedicated mall visits fixture", "true".equals(InstrumentationRegistry.getArguments().getString("qaMallFixture")));
+        Bundle args = openIsolatedFixture();
+        evaluate("document.getElementById('login-email').value=" + JSONObject.quote(args.getString("qaEmail")) +
+            ";document.getElementById('login-password').value=" + JSONObject.quote(args.getString("qaPassword")) +
+            ";document.getElementById('login-form').requestSubmit()");
+        waitFor("window.DaynestAccount?.current?.() && !document.getElementById('mobile-tabs').hidden", "mall fixture login");
+        openMobilePage("timeline");
+        clickOfflineControl("#mall-open");
+        String modal = "document.getElementById('mall-dialog')";
+        String totals = modal + ".querySelector('[data-visit-total]').textContent";
+        String cards = modal + ".querySelectorAll('.mall-list-item')";
+        String add = "{const form=" + modal + ".querySelector('form');form.elements.mallName.value='测试万象城';form.elements.city.value='杭州';form.requestSubmit()}";
+        waitFor(modal + ".open && " + totals + " === '0'", "new mall book");
+        assertEquals("true", evaluate(modal + ".getBoundingClientRect().width <= innerWidth"));
+        evaluate(add);
+        waitFor(totals + " === '1'", "first mall visit");
+        evaluate(add);
+        waitFor(modal + ".querySelector('[data-mall-status]').textContent.includes('当天已经记过')", "same-day visit deduplicated");
+        assertEquals("\"1\"", evaluate(totals));
+        report("mall_first_visit_saved_and_duplicate_suppressed");
+
+        String previous = evaluate("(()=>{const d=new Date();d.setDate(d.getDate()-1);return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')})()");
+        evaluate("{const form=" + modal + ".querySelector('form');form.elements.mallName.value='测试万象城';form.elements.city.value='杭州';" +
+            "form.elements.day.value=" + previous + ";form.elements.day.dispatchEvent(new Event('change',{bubbles:true}));form.requestSubmit()}");
+        waitFor(totals + " === '2' && " + cards + ".length === 1", "historical visit grouped");
+        evaluate("{const form=" + modal + ".querySelector('form');form.elements.mallName.value='测试万象城';form.elements.city.value='上海';form.requestSubmit()}");
+        waitFor(totals + " === '3' && " + cards + ".length === 2", "same names in distinct cities");
+        evaluate("{const input=" + modal + ".querySelector('[data-mall-search]');input.value='上海';input.dispatchEvent(new Event('input',{bubbles:true}))}");
+        waitFor(cards + ".length === 1 && " + cards + "[0].textContent.includes('上海')", "filter by city");
+        report("mall_counts_group_dates_and_keep_cities_distinct");
+
+        clickOfflineControl("#mall-dialog [data-mall-close]");
+        waitFor("!" + modal + ".open", "close mall dialog");
+        evaluate("window.__mallFixture=true; setTimeout(()=>location.reload(),0); true");
+        waitFor("typeof window.__mallFixture === 'undefined' && window.DaynestAccount?.current?.()", "app restores after reload");
+        openMobilePage("timeline");
+        clickOfflineControl("#mall-open");
+        waitFor(totals + " === '3'", "mall history persisted");
+        evaluate("{const sort=" + modal + ".querySelector('[data-mall-sort]');sort.value='visits';sort.dispatchEvent(new Event('change',{bubbles:true}))}");
+        assertEquals("true", evaluate(cards + "[0].textContent.includes('杭州')"));
+        evaluate(cards + "[0].querySelector('summary').click()");
+        evaluate("{const confirm=window.confirm;window.confirm=()=>{window.confirm=confirm;return true};" +
+            "const date=[..." + cards + "[0].querySelectorAll('li')].find(row=>row.querySelector('time').dateTime===" + previous +
+            ");date.querySelector('[data-remove-visit]').click()}");
+        waitFor(totals + " === '2' && " + cards + ".length === 2", "remove only the selected visit");
+        report("mall_history_persists_sorts_and_removes_one_visit");
+
+        evaluate("""
+            {
+              const fetchOnline = window.fetch;
+              window.fetch = (input, options) => {
+                const endpoint = new URL(input, location.href);
+                if (endpoint.hostname === 'commons.wikimedia.org') {
+                  const imageinfo = [{mime:'image/png',thumburl:'https://upload.wikimedia.org/qa-mall.png',
+                    descriptionurl:'https://commons.wikimedia.org/wiki/File:QA_mall.png',
+                    extmetadata:{Artist:{value:'测试摄影师'},LicenseShortName:{value:'CC BY-SA 4.0'},
+                      LicenseUrl:{value:'https://creativecommons.org/licenses/by-sa/4.0/'}}}];
+                  return Promise.resolve(new Response(JSON.stringify({query:{pages:[{title:'File:杭州万象城.png',imageinfo}]}})));
+                }
+                if (endpoint.hostname === 'upload.wikimedia.org') {
+                  return fetchOnline('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGN48+kVAAWWAslgVeOLAAAAAElFTkSuQmCC');
+                }
+                if (endpoint.hostname !== 'photon.komoot.io') return fetchOnline(input, options);
+                const features = ['杭州', '宁波'].filter(city => !endpoint.searchParams.get('q').includes('杭州') || city === '杭州')
+                  .map((city, index) => ({geometry:{type:'Point', coordinates:[120.2 + index, 30.25]},
+                    properties:{name:'万象城',city:city+'市',state:'浙江省',street:'富春路',osm_type:'W',osm_id:200+index,osm_key:'shop',osm_value:'mall'}}));
+                return Promise.resolve(new Response(JSON.stringify({features}), {headers:{'Content-Type':'application/json'}}));
+              };
+            }
+            """);
+        evaluate("{const form=" + modal + ".querySelector('form');form.elements.mallName.value='万象城';form.elements.city.value='';}");
+        clickOfflineControl("#mall-dialog [data-mall-find]");
+        waitFor(modal + ".querySelectorAll('[data-mall-results] button').length === 2 && !" +
+            modal + ".querySelector('[data-mall-location-value]').textContent", "ambiguous name should not auto-bind");
+        evaluate("{const city=" + modal + ".querySelector('form').elements.city;city.value='杭州';city.dispatchEvent(new Event('input',{bubbles:true}));}");
+        clickOfflineControl("#mall-dialog [data-mall-find]");
+        waitFor(modal + ".querySelector('[data-mall-location-value]').textContent.includes('富春路')", "unique location auto-bound");
+        waitFor(modal + ".querySelector('[data-mall-photo-gallery]').textContent.includes('CC BY-SA 4.0')",
+            "matching a location prepares a licensed photo");
+        String amapLink = modal + ".querySelector('[data-mall-open-amap]')";
+        assertEquals("true", evaluate("new URL(" + amapLink + ".href).searchParams.get('coordinate')==='wgs84'"));
+        if (instrumentation.getTargetContext().getString(R.string.daynest_amap_android_key).isEmpty()) {
+            clickOfflineControl("#mall-dialog [data-mall-map-toggle]");
+            waitFor(modal + ".querySelector('[data-mall-location-status]').textContent.includes('尚未配置高德地图') && !" +
+                amapLink + ".hidden", "build without a key offers the AMap link");
+        }
+        evaluate("{const form=" + modal + ".querySelector('form');form.elements.rating.value='5';form.elements.notes.value='停车比较方便';form.requestSubmit()}");
+        waitFor(totals + " === '3' && " + modal + ".querySelector('[data-mall-list]').textContent.includes('停车比较方便')", "location and review persisted");
+        report("mall_location_search_selects_unique_place_and_stores_review");
+
+        evaluate("{const card=[..." + cards + "].find(row=>row.querySelector('summary strong').textContent==='万象城');card.open=true;card.querySelector('[data-edit-visit]').click()}");
+        evaluate("""
+            {
+              const nativePromise = window.Capacitor.nativePromise;
+              window.Capacitor.nativePromise = (plugin, method, options) => {
+                if (plugin !== 'DaynestMaps' || method !== 'pick') return nativePromise(plugin, method, options);
+                window.qaMallPicker = options;
+                return Promise.resolve(window.qaMallPickerResult || {cancelled:true});
+              };
+            }
+            """);
+        clickOfflineControl("#mall-dialog [data-mall-map-toggle]");
+        waitFor("window.qaMallPicker?.selected?.coordinateSystem==='wgs84' && " +
+            modal + ".querySelector('[data-mall-save]:enabled') && new URL(" + amapLink + ".href).searchParams.get('coordinate')==='wgs84'",
+            "picker receives saved WGS84 location and cancellation leaves it unchanged");
+        evaluate("window.qaMallPickerResult={lat:30.253,lng:120.206}");
+        clickOfflineControl("#mall-dialog [data-mall-map-toggle]");
+        waitFor("new URL(" + amapLink + ".href).searchParams.get('coordinate')==='gaode'", "manual selection uses GCJ-02");
+        evaluate("{const form=" + modal + ".querySelector('form');form.elements.rating.value='4';form.elements.notes.value='已核对入口位置';form.requestSubmit()}");
+        waitFor(totals + " === '3' && " + modal + ".querySelector('[data-mall-list]').textContent.includes('已核对入口位置')", "edit review and point without adding a visit");
+        evaluate("{const card=[..." + cards + "].find(row=>row.querySelector('summary strong').textContent==='万象城');card.open=true;card.querySelector('[data-edit-visit]').click()}");
+        assertEquals("true", evaluate("new URL(" + amapLink + ".href).searchParams.get('coordinate')==='gaode'"));
+        report("mall_manual_pin_and_edit_update_the_same_visit");
+
+        String form = modal + ".querySelector('form')";
+        String photoCount = modal + ".querySelector('[data-mall-photo-count]').textContent";
+        assertEquals("true", evaluate("['mallName','city','day'].every(key=>!" + form + ".elements[key].readOnly)"));
+        evaluate("{const fields=" + form + ".elements;fields.mallName.value='测试万象城';fields.city.value='杭州';" + form + ".requestSubmit()}");
+        waitFor(modal + ".querySelector('[data-mall-status]').textContent.includes('所选日期已有到访记录') && " + totals + " === '3'",
+            "conflicting edit retains existing visits");
+        evaluate("{const fields=" + form + ".elements;fields.mallName.value='改名商场';fields.city.value='宁波';fields.day.value=" + previous + ";" +
+            "fields.city.dispatchEvent(new Event('input',{bubbles:true}));}");
+        assertEquals("true", evaluate(amapLink + ".hidden"));
+        evaluate("""
+            (async () => {
+              const fileInput = document.querySelector('[data-mall-photo-input]');
+              const blob = await (await fetch('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGN48+kVAAWWAslgVeOLAAAAAElFTkSuQmCC')).blob();
+              const transfer = new DataTransfer();
+              transfer.items.add(new File([blob], 'mall-test.png', {type:'image/png'}));
+              fileInput.files = transfer.files;
+              fileInput.dispatchEvent(new Event('change',{bubbles:true}));
+            })()
+            """);
+        waitFor(photoCount + " === '2/3' && " + form + ".querySelector('[data-mall-save]:enabled')", "local photo prepared");
+        evaluate(form + ".requestSubmit()");
+        waitFor(totals + " === '3' && " + modal + ".querySelector('[data-mall-list]').textContent.includes('改名商场')",
+            "edit moves name, city and date with photos attached");
+        evaluate(modal + ".querySelector('[data-mall-photo-filter]').click()");
+        assertEquals("true", evaluate(cards + ".length===1 && " + cards + "[0].querySelectorAll('.mall-photo-thumb').length===2 && " +
+            cards + "[0].querySelector('time').dateTime===" + previous));
+        report("mall_identity_date_and_photos_survive_edit");
+    }
+
     @Test public void commuteClockWorksOnPhysicalPhone() throws Exception {
         assumeTrue("Requires a dedicated commute fixture", "true".equals(InstrumentationRegistry.getArguments().getString("qaCommuteFixture")));
         Bundle args = openIsolatedFixture();
