@@ -1,4 +1,4 @@
-// Browser APIs are simulated: never requests a real microphone or reads personal files.
+// Browser APIs are simulated: does not read personal files.
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const {Blob}=require('node:buffer');
 const root='internal/httpapi/assets/',html=fs.readFileSync(root+'index.html','utf8');
@@ -7,11 +7,10 @@ const ids=new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]));
 for(const match of script.matchAll(/\$\('([^']+)'\)/g))assert(ids.has('pocket-'+match[1]),'missing DOM '+match[1]);
 for(const asset of ['toolkit-pocket.css','toolkit-pocket-core.js','toolkit-pocket.js'])assert(html.includes('/static/'+asset)&&fs.existsSync(root+asset));
 assert(html.indexOf('/static/toolkit-pocket-core.js')<html.indexOf('/static/toolkit-pocket.js'));
-const settle=async()=>{for(let i=0;i<8;i++)await Promise.resolve();};
 function harness(){
-  let account='user-one',now=0,urlID=0;
-  const elements=new Map(),observers=[],intervals=[],windowEvents={},documentEvents={},urls=new Set(),downloads=[],recorders=[],streams=[];
-  const options={permissionError:null,deferPermission:false,permissionResolve:null,deferImage:false,decode:null,deferBlob:false,encode:null,outputType:null,failBlob:false};
+  let account='user-one',urlID=0;
+  const elements=new Map(),observers=[],windowEvents={},documentEvents={},urls=new Set(),downloads=[];
+  const options={deferImage:false,decode:null,deferBlob:false,encode:null,outputType:null,failBlob:false};
   function el(id){
     if(!elements.has(id)){
       assert(ids.has(id),'unknown element '+id);
@@ -25,44 +24,30 @@ function harness(){
   }
   const E=id=>el('pocket-'+id);
   E('image-edge').value='1920';E('image-format').value='image/jpeg';E('image-quality').value='82';
-  function stream(){const track={stopped:false,stop(){this.stopped=true;},addEventListener(type,fn){this[type]=fn;}};const s={getTracks:()=>[track],track};streams.push(s);return s;}
-  class Recorder{
-    static isTypeSupported(type){return type==='audio/webm;codecs=opus';}
-    constructor(s,opts={}){this.stream=s;this.mimeType=opts.mimeType||'audio/webm';this.state='inactive';recorders.push(this);}
-    start(){this.state='recording';}
-    pause(){assert.equal(this.state,'recording');this.state='paused';queueMicrotask(()=>this.onpause?.());}
-    resume(){assert.equal(this.state,'paused');this.state='recording';queueMicrotask(()=>this.onresume?.());}
-    stop(){assert.notEqual(this.state,'inactive');this.state='inactive';queueMicrotask(()=>{this.ondataavailable?.({data:new Blob(['final audio'],{type:this.mimeType})});this.onstop?.();});}
-  }
   class Picture{
     constructor(){this.naturalWidth=4000;this.naturalHeight=3000;}
     set src(value){this.source=value;if(!value)return;const decode=()=>this.onload?.();if(options.deferImage)options.decode=decode;else queueMicrotask(decode);}
   }
-  const navigator={clipboard:{writeText:async()=>{}},mediaDevices:{async getUserMedia(){if(options.permissionError)throw options.permissionError;if(options.deferPermission)return new Promise(resolve=>options.permissionResolve=()=>resolve(stream()));return stream();}}};
-  const window={isSecureContext:true,MediaRecorder:Recorder,addEventListener:(type,fn)=>windowEvents[type]=fn,setInterval:fn=>intervals.push(fn)};
+  const window={addEventListener:(type,fn)=>windowEvents[type]=fn};
   const document={hidden:false,getElementById:el,addEventListener:(type,fn)=>documentEvents[type]=fn,body:{appendChild(){}},createElement(type){
     if(type==='a')return {click(){downloads.push({url:this.href,name:this.download});},remove(){}};
     assert.equal(type,'canvas');return {width:0,height:0,getContext:()=>({fillRect(){},drawImage(){}}),toBlob(fn,type){const encode=()=>fn(options.failBlob?null:new Blob(['encoded image'],{type:options.outputType||type}));if(options.deferBlob)options.encode=encode;else queueMicrotask(encode);}};
   }};
-  const context=vm.createContext({window,document,navigator,Blob,Image:Picture,Date,console,confirm:()=>true,performance:{now:()=>now},localStorage:{getItem:()=>account},
+  const context=vm.createContext({window,document,Blob,Image:Picture,Date,console,localStorage:{getItem:()=>account},
     URL:{createObjectURL(){const url='blob:test-'+(++urlID);urls.add(url);return url;},revokeObjectURL:url=>urls.delete(url)},
     MutationObserver:class{constructor(fn){this.fn=fn;}observe(target){observers.push({target,fn:this.fn});}}});
   vm.runInContext(core,context);vm.runInContext(script,context);
-  return {P:window.DaynestPocket,E,el,options,window,document,navigator,urls,downloads,recorders,streams,context,
+  return {P:window.DaynestPocket,E,el,options,window,document,urls,downloads,context,
     click:id=>E(id).listeners.click(),input:id=>E(id).listeners.input(),
     image:async(file={name:'holiday.png',type:'image/png',size:1024})=>{E('image-file').files=[file];return E('image-file').listeners.change();},
-    advance(ms){now+=ms;intervals.forEach(fn=>fn());},
-    leave(){el('toolkit-record').hidden=true;observers.filter(o=>o.target===el('toolkit-record')).forEach(o=>o.fn());},
-    enter(){el('toolkit-record').hidden=false;},
     account(value){account=value;windowEvents.storage({key:'studyflow.token'});},
-    hide(){document.hidden=true;documentEvents.visibilitychange();},
     unload(){windowEvents.pagehide();},windowEvents};
 }
 (async()=>{
   const h=harness(),{P,E}=h;
   assert.equal(P.fitImage(4000,3000,1920).height,1440);assert.equal(P.fitImage(100,50,640).width,100);
   assert.throws(()=>P.fitImage(6000,6000,1920));assert.throws(()=>P.fitImage(0,10,640));assert.throws(()=>P.fitImage(100,100,999));
-  assert.equal(P.fileBase('my:photo.png'),'my_photo');assert.equal(P.audioExtension('audio/mp4'),'m4a');assert.equal(P.audioExtension('audio/ogg;codecs=opus'),'ogg');
+  assert.equal(P.fileBase('my:photo.png'),'my_photo');
   assert.equal(P.fileBase('10.09 会议',false),'10.09 会议');assert.equal(P.fileBase('CON',false),'_CON');assert.equal(P.fileBase('voice. ',false),'voice');
 
   await h.image();assert(!E('image-process').disabled);await h.click('image-process');assert(!E('image-download').disabled);assert.match(E('image-info').textContent,/1920 × 1440/);
@@ -75,19 +60,7 @@ function harness(){
   h.options.deferImage=true;const loading=h.image();E('image-edge').value='640';h.input('image-edge');h.options.decode();await loading;assert(!E('image-process').disabled); // option change during decode
   h.options.deferImage=false;h.options.deferBlob=true;const processing=h.click('image-process');h.account('user-two');h.options.encode();await processing;assert(E('image-download').disabled);assert.equal(h.urls.size,0);
 
-  h.options.permissionError={name:'NotAllowedError'};await h.click('record-start');assert.match(E('record-status').textContent,/权限被拒绝/);assert(!E('record-start').disabled);
-  h.options.permissionError=null;h.options.deferPermission=true;const pending=h.click('record-start');assert(E('record-start').disabled);h.leave();h.options.permissionResolve();await pending;assert(h.streams.at(-1).track.stopped);assert.equal(h.recorders.length,0);
-  h.options.deferPermission=false;h.enter();await h.click('record-start');assert.equal(h.recorders.at(-1).state,'recording');h.advance(3000);assert.equal(E('record-time').textContent,'00:03');
-  h.click('record-pause');await settle();h.advance(7000);assert.equal(E('record-time').textContent,'00:03');h.click('record-pause');await settle();h.advance(2000);assert.equal(E('record-time').textContent,'00:05');
-  h.click('record-stop');assert(h.streams.at(-1).track.stopped);await settle();assert(!E('record-preview').hidden);assert(!E('record-download').disabled);assert.equal(E('record-time').textContent,'00:05');
-  E('record-name').value='10.09 my:voice';h.click('record-download');assert.equal(h.downloads.at(-1).name,'10.09 my_voice.webm');assert.equal(h.urls.size,1);
-  h.options.permissionError={name:'NotFoundError'};await h.click('record-start');assert(!E('record-download').disabled);assert.equal(h.urls.size,1); // denial retains previous audio
-  h.options.permissionError=null;await h.click('record-start');assert.equal(h.urls.size,0);h.advance(1800000);await settle();assert.match(E('record-status').textContent,/30 分钟/);assert(h.streams.at(-1).track.stopped);
-  await h.click('record-start');h.leave();await settle();assert(!E('record-download').disabled);assert(h.streams.at(-1).track.stopped);
-  h.enter();await h.click('record-start');h.account('user-three');await settle();assert(E('record-download').disabled);assert(h.streams.at(-1).track.stopped);assert.equal(h.urls.size,0);
-  await h.click('record-start');h.hide();await settle();assert(h.streams.at(-1).track.stopped);assert(!E('record-download').disabled);
-  h.document.hidden=false;h.enter();await h.click('record-start');h.windowEvents['daynest:mobile-pause']();await settle();assert(h.streams.at(-1).track.stopped);assert(!E('record-download').disabled);assert.match(E('record-status').textContent,/App 已进入后台/);
-  h.unload();assert.equal(h.urls.size,0);assert(E('record-download').disabled);
-  const unsupported=harness();unsupported.window.isSecureContext=false;await unsupported.click('record-start');assert.match(unsupported.E('record-status').textContent,/HTTPS/);assert.equal(unsupported.streams.length,0);
-  console.log('Pocket tools passed: image validation/encoding/cancellation/URLs, mic permissions/pause/resume/final chunks/limits/navigation/account cleanup (mocked browser APIs).');
+  h.unload();assert.equal(h.urls.size,0);assert(E('image-download').disabled);
+  assert(!script.includes('getUserMedia'));
+  console.log('Image tools passed: validation, encoding, cancellation, object URL and account cleanup.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

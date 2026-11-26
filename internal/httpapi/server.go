@@ -24,6 +24,7 @@ type Server struct {
 	chatGPT            *chatgpt.Manager
 	bigModel           *chatgpt.BigModel
 	remoteBigModelAI   bool
+	localTranslation   bool
 	transfers          *transfers.Store
 	localOnlyTransfers bool
 	snapshotInterval   time.Duration
@@ -47,6 +48,7 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 	s.chatGPT = chatgpt.New(filepath.Join(filepath.Dir(dataFile), "chatgpt-registration.json"))
 	s.bigModel = chatgpt.NewBigModel(os.Getenv("BIGMODEL_API_KEY"), os.Getenv("BIGMODEL_MODEL"))
 	s.remoteBigModelAI = !tokens.UsesDevelopmentSecret() && os.Getenv("BIGMODEL_REMOTE_ENABLED") == "1"
+	s.localTranslation = os.Getenv("READING_TRANSLATION_LOCAL") == "1"
 	s.transfers = transfers.New(filepath.Join(filepath.Dir(dataFile), "transfers"))
 	s.localOnlyTransfers = tokens.UsesDevelopmentSecret()
 	root := http.NewServeMux()
@@ -228,6 +230,7 @@ func NewHandler(svc *service.Service, tokens *security.TokenManager, bus *event.
 	private.HandleFunc("POST /api/v1/memos/{note_id}/duplicate", s.duplicateMemoNote)
 	private.HandleFunc("DELETE /api/v1/memos/{note_id}/permanent", s.deleteMemoNotePermanently)
 	private.HandleFunc("GET /api/v1/english/articles", s.englishArticles)
+	private.HandleFunc("POST /api/v1/reading/translate", s.translateReading)
 	private.HandleFunc("GET /api/v1/english/library", s.listEnglishReadings)
 	private.HandleFunc("POST /api/v1/english/library", s.saveEnglishReading)
 	private.HandleFunc("PATCH /api/v1/english/library/{reading_id}", s.updateEnglishReading)

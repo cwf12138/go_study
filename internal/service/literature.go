@@ -2,13 +2,11 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"hash/fnv"
-	"io"
-	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -27,33 +25,12 @@ func (s *Service) lockLiteratureUser(userID string) func() {
 	return lock.Unlock
 }
 
-type literatureCatalogCacheEntry struct {
-	catalog   domain.EBookCatalog
-	expiresAt time.Time
-}
 type literatureContentCacheEntry struct {
 	content   domain.EBookContent
 	expiresAt time.Time
 }
 
-type gutendexResponse struct {
-	Results []gutendexBook `json:"results"`
-}
-type gutendexBook struct {
-	ID        int      `json:"id"`
-	Title     string   `json:"title"`
-	Subjects  []string `json:"subjects"`
-	Summaries []string `json:"summaries"`
-	Authors   []struct {
-		Name string `json:"name"`
-	} `json:"authors"`
-	Languages     []string          `json:"languages"`
-	Copyright     bool              `json:"copyright"`
-	Formats       map[string]string `json:"formats"`
-	DownloadCount int               `json:"download_count"`
-}
-
-var ebookMarkerPattern = regexp.MustCompile(`(?im)^\*\*\*\s*(?:START|END) OF (?:THE|THIS) PROJECT GUTENBERG EBOOK.*?\*\*\*\s*$`)
+var ebookMarkerPattern = regexp.MustCompile(`(?im)^\*\*\*\s*(START|END) OF (?:THE|THIS) PROJECT GUTENBERG EBOOK.*?\*\*\*\s*$`)
 var ebookChapterPattern = regexp.MustCompile(`(?i)^(chapter|book|part|volume)\s+([ivxlcdm0-9]+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b.*$`)
 
 func (s *Service) SearchEBooks(ctx context.Context, query string) (domain.EBookCatalog, error) {
@@ -61,122 +38,51 @@ func (s *Service) SearchEBooks(ctx context.Context, query string) (domain.EBookC
 	if utf8.RuneCountInString(query) > 120 {
 		return domain.EBookCatalog{}, fmt.Errorf("%w: search query is too long", domain.ErrInvalidInput)
 	}
-	key := strings.ToLower(query)
-	now := s.now().UTC()
-	s.literatureMu.RLock()
-	cached, ok := s.literatureCatalog[key]
-	s.literatureMu.RUnlock()
-	if ok && now.Before(cached.expiresAt) {
-		return cached.catalog, nil
+	if err := ctx.Err(); err != nil {
+		return domain.EBookCatalog{}, err
 	}
 	if query == "" {
-		catalog := domain.EBookCatalog{Items: curatedEBooks(), Provider: "StudyFlow curated Project Gutenberg catalog"}
-		s.cacheEBookCatalog(key, catalog, now)
+		return domain.EBookCatalog{Items: curatedEBooks(), Provider: "Project Gutenberg · Featured"}, nil
+	}
+
+	catalog := domain.EBookCatalog{Items: filterCuratedEBooks(query), Query: query, Provider: "Project Gutenberg"}
+	s.literatureMu.RLock()
+	index := s.literatureIndex
+	s.literatureMu.RUnlock()
+	if len(index) == 0 {
+		catalog.Degraded = true
 		return catalog, nil
 	}
-	endpoint, _ := url.Parse("https://gutendex.com/books")
-	params := endpoint.Query()
-	params.Set("search", query)
-	params.Set("languages", "en")
-	params.Set("copyright", "false")
-	endpoint.RawQuery = params.Encode()
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
-	req.Header.Set("User-Agent", "StudyFlow/1.0 (local personal ebook reader)")
-	client := &http.Client{Timeout: 7 * time.Second}
-	response, err := client.Do(req)
-	if err == nil {
-		defer response.Body.Close()
-		if response.StatusCode != http.StatusOK {
-			err = fmt.Errorf("catalog returned %s", response.Status)
-		}
-	}
-	var payload gutendexResponse
-	if err == nil {
-		err = json.NewDecoder(io.LimitReader(response.Body, 2<<20)).Decode(&payload)
-	}
-	items := make([]domain.EBookCatalogItem, 0, len(payload.Results))
-	if err == nil {
-		for _, book := range payload.Results {
-			if item, usable := convertGutendexBook(book); usable {
-				items = append(items, item)
-			}
-			if len(items) == 24 {
-				break
-			}
-		}
-	}
-	catalog := domain.EBookCatalog{Items: items, Query: query, Provider: "Gutendex / Project Gutenberg"}
-	if err != nil || len(items) == 0 {
-		catalog.Items = filterCuratedEBooks(query)
-		catalog.Provider = "StudyFlow offline catalog"
-		catalog.Degraded = true
-	}
-	s.cacheEBookCatalog(key, catalog, now)
-	return catalog, nil
-}
 
-func (s *Service) cacheEBookCatalog(key string, catalog domain.EBookCatalog, now time.Time) {
-	s.literatureMu.Lock()
-	defer s.literatureMu.Unlock()
-	if len(s.literatureCatalog) > 60 {
-		for cacheKey := range s.literatureCatalog {
-			delete(s.literatureCatalog, cacheKey)
+	seen := make(map[string]bool, len(catalog.Items))
+	for _, item := range catalog.Items {
+		seen[item.ID] = true
+	}
+	for _, item := range index {
+		if seen[item.ID] || !matchesEBook(item, query) {
+			continue
+		}
+		catalog.Items = append(catalog.Items, item)
+		seen[item.ID] = true
+		if len(catalog.Items) >= 24 {
 			break
 		}
 	}
-	s.literatureCatalog[key] = literatureCatalogCacheEntry{catalog: catalog, expiresAt: now.Add(30 * time.Minute)}
+	return catalog, nil
 }
 
-func convertGutendexBook(book gutendexBook) (domain.EBookCatalogItem, bool) {
-	if book.Copyright || book.ID <= 0 || strings.TrimSpace(book.Title) == "" {
-		return domain.EBookCatalogItem{}, false
+func matchesEBook(book domain.EBookCatalogItem, query string) bool {
+	if strings.EqualFold(book.ID, query) || gutenbergNumber(book.ID) == query {
+		return true
 	}
-	contentURL := preferredTextFormat(book.Formats)
-	if contentURL == "" || !allowedEBookContentURL(contentURL) {
-		return domain.EBookCatalogItem{}, false
-	}
-	authors := make([]string, 0, len(book.Authors))
-	for _, author := range book.Authors {
-		if name := strings.TrimSpace(author.Name); name != "" {
-			authors = append(authors, name)
+	fields := strings.Fields(strings.ToLower(query))
+	content := strings.ToLower(book.Title + " " + book.ChineseTitle + " " + strings.Join(book.Authors, " "))
+	for _, word := range fields {
+		if !strings.Contains(content, word) {
+			return false
 		}
 	}
-	language := "en"
-	if len(book.Languages) > 0 {
-		language = book.Languages[0]
-	}
-	summary := "A public-domain classic available for focused reading in StudyFlow."
-	if len(book.Summaries) > 0 {
-		summary = cleanEnglishText(book.Summaries[0], 420)
-	}
-	cover := preferredFormat(book.Formats, "image/jpeg")
-	subjects := append([]string(nil), book.Subjects...)
-	if len(subjects) > 5 {
-		subjects = subjects[:5]
-	}
-	return domain.EBookCatalogItem{ID: "pg-" + strconv.Itoa(book.ID), Title: cleanEnglishText(book.Title, 240), Authors: authors, Summary: summary, Language: language, Subjects: subjects, CoverURL: cover, ContentURL: contentURL, SourceURL: fmt.Sprintf("https://www.gutenberg.org/ebooks/%d", book.ID), DownloadCount: book.DownloadCount}, true
-}
-
-func preferredTextFormat(formats map[string]string) string {
-	for _, key := range []string{"text/plain; charset=utf-8", "text/plain; charset=us-ascii", "text/plain"} {
-		if value := strings.TrimSpace(formats[key]); value != "" {
-			return value
-		}
-	}
-	for kind, value := range formats {
-		if strings.HasPrefix(strings.ToLower(kind), "text/plain") && strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
-}
-func preferredFormat(formats map[string]string, prefix string) string {
-	for kind, value := range formats {
-		if strings.HasPrefix(strings.ToLower(kind), prefix) {
-			return value
-		}
-	}
-	return ""
+	return len(fields) > 0
 }
 
 func allowedEBookContentURL(value string) bool {
@@ -185,11 +91,10 @@ func allowedEBookContentURL(value string) bool {
 		return false
 	}
 	host := strings.ToLower(parsed.Hostname())
-	return host == "gutenberg.org" || strings.HasSuffix(host, ".gutenberg.org")
+	return parsed.User == nil && (parsed.Port() == "" || parsed.Port() == "443") && (host == "gutenberg.org" || host == "www.gutenberg.org")
 }
 
 func (s *Service) AddEBook(ctx context.Context, userID string, book domain.EBookCatalogItem) (domain.EBookReading, error) {
-	defer s.lockLiteratureUser(userID)()
 	book, err := validateEBook(book)
 	if err != nil {
 		return domain.EBookReading{}, err
@@ -198,10 +103,30 @@ func (s *Service) AddEBook(ctx context.Context, userID string, book domain.EBook
 	if err != nil {
 		return domain.EBookReading{}, err
 	}
-	for _, reading := range items {
-		if reading.Book.ID == book.ID {
-			return reading, nil
+	if existing, ok := findEBook(items, book.ID); ok {
+		return existing, nil
+	}
+
+	seeds := curatedEBooks()
+	if index := slices.IndexFunc(seeds, func(item domain.EBookCatalogItem) bool { return item.ID == book.ID }); index >= 0 {
+		book = seeds[index]
+	} else {
+		id := gutenbergNumber(book.ID)
+		if err := verifyGutenbergRights(ctx, id); err != nil {
+			return domain.EBookReading{}, err
 		}
+		trusted := gutenbergBook(id)
+		book.ContentURL, book.SourceURL = trusted.ContentURL, trusted.SourceURL
+		book.Included = false
+	}
+
+	defer s.lockLiteratureUser(userID)()
+	items, err = s.repo.ListEBookReadings(ctx, userID)
+	if err != nil {
+		return domain.EBookReading{}, err
+	}
+	if existing, ok := findEBook(items, book.ID); ok {
+		return existing, nil
 	}
 	now := s.now().UTC()
 	reading := domain.EBookReading{ID: platform.NewID(), UserID: userID, Book: book, Status: "reading", Bookmarks: []domain.EBookBookmark{}, Notes: []domain.EBookNote{}, AddedAt: now, LastReadAt: now, UpdatedAt: now}
@@ -212,18 +137,24 @@ func (s *Service) AddEBook(ctx context.Context, userID string, book domain.EBook
 	return reading, nil
 }
 
+func findEBook(items []domain.EBookReading, bookID string) (domain.EBookReading, bool) {
+	index := slices.IndexFunc(items, func(item domain.EBookReading) bool { return item.Book.ID == bookID })
+	if index < 0 {
+		return domain.EBookReading{}, false
+	}
+	return items[index], true
+}
+
 func validateEBook(book domain.EBookCatalogItem) (domain.EBookCatalogItem, error) {
 	book.Title = cleanEnglishText(book.Title, 240)
 	book.ChineseTitle = cleanEnglishText(book.ChineseTitle, 120)
 	book.Summary = cleanEnglishText(book.Summary, 600)
 	book.Authors = cleanBookStrings(book.Authors, 8, 120)
 	book.Subjects = cleanBookStrings(book.Subjects, 8, 160)
-	if !regexp.MustCompile(`^pg-[0-9]+$`).MatchString(book.ID) || book.Title == "" || !allowedEBookContentURL(book.ContentURL) {
+	if gutenbergNumber(book.ID) == "" || book.Title == "" || !allowedEBookContentURL(book.ContentURL) {
 		return book, fmt.Errorf("%w: invalid or unsupported ebook metadata", domain.ErrInvalidInput)
 	}
-	parsed, err := url.Parse(book.SourceURL)
-	host := strings.ToLower(parsed.Hostname())
-	if err != nil || parsed.Scheme != "https" || (host != "gutenberg.org" && !strings.HasSuffix(host, ".gutenberg.org")) {
+	if !allowedEBookContentURL(book.SourceURL) {
 		return book, fmt.Errorf("%w: invalid ebook source", domain.ErrInvalidInput)
 	}
 	if book.Copyright {
@@ -281,14 +212,16 @@ func (s *Service) EBookContent(ctx context.Context, userID, readingID string) (d
 	s.literatureMu.RUnlock()
 	now := s.now().UTC()
 	if ok && now.Before(cached.expiresAt) {
-		return cached.content, nil
+		content := cached.content
+		content.Book = reading.Book
+		return content, nil
 	}
-	content, err := fetchEBookContent(ctx, reading.Book, now)
+	content, err := s.loadEBookContent(ctx, reading.Book, now)
 	if err != nil {
-		return domain.EBookContent{}, fmt.Errorf("%w: unable to download ebook text: %v", domain.ErrInvalidState, err)
+		return domain.EBookContent{}, err
 	}
 	s.literatureMu.Lock()
-	if len(s.literatureContent) > 10 {
+	if len(s.literatureContent) >= 10 {
 		oldest := ""
 		var oldestTime time.Time
 		for key, entry := range s.literatureContent {
@@ -301,44 +234,6 @@ func (s *Service) EBookContent(ctx context.Context, userID, readingID string) (d
 	s.literatureContent[reading.Book.ID] = literatureContentCacheEntry{content: content, expiresAt: now.Add(6 * time.Hour)}
 	s.literatureMu.Unlock()
 	return content, nil
-}
-
-func fetchEBookContent(ctx context.Context, book domain.EBookCatalogItem, now time.Time) (domain.EBookContent, error) {
-	if !allowedEBookContentURL(book.ContentURL) {
-		return domain.EBookContent{}, fmt.Errorf("unsupported content host")
-	}
-	client := &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(req *http.Request, _ []*http.Request) error {
-		if !allowedEBookContentURL(req.URL.String()) {
-			return fmt.Errorf("redirected to unsupported host")
-		}
-		return nil
-	}}
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, book.ContentURL, nil)
-	req.Header.Set("User-Agent", "StudyFlow/1.0 (local personal ebook reader)")
-	response, err := client.Do(req)
-	if err != nil {
-		return domain.EBookContent{}, err
-	}
-	defer response.Body.Close()
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return domain.EBookContent{}, fmt.Errorf("source returned %s", response.Status)
-	}
-	data, err := io.ReadAll(io.LimitReader(response.Body, (12<<20)+1))
-	if err != nil {
-		return domain.EBookContent{}, err
-	}
-	if len(data) > 12<<20 {
-		return domain.EBookContent{}, fmt.Errorf("ebook exceeds 12 MiB limit")
-	}
-	text := strings.ToValidUTF8(string(data), "�")
-	text = strings.TrimPrefix(text, "\ufeff")
-	text = strings.ReplaceAll(text, "\r\n", "\n")
-	text = extractGutenbergBody(text)
-	pages := paginateEBook(text, 3600)
-	if len(pages) == 0 {
-		return domain.EBookContent{}, fmt.Errorf("ebook contains no readable text")
-	}
-	return domain.EBookContent{Book: book, Pages: pages, TotalWords: countLiteratureWords(text), LicenseNotice: "This reader displays a reformatted copy of a Project Gutenberg text. Copyright status is determined under U.S. law; users outside the United States should check local law. See the source page and Project Gutenberg License.", FetchedAt: now}, nil
 }
 
 func extractGutenbergBody(text string) string {
@@ -541,15 +436,18 @@ func curatedEBooks() []domain.EBookCatalogItem {
 	items := make([]domain.EBookCatalogItem, 0, len(seeds))
 	for index, seed := range seeds {
 		id := strconv.Itoa(seed.id)
-		items = append(items, domain.EBookCatalogItem{ID: "pg-" + id, Title: seed.title, ChineseTitle: seed.chineseTitle, Authors: []string{seed.author}, Summary: seed.summary, Language: "en", Subjects: []string{"Classic literature"}, ContentURL: "https://www.gutenberg.org/cache/epub/" + id + "/pg" + id + ".txt", SourceURL: "https://www.gutenberg.org/ebooks/" + id, Featured: index < 4})
+		book := gutenbergBook(id)
+		book.Title, book.ChineseTitle, book.Summary = seed.title, seed.chineseTitle, seed.summary
+		book.Authors, book.Subjects = []string{seed.author}, []string{"Classic literature"}
+		book.Featured, book.Included = index < 4, index < 4
+		items = append(items, book)
 	}
 	return items
 }
 func filterCuratedEBooks(query string) []domain.EBookCatalogItem {
-	query = strings.ToLower(query)
 	result := []domain.EBookCatalogItem{}
 	for _, item := range curatedEBooks() {
-		if strings.Contains(strings.ToLower(item.Title+" "+item.ChineseTitle+" "+strings.Join(item.Authors, " ")), query) {
+		if matchesEBook(item, query) {
 			result = append(result, item)
 		}
 	}

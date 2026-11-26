@@ -13,7 +13,7 @@ if (missing.length) throw new Error(`literature.js references missing HTML ids: 
 
 for (const marker of [
   'data-view="literature"', 'id="panel-literature"', 'id="ebook-reader-dialog"',
-  'id="classic-reader-dialog"', '/static/literature.js?v=20260909-1',
+  'id="classic-reader-dialog"', '/static/literature.js?v=', 'id="ebook-content-origin"',
   '/static/literature.css?v=20260902-1',
 ]) if (!html.includes(marker)) throw new Error(`missing HTML marker: ${marker}`);
 

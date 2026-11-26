@@ -8,6 +8,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(DaynestFilesPlugin.class);
         registerPlugin(DaynestRemindersPlugin.class);
         registerPlugin(DaynestMapsPlugin.class);
+        registerPlugin(DaynestBrowsersPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

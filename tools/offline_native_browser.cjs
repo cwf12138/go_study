@@ -7,7 +7,6 @@ let api,server,browser,page,online=true,requests=0,dropImport=false;const report
   api=spawn(path.resolve(process.env.DAYNEST_TEST_API||path.join(root,'.local/offline-api.exe')),[],{cwd:root,windowsHide:true,env:{...process.env,HTTP_ADDR:'127.0.0.1:'+port,JWT_SECRET:crypto.randomBytes(32).toString('hex'),DATA_FILE:path.join(dir,'fixture.json'),SNAPSHOT_INTERVAL:'2s'},stdio:'ignore'});
   let ready=false;for(let i=0;i<100;i++){try{if((await fetch(origin+'/healthz')).ok){ready=true;break;}}catch{}await new Promise(r=>setTimeout(r,100));}assert(ready);
   const a=(await(await fetch(origin+'/api/v1/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'安卓离线验证',email:'native-offline@example.test',password:'native-offline-fixture-password'})})).json()).data;
-  const note=(await(await fetch(origin+'/api/v1/memos',{method:'POST',headers:{Authorization:'Bearer '+a.token,'Content-Type':'application/json'},body:JSON.stringify({title:'随身阅读资料',content:'电脑关闭后，也能阅读这份已确认的副本。',tags:[],color:'default'})})).json()).data;
   const date=require('../internal/httpapi/assets/planning-cache-core.js').today();
   const nativeTodo=(await(await fetch(origin+'/api/v1/todos',{method:'POST',headers:{Authorization:'Bearer '+a.token,'Content-Type':'application/json'},body:JSON.stringify({title:'手机随身待办',notes:'离线时只能查看',priority:'high',my_day_date:date})})).json()).data;
   const nativeCalendar=(await(await fetch(origin+'/api/v1/calendar/events',{method:'POST',headers:{Authorization:'Bearer '+a.token,'Content-Type':'application/json'},body:JSON.stringify({title:'手机随身安排',description:'已确认的日程副本',start_at:date+'T11:00:00+08:00',end_at:date+'T12:00:00+08:00',all_day:false,repeat_rule:'none'})})).json()).data;
@@ -18,7 +17,32 @@ let api,server,browser,page,online=true,requests=0,dropImport=false;const report
   browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_EXECUTABLE});page=await browser.newPage({viewport:{width:390,height:844},timezoneId:'Asia/Shanghai'});const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
   await page.exposeFunction('__nativeHTTP',async options=>{requests++;if(!online)throw Error('电脑不可达（隔离测试）');const url=new URL(options.url);assert.equal(url.origin,chosen);const response=await fetch(origin+url.pathname+url.search,{method:options.method,headers:options.headers,body:options.data});if(dropImport&&url.pathname==='/api/v1/todo-imports'&&options.method==='POST'){dropImport=false;await response.text();throw Error('响应丢失（隔离测试）');}return{status:response.status,data:response.status===204?'':await response.text(),headers:Object.fromEntries(response.headers.entries()),url:options.url};});
   await page.addInitScript(({server,token})=>{if(window===parent&&!localStorage.getItem('daynest.mobile.connection.v1')){localStorage.setItem('daynest.mobile.connection.v1',JSON.stringify({server,httpAcknowledged:true}));localStorage.setItem('studyflow.token',token);}},{server:chosen,token:a.token});
-  await page.goto('http://127.0.0.1:'+webPort);await page.waitForFunction(()=>!!window.DaynestAccount?.current?.());await page.evaluate(id=>{document.querySelector('.nav-link[data-view="memos"]').click();document.dispatchEvent(new CustomEvent('daynest:open-search-memo',{detail:{id}}));},note.id);await page.waitForFunction(()=>document.getElementById('memo-title').value==='随身阅读资料');await page.click('#memo-mobile-list');await page.click('#memo-offline-open');await page.check('#rc-enabled');await page.waitForFunction(()=>document.getElementById('rc-summary').textContent.includes('1 / 20'));pass('packaged_client_retains_verified_memo_under_selected_server');await page.check('#pc-enabled');await page.waitForFunction(()=>document.getElementById('pc-summary').textContent.includes('1 项待办'));pass('packaged_client_retains_planning_independently_of_memo_snapshots');
+  await page.goto('http://127.0.0.1:'+webPort);
+  await page.waitForFunction(()=>!!window.DaynestAccount?.current?.());
+  await page.evaluate(()=>{
+    const account=window.DaynestAccount.current(), C=window.DaynestMemoDrafts;
+    const storage=C.create(localStorage,C.scope(account.server,account.userID));
+    storage.put({version:1,id:'local-draft',noteID:'legacy-memo',generation:1,savedAt:Date.now(),baseUpdatedAt:'',
+      base:C.fields({}),value:C.fields({title:'旧版本机草稿',content:'等待导出的文字'})});
+    const vault=window.DaynestReadCacheCore.create(localStorage,account.server,account.userID);
+    vault.setEnabled(true);
+    vault.put({id:'legacy-memo',user_id:account.userID,title:'旧版离线副本',content:'等待导出的副本',
+      tags:[],archived:false,updated_at:'2026-11-01T01:00:00Z',created_at:'2026-11-01T01:00:00Z'});
+    document.getElementById('diagnostics-open').click();
+    document.getElementById('dg-tab-data').click();
+  });
+  await page.click('#dc-export-legacy-local');
+  await page.waitForFunction(()=>window.__nativeSaved.length===1);
+  const legacy=JSON.parse(Buffer.from((await page.evaluate(()=>window.__nativeSaved[0])).data,'base64').toString('utf8'));
+  assert.equal(legacy.memo_drafts[0].value.content,'等待导出的文字');
+  assert.equal(legacy.memo_snapshots[0].note.content,'等待导出的副本');
+  await page.evaluate(()=>document.getElementById('dg-dialog').close());
+  pass('legacy_memo_draft_and_snapshot_export_from_data_center');
+  await page.evaluate(()=>{document.querySelector('.nav-link[data-view="todo"]').click();document.getElementById('todo-offline-open').click();});
+  await page.check('#pc-enabled');
+  await page.waitForFunction(()=>document.getElementById('pc-summary').textContent.includes('1 项待办'));
+  await page.click('#rc-close');
+  pass('packaged_client_prepares_offline_todos_and_agenda');
   await page.evaluate(()=>document.getElementById('todo-local-open').click());await page.frameLocator('#mobile-offline-frame').locator('#ob-new:enabled').waitFor();await page.click('#mobile-offline-close');await page.waitForFunction(()=>!document.getElementById('mobile-offline-reader').open);pass('verified_native_account_prepares_local_capture_entry');
   await page.evaluate(id=>DaynestTodos.open(id),nativeTodo.id);await page.waitForFunction(()=>document.getElementById('te-name').value==='手机随身待办');await page.fill('#te-notes','安卓界面通过所选电脑核验版本后保存');await page.click('#te-save');await page.waitForFunction(()=>document.getElementById('te-status').textContent.startsWith('已提交服务'));await page.click('#te-close');await page.evaluate(()=>DaynestReadCache.refreshPlanning());await page.waitForFunction(()=>document.getElementById('pc-summary').textContent.includes('1 项待办'));pass('packaged_todo_editor_uses_selected_computer_and_conditional_native_requests');
   await page.evaluate(()=>document.getElementById('todo-drafts-open').click());await page.locator('#td-list button').first().click();await page.waitForFunction(()=>!document.getElementById('td-restore').disabled);assert((await page.inputValue('#td-local')).includes('安卓界面通过所选电脑核验版本后保存'));await page.click('#td-close');pass('packaged_todo_drafts_preserve_submitted_copy_under_verified_server_and_account');
@@ -41,25 +65,39 @@ let api,server,browser,page,online=true,requests=0,dropImport=false;const report
   await page.keyboard.press('Escape');await page.click('#save-status-open');await page.waitForFunction(()=>document.querySelectorAll('.save-status-list li').length>=3&&Array.from(document.querySelectorAll('.save-status-list li')).every(el=>el.textContent.includes('已纳入成功快照')),{},{timeout:15000});await page.click('[data-save-close]');pass('packaged_native_http_preserves_write_receipt_headers_and_checks_real_snapshot');
 
   online=false;await page.reload();await page.waitForFunction(()=>document.getElementById('mobile-state').textContent.includes('电脑不可达'));assert.equal(await page.locator('script[src^="/static/"]').count(),0);assert.equal(await page.evaluate(()=>!!window.DaynestAccount),false);let before= requests;
-  await page.click('#mobile-offline');const reader=page.frameLocator('#mobile-offline-frame');await reader.locator('#or-document:not([hidden])').waitFor();assert.equal(await reader.locator('#or-content').textContent(),note.content);assert.equal(requests,before);assert((await reader.locator('#or-account').textContent()).includes(chosen));pass('offline_connection_screen_opens_packaged_reader_without_loading_app_or_sending_api_requests');
-  assert(await reader.locator('#or-title').isVisible());assert.equal(await reader.locator('#or-library').getAttribute('aria-expanded'),'false');await reader.locator('#or-library').click();await reader.locator('[data-note]').click();assert.equal(await reader.locator('#or-library').getAttribute('aria-expanded'),'false');
-  await reader.locator('#or-export').click();await page.waitForFunction(()=>window.__nativeSaved.length===1);const saved=await page.evaluate(()=>window.__nativeSaved[0]);assert(Buffer.from(saved.data,'base64').toString('utf8').includes(note.content));assert.equal(requests,before);pass('native_file_export_works_before_server_connection_is_restored');
-  await reader.locator('[data-offline-section="todos"]').click();await reader.locator('.op-todo').waitFor();assert((await reader.locator('#op-content').textContent()).includes('手机随身待办'));assert.equal(await reader.locator('#offline-planning input[type=checkbox]').count(),0);await reader.locator('[data-offline-section="agenda"]').click();assert((await reader.locator('#op-content').textContent()).includes('手机随身安排'));assert.equal(requests,before);pass('packaged_planning_tabs_work_offline_without_loading_business_scripts');
-  await reader.locator('#op-export').click();await page.waitForFunction(()=>window.__nativeSaved.length===2);const planSaved=await page.evaluate(()=>window.__nativeSaved[1]);assert(Buffer.from(planSaved.data,'base64').toString('utf8').includes('手机随身安排'));assert.equal(requests,before);pass('planning_export_uses_native_files_while_disconnected');await reader.locator('[data-offline-section="notes"]').click();
+  await page.click('#mobile-auth-offline');const reader=page.frameLocator('#mobile-offline-frame');await reader.locator('[data-offline-section="todos"]').click();await reader.locator('.op-todo').first().waitFor();assert.equal(await reader.locator('[data-offline-section="notes"]').count(),0);assert.equal(requests,before);assert((await reader.locator('#or-account').textContent()).includes(chosen));pass('offline_connection_screen_opens_packaged_reader_without_loading_app_or_sending_api_requests');
+  await reader.locator('[data-offline-section="todos"]').click();await reader.locator('.op-todo').first().waitFor();assert((await reader.locator('#op-content').textContent()).includes('手机随身待办'));assert.equal(await reader.locator('#offline-planning input[type=checkbox]').count(),0);await reader.locator('[data-offline-section="agenda"]').click();assert((await reader.locator('#op-content').textContent()).includes('手机随身安排'));assert.equal(requests,before);pass('packaged_planning_tabs_work_offline_without_loading_business_scripts');
+  await reader.locator('#op-export').click();await page.waitForFunction(()=>window.__nativeSaved.length===1);const planSaved=await page.evaluate(()=>window.__nativeSaved[0]);assert(Buffer.from(planSaved.data,'base64').toString('utf8').includes('手机随身安排'));assert.equal(requests,before);pass('planning_export_uses_native_files_while_disconnected');
+
 
   await page.screenshot({path:path.join(out,'offline-native.png'),fullPage:true});
 
   await reader.locator('[data-offline-section="capture"]').click();await reader.locator('#ob-new:enabled').waitFor();await reader.locator('#ob-new').click();await reader.locator('#ob-title').fill('手机断网随手记');await reader.locator('#ob-notes').fill('关闭窗口前的最后一次修改');
   await page.click('#mobile-offline-close');await page.waitForFunction(()=>!document.getElementById('mobile-offline-reader').open);await page.evaluate(()=>DaynestMobile.openOfflineReader('capture'));await reader.locator('[data-outbox-id]').click();await reader.locator('#ob-title').evaluate(async el=>{for(let i=0;i<100&&el.value!=='手机断网随手记';i++)await new Promise(r=>setTimeout(r,20));});assert.equal(await reader.locator('#ob-notes').inputValue(),'关闭窗口前的最后一次修改');assert.equal(requests,before);assert.equal(await page.locator('script[src^="/static/"]').count(),0);pass('cold_native_capture_saves_before_close_and_reopens_without_business_scripts_or_network');
-  await reader.locator('#ob-export').click();await page.waitForFunction(()=>window.__nativeSaved.length===3);assert(Buffer.from((await page.evaluate(()=>window.__nativeSaved[2])).data,'base64').toString('utf8').includes('关闭窗口前'));assert.equal(requests,before);pass('unsent_native_capture_can_be_exported_while_disconnected');
+  await reader.locator('#ob-export').click();await page.waitForFunction(()=>window.__nativeSaved.length===2);assert(Buffer.from((await page.evaluate(()=>window.__nativeSaved[1])).data,'base64').toString('utf8').includes('关闭窗口前'));assert.equal(requests,before);pass('unsent_native_capture_can_be_exported_while_disconnected');
   online=true;dropImport=true;await reader.locator('#ob-send').click();await reader.locator('#ob-status').evaluate(async el=>{for(let i=0;i<200&&!el.textContent.includes('可能已经处理');i++)await new Promise(r=>setTimeout(r,20));});assert((await reader.locator('#ob-status').textContent()).includes('可能已经处理'));assert(await reader.locator('#ob-title').isDisabled());
   const list=async()=> (await(await fetch(origin+'/api/v1/todos?view=all',{headers:{Authorization:'Bearer '+a.token}})).json()).data;assert.equal((await list()).filter(t=>t.title==='手机断网随手记').length,1);pass('cold_native_bridge_submits_to_selected_computer_and_retains_command_after_lost_response');
   await reader.locator('#ob-check').click();await reader.locator('#ob-record-state').evaluate(async el=>{for(let i=0;i<200&&!el.textContent.includes('已确认提交');i++)await new Promise(r=>setTimeout(r,20));});assert((await reader.locator('#ob-record-state').textContent()).includes('已确认提交'));assert.equal((await list()).filter(t=>t.title==='手机断网随手记').length,1);pass('cold_native_receipt_lookup_confirms_without_duplicate_submission');
   const prior=requests,blocked=await page.evaluate(async({server,token})=>{const paths=[['/api/v1/todos',server],['/api/v1/me','http://192.168.1.99:8080']];return Promise.all(paths.map(async([path,expectedServer])=>{try{await DaynestMobile.todoOutboxRequest(path,{expectedServer,headers:{Authorization:'Bearer '+token}});return false;}catch{return true;}}));},{server:chosen,token:a.token});assert.deepEqual(blocked,[true,true]);assert.equal(requests,prior);pass('cold_native_bridge_rejects_unrelated_endpoints_and_wrong_server_before_network');
-  online=false;before=requests;await reader.locator('[data-offline-section="notes"]').click();await reader.locator('#or-document:not([hidden])').waitFor();
-
-  await page.evaluate(()=>localStorage.setItem('studyflow.token','different-account-token'));await reader.locator('#or-document[hidden]').waitFor({state:'attached'});assert.equal(await reader.locator('#or-content').textContent(),'');pass('native_reader_locks_after_credential_change');
-  await page.evaluate(token=>localStorage.setItem('studyflow.token',token),a.token);await reader.locator('#or-document:not([hidden])').waitFor();await page.evaluate(()=>localStorage.setItem('daynest.mobile.connection.v1',JSON.stringify({server:'http://192.168.1.19:8080',httpAcknowledged:true})));await reader.locator('#or-document[hidden]').waitFor({state:'attached'});assert((await reader.locator('#or-status').textContent()).includes('连接已变化'));assert.equal(requests,before);pass('native_reader_locks_after_selected_server_change');
+  online=false;
+  before=requests;
+  await reader.locator('[data-offline-section="todos"]').click();
+  const accountLabel=async expected=>page.waitForFunction(expected=>{
+    const doc=document.getElementById('mobile-offline-frame')?.contentDocument;
+    return doc?.getElementById('or-account')?.textContent.includes(expected);
+  },expected);
+  await accountLabel(chosen);
+  await page.evaluate(()=>localStorage.setItem('studyflow.token','different-account-token'));
+  await accountLabel('没有可核对');
+  assert.equal(await reader.locator('.op-todo').count(),0);
+  pass('native_reader_locks_after_credential_change');
+  await page.evaluate(token=>localStorage.setItem('studyflow.token',token),a.token);
+  await accountLabel(chosen);
+  await page.evaluate(()=>localStorage.setItem('daynest.mobile.connection.v1',JSON.stringify({server:'http://192.168.1.19:8080',httpAcknowledged:true})));
+  await accountLabel('没有可核对');
+  assert((await reader.locator('#or-status').textContent()).includes('连接已变化'));
+  assert.equal(requests,before);
+  pass('native_reader_locks_after_selected_server_change');
   await page.click('#mobile-offline-close');await page.waitForFunction(()=>!document.getElementById('mobile-offline-reader').open);assert.equal(await page.locator('#mobile-offline-frame').getAttribute('src'),'about:blank');pass('native_reader_closes_without_activating_or_reloading_the_app');
   assert.deepEqual(errors,[]);report.passed=true;
 })().catch(async error=>{report.passed=false;report.failure=error.message;console.error(error);process.exitCode=1;if(page)await page.screenshot({path:path.join(out,'offline-native-failure.png'),fullPage:true}).catch(()=>{});}).finally(async()=>{if(browser)await browser.close();if(server)await new Promise(r=>server.close(r));if(api){api.kill();await Promise.race([new Promise(r=>api.once('exit',r)),new Promise(r=>setTimeout(r,2000))]);}report.finished_at=new Date().toISOString();fs.writeFileSync(path.join(out,'offline-native-browser-report.json'),JSON.stringify(report,null,2)+'\n');console.log('Report: .local/checks/offline-native-browser-report.json. Native bridge mocked; no APK/device.');});

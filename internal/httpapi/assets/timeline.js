@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const $=selector=>document.querySelector(selector),panel=$('#panel-timeline');
-  const kinds={task:['✓','完成任务','tasks'],todo:['☑','完成待办','todo'],focus:['◷','完成专注','focus'],book:['阅','读完书籍','literature'],memo:['▤','新建备忘录','memos']};
+  const kinds={task:['✓','完成学习任务',''],todo:['☑','完成待办','todo'],focus:['◷','完成专注','focus'],book:['阅','读完书籍','literature'],memo:['▤','历史备忘录','']};
   let page=1,pages=0,version=0,controller;
   const month=()=>{const date=new Date();return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`};
   $('#trail-month').value=month();
@@ -21,7 +21,7 @@
       $('#trail-total').textContent=data.total;$('#trail-days').textContent=data.active_days;$('#trail-minutes').textContent=data.focus_minutes;
       $('#trail-status').textContent=data.total?'已按时间从新到旧排列。':'当前筛选下没有记录。完成一件小事，足迹就会出现在这里。';
       $('#trail-page').textContent=`第 ${page} / ${Math.max(1,pages)} 页`;
-      $('#trail-list').innerHTML=data.items.map(item=>{const [icon,label,target]=kinds[item.kind];return `<article class="trail-item"><span class="trail-icon" aria-hidden="true">${icon}</span><div><small>${label}${item.minutes?' · '+item.minutes+' 分钟':''}</small><h4>${escape(item.title)}</h4><time datetime="${escape(item.at)}">${escape(new Date(item.at).toLocaleString('zh-CN',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'}))}</time></div><button class="quiet" type="button" data-goto="${target}">前往模块 →</button></article>`}).join('');
+      $('#trail-list').innerHTML=data.items.filter(item=>Object.hasOwn(kinds,item.kind)).map(item=>{const [icon,label,target]=kinds[item.kind];return `<article class="trail-item"><span class="trail-icon" aria-hidden="true">${icon}</span><div><small>${label}${item.minutes?' · '+item.minutes+' 分钟':''}</small><h4>${escape(item.title)}</h4><time datetime="${escape(item.at)}">${escape(new Date(item.at).toLocaleString('zh-CN',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'}))}</time></div>${target?'<button class="quiet" type="button" data-goto="' + target + '">前往模块 →</button>':''}</article>`}).join('');
       $('#trail-prev').disabled=page<=1;$('#trail-next').disabled=page>=pages;
     }catch(error){if(current===version&&token===localStorage.getItem('studyflow.token'))$('#trail-status').textContent=error.name==='AbortError'?'加载超时，请点击“查看足迹”重试':error.message}
     finally{clearTimeout(timer)}

@@ -6,13 +6,17 @@ for (const name of ['今天','记录','成长']) assert(html.includes(`role="gro
 assert(!html.includes('id="panel-knowledge"') && !html.includes('/static/knowledge.js'));
 for (const match of html.matchAll(/(?:src|href)="\/static\/([^"?]+)(?:\?[^" ]*)?"/g)) assert(fs.existsSync(root+match[1]), `missing asset ${match[1]}`);
 const navs = [...html.matchAll(/class="nav-link[^"]*"[^>]*data-view="([^"]+)"/g)].map(m=>m[1]);
-assert.equal(new Set(navs).size,22); assert(!navs.includes('transfers')); assert(!navs.includes('whiteboards')); assert(!navs.includes('splits')); assert(navs.includes('care')); assert(navs.includes('fitness')); assert(!navs.includes('bookmarks')); assert(navs.includes('toolkit')); assert(navs.includes('subscriptions')); assert(navs.includes('meals')); assert(!navs.includes('projects')); assert(!navs.includes('travel')); for (const name of navs) assert(html.includes(`id="panel-${name}"`));
+assert.equal(new Set(navs).size,14); assert(!navs.includes('transfers')); assert(!navs.includes('whiteboards')); assert(!navs.includes('splits')); assert(navs.includes('fitness')); assert(!navs.includes('bookmarks')); assert(navs.includes('toolkit')); assert(navs.includes('subscriptions')); assert(navs.includes('meals')); assert(!navs.includes('projects')); assert(!navs.includes('travel')); for (const name of navs) assert(html.includes(`id="panel-${name}"`));
+for (const view of ['insights','goals','tasks','planner','explore','care','memos','inventory']) {
+  assert(!navs.includes(view) && !html.includes('id="panel-'+view+'"'));
+}
+assert.match(html, /data-goto="todo">查看待办/);
 const elements = new Map();
 function el(key) { if (!elements.has(key)) elements.set(key,{value:'',textContent:'',innerHTML:'',disabled:false,classList:{toggle(){},remove(){}},parentElement:{classList:{toggle(){}}}}); return elements.get(key); }
 const context = {Date,Intl,URLSearchParams,AbortController,Headers:class{set(){}has(){return false}},console,
   localStorage:{getItem(){return ''}},document:{querySelector:el,querySelectorAll(){return []}},window:{setTimeout(){},clearTimeout(){}}};
 const source=fs.readFileSync(root+'app.js','utf8');
-vm.runInNewContext(source.replace('  bootstrap();','  window.test={state,renderToday,saveTodayNote,localDateKey,showView};'),context);
+vm.runInNewContext(source.replace('  bootstrap();','  window.test={state,renderToday,localDateKey,showView};'),context);
 const app=context.window.test, today=app.localDateKey(new Date());
 context.localStorage.getItem=key=>key==='studyflow.token'?app.state.token:'';
 app.state.token='one';app.state.todos=[
@@ -28,21 +32,7 @@ assert.match(el('#today-todos').innerHTML,/&lt;img/);assert.match(el('#today-tod
 assert.match(el('#today-agenda').innerHTML,/&lt;script/);assert.match(el('#today-agenda').innerHTML,/全天/);
 app.state.todayCalendarError=true;app.state.todayTodosError=true;app.renderToday();
 assert.match(el('#today-agenda').innerHTML,/暂未加载成功/);assert.match(el('#today-todos').innerHTML,/暂未加载成功/);
-const button={disabled:false},event={preventDefault(){},currentTarget:{querySelector(){return button}}};
-async function run() {
-  let calls=0;
-  context.fetch=async()=>{calls++;throw new Error('offline')};
-  el('#today-note').value='   ';await app.saveTodayNote(event);assert.equal(calls,0);
-  el('#today-note').value='a thought';await app.saveTodayNote(event);assert.equal(el('#today-note').value,'a thought');assert.match(el('#today-note-status').textContent,/保存失败/);assert(!button.disabled);
-  let release, body;
-  context.fetch=(_,options)=>{body=JSON.parse(options.body);return new Promise(resolve=>{release=resolve})};
-  const pending=app.saveTodayNote(event);assert(button.disabled);
-  await app.saveTodayNote(event);assert.equal(body.content,'a thought');
-  el('#today-note').value='keep typing';release({ok:true,status:200,json:async()=>({data:{id:'memo'}})});await pending;
-  assert.equal(el('#today-note').value,'keep typing');assert.match(el('#today-note-status').textContent,/已存入/);
-  const stale=app.saveTodayNote(event);app.state.token='two';el('#today-note-status').textContent='new account';
-  release({ok:true,status:200,json:async()=>({data:{id:'old'}})});await stale;assert.equal(el('#today-note-status').textContent,'new account');
-  const css=fs.readFileSync(root+'daynest.css','utf8');for(const hook of ['max-width:650px','prefers-reduced-motion:reduce','var(--paper)','overflow-y:auto'])assert(css.includes(hook));
-  console.log('Daynest passed: navigation/assets, real daily data, completed/overdue filtering, escaping, failure states, quick-note retry, duplicate prevention, in-flight edits and account isolation.');
-}
-run().catch(error=>{console.error(error);process.exitCode=1});
+const css=fs.readFileSync(root+'daynest.css','utf8');
+for(const hook of ['max-width:650px','prefers-reduced-motion:reduce','var(--paper)','overflow-y:auto'])assert(css.includes(hook));
+assert(!html.includes('today-note-form'));
+console.log('Daynest passed: navigation, retired pages, daily data, todo filtering, escaping and failure states.');

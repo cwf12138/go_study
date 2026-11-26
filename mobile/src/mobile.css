@@ -58,7 +58,6 @@ body.daynest-native{padding-top:env(safe-area-inset-top);padding-bottom:env(safe
 .mobile-functions-grid>button{min-width:0;min-height:52px;padding:10px 6px;border:1px solid var(--line);border-radius:12px;background:var(--paper);color:var(--ink);font:inherit;font-size:14px;line-height:1.5;overflow-wrap:anywhere}.mobile-functions-grid>button[aria-current=page]{border-color:var(--blue);background:var(--canvas);font-weight:750}
 .mobile-functions>footer{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:16px 20px 20px;border-top:1px solid var(--line);background:var(--canvas)}.mobile-functions>footer button{min-height:44px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);font:inherit;font-size:14px}.mobile-functions :focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 .daynest-native .diagnostics-trigger svg{display:block;width:22px;height:22px}
-#mobile-memo-tools{display:none}#mobile-memo-actions>.mobile-functions-grid{padding:20px;grid-template-columns:1fr 1fr}
 .mobile-share-body{padding:20px;display:grid;gap:16px}.mobile-share-body p{margin:0;font-size:14px;line-height:1.8;color:var(--muted)}.mobile-share-body label{display:grid;gap:8px;font-size:13px}.mobile-share-body input{width:100%;min-width:0;min-height:46px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--canvas);color:var(--ink);font:inherit;font-size:16px}.mobile-share-body button{min-height:46px;border:0;border-radius:12px;background:var(--blue);color:#fff;font:inherit}
 
 @media(max-width:700px){
@@ -77,32 +76,10 @@ body.daynest-native{padding-top:env(safe-area-inset-top);padding-bottom:env(safe
   .mobile-keyboard-open .mobile-tabs{display:none}.daynest-native .product-toast{bottom:calc(var(--mobile-nav-height) + 12px);max-width:calc(100vw - 24px)}
   .daynest-native input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),.daynest-native textarea,.daynest-native select{font-size:16px;max-width:100%;scroll-margin-block:75px}
   .daynest-native :is(button,[role=button]){touch-action:manipulation}
-  .daynest-native :is(.memo-heading,.bookmark-hero,.ft-hero,.fit-hero){margin-bottom:16px}
+  .daynest-native :is(.bookmark-hero,.ft-hero,.fit-hero){margin-bottom:16px}
   .daynest-native :is(.bookmark-hero,.ft-hero,.fit-hero){padding:20px}
-  .daynest-native :is(.memo-heading,.bookmark-hero,.ft-hero,.fit-hero) :is(h2,h3){font-size:25px;line-height:1.4;letter-spacing:-.03em}
+  .daynest-native :is(.bookmark-hero,.ft-hero,.fit-hero) :is(h2,h3){font-size:25px;line-height:1.4;letter-spacing:-.03em}
   .daynest-native :is(.bookmark-hero,.ft-hero,.fit-hero)>div>p:not([class*=eyebrow]){font-size:14px;line-height:1.7;margin-block:10px 14px}
-  .daynest-native .memo-heading>div:first-child>p:last-child{display:none}
-  .daynest-native .memo-utility-bar{margin-bottom:12px;padding:10px}
-  .daynest-native .memo-utility-bar>div{display:flex;gap:6px;flex-wrap:wrap}
-  .daynest-native .memo-utility-bar select{flex:1;min-width:120px}.daynest-native #memo-focus{display:none}
-  .daynest-native .memo-workspace{height:max(380px,calc(var(--mobile-viewport-height) - 330px));min-height:380px}
-  .daynest-native .memo-workspace.show-editor{position:fixed;inset:env(safe-area-inset-top) 0 auto;z-index:50;width:100%;height:calc(var(--mobile-viewport-height) - var(--mobile-nav-height) - env(safe-area-inset-top));min-height:0;border:0;border-radius:0;background:var(--paper)}
-  .daynest-native .memo-workspace.show-editor .memo-editor-pane{transform:none}
-  .daynest-native .memo-editor-head{min-height:56px;padding:8px 10px;gap:8px;justify-content:flex-end}
-  .daynest-native .memo-editor-actions,.daynest-native .memo-editor-head>#memo-preview-toggle{display:none}
-  .daynest-native .memo-editor-head>#memo-mobile-list{margin-right:auto}
-  .daynest-native #mobile-memo-tools{display:block;padding:6px 12px}
-  .daynest-native .mobile-memo-save{background:var(--blue);color:#fff;border:0;padding:6px 16px}
-  .daynest-native .memo-editor-head button{min-width:40px;min-height:40px;flex-shrink:0}
-  .daynest-native .memo-editor-scroll{padding:16px;scroll-padding-block:16px}
-  .daynest-native #memo-content{min-height:220px;font-size:16px;line-height:1.8}
-  .daynest-native .memo-editor-footer{max-height:32%;overflow:auto;padding:10px 14px}
-  .daynest-native .memo-properties{grid-template-columns:1fr 1fr;gap:8px}
-  .daynest-native .memo-properties fieldset{grid-column:1/-1}
-  .daynest-native .memo-properties input,.daynest-native .memo-properties select{height:40px;min-width:0}
-  .daynest-native .memo-formatbar{top:-16px;flex-wrap:nowrap;overflow-x:auto}
-  .daynest-native .memo-formatbar button{min-height:38px;min-width:38px;flex-shrink:0}
-  .daynest-native .memo-folder-menu{display:block;min-width:36px;min-height:36px}
   .daynest-native #panel-bookmarks :is(.bookmark-layout,.bookmark-sidebar,.bookmark-main){min-width:0;max-width:100%}
   .daynest-native #panel-bookmarks :is(#bookmark-views,#bookmark-folders){min-width:0;max-width:100%;overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px}
   .daynest-native #panel-bookmarks .bookmark-toolbar>*{min-width:0}

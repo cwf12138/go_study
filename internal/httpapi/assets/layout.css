@@ -6,7 +6,7 @@
 }
 
 /* Wider working surfaces; reading columns retain their own readable line lengths. */
-.workspace:has(> .content > :is(#panel-calendar, #panel-memos, #panel-planner).active) {
+.workspace:has(> .content > #panel-calendar.active) {
   --page-width: 1680px;
 }
 

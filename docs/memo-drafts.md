@@ -1,5 +1,7 @@
 # 备忘录本机草稿与冲突恢复
 
+> 此文记载旧版行为。自 0.11.10 起，已保存的历史记录可在数据中心导出，旧版备忘录本机资料也可单独导出。
+
 交付日期：2026-11-02。对应路线图 D-06 的备忘录试点。第二批已将同一存储机制扩展至[心情与周复盘](record-drafts.md)，三类草稿共享总容量，旧备忘录格式兼容。正式服务仍使用内存仓储与周期 JSON 快照；没有迁移实际数据，也没有实现整站离线同步。
 
 ## 使用方式
@@ -61,7 +63,6 @@ node tools/check.cjs
 go build -o .local/memo-drafts-api.exe ./cmd/api
 # Playwright 已在 Node 模块路径中时不需要设置 PLAYWRIGHT_MODULE。
 # 若使用已有浏览器，可通过 PLAYWRIGHT_EXECUTABLE 指定绝对路径。
-node tools/memo_drafts_browser.cjs
 ```
 
 脚本启动独立服务，使用临时账号和 `.local/memo-drafts-browser-*` 临时目录；报告与截图位于 `.local/checks/`。覆盖故意延迟脚本后的刷新恢复、手动提交、请求处理中继续编辑、两个真实页面的版本冲突与另存、390px / 桌面 / 深色布局，以及断网查看和模拟原生保存交接。临时目录保留便于检查，不读取项目实际 `data/`。

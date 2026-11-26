@@ -66,7 +66,7 @@ function harness(saved, existingToken = '', defaultServer = '', primaryMarker) {
     init: async () => { for (const handler of events.DOMContentLoaded) await handler(); await settle(); },
     submit: () => nodes.get('mobile-form').fire('submit'),
     fetch: input => window.fetch(input),
-    openLocalTodo: () => window.testAuthActions.localTodo(),
+    openLocalTodo: () => window.DaynestMobile.openOfflineReader('capture'),
     openOffline: () => window.testAuthActions.offline(),
     server: (value, ack = true) => { nodes.get('mobile-server').value = value; nodes.get('mobile-consent').checked = ack; },
     get reloads() { return reloads; }, get minimized() { return minimized; }, get backs() { return backs; },

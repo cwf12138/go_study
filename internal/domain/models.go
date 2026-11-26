@@ -746,6 +746,7 @@ type EBookCatalogItem struct {
 	DownloadCount int      `json:"download_count"`
 	Copyright     bool     `json:"copyright"`
 	Featured      bool     `json:"featured,omitempty"`
+	Included      bool     `json:"included,omitempty"`
 }
 
 type EBookCatalog struct {
@@ -766,6 +767,7 @@ type EBookContent struct {
 	Pages         []EBookPage      `json:"pages"`
 	TotalWords    int              `json:"total_words"`
 	LicenseNotice string           `json:"license_notice"`
+	ContentOrigin string           `json:"content_origin,omitempty"`
 	FetchedAt     time.Time        `json:"fetched_at"`
 }
 

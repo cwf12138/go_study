@@ -18,7 +18,7 @@ if (missing.length) throw new Error(`english.js references missing HTML ids: ${m
 
 for (const marker of [
   'data-view="english"', 'id="panel-english"', 'id="english-reader-dialog"',
-  '/static/english.js?v=20261007-2', '/static/english.css?v=20261007-1',
+  '/static/english.js?v=', '/static/english.css?v=', 'data-english-mode="practice"',
 ]) if (!html.includes(marker)) throw new Error(`missing HTML marker: ${marker}`);
 
 for (const marker of [

@@ -223,3 +223,37 @@ func TestTodoAIRouteRequiresLoginAndHostedConfiguration(t *testing.T) {
 		}
 	}
 }
+
+func TestReadingTranslationRequiresLoginAndAcceptsOnlyExcerpt(t *testing.T) {
+	t.Setenv("BIGMODEL_API_KEY", "fixture-translation-key")
+	tokens := security.NewTokenManager("hosted-test-secret-long-enough", "test", time.Hour)
+	token, err := tokens.Issue("signed-in-user", "student")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bus := event.NewBus()
+	for _, tc := range []struct {
+		enable, auth, body string
+		want               int
+	}{
+		{"1", "", `{"text":"A paragraph."}`, http.StatusUnauthorized},
+		{"", token, `{"text":"A paragraph."}`, http.StatusServiceUnavailable},
+		{"1", token, `{"text":" "}`, http.StatusBadRequest},
+		{"1", token, `{"text":"A paragraph.","notes":"private note"}`, http.StatusBadRequest},
+	} {
+		t.Setenv("BIGMODEL_REMOTE_ENABLED", tc.enable)
+		handler := NewHandler(service.New(store.NewMemory(), tokens, bus), tokens, bus, slog.New(slog.NewTextHandler(io.Discard, nil)))
+		request := httptest.NewRequest("POST", "/api/v1/reading/translate", strings.NewReader(tc.body))
+		if tc.auth != "" {
+			request.Header.Set("Authorization", "Bearer "+tc.auth)
+		}
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, request)
+		if w.Code != tc.want || strings.Contains(w.Body.String(), "fixture-translation-key") {
+			t.Fatalf("expected status %d, got %d", tc.want, w.Code)
+		}
+		if tc.auth != "" && w.Header().Get("Cache-Control") != "no-store" {
+			t.Fatal("translation response must be non-cacheable")
+		}
+	}
+}

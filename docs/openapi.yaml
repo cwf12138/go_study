@@ -3462,6 +3462,10 @@ paths:
       summary: Aggregate current English RSS summaries with an offline reading-lab fallback
       parameters:
         - in: query
+          name: mode
+          description: Select the original exercises without contacting any RSS source
+          schema: { type: string, enum: [practice] }
+        - in: query
           name: refresh
           schema: { type: boolean, default: false }
       responses:
@@ -3473,6 +3477,35 @@ paths:
                 type: object
                 properties:
                   data: { $ref: "#/components/schemas/EnglishFeed" }
+  /api/v1/reading/translate:
+    post:
+      tags: [English, Literature]
+      security: [{ bearerAuth: [] }]
+      summary: Translate the current English excerpt to Simplified Chinese on demand
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              additionalProperties: false
+              properties:
+                text: { type: string, minLength: 1, maxLength: 4200 }
+      responses:
+        "200":
+          description: Translated excerpt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      translation: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "503": { description: Hosted translation is disabled }
   /api/v1/english/library:
     get:
       tags: [English]
@@ -3557,14 +3590,14 @@ paths:
     get:
       tags: [Literature]
       security: [{ bearerAuth: [] }]
-      summary: Search public-domain world classics by English or Chinese title
+      summary: Search the locally indexed Gutenberg catalog by English title, author or ID, or search curated Chinese aliases
       parameters:
         - in: query
           name: q
           schema: { type: string, maxLength: 120 }
       responses:
         "200":
-          description: Project Gutenberg catalog results, with an offline curated fallback
+          description: Catalog matches. Non-curated editions require rights verification when first added to the shelf.
           content:
             application/json:
               schema:
@@ -3642,6 +3675,7 @@ paths:
                 properties:
                   data: { $ref: "#/components/schemas/EBookContent" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "503": { description: The book has no server copy and the upstream sources are temporarily unavailable }
   /api/v1/literature/shelf/{reading_id}/progress:
     parameters:
       - in: path
@@ -5703,7 +5737,7 @@ components:
         url: { type: string, format: uri }
         source: { type: string }
         source_url: { type: string, format: uri }
-        category: { type: string, enum: [world, science, technology, learning] }
+        category: { type: string, enum: [world, science, technology, space, learning] }
         difficulty: { type: string, enum: [B1, B2, C1] }
         published_at: { type: string, format: date-time }
         reading_minutes: { type: integer, minimum: 1 }
@@ -5780,6 +5814,7 @@ components:
         download_count: { type: integer, minimum: 0 }
         copyright: { type: boolean }
         featured: { type: boolean }
+        included: { type: boolean, description: The server ships with the full text of this edition }
     EBookCatalog:
       type: object
       properties:
@@ -5800,6 +5835,7 @@ components:
         pages: { type: array, items: { $ref: "#/components/schemas/EBookPage" } }
         total_words: { type: integer, minimum: 0 }
         license_notice: { type: string }
+        content_origin: { type: string, enum: [included, cache, online] }
         fetched_at: { type: string, format: date-time }
     EBookBookmark:
       type: object

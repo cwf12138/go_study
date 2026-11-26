@@ -136,10 +136,8 @@
   color: var(--auth-muted);
   font-size: 14px;
 }
-.daynest-native #auth-view :is(.tabs .tab,.mobile-auth-help button) { min-height: 44px; border: 0; background: transparent; color: var(--auth-accent); font: inherit; font-weight: 680; }
+.daynest-native #auth-view .tabs .tab { min-height: 44px; border: 0; background: transparent; color: var(--auth-accent); font: inherit; font-weight: 680; }
 .daynest-native #auth-view .tabs .tab { flex: none; padding-inline: 6px; }
-.daynest-native #auth-view .mobile-auth-help { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 10px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--auth-line); font-size: 13px; }
-.daynest-native #auth-view .mobile-auth-help button { color: var(--auth-muted); font-weight: 540; }
 .mobile-auth-error, .mobile-auth-connection { margin: 0; padding: 12px; border-radius: 12px; }
 .mobile-auth-error { color: var(--auth-error); background: var(--auth-error-paper); font-size: 14px; line-height: 1.5; }
 .mobile-auth-connection { background: var(--auth-field); color: var(--auth-muted); margin-bottom: 18px; }
@@ -173,7 +171,6 @@
   .daynest-native #auth-view { grid-template-columns: minmax(0, 1fr) minmax(390px, 480px); grid-template-rows: 1fr; }
   .daynest-native #auth-view .hero { padding: 36px; }
   .daynest-native #auth-view .auth-card { justify-content: center; margin: 0; padding: 26px 36px; border-radius: 0; }
-  .daynest-native #auth-view .mobile-auth-help { margin-top: 16px; }
 }
 @media (max-height: 520px) {
   .daynest-native #auth-view .hero { min-height: 0; padding-top: 16px; padding-bottom: 24px; }

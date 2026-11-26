@@ -45,6 +45,6 @@ function fixture(){
  const finishedSignal=auth.calls.at(-1).options.signal;auth.actor={...auth.actor,session:3};auth.client.cancelStale();assert(!finishedSignal.aborted,'completed request retained in active set');
  assert(new RequestError('safe') instanceof Error);
  const html=fs.readFileSync(path.join(dir,'index.html'),'utf8');for(const name of ['http-client.js','auth-state.js','auth-state.css'])assert(html.includes('/static/'+name));assert(html.indexOf('/static/http-client.js')<html.indexOf('/static/data-center.js'));
- for(const name of ['memos.js','data-center.js'])assert(fs.readFileSync(path.join(dir,name),'utf8').includes('DaynestHTTP.json'));
+ for(const name of ['data-center.js'])assert(fs.readFileSync(path.join(dir,name),'utf8').includes('DaynestHTTP.json'));
  console.log('HTTP auth: single expiry notice, no destructive logout or repeated protected requests, renewed same-token session works.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

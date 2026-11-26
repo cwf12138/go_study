@@ -1,0 +1,25 @@
+[Unit]
+Description=Daynest local English-to-Chinese translator
+After=network.target
+
+[Service]
+Type=simple
+User=daynest
+Group=daynest
+Environment=PYTHONPATH=/opt/daynest/reading-translator/python
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 /opt/daynest/reading-translator/reading-translator.py /opt/daynest/reading-translator/model
+Restart=on-failure
+RestartSec=2s
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictAddressFamilies=AF_UNIX AF_INET
+IPAddressDeny=any
+IPAddressAllow=localhost
+MemoryMax=600M
+
+[Install]
+WantedBy=multi-user.target

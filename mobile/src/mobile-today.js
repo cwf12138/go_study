@@ -62,7 +62,7 @@ function button(className, text, onClick) {
 
 export function installMobileToday() {
   let root, current, selection = 'pending', expanded = false, allTodos = false;
-  let buttons, card, agenda, todos, noteAction, savedMemo;
+  let buttons, card, agenda, todos;
   function mount() {
     root = document.getElementById('panel-dashboard');
     card = root.querySelector('.today-todos');
@@ -96,16 +96,7 @@ export function installMobileToday() {
     overview.append(segments);
     root.querySelector('.today-heading').after(overview);
 
-    noteAction = button('quiet mobile-today-note-action', '将刚保存的备忘录关联到待办', async () => {
-      if (!savedMemo || !window.DaynestActions?.openMemo) return;
-      try { await window.DaynestActions.openMemo(savedMemo, 0, 0); }
-      catch (error) { window.DaynestUI?.notify(error.message, 'error'); }
-    });
-    noteAction.hidden = true;
-    document.getElementById('today-note-form').after(noteAction);
     document.addEventListener('daynest:account-leaving', () => {
-      savedMemo = null;
-      noteAction.hidden = true;
       current = null;
       selection = 'pending';
       expanded = allTodos = false;
@@ -230,11 +221,6 @@ export function installMobileToday() {
       if (current && data.day !== current.day) expanded = allTodos = false;
       current = data;
       paint();
-    },
-    memoSaved(note) {
-      if (!noteAction || !note?.id) return;
-      savedMemo = note;
-      noteAction.hidden = false;
     },
   };
 }

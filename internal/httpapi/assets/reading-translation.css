@@ -1,0 +1,40 @@
+.reading-translation {
+  margin-block: .6rem 1rem;
+}
+.reading-translation > button,
+.english-original-actions > :is(button, a) {
+  min-height: 44px;
+}
+.reading-translation [data-translation-panel] {
+  margin-top: .65rem;
+  padding: .9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: inherit;
+}
+.reading-translation [data-translation-status] {
+  margin: 0;
+  font-size: .85rem;
+  font-weight: 650;
+}
+.reading-translation [data-translation-result]:not(:empty) {
+  margin-block-start: .55rem;
+  font-size: clamp(1rem, 2.5vw, 1.15rem);
+  line-height: 1.85;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.english-original-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+.english-original-actions a {
+  display: inline-flex;
+  align-items: center;
+}
+.english-original-actions[hidden],
+.english-original-actions button[hidden] {
+  display: none;
+}

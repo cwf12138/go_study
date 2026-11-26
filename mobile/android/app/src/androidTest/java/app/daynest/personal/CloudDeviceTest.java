@@ -133,9 +133,6 @@ public class CloudDeviceTest {
         waitFor("document.getElementById('todo-title').value === '' && document.getElementById('panel-todo').textContent.includes(" + JSONObject.quote(label + " todo") + ")", "new todo visible");
         report("create_todo_through_app_form");
 
-        evaluate("document.querySelector('.nav-link[data-view=dashboard]').click();document.getElementById('today-note').value=" + JSONObject.quote(label + " memo: written on the physical Android device") + ";document.getElementById('today-note-form').requestSubmit()");
-        waitFor("document.getElementById('today-note-status').textContent.includes('已存入备忘录')", "memo saved");
-        report("create_memo_through_app_form");
 
         evaluate("document.querySelector('.nav-link[data-view=calendar]').click()");
         waitFor("window.DaynestCalendarEvents && document.getElementById('page-title').textContent.includes('日历')", "calendar navigation");
@@ -161,9 +158,6 @@ public class CloudDeviceTest {
         evaluate("document.querySelector('.nav-link[data-view=todo]').click()");
         waitFor("document.getElementById('panel-todo').textContent.includes(" + JSONObject.quote(label + " todo") + ")", "todo reloaded from server");
         report("todo_reloaded_after_restart");
-        evaluate("document.querySelector('.nav-link[data-view=memos]').click()");
-        waitFor("document.getElementById('memo-note-list').textContent.includes(" + JSONObject.quote(label) + ")", "memo reloaded from server");
-        report("memo_reloaded_after_restart");
         evaluate("document.querySelector('.nav-link[data-view=dashboard]').click()");
     }
 
@@ -260,11 +254,8 @@ public class CloudDeviceTest {
         waitFor("document.getElementById('auth-view').dataset.mobileConnection === 'ready'", "redesigned sign-in");
         assertEquals("true", evaluate("document.documentElement.scrollWidth <= screen.width + 1 && document.getElementById('mobile-auth-heading').textContent==='欢迎回来'"));
         screenshot("auth-login");
-        tapVisible("#mobile-auth-settings");
-        waitFor("document.getElementById('mobile-connection').open", "connection settings");
-        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);
-        waitFor("!document.getElementById('mobile-connection').open", "back to sign-in");
-        report("connection_settings_and_native_back");
+        assertEquals("true", evaluate("document.getElementById('mobile-auth-settings').hidden && document.getElementById('mobile-auth-offline').hidden"));
+        report("healthy_login_hides_connection_and_offline_actions");
 
         tapVisible("[data-auth-tab=register]");
         waitFor("!document.getElementById('register-form').classList.contains('hidden')", "registration view");
@@ -566,7 +557,6 @@ public class CloudDeviceTest {
         waitFor("document.getElementById('today-todos').textContent.includes(" + todo + ")", "completed filter retains the same task");
         report("today_completion_moves_one_task_to_completed");
 
-        evaluate("document.getElementById('today-note').value=" + note + ";document.getElementById('today-note-form').requestSubmit()");
         clickOfflineControl(".mobile-today-note-action");
         waitFor("document.getElementById('action-dialog').open && document.getElementById('action-todo-title').value === " + note, "saved note opens the linked action form");
         evaluate("document.getElementById('action-create-form').requestSubmit()");
@@ -597,7 +587,9 @@ public class CloudDeviceTest {
         fixtureControl(args, "offline");
         evaluate("setTimeout(()=>location.reload(),0); true");
         waitFor("document.getElementById('auth-view').dataset.mobileConnection === 'offline'", "offline cold launch");
-        clickOfflineControl("#mobile-auth-local-todo");
+        clickOfflineControl("#mobile-auth-offline");
+        waitFor(frame + "?.querySelector('[data-offline-section=capture]')", "offline tabs loaded");
+        evaluate(frame + ".querySelector('[data-offline-section=capture]').click()");
         waitFor(inboxReady, "offline entry opens previously verified inbox");
         evaluate(frame + ".getElementById('ob-new').click()");
         waitFor(frame + "?.getElementById('ob-editor')?.hidden === false", "open a local draft");
@@ -609,7 +601,9 @@ public class CloudDeviceTest {
         clickOfflineControl("#mobile-offline-close");
         waitFor("!document.getElementById('mobile-offline-reader').open && " +
             "document.getElementById('mobile-offline-frame').getAttribute('src') === 'about:blank'", "close and detach offline reader after writing");
-        clickOfflineControl("#mobile-auth-local-todo");
+        clickOfflineControl("#mobile-auth-offline");
+        waitFor(frame + "?.querySelector('[data-offline-section=capture]')", "offline tabs loaded");
+        evaluate(frame + ".querySelector('[data-offline-section=capture]').click()");
         waitFor(inboxReady, "reopened offline reader has verified identity");
         waitFor(inboxReady + " && " + frame + ".getElementById('ob-items').textContent.includes(" + title + ")", "draft reopens offline");
         report("offline_cold_launch_can_save_and_reopen_draft");
@@ -657,24 +651,67 @@ public class CloudDeviceTest {
         waitFor("document.getElementById('mobile-server-bar').dataset.connectionState === 'online'", "connection restored on return");
         assertEquals("true", evaluate("DaynestAccount.current().userID === window.__deviceOwner"));
         report("resume_recovers_connection_and_keeps_session");
+        evaluate("location.hash='planner'");
+        waitFor("location.hash==='#calendar' && !document.querySelector('#panel-planner,#panel-goals,#panel-tasks')", "retired learning pages");
+        report("retired_learning_pages_redirect");
+    }
 
-        openMobilePage("planner");
-        waitFor("document.querySelectorAll('.mobile-planner-days button').length === 7", "weekly date picker");
-        evaluate("document.querySelector('.mobile-planner-days button:last-child').click()");
-        assertEquals("true", evaluate("document.getElementById('planner-block-date').value === document.querySelector('.mobile-planner-days button:last-child').dataset.mobilePlannerDay"));
-        String title = args.getString("qaLabel") + " planner";
-        evaluate("document.getElementById('planner-block-title').value=" + JSONObject.quote(title) + ";document.getElementById('planner-block-start').value='13:00';document.getElementById('planner-block-end').value='13:50'");
-        fixtureControl(args, "hold-write");
-        try {
-            evaluate("document.getElementById('planner-block-form').requestSubmit()");
-            waitFor("document.querySelector('#planner-block-form button[type=submit]').disabled", "planner save pending");
-            evaluate("document.getElementById('planner-block-form').requestSubmit();document.getElementById('planner-block-title').value='Next entry draft';document.getElementById('planner-block-title').dispatchEvent(new Event('input',{bubbles:true}))");
-        } finally {
-            fixtureControl(args, "release-write");
+    @Test public void learningRetirementWorksOnPhysicalPhone() throws Exception {
+        assumeTrue("Requires a dedicated learning retirement fixture", "true".equals(InstrumentationRegistry.getArguments().getString("qaLearningRetirementFixture")));
+        Bundle args = openIsolatedFixture();
+        evaluate("document.getElementById('login-email').value=" + JSONObject.quote(args.getString("qaEmail")) +
+            ";document.getElementById('login-password').value=" + JSONObject.quote(args.getString("qaPassword")) +
+            ";document.getElementById('login-form').requestSubmit()");
+        waitFor("window.DaynestAccount?.current?.() && !document.getElementById('mobile-tabs').hidden", "isolated fixture login");
+
+        tapVisible("[data-mobile-view=all]");
+        waitFor("document.getElementById('mobile-functions').open && document.querySelector('[data-mobile-target=todo]')", "function directory");
+        for (String view : new String[]{"goals", "tasks", "insights", "planner"}) {
+            assertEquals("Retired view " + view, "false",
+                evaluate("Boolean(document.querySelector('#panel-" + view + ",.nav-link[data-view=" + view + "],[data-mobile-target=" + view + "]'))"));
         }
-        waitFor("document.querySelector('.planner-day-column[data-mobile-day-active]').textContent.includes(" + JSONObject.quote(title) + ")", "weekly planner readback");
-        assertEquals("\"Next entry draft\"", evaluate("document.getElementById('planner-block-title').value"));
-        report("planner_selected_day_and_pending_edit_preserved");
+        tapVisible("#mobile-functions-close");
+        report("retired_learning_entries_absent");
+
+        for (String[] route : new String[][]{{"goals", "vocabulary"}, {"tasks", "todo"}, {"insights", "vocabulary"}, {"planner", "calendar"}}) {
+            evaluate("location.hash=" + JSONObject.quote(route[0]));
+            String destination = route[1];
+            waitFor("location.hash==='#" + destination + "' && document.body.dataset.mobileView==='" + destination + "'", "legacy link " + route[0]);
+        }
+        report("legacy_learning_links_redirect");
+
+        waitFor("document.querySelectorAll('[data-calendar-date]').length >= 28", "calendar shows month dates");
+        String month = evaluate("document.getElementById('calendar-title').textContent");
+        clickOfflineControl("#calendar-next");
+        waitFor("document.getElementById('calendar-title').textContent !== " + month + " && document.querySelectorAll('[data-calendar-date]').length >= 28", "next calendar month");
+        report("calendar_month_renders_and_navigates");
+
+        String title = JSONObject.quote(args.getString("qaLabel") + " focus todo");
+        openMobilePage("todo");
+        clickOfflineControl("#mobile-page-action");
+        waitFor("document.getElementById('mobile-todo-create').open", "todo creation sheet");
+        evaluate("document.getElementById('todo-title').value=" + title +
+            ";document.getElementById('todo-my-day').checked=true;document.getElementById('todo-form').requestSubmit()");
+        waitFor("Array.from(document.querySelectorAll('.todo-item h4')).some(el => el.textContent === " + title + ")", "fixture todo appears in list");
+        report("todo_created_in_app");
+
+        openMobilePage("focus");
+        waitFor("Array.from(document.querySelectorAll('#focus-task option')).some(el => el.value.startsWith('todo:') && el.textContent.includes(" + title + "))", "todo available to focus");
+        String focusState = "document.getElementById('panel-focus').dataset.focusState";
+        evaluate("const task=document.getElementById('focus-task');task.value=Array.from(task.options).find(el => el.textContent.includes(" + title +
+            ")).value;task.dispatchEvent(new Event('change'));document.getElementById('focus-minutes').value=2;document.getElementById('focus-break-enabled').checked=false");
+        clickOfflineControl("#start-focus");
+        waitFor(focusState + " === 'running' && document.getElementById('focus-task').value.startsWith('todo:')", "todo focus started");
+        clickOfflineControl("#pause-focus");
+        waitFor(focusState + " === 'paused'", "focus paused");
+        String time = evaluate("document.getElementById('focus-clock').textContent");
+        SystemClock.sleep(1200);
+        assertEquals("Paused time is stable", time, evaluate("document.getElementById('focus-clock').textContent"));
+        clickOfflineControl("#resume-focus");
+        waitFor(focusState + " === 'running' && document.getElementById('focus-clock').textContent !== " + time, "focus countdown resumed");
+        clickOfflineControl("#finish-focus");
+        waitFor(focusState + " === 'idle' && document.getElementById('focus-action-status').textContent.includes('已记录')", "focus record saved");
+        report("todo_focus_starts_pauses_resumes_and_saves");
     }
 
     private void reminderEvent(String email, String password) throws Exception {
@@ -1023,32 +1060,13 @@ public class CloudDeviceTest {
         report("full_screen_function_search_and_native_back");
 
         tapVisible("#mobile-tabs [data-mobile-view=all]");
-        tapVisible("[data-mobile-category=记录]");
-        tapVisible("[data-mobile-target=memos]");
-        waitFor("document.body.dataset.mobileView==='memos'", "memo page");
-        tapVisible("#mobile-page-action");
-        waitFor("document.body.classList.contains('mobile-memo-editor') && document.getElementById('memo-title').value==='新备忘录'", "new memo ready");
-        evaluate("{const title=document.getElementById('memo-title');title.value=" + JSONObject.quote(label + " memo") + ";title.dispatchEvent(new Event('input',{bubbles:true}));const body=document.getElementById('memo-content');body.value='Native preview fixture';body.dispatchEvent(new Event('input',{bubbles:true}));body.focus()}");
-        instrumentation.runOnMainSync(() -> {
-            webView.requestFocus();
-            InputMethodManager manager = (InputMethodManager) instrumentation.getTargetContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-            manager.showSoftInput(webView, InputMethodManager.SHOW_IMPLICIT);
-        });
-        waitFor("document.body.classList.contains('mobile-keyboard-open')", "memo uses real keyboard");
-        assertEquals("true", evaluate("!document.getElementById('mobile-tabs').getClientRects().length && document.getElementById('memo-save').getBoundingClientRect().bottom <= visualViewport.height"));
-        screenshot("preview-memo-keyboard");
-        tapVisible("#memo-save");
-        evaluate("window.__previewMemo=false;(async()=>{for(let i=0;i<50;i++){const r=await DaynestHTTP.json('/api/v1/memos');if(JSON.stringify(r).includes(" + JSONObject.quote(label + " memo") + ")){window.__previewMemo=true;return}await new Promise(resolve=>setTimeout(resolve,200));}})()");
-        waitFor("window.__previewMemo", "memo visible in native API after save");
-        instrumentation.runOnMainSync(() -> {
-            InputMethodManager manager = (InputMethodManager) instrumentation.getTargetContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-            manager.hideSoftInputFromWindow(webView.getWindowToken(), 0);
-        });
-        evaluate("document.activeElement.blur()");
-        waitFor("!document.body.classList.contains('mobile-keyboard-open')", "keyboard dismissed");
-        instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);
-        waitFor("!document.body.classList.contains('mobile-memo-editor')", "memo back to list");
-        report("real_keyboard_memo_save_and_native_back");
+        assertEquals("0", evaluate("document.querySelectorAll('[data-mobile-target=memos],[data-mobile-target=inventory]').length"));
+        tapVisible("#mobile-functions-close");
+        for (String view : new String[]{"memos", "inventory"}) {
+            evaluate("location.hash=" + JSONObject.quote("#" + view));
+            waitFor("location.hash==='#dashboard' && document.body.dataset.mobileView==='dashboard'", "retired feature returns home");
+        }
+        report("retired_memos_and_inventory_are_absent");
 
         tapVisible("#mobile-tabs [data-mobile-view=calendar]");
         waitFor("document.body.dataset.mobileView==='calendar' && document.querySelectorAll('.calendar-month-grid .calendar-day-cell').length===42", "complete calendar month");
@@ -1083,7 +1101,7 @@ public class CloudDeviceTest {
         waitFor("!document.getElementById('mobile-functions').open", "Android back closes functions");
         report("function_search_and_native_back");
 
-        String[][] dialogs = {{"ledger", "ledger-new"}, {"subscriptions", "sub-new"}, {"care", "care-new"}, {"fitness", "fit-log-open"}};
+        String[][] dialogs = {{"ledger", "ledger-new"}, {"subscriptions", "sub-new"}, {"fitness", "fit-log-open"}};
         for (String[] entry : dialogs) {
             openMobilePage(entry[0]);
             evaluate("document.getElementById(" + JSONObject.quote(entry[1]) + ").click()");
@@ -1095,26 +1113,18 @@ public class CloudDeviceTest {
             report("dialog_" + entry[0]);
         }
 
-        openMobilePage("memos");
-        evaluate("document.getElementById('memo-new').click()");
-        waitFor("!document.getElementById('memo-new').disabled && document.getElementById('memo-title').value === '新备忘录' && document.body.classList.contains('mobile-memo-editor') && !document.getElementById('memo-editor').classList.contains('hidden') && Math.abs(document.querySelector('.memo-editor-pane').getBoundingClientRect().left)<1", "new memo ready in full screen editor");
-        String title = label + " mobile editor " + SystemClock.elapsedRealtime();
-        evaluate("document.getElementById('memo-title').value=" + JSONObject.quote(title) + ";document.getElementById('memo-title').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('memo-content').value='Native mobile editor save and keyboard verification';document.getElementById('memo-content').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('memo-save').click()");
-        evaluate("window.__qaMemoVerified=false;(async()=>{for(let i=0;i<80;i++){const response=await fetch('/api/v1/memos',{headers:{Authorization:'Bearer '+localStorage.getItem('studyflow.token')}});if(response.ok){const body=JSON.stringify(await response.json());if(body.includes(" + JSONObject.quote(title) + ")&&body.includes('Native mobile editor save and keyboard verification')){window.__qaMemoVerified=true;return;}}await new Promise(resolve=>setTimeout(resolve,250));}})()");
-        waitFor("window.__qaMemoVerified", "saved memo read back from server");
-        assertEquals("true", evaluate("(()=>{const r=document.getElementById('memo-save').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight})()"));
-        screenshot("memo-editor");
-        report("memo_editor_save_control_and_real_save");
-
-        evaluate("document.getElementById('memo-content').focus()");
+        openMobilePage("calendar");
+        tapVisible("#mobile-page-action");
+        waitFor("document.getElementById('calendar-event-dialog').open", "calendar editor");
+        evaluate("document.getElementById('calendar-event-title').focus()");
         instrumentation.runOnMainSync(() -> {
             webView.requestFocus();
             InputMethodManager manager = (InputMethodManager) instrumentation.getTargetContext().getSystemService(Context.INPUT_METHOD_SERVICE);
             manager.showSoftInput(webView, InputMethodManager.SHOW_IMPLICIT);
         });
         waitFor("document.body.classList.contains('mobile-keyboard-open')", "real keyboard resize");
-        assertEquals("true", evaluate("(()=>{const r=document.getElementById('memo-save').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=(window.visualViewport?.height||innerHeight)})()"));
-        screenshot("memo-keyboard");
+        assertEquals("true", evaluate("(()=>{const r=document.getElementById('calendar-event-save').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=(window.visualViewport?.height||innerHeight)})()"));
+        screenshot("calendar-keyboard");
         report("real_keyboard_preserves_save_action");
         instrumentation.runOnMainSync(() -> {
             InputMethodManager manager = (InputMethodManager) instrumentation.getTargetContext().getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -1123,8 +1133,8 @@ public class CloudDeviceTest {
         evaluate("document.activeElement.blur()");
         waitFor("!document.body.classList.contains('mobile-keyboard-open')", "keyboard closed");
         instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK);
-        waitFor("!document.body.classList.contains('mobile-memo-editor')", "back returns to memo list");
-        report("native_back_preserves_memo");
+        waitFor("!document.getElementById('calendar-event-dialog').open", "back closes the calendar editor");
+        report("native_back_closes_calendar_editor");
         openMobilePage("dashboard");
     }
 }

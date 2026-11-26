@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"net"
 	"net/http"
@@ -37,7 +39,7 @@ var englishHTMLTags = regexp.MustCompile(`<[^>]*>`)
 var englishSources = []englishFeedSource{
 	{Name: "ScienceDaily", URL: "https://www.sciencedaily.com/rss/top/science.xml", Homepage: "https://www.sciencedaily.com/", Category: "science"},
 	{Name: "ScienceDaily Technology", URL: "https://www.sciencedaily.com/rss/top/technology.xml", Homepage: "https://www.sciencedaily.com/news/matter_energy/technology/", Category: "technology"},
-	{Name: "UN News", URL: "https://news.un.org/feed/subscribe/en/news/all/rss.xml", Homepage: "https://news.un.org/en/", Category: "world"},
+	{Name: "NASA News", URL: "https://www.nasa.gov/news-release/feed/", Homepage: "https://www.nasa.gov/news/releases/", Category: "space"},
 }
 
 type rssDocument struct {
@@ -86,9 +88,9 @@ func (s *Service) EnglishFeed(ctx context.Context, refresh bool) (domain.English
 		s.englishFetching = nil
 		s.englishMu.Unlock()
 	}()
-	requestCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
+	requestCtx, cancel := context.WithTimeout(ctx, 7*time.Second)
 	defer cancel()
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{Timeout: 7 * time.Second}
 	results := make(chan englishFetchResult, len(englishSources))
 	for _, source := range englishSources {
 		go func(source englishFeedSource) {
@@ -97,11 +99,13 @@ func (s *Service) EnglishFeed(ctx context.Context, refresh bool) (domain.English
 		}(source)
 	}
 	feed := domain.EnglishFeed{Articles: []domain.EnglishArticle{}, Sources: []domain.EnglishSourceStatus{}, FetchedAt: now}
+	successful := false
 	for range englishSources {
 		result := <-results
 		status := domain.EnglishSourceStatus{Name: result.source.Name, URL: result.source.Homepage, Available: result.err == nil}
 		if result.err == nil {
 			status.LastSuccessAt = &now
+			successful = true
 		} else {
 			feed.Degraded = true
 			status.Error = englishSourceError(result.err)
@@ -124,11 +128,26 @@ func (s *Service) EnglishFeed(ctx context.Context, refresh bool) (domain.English
 		feed.Articles = append(feed.Articles, result.articles...)
 	}
 	sort.Slice(feed.Sources, func(i, j int) bool { return feed.Sources[i].Name < feed.Sources[j].Name })
-	sort.Slice(feed.Articles, func(i, j int) bool { return feed.Articles[i].PublishedAt.After(feed.Articles[j].PublishedAt) })
+	sort.Slice(feed.Articles, func(i, j int) bool {
+		a, b := feed.Articles[i], feed.Articles[j]
+		if a.PublishedAt.Equal(b.PublishedAt) {
+			return a.Source < b.Source || a.Source == b.Source && a.ID < b.ID
+		}
+		return a.PublishedAt.After(b.PublishedAt)
+	})
+	seen := make(map[string]bool)
+	unique := feed.Articles[:0]
+	for _, article := range feed.Articles {
+		if !seen[article.ID] {
+			seen[article.ID] = true
+			unique = append(unique, article)
+		}
+	}
+	feed.Articles = unique
 	if len(feed.Articles) == 0 {
 		feed.Degraded = true
 		feed.Offline = true
-		feed.Articles = offlineEnglishArticles(now)
+		feed.Articles = offlineEnglishArticles()
 	}
 	if len(feed.Articles) > 48 {
 		feed.Articles = feed.Articles[:48]
@@ -145,7 +164,29 @@ func (s *Service) EnglishFeed(ctx context.Context, refresh bool) (domain.English
 	s.englishMu.Lock()
 	s.englishCache = englishCacheEntry{feed: feed, expiresAt: feed.NextRefreshAt}
 	s.englishMu.Unlock()
+	if successful && s.readingCacheDir != "" {
+		if raw, err := json.Marshal(feed); err == nil {
+			_ = s.writeReadingCache(englishCacheFile, raw)
+		}
+	}
 	return feed, nil
+}
+
+func (s *Service) EnglishPractice() domain.EnglishFeed {
+	return domain.EnglishFeed{Offline: true, Articles: offlineEnglishArticles(), Sources: []domain.EnglishSourceStatus{}}
+}
+
+func (s *Service) RefreshEnglishPeriodically(ctx context.Context) {
+	ticker := time.NewTicker(20 * time.Minute)
+	defer ticker.Stop()
+	for {
+		_, _ = s.EnglishFeed(ctx, false)
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+	}
 }
 
 type englishHTTPError int
@@ -173,7 +214,7 @@ func fetchEnglishSource(ctx context.Context, client *http.Client, source english
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "StudyFlow/1.0 (+local learning RSS reader)")
+	req.Header.Set("User-Agent", "Daynest/1.0 (personal RSS reader)")
 	req.Header.Set("Accept", "application/rss+xml, application/atom+xml, application/xml, text/xml")
 	resp, err := client.Do(req)
 	if err != nil {
@@ -239,6 +280,7 @@ func fetchEnglishSource(ctx context.Context, client *http.Client, source english
 }
 
 func cleanEnglishText(value string, limit int) string {
+	value = html.UnescapeString(value)
 	value = englishHTMLTags.ReplaceAllString(value, " ")
 	value = strings.Join(strings.Fields(value), " ")
 	if utf8.RuneCountInString(value) <= limit {
@@ -295,17 +337,21 @@ func englishDifficulty(value string) string {
 	return "B1"
 }
 
-func offlineEnglishArticles(now time.Time) []domain.EnglishArticle {
+func offlineEnglishArticles() []domain.EnglishArticle {
 	items := []struct{ title, summary, category, level string }{
 		{"Why Small Habits Are Easier to Keep", "A useful habit does not need to feel impressive. When an action is small, the cost of starting becomes lower. Repeating it at a stable time also gives the brain a clear cue. The real goal is not one perfect study session, but a system that makes returning easier tomorrow.", "learning", "B1"},
 		{"How Curiosity Improves Deep Reading", "Strong readers do more than collect facts. They pause to predict, question, and connect each idea with something they already know. This active process may feel slower, yet it creates a richer mental model and makes the article easier to recall later.", "learning", "B2"},
 		{"The Hidden Cost of Constant Context Switching", "Moving rapidly between messages, documents, and difficult problems creates cognitive residue. Part of our attention remains attached to the previous task, so the next task receives fewer mental resources. Protecting even a short uninterrupted block can therefore improve both speed and accuracy.", "technology", "C1"},
+		{"A Quiet Place in a Busy City", "On her way home, Mina found a small garden behind the train station. She had walked past the gate for months without noticing it. Inside, people were reading, talking, and watering plants. Mina started visiting once a week. The garden did not make her journey shorter, but it made the journey feel like time she could enjoy.", "world", "B1"},
+		{"What a Shadow Can Tell Us", "One afternoon, two friends marked the end of a tree's shadow with a stone. They returned an hour later and found that the shadow pointed in a different direction. Instead of moving the stone, they placed a second one. As the markers formed a pattern, they began to understand how a simple observation can reveal a change we rarely notice.", "science", "B1"},
+		{"A Picture That Took Years to Arrive", "Looking at a distant star is also a way of looking back in time. Its light travels for years before it reaches Earth. A telescope can capture more of that faint light than the human eye. Astronomers compare what they see with measurements at other wavelengths, because a single image rarely tells the whole story.", "space", "B2"},
+		{"When a Good Measure Becomes a Bad Target", "A metric can illuminate a complex problem by making one aspect of it easier to observe. Once rewards depend on that metric, however, people often adjust their behaviour to improve the number. The original goal may receive less attention. This tension explains why thoughtful teams treat measurements as evidence alongside judgement, rather than as substitutes for judgement.", "learning", "C1"},
 	}
 	articles := make([]domain.EnglishArticle, 0, len(items))
 	for index, item := range items {
 		words := englishWordCount(item.summary)
 		link := fmt.Sprintf("studyflow://english-lab/%d", index+1)
-		articles = append(articles, domain.EnglishArticle{ID: englishArticleID(link), Title: item.title, Summary: item.summary, Source: "StudyFlow Reading Lab", Category: item.category, Difficulty: item.level, PublishedAt: now.Add(-time.Duration(index) * time.Hour), ReadingMinutes: max(1, (words+179)/180), WordCount: words, Offline: true})
+		articles = append(articles, domain.EnglishArticle{ID: englishArticleID(link), Title: item.title, Summary: item.summary, Source: "Daynest 原创练习", Category: item.category, Difficulty: item.level, ReadingMinutes: max(1, (words+179)/180), WordCount: words, Offline: true})
 	}
 	return articles
 }

@@ -13,7 +13,6 @@
 ```powershell
 node tools/organizer_ui_smoke.cjs
 node tools/calendar_ui_smoke.cjs
-node tools/memos_ui_smoke.cjs
 go test ./...
 ```
 

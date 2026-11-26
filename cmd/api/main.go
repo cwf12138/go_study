@@ -67,6 +67,9 @@ func main() {
 	bus := event.NewBus()
 	tokens := security.NewTokenManager(cfg.JWTSecret, cfg.JWTIssuer, cfg.TokenTTL)
 	services := service.New(repository, tokens, bus)
+	if err := services.SetReadingCache(filepath.Join(filepath.Dir(cfg.DataFile), "reading-cache")); err != nil {
+		logger.Warn("reading cache unavailable", "error", err)
+	}
 	handler := httpapi.NewHandler(services, tokens, bus, logger, httpapi.RuntimeOptions{SnapshotInterval: cfg.SnapshotInterval})
 
 	server := &http.Server{
@@ -82,7 +85,15 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	var background sync.WaitGroup
-	background.Add(2)
+	background.Add(4)
+	go func() {
+		defer background.Done()
+		services.RefreshEnglishPeriodically(ctx)
+	}()
+	go func() {
+		defer background.Done()
+		services.RefreshBookCatalogPeriodically(ctx, logger)
+	}()
 	go func() {
 		defer background.Done()
 		event.RunWorkerPool(ctx, logger, bus, cfg.WorkerCount, func(_ context.Context, evt event.Event) error {

@@ -15,7 +15,8 @@ export function boot({ Http, App, Files, defaultServer = '', appVersion = '' }) 
   async function nativeRequest(origin, path, options = {}) {
     if (options.signal?.aborted) throw abortError();
     const headers = Object.fromEntries(new Headers(options.headers || {}));
-    const readTimeout = path === '/api/v1/meals/ai/recommend' || path === '/api/v1/todo-assist/steps' ? 65000 : 25000;
+    const longResponse = path === '/api/v1/meals/ai/recommend' || path === '/api/v1/todo-assist/steps' || path === '/api/v1/reading/translate' || /^\/api\/v1\/literature\/shelf\/[^/]+\/content$/.test(path);
+    const readTimeout = longResponse ? 65000 : 25000;
     const response = await race(Http.request({ url: origin + path, method: options.method || 'GET', headers, data: options.body, connectTimeout: 8000, readTimeout, disableRedirects: true, responseType: 'text' }), options.signal);
     if (response.status >= 300 && response.status < 400) throw Error('服务返回重定向，请填写最终服务地址；不会自动转发登录令牌。');
     if (response.url && new URL(response.url).origin !== origin) throw Error('服务地址改变，已拒绝展示跨地址响应。');
@@ -168,7 +169,6 @@ export function boot({ Http, App, Files, defaultServer = '', appVersion = '' }) 
       openSettings,
       retry: () => fatal ? location.reload() : connect(),
       offline: () => window.DaynestMobile.openOfflineReader(),
-      localTodo: () => window.DaynestMobile.openOfflineReader('capture'),
     });
     window.DaynestMobile.showAuthError = auth.showError;
     $('offline-close').addEventListener('click',closeReader);
@@ -280,11 +280,14 @@ export function boot({ Http, App, Files, defaultServer = '', appVersion = '' }) 
         if (check.signal.aborted) return;
         updateConnectionStatus(true);
         state('已连接');
+        if (authVisible()) auth.connection('ready', '', true);
         if (token()) document.getElementById('app-sync-retry')?.click();
       } catch (error) {
         if (!check.signal.aborted) {
           updateConnectionStatus(false);
-          state(error.message || '暂时无法连接，请检查手机网络后重试。');
+          const message = error.message || '暂时无法连接，请检查手机网络后重试。';
+          state(message);
+          if (authVisible()) auth.connection('offline', message, true);
         }
       } finally {
         if (foregroundCheck === check) foregroundCheck = undefined;
@@ -309,23 +312,18 @@ function installMobileAuth(actions) {
   tabs.removeAttribute('role');
   const note = document.createElement('span'); tabs.prepend(note);
   card.append(tabs);
-  card.querySelector('.hint')?.remove();
   const oldOffline = document.getElementById('auth-offline-open');
   if (oldOffline) oldOffline.hidden = true;
   const status = document.createElement('section');
   status.className = 'mobile-auth-connection';
-  status.innerHTML = '<p role="status"></p><div class="mobile-auth-connection-actions"><button type="button" class="quiet" data-mobile-retry hidden>重试连接</button><button id="mobile-auth-local-todo" type="button" class="quiet" hidden>打开本机待办</button></div>';
+  status.innerHTML = '<p role="status"></p><div class="mobile-auth-connection-actions"><button type="button" class="quiet" data-mobile-retry hidden>重试连接</button><button id="mobile-auth-settings" type="button" class="quiet" hidden>连接设置</button><button id="mobile-auth-offline" type="button" class="quiet" hidden>离线资料</button></div>';
   intro.after(status);
-  const help = document.createElement('footer');
-  help.className = 'mobile-auth-help';
-  help.innerHTML = '<button type="button" id="mobile-auth-settings">连接设置</button><button type="button" id="mobile-auth-offline" hidden>离线资料</button>';
-  card.append(help);
-  const retry = status.querySelector('[data-mobile-retry]'), settings = help.firstElementChild, offline = help.lastElementChild;
-  const localTodo = status.querySelector('#mobile-auth-local-todo');
+  const retry = status.querySelector('[data-mobile-retry]');
+  const settings = status.querySelector('#mobile-auth-settings');
+  const offline = status.querySelector('#mobile-auth-offline');
   retry.addEventListener('click', actions.retry);
   settings.addEventListener('click', actions.openSettings);
   offline.addEventListener('click', actions.offline);
-  localTodo.addEventListener('click', actions.localTodo);
 
   const hidePasswords = forms.map(form => {
     const password = form.querySelector('input[type="password"]');
@@ -401,8 +399,8 @@ function installMobileAuth(actions) {
       status.hidden = phase === 'ready';
       status.querySelector('p').textContent = phase === 'connecting' ? '正在检查服务连接…' : message;
       retry.hidden = phase !== 'offline';
-      localTodo.hidden = phase === 'ready' || !canReadOffline;
-      offline.hidden = !canReadOffline;
+      settings.hidden = phase !== 'offline';
+      offline.hidden = phase !== 'offline' || !canReadOffline;
       render();
     },
     showError(formID, error) {

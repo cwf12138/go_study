@@ -29,19 +29,37 @@ const pass=name=>{report.checks.push({name,passed:true});console.log('PASS '+nam
  assert((await page.inputValue('#ld-local')).includes('散步'));await page.locator('#ld-dialog').screenshot({path:path.join(out,'record-drafts-desktop.png')});const before=writes;await page.click('#ld-restore');await page.waitForSelector('#ld-dialog:not([open])',{state:'attached'});assert.equal(await page.inputValue('#mood-note'),'刷新后继续这段心情长文。');assert.equal(await page.inputValue('#mood-value'),'great');await page.waitForTimeout(850);assert.equal(writes,before);
  await page.click('#mood-form button[type=submit]');await page.waitForFunction(()=>document.getElementById('mood-draft-status').textContent.includes('已提交服务'));assert.equal((await request('/api/v1/moods?month='+date.slice(0,7))).find(r=>r.date===date).note,'刷新后继续这段心情长文。');
  pass('mood_reload_complete_fields_manual_save');
- await page.goto(origin+'/#insights',{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.getElementById('weekly-wins').value==='服务端复盘原文');
- await page.fill('#weekly-wins','保留未完成的本周复盘');await page.fill('#weekly-challenges','写到一半的困难');await page.fill('#weekly-lessons','新的经验');await page.fill('#weekly-priorities','第一件事\n第二件事');await page.selectOption('#weekly-satisfaction','5');
- await page.click('#weekly-review-prev');await page.waitForFunction(()=>!document.getElementById('weekly-wins').disabled&&document.getElementById('weekly-wins').value==='');
- await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.getElementById('weekly-wins').value==='服务端复盘原文');await page.click('#ld-weekly-open');await page.waitForFunction(()=>!document.getElementById('ld-restore').disabled);assert((await page.inputValue('#ld-local')).includes('第二件事'));
- await page.click('#ld-restore');await page.waitForSelector('#ld-dialog:not([open])',{state:'attached'});assert.equal(await page.inputValue('#weekly-lessons'),'新的经验');assert.equal(await page.inputValue('#weekly-satisfaction'),'5');await page.click('#weekly-reflection-form button[type=submit]');await page.waitForFunction(()=>document.getElementById('weekly-reflection-status').textContent.includes('已提交服务'));const reviewed=await request('/api/v1/reviews/weekly?week_start='+week);assert.equal(reviewed.reflection.wins,'保留未完成的本周复盘');assert.deepEqual(reviewed.reflection.next_week_priorities,['第一件事','第二件事']);
- pass('weekly_switch_reload_original_week_and_all_fields');
+ const retiredRequests=[];
+ page.on('request',r=>{if(/\/analytics\/learning|\/reviews\/weekly/.test(r.url()))retiredRequests.push(r.url());});
+ await page.goto(origin+'/#insights',{waitUntil:'domcontentloaded'});
+ await page.waitForSelector('#panel-vocabulary.active');assert.equal(new URL(page.url()).hash,'#vocabulary');
+ assert.equal(await page.locator('#panel-insights').count(),0);
  await page.goto(origin+'/#moods',{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.getElementById('mood-note').value==='刷新后继续这段心情长文。');
+ await page.evaluate(week=>{
+   const core=window.DaynestRecordDraftCore,account=window.DaynestAccount.current();
+   core.create(localStorage,core.scope(account.server,account.userID)).put({
+     version:1,id:'legacy-archive-fixture',kind:'weekly',key:week,generation:1,savedAt:Date.now(),baseVersion:'',
+     base:core.fields('weekly'),value:core.fields('weekly',{wins:'保留未完成的本周复盘',lessons:'新的经验',priorities:'第一件事\n第二件事'}),
+   });
+ },week);
+ await page.click('#ld-mood-open');await page.click('[data-ld-kind=weekly]');
+ assert((await page.inputValue('#ld-local')).includes('第二件事'));
+ assert(await page.locator('#ld-restore').isHidden());
+ assert.equal(await page.locator('#ld-copy').count(),0);
+ const download=page.waitForEvent('download');
+ await page.click('#ld-export');
+ assert((await download).suggestedFilename().endsWith('-草稿.md'));
+ assert.equal((await request('/api/v1/reviews/weekly?week_start='+week)).reflection.wins,'服务端复盘原文');
+ assert.deepEqual(retiredRequests,[]);await page.click('#ld-close');
+ pass('retired_route_redirect_and_local_archive_copy');
  const second=await context.newPage();await second.goto(origin+'/#moods',{waitUntil:'domcontentloaded'});await second.waitForFunction(()=>document.getElementById('mood-note').value==='刷新后继续这段心情长文。');
  await page.fill('#mood-note','第一窗口已提交的新心情');await page.click('#mood-form button[type=submit]');await page.waitForFunction(()=>document.getElementById('mood-draft-status').textContent.includes('已提交服务'));
  await second.fill('#mood-note','第二窗口需要保留的独立内容');await second.click('#mood-form button[type=submit]');await second.waitForFunction(()=>document.getElementById('mood-draft-status').textContent.includes('服务端也有修改'));await second.click('#ld-mood-open');await second.waitForFunction(()=>document.getElementById('ld-status').textContent.includes('服务端也有修改'));assert(await second.locator('#ld-restore').isDisabled());assert((await second.inputValue('#ld-local')).includes('第二窗口需要保留的独立内容'));assert((await second.inputValue('#ld-server')).includes('第一窗口已提交的新心情'));
  await second.setViewportSize({width:390,height:844});await second.locator('#ld-dialog').screenshot({path:path.join(out,'record-drafts-mobile.png')});assert(await second.locator('#ld-dialog').evaluate(e=>e.scrollWidth<=e.clientWidth+1));let box=await second.locator('#ld-dialog').boundingBox();assert(box.width<=390&&box.height<=844);
  await second.setViewportSize({width:1440,height:1100});await second.evaluate(()=>document.documentElement.dataset.theme='dark');await second.locator('#ld-dialog').screenshot({path:path.join(out,'record-drafts-dark.png')});
- await second.click('#ld-copy');await second.waitForFunction(()=>document.getElementById('ld-status').textContent.includes('服务已接收新备忘录'));const memos=await request('/api/v1/memos');assert(memos.some(m=>m.title.includes('心情日记（草稿保留）')));assert.equal((await request('/api/v1/moods?month='+date.slice(0,7))).find(r=>r.date===date).note,'第一窗口已提交的新心情');pass('real_two_window_conflict_copy_and_responsive_layouts');
+ assert.equal(await second.locator('#ld-copy').count(),0);
+ assert.equal((await request('/api/v1/moods?month='+date.slice(0,7))).find(r=>r.date===date).note,'第一窗口已提交的新心情');
+ pass('real_two_window_conflict_and_responsive_layouts');
  await second.route('**/api/v1/moods?**',r=>r.abort('failed'));await second.locator('#ld-list button').first().click();await second.waitForFunction(()=>document.getElementById('ld-status').textContent.includes('本机文字仍可导出'));await second.evaluate(()=>{window.DaynestMobile={saveBlob:async(blob,name,owner)=>{window.__draftFile={text:await blob.text(),name,ownerMatches:owner===localStorage.getItem('studyflow.token')};}};});await second.click('#ld-export');await second.waitForFunction(()=>!!window.__draftFile);const exported=await second.evaluate(()=>window.__draftFile);assert(exported.ownerMatches&&exported.text.includes('第二窗口需要保留的独立内容')&&exported.text.includes('心情：很好'));pass('offline_complete_text_and_native_file_handoff');
  await second.click('#ld-close');await second.click('#logout');await second.waitForSelector('#auth-view:not(.hidden)');assert.equal(await second.inputValue('#mood-note'),'');assert.equal(await second.locator('[data-mood-extra]').count(),0);assert.equal(await second.locator('#ld-dialog').getAttribute('open'),null);assert(!(await second.locator('#ld-list').textContent()).includes('第二窗口需要保留的独立内容'));pass('logout_clears_editor_and_preview_retains_scoped_draft');
  assert.deepEqual(errors,[]);report.passed=true;

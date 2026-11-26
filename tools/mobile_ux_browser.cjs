@@ -26,9 +26,13 @@ async function go(view) {
   assert(ready, 'isolated API starts');
   const account = (await (await fetch(origin + '/api/v1/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Mobile UX', email: 'mobile-ux@example.test', password: crypto.randomBytes(24).toString('hex') }) })).json()).data;
   const bridge = fs.readFileSync(path.join(root, 'mobile/src/core.js'), 'utf8') + '\n' + fs.readFileSync(path.join(root, 'mobile/src/mobile-client.js'), 'utf8').replace('export function boot', 'function boot') + '\n' + fs.readFileSync(path.join(root, 'mobile/src/mobile-ux.js'), 'utf8').replace('export function installMobileUX', 'function installMobileUX') + '\n' +
-    fs.readFileSync(path.join(root, 'mobile/src/mobile-reminders.js'), 'utf8').replaceAll('export function ', 'function ') + `
+    fs.readFileSync(path.join(root, 'mobile/src/mobile-today.js'), 'utf8').replaceAll('export function ', 'function ') + '\n' +
+    fs.readFileSync(path.join(root, 'mobile/src/mobile-reminders.js'), 'utf8').replaceAll('export function ', 'function ') + '\n' +
+    fs.readFileSync(path.join(root, 'mobile/src/mobile-browsers.js'), 'utf8').replace('export function ', 'function ') + `
     window.__nativeEvents={}; window.__nativeSaved=[]; window.__nativeCopied=[]; let exportName='',parts=[];
-    boot({Http:{request:options=>window.__nativeHTTP(options)},Files:{configure:async()=>{},setSession:async()=>{},cancel:async()=>{},writeClipboard:async value=>window.__nativeCopied.push(value.text),beginExport:async value=>{exportName=value.filename;parts=[];return{id:'ux-export'};},appendExport:async value=>parts.push(value.data),finishExport:async()=>window.__nativeSaved.push({name:exportName,data:parts.join('')})},App:{addListener:async(name,handler)=>{window.__nativeEvents[name]=handler;},minimizeApp:async()=>{}}}); installMobileUX();
+    boot({Http:{request:options=>window.__nativeHTTP(options)},Files:{configure:async()=>{},setSession:async()=>{},cancel:async()=>{},writeClipboard:async value=>window.__nativeCopied.push(value.text),beginExport:async value=>{exportName=value.filename;parts=[];return{id:'ux-export'};},appendExport:async value=>parts.push(value.data),finishExport:async()=>window.__nativeSaved.push({name:exportName,data:parts.join('')})},App:{addListener:async(name,handler)=>{window.__nativeEvents[name]=handler;},minimizeApp:async()=>{}}}); installMobileUX(); installMobileToday();
+    window.__browserOpens = [];
+    installMobileBrowsers({openArticle:async options => window.__browserOpens.push(options)});
     let reminders = {enabled:false,permitted:true,exact:true,count:0,quietEnabled:false,quietStart:1320,quietEnd:480};
     installMobileReminders({addListener(){}},{
       async status() { return {...reminders}; }, async takeOpenDate() { return {}; }, addListener(){}, async clear(){},
@@ -50,11 +54,13 @@ async function go(view) {
   browser = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_EXECUTABLE });
   page = await browser.newPage({ viewport: { width: 360, height: 800 }, isMobile: true, hasTouch: true, timezoneId: 'Asia/Shanghai' });
   page.on('pageerror', error => report.errors.push(error.message)); page.on('dialog', dialog => dialog.dismiss());
-  let planWriteGate, planWrites = 0, todoAIGate, todoAIReceived;
+  let todoAIGate, todoAIReceived;
   const todoAIRequests = [];
+  const translationRequests = [];
+  let delayedTranslation, serviceAvailable = true;
   await page.exposeFunction('__nativeHTTP', async options => {
     const url = new URL(options.url); assert.equal(url.origin, chosen);
-    if (url.pathname === '/api/v1/plan-blocks' && options.method === 'POST') { planWrites++; await planWriteGate; }
+    if (!serviceAvailable) throw Error('测试服务暂不可达');
     if (url.pathname === '/api/v1/todo-assist/steps') {
       assert.equal(options.method, 'POST');
       assert.equal(options.readTimeout, 65000);
@@ -63,6 +69,16 @@ async function go(view) {
       todoAIReceived?.();
       await todoAIGate;
       return { status: 200, data: JSON.stringify({ data: { steps: ['保留我手写的步骤', '核对日期', '联系相关人员'] } }), url: options.url };
+    }
+    if (url.pathname === '/api/v1/reading/translate') {
+      assert.equal(options.method, 'POST');
+      assert.equal(options.readTimeout, 65000);
+      assert.equal(options.headers.authorization, 'Bearer ' + account.token);
+      const input = JSON.parse(options.data);
+      assert.deepEqual(Object.keys(input), ['text']);
+      translationRequests.push(input.text);
+      await delayedTranslation;
+      return {status: 200, data: JSON.stringify({data:{translation:'保留段落的测试译文。'}}), url: options.url};
     }
     const response = await fetch(origin + url.pathname + url.search, { method: options.method, headers: options.headers, body: options.data });
     return { status: response.status, data: response.status === 204 ? '' : await response.text(), headers: Object.fromEntries(response.headers.entries()), url: options.url };
@@ -78,8 +94,8 @@ async function go(view) {
       assert(contentWidth <= width + 1, `${view} page is ${contentWidth}px wide in a ${width}px viewport`);
       await contained(page.locator('#mobile-tabs'), 'bottom tabs');
       const action = await page.locator('#mobile-page-action').boundingBox();
-      const heading = await page.locator('#page-title').boundingBox();
-      assert(action && heading && heading.x + heading.width <= action.x, `${view} primary action should be reachable beside its title`);
+      const leadingControl = await page.locator(view === 'dashboard' ? '#content-search-trigger' : '#page-title').boundingBox();
+      assert(action && leadingControl && leadingControl.x + leadingControl.width <= action.x + 1, `${view} primary action should be reachable beside its leading control`);
       pass('layout_' + view + '_' + width);
     }
   }
@@ -89,7 +105,28 @@ async function go(view) {
   const agenda = await page.locator('.today-agenda').boundingBox();
   const tabbar = await page.locator('#mobile-tabs').boundingBox();
   assert(agenda && tabbar && agenda.y + 60 < tabbar.y, 'today agenda starts above the navigation');
-  await page.screenshot({ path: path.join(out, 'today-redesign.png') });
+  await page.screenshot({ path: path.join(out, 'today-redesign.png'), animations: 'disabled' });
+  await page.getByRole('tab', {name:'记录', exact:true}).click();
+  assert(await page.locator('[data-home-target=ledger]').isVisible());
+  assert.equal(await page.locator('.today-agenda').isVisible(), false);
+  await page.getByRole('tab', {name:'记录', exact:true}).press('ArrowRight');
+  assert(await page.locator('[data-home-target=english]').isVisible());
+  await page.evaluate(() => window.__nativeEvents.backButton({canGoBack:true}));
+  assert(await page.locator('.today-agenda').isVisible());
+  await page.getByRole('tab', {name:'学习', exact:true}).click();
+  await page.locator('[data-home-target=english]').click();
+  await page.waitForFunction(() => document.body.dataset.mobileView === 'english');
+  await go('dashboard');
+  await page.getByRole('tab', {name:'今日', exact:true}).click();
+  pass('home_sections_support_touch_keyboard_navigation_and_android_back');
+  await page.click('#mobile-profile-open');
+  assert.equal(await page.locator('[data-profile-name]').textContent(), 'Mobile UX');
+  await page.screenshot({ path: path.join(out, 'profile-redesign.png'), animations: 'disabled' });
+  await page.click('[data-profile-action=data]');
+  await page.locator('#dc-panel:not([hidden])').waitFor();
+  await page.evaluate(() => window.__nativeEvents.backButton({canGoBack:true}));
+  await page.locator('#dg-dialog[open]').waitFor({state:'detached'});
+  pass('profile_opens_scoped_data_center_and_back_returns_to_home');
   await page.click('#mobile-page-action');
   await page.locator('#mobile-capture[open]').waitFor();
   await page.click('[data-capture=todo]');
@@ -187,7 +224,7 @@ async function go(view) {
   assert.equal(await page.locator('[data-mobile-target]').count(), views.length);
   await page.click('[data-mobile-category="学习"]');
   assert.equal(await page.locator('[data-mobile-target=fitness]').count(), 0);
-  assert(await page.locator('[data-mobile-target=planner]').isVisible());
+  assert(await page.locator('[data-mobile-target=vocabulary]').isVisible());
   await page.fill('#mobile-functions-query','不存在的功能');
   await page.getByRole('button', { name: '清除筛选' }).click();
   assert.equal(await page.locator('[data-mobile-target]').count(), views.length);
@@ -199,39 +236,18 @@ async function go(view) {
   await page.evaluate(() => window.__nativeEvents.backButton({ canGoBack: true }));
   assert.equal(await page.locator('dialog[open]').count(), 0); pass('all_functions_empty_state_and_android_back');
   await page.click('#mobile-tabs [data-mobile-view=all]');
-  await page.click('[data-mobile-category="记录"]');
-  await page.click('[data-mobile-target=memos]'); await page.waitForFunction(() => document.body.dataset.mobileView === 'memos');
-  assert(await page.locator('#memo-search').isVisible());
-  await page.click('#mobile-page-action'); await page.waitForFunction(() => document.body.classList.contains('mobile-memo-editor') && !document.getElementById('memo-editor').classList.contains('hidden'));
-  await page.waitForFunction(() => Math.abs(document.querySelector('.memo-editor-pane').getBoundingClientRect().left) < 1);
-  await contained(page.locator('.memo-workspace'), 'full screen memo workspace'); await contained(page.locator('#memo-save'), 'memo save control');
-  await page.fill('#memo-title', '手机布局保存验证'); await page.fill('#memo-content', '保留正在编辑的内容，并通过独立服务端回读。');
-  await page.click('#memo-save');
-  for (let i = 0; i < 50; i++) {
-    const data = await (await fetch(origin + '/api/v1/memos', { headers: { Authorization: 'Bearer ' + account.token } })).json();
-    if (JSON.stringify(data).includes('保留正在编辑的内容')) break;
-    if (i === 49) throw Error('memo not saved to API');
-    await page.waitForTimeout(100);
+  assert.equal(await page.locator('[data-mobile-target=memos],[data-mobile-target=inventory]').count(), 0);
+  await page.locator('#mobile-functions-close').click();
+  for (const view of ['memos','inventory','lab','knowledge']) {
+    await page.evaluate(view => { location.hash = '#'+view; }, view);
+    await page.waitForFunction(() => location.hash === '#dashboard' && document.body.dataset.mobileView === 'dashboard');
   }
-  pass('full_screen_memo_has_reachable_save_and_persists_to_real_api');
-  await page.click('#mobile-memo-tools'); assert.equal(await page.getByRole('button', { name: '永久删除', exact: true }).count(), 0);
-  await page.getByRole('button', { name: '阅读预览', exact: true }).click();
-  assert.equal(await page.locator('#memo-preview').isVisible(), true); pass('memo_more_actions_preserve_visibility_and_preview');
-  await page.click('#mobile-memo-tools'); await page.getByRole('button', { name: '返回编辑', exact: true }).click();
-  await page.focus('#memo-content'); await page.setViewportSize({ width: 360, height: 420 });
-  await page.waitForFunction(() => document.body.classList.contains('mobile-keyboard-open'));
-  assert.equal(await page.locator('#mobile-tabs').isVisible(), false); await contained(page.locator('#memo-save'), 'save above keyboard');
-  pass('keyboard_resize_preserves_reachable_editor_actions');
-  await page.setViewportSize({ width: 360, height: 800 }); await page.evaluate(() => document.activeElement.blur());
-  await page.waitForFunction(() => !document.body.classList.contains('mobile-keyboard-open'));
-  await page.evaluate(() => window.__nativeEvents.backButton({ canGoBack: true })); await page.waitForFunction(() => !document.body.classList.contains('mobile-memo-editor'));
-  await page.waitForFunction(() => {
-    const workspace = document.querySelector('.memo-workspace').getBoundingClientRect();
-    return document.querySelector('.memo-editor-pane').getBoundingClientRect().left >= workspace.right - 1;
-  });
-  assert.equal(await page.inputValue('#memo-content'), '保留正在编辑的内容，并通过独立服务端回读。'); pass('android_back_returns_to_memo_list_without_clearing_editor');
-  await page.screenshot({ path: path.join(out, 'memo-list.png') });
-  for (const view of ['ledger','subscriptions','care','fitness']) {
+  await page.click('#mobile-page-action');
+  assert.equal(await page.locator('#mobile-capture [data-capture=memos]').count(), 0);
+  assert(await page.locator('#mobile-capture [data-capture=todo]').isVisible());
+  await page.locator('#mobile-capture header button').click();
+  pass('retired_memos_and_inventory_are_absent_and_old_links_return_home');
+  for (const view of ['ledger','subscriptions','fitness']) {
     await go(view); await page.click('#mobile-page-action'); const dialog = page.locator('dialog[open]').last(); await dialog.waitFor();
     await contained(dialog, view + ' dialog');
     await page.evaluate(() => window.__nativeEvents.backButton({ canGoBack: true }));
@@ -296,94 +312,140 @@ async function go(view) {
   assert(timeline.width <= 360);
   assert.equal(await page.locator('.calendar-time-grid').evaluate(node=>node.scrollWidth <= innerWidth),true);
   await page.click('[data-calendar-view=month]');
-  assert.equal(await page.locator('#panel-transfers,#panel-bookmarks,[data-explore-tab=challenge]').count(),0);
+  assert.equal(await page.locator('#panel-transfers,#panel-bookmarks,#panel-explore,[data-view=explore]').count(),0);
   await go('focus'); await page.locator('#panel-focus .workspace-extra>summary').click(); assert(await page.locator('#sound-start').isVisible()); pass('sound_inside_focus');
-  await go('toolkit'); await page.locator('#panel-toolkit .workspace-extra>summary').click(); assert(await page.locator('#choice-spin').isVisible()); pass('choice_inside_tools');
-  await page.click('#mobile-menu'); await page.click('[data-mobile-target=goals]'); assert(await page.locator('[data-workspace-views] button[data-view=vocabulary]').isVisible());
+  await go('toolkit');
+  assert.equal(await page.locator('.toolkit-tabs [data-tool]').count(),6);
+  assert.equal(await page.locator('#toolkit-tab-text,#toolkit-tab-record').count(),0);
+  await page.click('#toolkit-tab-image');
+  assert(await page.locator('#pocket-image-file').isVisible());
+  await page.locator('#panel-toolkit .workspace-extra>summary').click(); assert(await page.locator('#choice-spin').isVisible()); pass('choice_inside_tools');
+  await page.click('#mobile-menu'); await page.click('[data-mobile-target=vocabulary]'); assert(await page.locator('[data-workspace-views] button[data-view=vocabulary]').isVisible());
   await page.locator('[data-workspace-views] button[data-view=vocabulary]').click(); await page.waitForFunction(()=>document.body.dataset.mobileView==='vocabulary'); pass('learning_workspace_subpages');
   await page.click('#mobile-page-action');
   assert(await page.locator('#vocab-catalog-drawer[open]').isVisible());
-  await go('goals');
-  const goalFilters = page.locator('#panel-goals .mobile-inline-filters');
-  assert.equal(await page.locator('#goal-status-filter').isVisible(), false);
-  await goalFilters.locator('summary').click();
-  await page.selectOption('#goal-status-filter', 'active');
-  assert((await goalFilters.locator('summary').textContent()).includes('已调整'));
-  await goalFilters.locator('summary').click();
-  await goalFilters.locator('summary').click();
-  assert.equal(await page.inputValue('#goal-status-filter'), 'active');
-  await page.click('#mobile-page-action');
-  assert(await page.locator('#goal-title').evaluate(node => document.activeElement === node));
-  await go('tasks');
-  assert(await page.locator('#task-search').isVisible());
-  assert.equal(await page.locator('#task-filter').isVisible(), false);
-  await page.locator('#panel-tasks .mobile-inline-filters summary').click();
-  assert(await page.locator('#task-filter').isVisible());
-  pass('learning_forms_and_collapsible_filters_reuse_state');
   await go('english');
   await page.click('#mobile-page-action');
   await page.locator('#english-library').waitFor();
-  assert.equal(await page.textContent('#mobile-page-action'), '回文章');
+  await page.waitForFunction(() => document.getElementById('mobile-page-action').textContent === '回文章');
   await page.evaluate(() => window.__nativeEvents.backButton({ canGoBack: true }));
   assert.equal(await page.locator('#english-library').isVisible(), false);
   assert.equal(await page.locator('body').getAttribute('data-mobile-view'), 'english');
   pass('english_library_has_contextual_back');
+  await page.click('[data-english-mode=practice]');
+  await page.waitForFunction(() => document.getElementById('english-practice-status').textContent.includes('篇原创短文'));
+  await page.selectOption('#english-level', 'B1');
+  await page.click('#english-featured [data-english-open]');
+  await page.locator('#english-reader-dialog[open]').waitFor();
+  assert((await page.locator('#english-reader-summary').textContent()).trim().length > 80);
+  await page.fill('#english-reading-notes', 'private fixture note');
+  await page.click('[data-reading-translation=english] button');
+  await page.waitForFunction(() => document.querySelector('#english-translation [data-translation-result]').textContent === '保留段落的测试译文。');
+  assert(!translationRequests[0].includes('private fixture note'));
+  await page.click('[data-reading-translation=english] button');
+  await page.click('[data-reading-translation=english] button');
+  assert.equal(translationRequests.length, 1);
+  await page.evaluate(() => {
+    document.getElementById('english-original-actions').hidden = false;
+    document.getElementById('english-original-link').href = 'https://example.com/reading';
+  });
+  await page.click('#english-original-link');
+  await page.waitForFunction(() => window.__browserOpens.length === 1);
+  await page.click('#english-browser-choice');
+  await page.waitForFunction(() => window.__browserOpens.length === 2);
+  assert.deepEqual(await page.evaluate(() => window.__browserOpens), [
+    {url:'https://example.com/reading', choose:false}, {url:'https://example.com/reading', choose:true},
+  ]);
+  await page.fill('#english-reading-notes', '');
+  await page.click('#english-reader-close');
+  pass('english_practice_filters_and_opens_on_mobile');
+  pass('english_translation_sends_only_excerpt_and_opens_native_browser');
+
+  await go('literature');
+  await page.fill('#ebook-search', '爱丽丝梦游仙境');
+  await page.click('#ebook-search-form button[type=submit]');
+  await page.locator('#ebook-catalog [data-ebook-add=pg-11]').waitFor();
+  assert.match(await page.locator('#ebook-catalog .ebook-card').textContent(), /内置全文/);
+  await page.click('#ebook-catalog [data-ebook-add=pg-11]');
+  await page.waitForFunction(() => document.getElementById('ebook-content-origin').textContent === '服务器内置全文');
+  assert((await page.locator('#ebook-page-content').textContent()).trim().length > 80);
+  let releaseTranslation;
+  delayedTranslation = new Promise(resolve => { releaseTranslation = resolve; });
+  await page.click('[data-reading-translation=ebook] button');
+  await page.locator('#ebook-translation [role=status]').getByText('正在生成中文译文…').waitFor();
+  await page.click('#ebook-page-next');
+  await page.waitForFunction(() => document.getElementById('ebook-reader-page').textContent.startsWith('2 /'));
+  releaseTranslation();
+  delayedTranslation = undefined;
+  assert(await page.locator('#ebook-translation').isHidden());
+  await page.click('[data-reading-translation=ebook] button');
+  await page.waitForFunction(() => document.querySelector('#ebook-translation [data-translation-result]').textContent === '保留段落的测试译文。');
+  assert.equal(translationRequests.at(-1), await page.locator('#ebook-page-content').textContent());
+  await page.click('#ebook-reader-close');
+  await page.locator('#ebook-reader-dialog[open]').waitFor({state:'detached'});
+  await page.click('#reading-resume [data-ebook-open]');
+  await page.waitForFunction(() => document.getElementById('ebook-reader-page').textContent.startsWith('2 /'));
+  await page.click('#ebook-reader-close');
+  await page.locator('#ebook-reader-dialog[open]').waitFor({state:'detached'});
+  pass('literature_bundled_book_can_resume_on_mobile');
+  pass('ebook_translation_tracks_current_page');
+
   await go('meals');
   await page.click('#mobile-page-action');
   assert(await page.locator('#food-prompt').evaluate(node => document.activeElement === node));
   pass('meal_action_focuses_question_without_request');
-  await go('planner');
-  await page.locator('.mobile-planner-days button').first().waitFor();
-  assert.equal(await page.locator('.mobile-planner-days button').count(), 7);
-  const plannerDate = await page.locator('.mobile-planner-days button').last().getAttribute('data-mobile-planner-day');
-  await page.locator('.mobile-planner-days button').last().click();
-  assert.equal(await page.locator('.planner-day-column:visible').count(), 1);
-  assert.equal(await page.locator('.planner-day-column:visible').getAttribute('data-planner-date'), plannerDate);
-  assert.equal(await page.inputValue('#planner-block-date'), plannerDate);
-  const firstDate = await page.locator('.mobile-planner-days button').first().getAttribute('data-mobile-planner-day');
-  await page.fill('#planner-block-date', firstDate);
-  await page.locator('.mobile-planner-days button').nth(1).click();
-  assert.equal(await page.inputValue('#planner-block-date'), firstDate, 'day selection retains an explicitly entered date');
-  await page.locator('#planner-block-form').evaluate(form => form.reset());
-  await page.locator('.mobile-planner-days button').last().click();
-  await page.click('#mobile-page-action');
-  assert(await page.locator('#planner-block-form').evaluate(node => document.activeElement === node));
-  await page.fill('#planner-block-title', '手机日期选择测试安排');
-  assert.equal(await page.inputValue('#planner-block-date'), plannerDate);
-  await page.fill('#planner-block-start', '13:00');
-  await page.fill('#planner-block-end', '13:50');
-  let releasePlanWrite;
-  planWriteGate = new Promise(resolve => { releasePlanWrite = resolve; });
-  try {
-    await page.locator('#planner-block-form button[type=submit]').click();
-    await page.waitForFunction(() => document.querySelector('#planner-block-form [type=submit]').disabled);
-    await page.locator('#planner-block-form').evaluate(form => form.requestSubmit());
-    await page.fill('#planner-block-title', '保存期间继续写的下一个安排');
-  } finally { releasePlanWrite(); }
-  await page.locator('[data-mobile-day-active] [data-planner-block]').getByText('手机日期选择测试安排').click();
-  assert((await page.textContent('#planner-block-detail')).includes('手机日期选择测试安排'));
-  assert.equal(await page.inputValue('#planner-block-title'), '保存期间继续写的下一个安排');
-  assert.equal(planWrites, 1, 'one time block write during repeated submit');
-  await page.locator('#planner-block-form').evaluate(form => form.reset());
-  pass('planner_day_picker_and_quick_time_block');
+  for (const [oldRoute, destination] of [['goals','vocabulary'],['tasks','todo'],['planner','calendar']]) {
+    await page.evaluate(route => { location.hash=route; }, oldRoute);
+    await page.waitForFunction(view => document.body.dataset.mobileView===view, destination);
+    assert.equal(new URL(page.url()).hash, '#'+destination);
+  }
+  assert.equal(await page.locator('#panel-goals,#panel-tasks,#panel-planner').count(),0);
+  pass('retired_learning_links_redirect');
+  await page.evaluate(() => { location.hash = 'explore'; });
+  await page.waitForFunction(() => location.hash === '#timeline' && document.body.dataset.mobileView === 'timeline');
+  await page.click('[data-mobile-view=all]');
+  assert.equal(await page.locator('#mobile-functions [data-mobile-target=explore]').count(),0);
+  await page.click('#mobile-functions-close');
+  pass('retired_keepsakes_link_redirects_to_life_timeline');
+  await page.evaluate(() => { location.hash = 'care'; });
+  await page.waitForFunction(() => location.hash === '#dashboard' && document.body.dataset.mobileView === 'dashboard');
+  assert.equal(await page.locator('#panel-care,[data-view=care],#calendar-source option[value=care]').count(),0);
+  await page.click('[data-mobile-view=all]');
+  assert.equal(await page.locator('#mobile-functions [data-mobile-target=care]').count(),0);
+  await page.click('#mobile-functions-close');
+  pass('retired_care_entry_and_calendar_source_removed');
+
   await page.click('[data-mobile-view=all]'); await page.click('[data-mobile-action=settings]');
   await page.locator('#dg-dialog[open]').waitFor();
   await page.evaluate(() => window.__nativeEvents.backButton({ canGoBack: true }));
   await page.locator('#dg-dialog[open]').waitFor({ state: 'detached' });
   pass('settings_accessible_from_function_header');
-  await page.click('[data-mobile-view=all]'); await page.click('[data-mobile-action=theme]');
+  await go('dashboard'); await page.click('#mobile-profile-open'); await page.click('[data-profile-action=theme]');
+  await page.click('[data-profile-close]');
   assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
   await page.click('[data-mobile-view=all]'); await contained(page.locator('#mobile-functions'), 'dark function list');
   await page.screenshot({ path: path.join(out, 'functions-dark.png') }); pass('dark_mode_function_list');
-  await page.click('[data-mobile-action=connection]'); await page.waitForFunction(() => document.getElementById('mobile-connection').open);
+  assert.equal(await page.locator('#mobile-functions [data-mobile-action=save],#mobile-functions [data-mobile-action=refresh],#mobile-functions [data-mobile-action=connection]').count(), 0);
+  await page.click('[data-mobile-action=settings]');
+  await page.click('#dg-connection'); await page.waitForFunction(() => document.getElementById('mobile-connection').open);
   await page.evaluate(() => window.__nativeEvents.backButton({ canGoBack: true })); pass('connection_settings_remain_reachable');
   await page.setViewportSize({ width: 800, height: 390 }); await go('dashboard');
   assert(await page.locator('#mobile-menu').isVisible()); await page.click('#mobile-menu'); await contained(page.locator('#mobile-functions'), 'landscape function list');
   await page.evaluate(() => window.__nativeEvents.backButton({ canGoBack: true })); pass('landscape_keeps_function_navigation_reachable');
-  await page.setViewportSize({ width: 360, height: 800 }); await page.click('[data-mobile-view=all]'); await page.click('[data-mobile-action=logout]');
+  await page.setViewportSize({ width: 360, height: 800 }); await page.click('#mobile-profile-open'); await page.click('[data-profile-action=logout]');
   await page.waitForFunction(() => document.getElementById('mobile-tabs').hidden && !document.getElementById('mobile-functions').open);
   pass('logout_hides_authenticated_navigation_and_function_list');
   await page.locator('#login-form').waitFor();
+  assert.equal(await page.locator('#mobile-auth-settings').isVisible(), false);
+  assert.equal(await page.locator('#mobile-auth-offline').isVisible(), false);
+  serviceAvailable = false;
+  await page.evaluate(() => window.__nativeEvents.appStateChange({ isActive: true }));
+  await page.locator('#mobile-auth-settings').waitFor();
+  assert(await page.locator('#mobile-auth-offline').isVisible());
+  serviceAvailable = true;
+  await page.click('[data-mobile-retry]');
+  await page.locator('#mobile-auth-settings').waitFor({state:'hidden'});
+  pass('auth_connection_actions_only_appear_during_recovery');
   assert.equal(await page.locator('#mobile-auth-heading').textContent(), '欢迎回来');
   assert.equal(await page.locator('[data-auth-tab=login]').isVisible(), false);
   await page.screenshot({ path: path.join(out, 'auth-dark.png') });

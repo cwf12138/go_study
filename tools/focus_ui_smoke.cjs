@@ -19,7 +19,7 @@ function element(selector) {
       setAttribute(name, value) { this.attributes[name] = value; },
       focus() { this.focused = true; },
       reportValidity() { return Number(element('#focus-minutes').value) >= 1 && Number(element('#focus-minutes').value) <= 240; },
-      querySelectorAll(selector) { return selector === 'input,select' ? ['#focus-minutes', '#focus-task', '#focus-break-enabled', '#focus-complete-task'].map(element) : []; },
+      querySelectorAll(selector) { return selector === 'input,select' ? ['#focus-minutes', '#focus-task', '#focus-break-enabled'].map(element) : []; },
     });
   }
   return elements.get(selector);
@@ -73,7 +73,6 @@ async function test() {
   await app.startFocus({ preventDefault() {} });
   assert.equal(calls, 0);
   element('#focus-minutes').value = 25;
-  element('#focus-complete-task').checked = false;
   const starting = app.startFocus({ preventDefault() {} });
   assert.equal(element('#focus-minutes').disabled, true);
   assert.equal(presets[0].disabled, true);
@@ -113,10 +112,10 @@ async function test() {
   assert.equal(element('#focus-minutes').value, 45);
   assert.equal(presets[2].attributes['aria-pressed'], 'true');
 
-  app.state.tasks = Array.from({ length: 8 }, (_, i) => ({ id: `task-${i}`, title: i === 7 ? '<script>unsafe</script>' : `Task ${i}`, status: 'todo', priority: 'medium' }));
-  app.state.focus.taskID = 'task-7';
+  app.state.todos = Array.from({ length: 8 }, (_, i) => ({ id: `task-${i}`, title: i === 7 ? '<script>unsafe</script>' : `Task ${i}`, status: 'open', priority: 'medium' }));
+  app.state.focus.todoID = 'task-7';
   app.renderFocusTaskPreview();
-  assert.match(element('#focus-task-preview').innerHTML, /data-focus-task-select="task-7" aria-pressed="true"/);
+  assert.match(element('#focus-task-preview').innerHTML, /data-focus-task-select="todo:task-7" aria-pressed="true"/);
   assert.match(element('#focus-task-preview').innerHTML, /&lt;script&gt;/);
   assert.equal((element('#focus-task-preview').innerHTML.match(/data-focus-task-select=/g) || []).length, 5);
 

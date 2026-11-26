@@ -25,7 +25,7 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 
 	home := httptest.NewRecorder()
 	handler.ServeHTTP(home, httptest.NewRequest(http.MethodGet, "/", nil))
-	if home.Code != http.StatusOK || !strings.Contains(home.Body.String(), "Daynest") || !strings.Contains(home.Body.String(), "mood-trend") || !strings.Contains(home.Body.String(), "theme-toggle") || !strings.Contains(home.Body.String(), "vocab-catalogs") || !strings.Contains(home.Body.String(), "vocab-pagination") || !strings.Contains(home.Body.String(), "panel-calendar") || !strings.Contains(home.Body.String(), "panel-memos") || !strings.Contains(home.Body.String(), "memo-editor") || strings.Contains(home.Body.String(), "panel-knowledge") || !strings.Contains(home.Body.String(), "panel-english") || !strings.Contains(home.Body.String(), "panel-literature") || !strings.Contains(home.Body.String(), "ebook-reader-dialog") || !strings.Contains(home.Body.String(), "classic-reader-dialog") || !strings.Contains(home.Body.String(), "english-reader-dialog") || !strings.Contains(home.Body.String(), "command-dialog") || !strings.Contains(home.Body.String(), "memos.js?v=20261103-http") || !regexp.MustCompile(`src="/static/app.js\?v=[^"]+"`).MatchString(home.Body.String()) || strings.Contains(home.Body.String(), "panel-review") || strings.Contains(home.Body.String(), `data-view="review"`) {
+	if home.Code != http.StatusOK || !strings.Contains(home.Body.String(), "Daynest") || !strings.Contains(home.Body.String(), "mood-trend") || !strings.Contains(home.Body.String(), "theme-toggle") || !strings.Contains(home.Body.String(), "vocab-catalogs") || !strings.Contains(home.Body.String(), "vocab-pagination") || !strings.Contains(home.Body.String(), "panel-calendar") || strings.Contains(home.Body.String(), "panel-knowledge") || !strings.Contains(home.Body.String(), "panel-english") || !strings.Contains(home.Body.String(), "panel-literature") || !strings.Contains(home.Body.String(), "ebook-reader-dialog") || !strings.Contains(home.Body.String(), "classic-reader-dialog") || !strings.Contains(home.Body.String(), "english-reader-dialog") || !strings.Contains(home.Body.String(), "command-dialog") || !regexp.MustCompile(`src="/static/app.js\?v=[^"]+"`).MatchString(home.Body.String()) || strings.Contains(home.Body.String(), "panel-review") || strings.Contains(home.Body.String(), `data-view="review"`) {
 		t.Fatalf("home status = %d; missing or unexpected home markers", home.Code)
 	}
 	if contentType := home.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "text/html") {
@@ -101,11 +101,11 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 	}
 
 	if !strings.Contains(home.Body.String(), `/static/organizer-studio.css?v=`) {
-		t.Fatal("calendar and memos shared presentation stylesheet is missing")
+		t.Fatal("calendar presentation stylesheet is missing")
 	}
 	organizerStyles := httptest.NewRecorder()
 	handler.ServeHTTP(organizerStyles, httptest.NewRequest(http.MethodGet, "/static/organizer-studio.css?v=test", nil))
-	if organizerStyles.Code != http.StatusOK || !strings.HasPrefix(organizerStyles.Header().Get("Content-Type"), "text/css") || !strings.Contains(organizerStyles.Body.String(), "#panel-memos") || !strings.Contains(organizerStyles.Body.String(), "#panel-calendar") {
+	if organizerStyles.Code != http.StatusOK || !strings.HasPrefix(organizerStyles.Header().Get("Content-Type"), "text/css") || !strings.Contains(organizerStyles.Body.String(), "#panel-calendar") {
 		t.Fatalf("organizer stylesheet status = %d", organizerStyles.Code)
 	}
 	if !strings.Contains(organizerStyles.Header().Get("Cache-Control"), "must-revalidate") {
@@ -124,18 +124,15 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 		t.Fatal("focus stylesheet must revalidate with the server")
 	}
 
-	for _, marker := range []string{`/static/task-studio.css?v=`, `id="task-search"`, `id="tasks-pagination"`, `id="task-create-shortcut"`} {
-		if !strings.Contains(home.Body.String(), marker) {
-			t.Fatalf("task studio marker is missing: %s", marker)
+	for _, retired := range []string{
+		`id="panel-goals"`, `id="panel-tasks"`, `id="panel-planner"`, `id="panel-insights"`,
+		`id="panel-explore"`, `data-view="explore"`, "/static/explore.", "/static/keepsakes.",
+		`id="panel-care"`, `data-view="care"`, "/static/care.", "/static/care-core.",
+		`id="panel-memos"`, `id="panel-inventory"`, `id="today-note-form"`, `id="shopping-dialog"`, "/static/memos.", "/static/inventory.", "/static/shopping.",
+	} {
+		if strings.Contains(home.Body.String(), retired) {
+			t.Fatalf("retired page is still present: %s", retired)
 		}
-	}
-	taskStyles := httptest.NewRecorder()
-	handler.ServeHTTP(taskStyles, httptest.NewRequest(http.MethodGet, "/static/task-studio.css?v=test", nil))
-	if taskStyles.Code != http.StatusOK || !strings.HasPrefix(taskStyles.Header().Get("Content-Type"), "text/css") || !strings.Contains(taskStyles.Body.String(), "#panel-tasks") {
-		t.Fatalf("task stylesheet status = %d, content-type = %q", taskStyles.Code, taskStyles.Header().Get("Content-Type"))
-	}
-	if !strings.Contains(taskStyles.Header().Get("Cache-Control"), "must-revalidate") {
-		t.Fatal("task stylesheet must revalidate with the server")
 	}
 
 	catalogStyles := httptest.NewRecorder()
@@ -157,7 +154,7 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 	}
 	commandsScript := httptest.NewRecorder()
 	handler.ServeHTTP(commandsScript, httptest.NewRequest(http.MethodGet, "/static/commands.js", nil))
-	if commandsScript.Code != http.StatusOK || !strings.Contains(commandsScript.Body.String(), "daynest:search-memos") {
+	if commandsScript.Code != http.StatusOK || !strings.Contains(commandsScript.Body.String(), "添加待办") {
 		t.Fatalf("commands script status = %d", commandsScript.Code)
 	}
 	daynestStyle := httptest.NewRecorder()
@@ -165,10 +162,12 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 	if daynestStyle.Code != http.StatusOK || !strings.Contains(daynestStyle.Body.String(), ".today-grid") {
 		t.Fatalf("Daynest stylesheet status = %d", daynestStyle.Code)
 	}
-	memosScript := httptest.NewRecorder()
-	handler.ServeHTTP(memosScript, httptest.NewRequest(http.MethodGet, "/static/memos.js", nil))
-	if memosScript.Code != http.StatusOK || !strings.Contains(memosScript.Body.String(), "function renderMemos") || !strings.Contains(memosScript.Body.String(), "function saveCurrent") {
-		t.Fatalf("memos script status = %d", memosScript.Code)
+	for _, resource := range []string{"memos.js", "inventory.js", "shopping.js"} {
+		reply := httptest.NewRecorder()
+		handler.ServeHTTP(reply, httptest.NewRequest(http.MethodGet, "/static/"+resource, nil))
+		if reply.Code != http.StatusNotFound {
+			t.Fatalf("retired resource %s returned %d", resource, reply.Code)
+		}
 	}
 
 	englishScript := httptest.NewRecorder()

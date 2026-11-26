@@ -26,7 +26,6 @@
 go test ./...
 node tools/daynest_ui_smoke.cjs
 node tools/commands_ui_smoke.cjs
-node tools/memos_ui_smoke.cjs
 node tools/app_sync_smoke.cjs
 node tools/layout_smoke.cjs
 ```

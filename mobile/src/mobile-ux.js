@@ -1,5 +1,5 @@
 const mobileTabs = [
-  ['dashboard', '今天'], ['calendar', '日历'], ['todo', '待办'], ['moods', '心情'], ['all', '全部'],
+  ['dashboard', '今天'], ['calendar', '日历'], ['todo', '待办'], ['moods', '心情'], ['all', '频道'],
 ];
 
 const mobileGroups = [
@@ -9,25 +9,17 @@ const mobileGroups = [
     ['todo', '待办清单', '✓', '管理每天要做的事'],
     ['meals', '今天吃什么', '♨', '按口味和预算选一餐'],
     ['fitness', '运动日常', '↗', '训练计划与锻炼打卡'],
-    ['care', '生活保养站', '✳', '定期保养与到期提醒'],
   ]],
   ['记录', [
     ['moods', '心情日历', '☺', '记心情日记和月度回顾'],
-    ['memos', '备忘录', '▤', '记笔记和查草稿'],
     ['ledger', '生活账本', '¥', '查看收支和账单'],
     ['subscriptions', '订阅管家', '↻', '费用与续费日期'],
-    ['inventory', '物品管家', '▣', '查物品、位置和保修'],
     ['timeline', '生活足迹', '↟', '查看日常记录和商场足迹'],
-    ['explore', '回忆收藏', '◇', '时光邮局、人生地图与私人博物馆'],
   ]],
   ['学习', [
-    ['goals', '学习目标', '◎', '管理目标和截止日期'],
-    ['tasks', '学习任务', '☷', '按关联目标推进任务'],
-    ['planner', '智能学习规划', '▥', '排程和时间块'],
     ['vocabulary', '单词学习', 'Aa', '安装词书和背单词'],
     ['english', '英语精读', 'En', '读外刊和回看收藏'],
     ['literature', '阅读书房', '▰', '世界名著和古诗文'],
-    ['insights', '学习洞察与复盘', '▧', '分析节奏并做每周复盘'],
   ]],
   ['工具', [
     ['toolkit', '随身工具', '⊞', '计算器、时钟和转换工具'],
@@ -71,30 +63,36 @@ export function installMobileUX() {
     const narrow = window.matchMedia('(max-width:920px)');
     const byID = id => document.getElementById(id);
     const topbar = app.querySelector('.topbar');
+    const profileButton = document.createElement('button');
+    profileButton.type = 'button';
+    profileButton.id = 'mobile-profile-open';
+    profileButton.setAttribute('aria-label', '我的');
+    profileButton.setAttribute('aria-haspopup', 'dialog');
+    profileButton.setAttribute('aria-controls', 'mobile-profile');
+    topbar?.prepend(profileButton);
     const pageAction = document.createElement('button');
     pageAction.id = 'mobile-page-action'; pageAction.type = 'button';
     topbar?.querySelector('.user-actions:not(.topbar-glance)')?.append(pageAction);
     const todoSheets = installTodoSheets(narrow);
     const mood = installMobileMood(narrow);
-    installPlannerDayPicker(narrow);
-    installMobileFilters(narrow, ['#panel-goals .goals-toolbar']);
-    installMobileFilters(narrow, ['#panel-tasks .task-filter-grid', '#panel-tasks .task-filter-foot']);
     const englishLibrary = byID('english-library');
     const actions = {
-      dashboard: ['随手记', '随手记'], calendar: ['新建日程', '+', 'calendar-create'], todo: ['添加待办', '+'],
-      moods: ['记录今天的心情', '记今天'], memos: ['新建备忘录', '+', 'memo-new'], ledger: ['记一笔', '+', 'ledger-new'],
-      subscriptions: ['添加订阅', '+', 'sub-new'], inventory: ['添加物品', '+', 'inventory-new'], care: ['添加保养事项', '+', 'care-new'],
+      dashboard: ['随手记', '+'], calendar: ['新建日程', '+', 'calendar-create'], todo: ['添加待办', '+'],
+      moods: ['记录今天的心情', '记今天'], ledger: ['记一笔', '+', 'ledger-new'],
+      subscriptions: ['添加订阅', '+', 'sub-new'],
       fitness: ['补记运动', '补记', 'fit-log-open'], meals: ['填写用餐需求', '选一餐', 'food-prompt', 'focus'],
-      goals: ['填写学习目标', '新目标', 'goal-title', 'focus'], tasks: ['新建学习任务', '+', 'task-create-shortcut'],
-      planner: ['添加时间块', '排时间', 'planner-block-form', 'focus'], vocabulary: ['选择或安装词书', '词书', 'vocab-open-catalog'],
+      vocabulary: ['选择或安装词书', '词书', 'vocab-open-catalog'],
       english: ['打开我的阅读', '我的阅读', 'english-library-toggle'], literature: ['搜索世界名著', '找书', 'ebook-search', 'books'],
-      insights: ['填写本周复盘', '复盘', 'weekly-reflection-form', 'focus'], timeline: ['查看本月足迹', '本月', 'trail-today'],
-      explore: ['查看收藏记录', '收藏', 'explore-list-title', 'focus'], focus: ['查看每日专注进度', '进度', 'focus-progress-caption', 'focus'],
+      timeline: ['查看本月足迹', '本月', 'trail-today'],
+      focus: ['查看每日专注进度', '进度', 'focus-progress-caption', 'focus'],
       toolkit: ['查看工具栏', '工具', 'toolkit-tab-calc', 'tools'],
     };
     const dashboard = byID('panel-dashboard');
     const dashboardGrid = dashboard?.querySelector('.today-grid');
     const focusPanel = byID('panel-focus');
+    const home = dashboard ? installHomeSections(dashboard, groups, narrow, view => go(view)) : null;
+    const profile = installProfile(profileButton, byID);
+    byID('content-search-trigger')?.querySelector('span:last-child')?.replaceChildren('搜索日程、待办等');
     const restoreLayout = new Map();
     function moveForPhone(node, parent, before = null) {
       if (!node || !parent) return;
@@ -106,10 +104,9 @@ export function installMobileUX() {
     }
     function arrangePages() {
       if (narrow.matches) {
-        for (const selector of ['.today-capture', '.today-todos', '.today-agenda']) {
+        for (const selector of ['.today-todos', '.today-agenda']) {
           moveForPhone(dashboardGrid?.querySelector(selector), dashboardGrid, dashboardGrid?.firstElementChild);
         }
-        moveForPhone(dashboard?.querySelector('.shopping-home'), dashboard, dashboardGrid?.nextElementSibling);
         moveForPhone(focusPanel?.querySelector('.workspace-extra'), focusPanel);
       } else {
         for (const [node, marker] of restoreLayout) marker.after(node);
@@ -122,7 +119,7 @@ export function installMobileUX() {
     capture.innerHTML = `<header><h2 id="mobile-capture-title">随手记</h2><button type="button" aria-label="关闭随手记">×</button></header>
       <div class="mobile-capture-options"><button type="button" data-capture="todo">添加待办 <span>›</span></button>
       <button type="button" data-capture="local-todo"><span>本机待办 <small>可离线</small></span><span aria-hidden="true">›</span></button>
-      <button type="button" data-capture="calendar">新建日程 <span>›</span></button><button type="button" data-capture="memos">新建备忘录 <span>›</span></button>
+      <button type="button" data-capture="calendar">新建日程 <span>›</span></button>
       <button type="button" data-capture="moods">记录心情 <span>›</span></button></div>`;
     capture.querySelector('header button').addEventListener('click', () => capture.close());
     document.body.append(capture);
@@ -164,11 +161,11 @@ export function installMobileUX() {
     }
     const all = nav.querySelector('[data-mobile-view=all]');
     const dialog = document.createElement('dialog'); dialog.id = 'mobile-functions'; dialog.className = 'mobile-functions'; dialog.setAttribute('aria-labelledby','mobile-functions-title');
-    dialog.innerHTML = `<div class="mobile-functions-toolbar"><header><h2 id="mobile-functions-title">全部功能</h2><div class="mobile-functions-actions"><button type="button" data-mobile-action="settings" aria-label="设置与数据"></button><button type="button" id="mobile-functions-close" aria-label="关闭全部功能">×</button></div></header>
-      <label class="mobile-functions-search"><span class="product-sr-only">搜索功能</span><input id="mobile-functions-query" type="search" placeholder="搜索功能名称" autocomplete="off" enterkeyhint="search"></label>
+    dialog.innerHTML = `<div class="mobile-functions-toolbar"><header><h2 id="mobile-functions-title">频道</h2><div class="mobile-functions-actions"><button type="button" data-mobile-action="settings" aria-label="设置与数据"></button><button type="button" id="mobile-functions-close" aria-label="关闭频道">×</button></div></header>
+      <label class="mobile-functions-search"><span class="product-sr-only">搜索功能</span><input id="mobile-functions-query" type="search" placeholder="搜索频道或功能" autocomplete="off" enterkeyhint="search"></label>
       <div class="mobile-categories" role="group" aria-label="功能分类"></div></div>
       <p id="mobile-functions-count" role="status" aria-live="polite"></p><div id="mobile-functions-list"></div>
-      <footer><button type="button" data-mobile-action="save">保存状态</button><button type="button" data-mobile-action="refresh">刷新数据</button><button type="button" data-mobile-action="connection">连接设置</button><button type="button" data-mobile-action="theme">切换主题</button><button type="button" data-mobile-action="logout">退出账号</button></footer>`;
+`;
     dialog.querySelector('[data-mobile-action="settings"]').append(icon('settings'));
     document.body.append(nav, dialog);
     all.setAttribute('aria-haspopup','dialog'); all.setAttribute('aria-controls',dialog.id); all.setAttribute('aria-expanded','false');
@@ -193,10 +190,7 @@ export function installMobileUX() {
         heading.textContent = group.title; grid.className = 'mobile-functions-grid'; section.dataset.mobileGroup = group.title; section.append(heading,grid);
         for (const page of matches) {
           const button = document.createElement('button'); button.type = 'button'; button.dataset.mobileTarget = page.view;
-          const mark = document.createElement('span'); mark.className = 'mobile-function-mark'; mark.textContent = page.glyph || '·'; mark.setAttribute('aria-hidden', 'true');
-          const text = document.createElement('span'), label = document.createElement('strong'), description = document.createElement('small');
-          label.textContent = page.label; description.textContent = page.description; text.append(label, description);
-          button.append(mark, text);
+          fillChannelCard(button, page, group.title);
           if (byID('panel-' + page.view)?.classList.contains('active')) button.setAttribute('aria-current','page');
           grid.append(button); count++;
         }
@@ -236,12 +230,13 @@ export function installMobileUX() {
       const view = button.dataset.mobileView;
       if (view === 'all') { openFunctions(button); return; }
       if (view === 'moods' && byID('panel-moods')?.classList.contains('active')) { mood?.calendar(); return; }
+      if (view === 'dashboard' && byID('panel-dashboard')?.classList.contains('active')) home?.reset();
       if (byID('panel-' + view)?.classList.contains('active')) { window.scrollTo({ top: 0, behavior: 'instant' }); return; }
       go(view);
     });
     const menu = document.getElementById('mobile-menu');
     menu?.addEventListener('click', event => { event.preventDefault(); event.stopImmediatePropagation(); openFunctions(menu); },true);
-    if (menu) { menu.setAttribute('aria-controls',dialog.id); menu.setAttribute('aria-haspopup','dialog'); menu.setAttribute('aria-label','打开全部功能'); }
+    if (menu) { menu.setAttribute('aria-controls',dialog.id); menu.setAttribute('aria-haspopup','dialog'); menu.setAttribute('aria-label','打开频道'); }
     if (menu) menu.replaceChildren(icon('all'));
     topbar?.querySelector('#content-search-trigger > [aria-hidden]')?.replaceChildren(icon('search'));
     document.getElementById('diagnostics-open')?.replaceChildren(icon('settings'));
@@ -260,14 +255,13 @@ export function installMobileUX() {
     });
     dialog.addEventListener('click',event=>{
       const target = event.target.closest('[data-mobile-target]'); if (target) { go(target.dataset.mobileTarget); return; }
-      const action = event.target.closest('[data-mobile-action]')?.dataset.mobileAction;
-      const control = {settings:'diagnostics-open',save:'save-status-open',refresh:'app-sync-retry',connection:'mobile-server-bar',theme:'theme-toggle',logout:'logout'}[action];
-      if (control) { closeFunctions(false); document.getElementById(control)?.click(); }
+      if (event.target.closest('[data-mobile-action="settings"]')) { closeFunctions(false); byID('diagnostics-open')?.click(); }
     });
     function sync() {
       scheduled = false;
       const visible = authenticated(), view = document.querySelector('.panel.active')?.id.replace(/^panel-/,'') || 'dashboard';
       nav.hidden = !visible; document.body.classList.toggle('mobile-has-tabs',visible); document.body.dataset.mobileView = visible ? view : '';
+      profile.sync(visible ? byID('user-name')?.textContent : '');
       if (view === 'moods') byID('page-title').textContent = '心情日历';
       const action = actions[view], target = byID(action?.[2]);
       pageAction.hidden = !visible || !action || !!(action[2] && !target);
@@ -285,21 +279,25 @@ export function installMobileUX() {
         button.classList.toggle('active',selected || nested);
         if (selected) button.setAttribute('aria-current','page'); else button.removeAttribute('aria-current');
       }
-      document.body.classList.toggle('mobile-memo-editor',visible && view === 'memos' && !!document.querySelector('.memo-workspace.show-editor'));
       if (view !== 'moods' || !visible) mood?.reset();
       for (const tabs of app.querySelectorAll('.workspace-tabs:not(.hidden)')) {
         const selected = tabs.querySelector('.nav-link.active');
         if (selected) tabs.scrollLeft += selected.getBoundingClientRect().left - tabs.getBoundingClientRect().left - (tabs.clientWidth - selected.offsetWidth) / 2;
       }
       if (!visible && dialog.open) closeFunctions(false);
-      if (!visible) for (const id of ['mobile-memo-actions','mobile-share-connection']) { const overlay = document.getElementById(id); if (overlay?.open) overlay.close(); }
+      if (!visible) for (const id of ['mobile-share-connection']) { const overlay = document.getElementById(id); if (overlay?.open) overlay.close(); }
     }
     const schedule = () => { if (!scheduled) { scheduled = true; requestAnimationFrame(sync); } };
     const observer = new MutationObserver(schedule);
-    for (const node of [app,...document.querySelectorAll('.panel'),document.querySelector('.memo-workspace'),englishLibrary].filter(Boolean)) observer.observe(node,{attributes:true,attributeFilter:['class']});
+    for (const node of [app,...document.querySelectorAll('.panel'),englishLibrary].filter(Boolean)) observer.observe(node,{attributes:true,attributeFilter:['class']});
     for (const [, , id] of Object.values(actions)) if (byID(id)) observer.observe(byID(id), { attributes: true, attributeFilter: ['disabled'] });
     document.addEventListener('daynest:account-ready',schedule); window.addEventListener('hashchange',schedule);
-    document.addEventListener('daynest:account-leaving', () => { todoSheets?.close(); capture.close(); });
+    document.addEventListener('daynest:account-leaving', () => {
+      todoSheets?.close();
+      capture.close();
+      profile.sync('');
+      home?.reset();
+    });
 
     const textField = node => node?.matches?.('textarea,input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=range]):not([type=color]):not([type=file])');
     let baseline = window.innerHeight, viewportWidth = window.innerWidth;
@@ -315,41 +313,15 @@ export function installMobileUX() {
     document.addEventListener('focusin',event=>{viewport();if(textField(event.target))setTimeout(()=>{if(document.activeElement===event.target)event.target.scrollIntoView({block:'nearest',behavior:'instant'});},250);});
     document.addEventListener('focusout',()=>setTimeout(viewport,100));
 
-    const memoHead = document.querySelector('.memo-editor-head'), memoSave = document.getElementById('memo-save');
-    if (memoHead && memoSave) {
-      const tools = document.createElement('button'); tools.type = 'button'; tools.id = 'mobile-memo-tools'; tools.textContent = '更多'; tools.setAttribute('aria-haspopup','dialog');
-      const actions = document.createElement('dialog'); actions.id = 'mobile-memo-actions'; actions.className = 'mobile-functions'; actions.setAttribute('aria-labelledby','mobile-memo-actions-title');
-      actions.innerHTML = '<header><h2 id="mobile-memo-actions-title">记录操作</h2><button type="button" aria-label="关闭记录操作">×</button></header><div class="mobile-functions-grid"></div>';
-      actions.querySelector('header>button').addEventListener('click',()=>actions.close());
-      const originals = [['memo-preview-toggle','切换阅读预览'],['memo-pin','切换置顶'],['memo-to-action','关联待办'],['memo-download','导出 Markdown'],['memo-duplicate','复制一份'],['memo-archive','切换归档'],['memo-trash','移到回收站'],['memo-restore','恢复记录'],['memo-delete-permanent','永久删除']];
-      tools.addEventListener('click',()=>{
-        const grid = actions.querySelector('.mobile-functions-grid'); grid.replaceChildren();
-        for (const [id,label] of originals) {
-          const original = document.getElementById(id);
-          if (!original || original.disabled || original.closest('[hidden],.hidden')) continue;
-          const button = document.createElement('button'); button.type = 'button'; button.textContent = label;
-          if (id === 'memo-pin') button.textContent = original.classList.contains('active') ? '取消置顶' : '置顶记录';
-          if (id === 'memo-archive') button.textContent = original.classList.contains('active') ? '取消归档' : '归档记录';
-          if (id === 'memo-preview-toggle') button.textContent = original.classList.contains('active') ? '返回编辑' : '阅读预览';
-          button.addEventListener('click',()=>{actions.close();original.click();}); grid.append(button);
-        }
-        actions.showModal();
-      });
-      memoSave.classList.add('mobile-memo-save'); memoHead.append(tools,memoSave); document.body.append(actions);
-    }
-
     window.DaynestMobileUX = {back() {
       if (!narrow.matches) return false;
       const view = document.body.dataset.mobileView;
+      if (view === 'dashboard' && home?.back()) return true;
       if (view === 'moods' && mood?.back()) return true;
       if (view === 'english' && englishLibrary && !englishLibrary.classList.contains('hidden')) {
         byID('english-library-close')?.click(); pageAction.focus({ preventScroll: true }); return true;
       }
       if (view === 'focus' && focusPanel?.classList.contains('is-quiet')) { byID('focus-quiet-toggle')?.click(); return true; }
-      if (view !== 'memos' || !window.matchMedia('(max-width:700px)').matches) return false;
-      const workspace = document.querySelector('.memo-workspace');
-      if (workspace?.classList.contains('show-folders')) { workspace.classList.remove('show-folders'); return true; }
-      if (workspace?.classList.contains('show-editor')) { document.activeElement?.blur(); document.getElementById('memo-mobile-list')?.click(); return true; }
       return false;
     }};
     sync(); viewport();
@@ -357,31 +329,131 @@ export function installMobileUX() {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',mount,{once:true}); else mount();
 }
 
-function installMobileFilters(narrow, selectors) {
-  const fields = selectors.map(selector => document.querySelector(selector)).filter(Boolean);
-  if (!fields.length) return;
-  const details = document.createElement('details'), summary = document.createElement('summary');
-  details.className = 'mobile-inline-filters';
-  summary.textContent = '筛选与排序'; details.append(summary);
-  const anchors = fields.map(field => { const anchor = document.createComment('filter controls'); field.before(anchor); return anchor; });
-  anchors[0].before(details);
-  function updateLabel() {
-    const changed = [...details.querySelectorAll('select')].filter(select => {
-      const initial = [...select.options].find(option => option.defaultSelected) || select.options[0];
-      return initial && select.value !== initial.value;
-    }).length;
-    summary.textContent = changed ? `筛选与排序 · ${changed} 项已调整` : '筛选与排序';
+function fillChannelCard(button, page, group) {
+  button.dataset.channelGroup = group;
+  const mark = document.createElement('span');
+  mark.className = 'mobile-function-mark';
+  mark.setAttribute('aria-hidden', 'true');
+  mark.textContent = page.glyph;
+  const text = document.createElement('span');
+  text.className = 'mobile-function-copy';
+  const title = document.createElement('strong');
+  const description = document.createElement('small');
+  title.textContent = page.label;
+  description.textContent = page.description;
+  text.append(title, description);
+  button.append(mark, text);
+}
+
+function installHomeSections(dashboard, groups, narrow, go) {
+  const tabs = document.createElement('div');
+  tabs.className = 'mobile-home-tabs';
+  tabs.setAttribute('role', 'tablist');
+  tabs.setAttribute('aria-label', '首页栏目');
+  const sections = ['今日', '记录', '学习'].map((title, index) => {
+    const tab = document.createElement('button');
+    tab.id = 'mobile-home-tab-' + index;
+    tab.type = 'button';
+    tab.setAttribute('role', 'tab');
+    tab.textContent = title;
+    const panel = document.createElement('section');
+    panel.id = 'mobile-home-section-' + index;
+    panel.className = 'mobile-home-section';
+    panel.setAttribute('role', 'tabpanel');
+    panel.setAttribute('aria-labelledby', tab.id);
+    tab.setAttribute('aria-controls', panel.id);
+    tabs.append(tab);
+    if (index > 0) {
+      panel.classList.add('mobile-channel-grid');
+      for (const page of groups.find(group => group.title === title)?.pages || []) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.dataset.homeTarget = page.view;
+        fillChannelCard(button, page, title);
+        button.addEventListener('click', () => go(page.view));
+        panel.append(button);
+      }
+    }
+    tab.addEventListener('click', () => select(index));
+    return { tab, panel };
+  });
+  const today = sections[0].panel;
+  const originalContent = [...dashboard.children];
+  dashboard.prepend(tabs, today);
+  today.append(...originalContent);
+  dashboard.append(sections[1].panel, sections[2].panel);
+
+  let active = 0;
+  function select(next, focus = false) {
+    active = next;
+    sections.forEach(({ tab, panel }, index) => {
+      tab.setAttribute('aria-selected', String(index === next));
+      tab.tabIndex = index === next ? 0 : -1;
+      panel.hidden = index !== next;
+    });
+    if (focus) sections[next].tab.focus();
   }
-  function layout() {
-    details.hidden = !narrow.matches;
-    if (narrow.matches) { details.append(...fields); updateLabel(); }
-    else for (const [index, field] of fields.entries()) anchors[index].after(field);
+  tabs.addEventListener('keydown', event => {
+    const next = { ArrowLeft: (active + 2) % 3, ArrowRight: (active + 1) % 3, Home: 0, End: 2 }[event.key];
+    if (next === undefined) return;
+    event.preventDefault();
+    select(next, true);
+  });
+  narrow.addEventListener('change', () => { if (!narrow.matches) select(0); });
+  select(0);
+  return {
+    reset: () => select(0),
+    back() {
+      if (!active) return false;
+      select(0, true);
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      return true;
+    },
+  };
+}
+
+function installProfile(trigger, byID) {
+  const dialog = document.createElement('dialog');
+  dialog.id = 'mobile-profile';
+  dialog.className = 'mobile-product-sheet';
+  dialog.setAttribute('aria-labelledby', 'mobile-profile-title');
+  dialog.innerHTML = '<header><h2 id="mobile-profile-title">我的</h2><button type="button" aria-label="关闭我的" data-profile-close>×</button></header>'
+    + '<div class="mobile-profile-identity"><span aria-hidden="true" data-profile-initial></span><strong data-profile-name></strong></div>'
+    + '<div class="mobile-profile-actions"><button type="button" data-profile-action="settings">设置与诊断</button>'
+    + '<button type="button" data-profile-action="data">数据中心</button>'
+    + '<button type="button" data-profile-action="theme"></button>'
+    + '<button type="button" data-profile-action="logout">退出账号</button></div>';
+  document.body.append(dialog);
+  const theme = dialog.querySelector('[data-profile-action="theme"]');
+  function updateTheme() {
+    theme.textContent = document.documentElement.dataset.theme === 'dark' ? '切换至浅色模式' : '切换至深色模式';
   }
-  narrow.addEventListener('change', layout); layout();
-  details.addEventListener('change', updateLabel);
-  details.addEventListener('click', event => { if (event.target.closest('#task-clear-filters')) requestAnimationFrame(updateLabel); });
-  document.addEventListener('daynest:account-ready', updateLabel);
-  document.addEventListener('daynest:account-leaving', () => { details.open = false; });
+  trigger.addEventListener('click', () => {
+    if (trigger.hidden || dialog.open) return;
+    updateTheme();
+    dialog.showModal();
+  });
+  dialog.addEventListener('close', () => { if (!trigger.hidden) trigger.focus({ preventScroll: true }); });
+  dialog.addEventListener('click', event => {
+    if (event.target === dialog || event.target.closest('[data-profile-close]')) { dialog.close(); return; }
+    const action = event.target.closest('[data-profile-action]')?.dataset.profileAction;
+    if (action === 'theme') { byID('theme-toggle')?.click(); updateTheme(); return; }
+    if (!action) return;
+    dialog.close();
+    if (action === 'logout') { byID('logout')?.click(); return; }
+    byID('diagnostics-open')?.click();
+    if (action === 'data') byID('dg-tab-data')?.click();
+  });
+  return {
+    sync(name) {
+      const initial = [...(name || '').trim()][0] || 'D';
+      trigger.textContent = initial;
+      trigger.hidden = !name;
+      dialog.querySelector('[data-profile-initial]').textContent = initial;
+      dialog.querySelector('[data-profile-name]').textContent = name || '';
+      if (!name && dialog.open) dialog.close();
+    },
+  };
 }
 
 function installMobileMood(narrow) {
@@ -450,71 +522,6 @@ function installMobileMood(narrow) {
       setPane('calendar', true); return true;
     },
   };
-}
-
-function installPlannerDayPicker(narrow) {
-  const calendar = document.getElementById('planner-calendar');
-  if (!calendar) return;
-  const picker = document.createElement('div'); picker.className = 'mobile-planner-days';
-  picker.setAttribute('role', 'group'); picker.setAttribute('aria-label', '查看本周某一天'); picker.hidden = true;
-  const status = document.createElement('p'); status.className = 'mobile-planner-day-status'; status.hidden = true;
-  status.setAttribute('role', 'status');
-  const viewport = calendar.closest('.action-calendar-viewport') || calendar;
-  viewport.before(picker, status);
-  let selected = '';
-
-  function select(date) {
-    selected = date;
-    document.dispatchEvent(new CustomEvent('daynest:planner-day', { detail: { date } }));
-    for (const button of picker.children) button.setAttribute('aria-pressed', String(button.dataset.mobilePlannerDay === date));
-    for (const column of calendar.querySelectorAll('[data-planner-date]')) {
-      const active = column.dataset.plannerDate === date;
-      column.toggleAttribute('data-mobile-day-active', active);
-      if (active) status.textContent = column.querySelector('[data-planner-block]') ? '' : '这一天还没有时间块。';
-    }
-  }
-  function renderDays() {
-    const columns = [...calendar.querySelectorAll('[data-planner-date]')];
-    const dates = columns.map(column => column.dataset.plannerDate);
-    picker.hidden = status.hidden = !narrow.matches || !dates.length;
-    if (picker.hidden) return;
-    if (dates.join() !== [...picker.children].map(button => button.dataset.mobilePlannerDay).join()) {
-      const labels = [...calendar.querySelectorAll('.planner-day-header span')];
-      const buttons = columns.map((column, index) => {
-        const date = dates[index], button = document.createElement('button'), day = document.createElement('strong');
-        button.type = 'button'; button.dataset.mobilePlannerDay = date;
-        button.setAttribute('aria-label', date + ' ' + labels[index].textContent);
-        if (column.classList.contains('today')) button.setAttribute('aria-current', 'date');
-        day.textContent = Number(date.slice(-2)); button.append(labels[index].textContent, day);
-        return button;
-      });
-      picker.replaceChildren(...buttons);
-    }
-    select(dates.includes(selected) ? selected : (calendar.querySelector('.planner-day-column.today')?.dataset.plannerDate || dates[0]));
-  }
-  picker.addEventListener('click', event => {
-    const day = event.target.closest('[data-mobile-planner-day]');
-    if (!day) return;
-    select(day.dataset.mobilePlannerDay);
-    const scroll = calendar.querySelector('.planner-calendar-scroll');
-    const first = calendar.querySelector('[data-mobile-day-active] [data-planner-block]');
-    if (scroll) scroll.scrollTop = first ? Math.max(0, first.offsetTop - 36) : 0;
-  });
-  calendar.addEventListener('click', event => {
-    if (!narrow.matches || !event.target.closest('[data-planner-block]')) return;
-    const detail = document.getElementById('planner-block-detail');
-    requestAnimationFrame(() => detail?.closest('article')?.scrollIntoView({ block: 'start' }));
-  });
-  new MutationObserver(renderDays).observe(calendar, { childList: true });
-  narrow.addEventListener('change', () => {
-    renderDays();
-    if (!narrow.matches) {
-      const weekStart = calendar.querySelector('[data-planner-date]')?.dataset.plannerDate;
-      if (weekStart) document.dispatchEvent(new CustomEvent('daynest:planner-day', { detail: { date: weekStart } }));
-    }
-  });
-  document.addEventListener('daynest:account-leaving', () => { selected = ''; });
-  renderDays();
 }
 
 function installTodoSheets(narrow) {

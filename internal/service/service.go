@@ -23,8 +23,10 @@ type Service struct {
 	englishMu         sync.RWMutex
 	englishFetching   chan struct{}
 	englishCache      englishCacheEntry
+	readingCacheDir   string
 	literatureMu      sync.RWMutex
-	literatureCatalog map[string]literatureCatalogCacheEntry
+	literatureIndex   []domain.EBookCatalogItem
+	literatureIndexed time.Time
 	literatureContent map[string]literatureContentCacheEntry
 	// Bounded lock striping serializes a user's literature read-modify-write operations.
 	// Separate from external-content caches; no network calls are made under these locks.
@@ -32,7 +34,7 @@ type Service struct {
 }
 
 func New(repo store.Repository, tokens *security.TokenManager, events event.Publisher) *Service {
-	return &Service{repo: repo, tokens: tokens, events: events, now: time.Now, historyCache: make(map[string]historyCacheEntry), literatureCatalog: make(map[string]literatureCatalogCacheEntry), literatureContent: make(map[string]literatureContentCacheEntry)}
+	return &Service{repo: repo, tokens: tokens, events: events, now: time.Now, historyCache: make(map[string]historyCacheEntry), literatureContent: make(map[string]literatureContentCacheEntry)}
 }
 
 func (s *Service) publish(eventType, actorID, aggregateID string, data map[string]any) {

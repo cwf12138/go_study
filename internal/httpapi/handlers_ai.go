@@ -136,6 +136,41 @@ func (s *Server) suggestTodoSteps(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, envelope{"data": out})
 }
 
+func (s *Server) translateReading(w http.ResponseWriter, r *http.Request) {
+	if !s.remoteBigModelAllowed(w) && !s.localTranslation {
+		writeJSON(w, http.StatusServiceUnavailable, envelope{"error": envelope{
+			"code": "translation_unavailable", "message": "Daynest 服务尚未启用阅读翻译。",
+		}})
+		return
+	}
+	var in chatgpt.TranslationRequest
+	r.Body = http.MaxBytesReader(w, r.Body, 32<<10)
+	if err := decodeJSON(w, r, &in); err != nil {
+		writeError(w, invalidJSON(err))
+		return
+	}
+	var out chatgpt.Translation
+	var err error
+	if s.localTranslation {
+		out, err = chatgpt.TranslateReadingLocally(r.Context(), in)
+	} else {
+		out, err = s.bigModel.TranslateReading(r.Context(), in)
+	}
+	if errors.Is(err, chatgpt.ErrTranslationText) {
+		writeJSON(w, http.StatusBadRequest, envelope{"error": envelope{"code": "invalid_translation_text", "message": err.Error()}})
+		return
+	}
+	if err != nil {
+		if errors.Is(err, chatgpt.ErrLocalTranslation) {
+			writeJSON(w, http.StatusServiceUnavailable, envelope{"error": envelope{"code": "translation_unavailable", "message": err.Error()}})
+			return
+		}
+		aiError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{"data": out})
+}
+
 func (s *Server) aiMealRecommend(w http.ResponseWriter, r *http.Request) {
 	var in chatgpt.MealRequest
 	if err := decodeJSON(w, r, &in); err != nil {

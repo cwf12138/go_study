@@ -10,8 +10,8 @@
   const current=(id,account)=>id===epoch&&account===identity()&&dialog.open;
   const status=text=>{$('status').textContent=text;};
   function cancel(){epoch++;for(const c of controllers)c.abort();controllers.clear();checkController=null;loading=checking=exporting=guideBusy=false;fresh=false;resultCurrent=false;}
-  function sync(){const account=identity();if(account!==owner){cancel();owner=account;model=result=null;$('collections').innerHTML='';$('issues').innerHTML='';$('export-state').textContent='本次会话尚未导出。';render();}return !!owner;}
-  function activate(index,load=true){const changed=tab!==index;tab=index;dialog.dataset.section=index===1?'data':'overview';tabs.forEach((t,i)=>{t.setAttribute('aria-selected',String(i===index));t.tabIndex=i===index?0:-1;});overview.hidden=index!==0;$('panel').hidden=index!==1;if(changed)dialog.scrollTop=0;if(index===1&&load&&sync())refresh();}
+  function sync(){const account=identity();if(account!==owner){cancel();owner=account;model=result=null;$('collections').innerHTML='';$('issues').innerHTML='';$('export-state').textContent='本次会话尚未导出。';renderLegacyLocal();render();}return !!owner;}
+  function activate(index,load=true){const changed=tab!==index;tab=index;dialog.dataset.section=index===1?'data':'overview';tabs.forEach((t,i)=>{t.setAttribute('aria-selected',String(i===index));t.tabIndex=i===index?0:-1;});overview.hidden=index!==0;$('panel').hidden=index!==1;if(changed)dialog.scrollTop=0;if(index===1&&load&&sync()){renderLegacyLocal();refresh();}}
   function render(){
     const r=model?.records,a=model?.attachments,hasR=r?.state==='available',hasA=a?.state==='available';
     $('objects').textContent=hasR?r.objects.toLocaleString('zh-CN'):'—';$('files').textContent=hasA?String(a.files):'—';$('usage').textContent=hasA?C.bytes(a.accounted_bytes):'—';
@@ -42,6 +42,33 @@
     finally{controllers.delete(c);if(id===epoch){if(account!==identity())sync();else{checking=false;checkController=null;render();}}}
   }
   async function saveBlob(blob,name,account){if(window.DaynestMobile?.saveBlob){await window.DaynestMobile.saveBlob(blob,name,account);return;}const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);}
+  function legacyLocal(){
+    const account=window.DaynestAccount?.current?.();
+    if(!account||window.DaynestHTTP?.authExpired?.())return null;
+    const drafts=window.DaynestMemoDrafts;
+    const scope=drafts.scope(account.server,account.userID);
+    const originals=drafts.create(localStorage,scope).list().records;
+    const snapshots=window.DaynestReadCacheCore.create(localStorage,account.server,account.userID).read().entries;
+    return originals.length||snapshots.length?{memo_drafts:originals,memo_snapshots:snapshots}:null;
+  }
+  function renderLegacyLocal(){
+    const button=$('export-legacy-local');
+    button.hidden=true;
+    try{button.hidden=!legacyLocal();}catch(_){}
+  }
+  $('export-legacy-local').addEventListener('click',async()=>{
+    if(!sync())return;
+    const account=owner,id=epoch,button=$('export-legacy-local');
+    if(button.disabled)return;
+    button.disabled=true;
+    try{
+      const data=legacyLocal();
+      if(!data){renderLegacyLocal();return;}
+      await saveBlob(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),'daynest-legacy-local-memos.json',token());
+      if(current(id,account))$('export-state').textContent='旧版备忘录本机资料已交给保存窗口或浏览器下载。';
+    }catch(_){if(current(id,account))$('export-state').textContent='本机资料导出未完成，请重试。';}
+    finally{button.disabled=false;}
+  });
   async function exportBlob(response){const limit=64*1024*1024,tooLarge=()=>Error('导出大小超出当前客户端范围，请在电脑端创建完整备份。');if(Number(response.headers.get('Content-Length'))>limit)throw tooLarge();if(!response.body?.getReader){const blob=await response.blob();if(blob.size>limit)throw tooLarge();if(!blob.size)throw Error('服务返回了空的导出文件，请重试。');return blob;}const reader=response.body.getReader(),chunks=[];let total=0;try{while(true){const {value,done}=await reader.read();if(done)break;total+=value.byteLength;if(total>limit){await reader.cancel();throw tooLarge();}chunks.push(value);}}finally{reader.releaseLock();}if(!total)throw Error('服务返回了空的导出文件，请重试。');return new Blob(chunks,{type:'application/json'});}
   $('export').addEventListener('click',async()=>{if(!sync()||exporting)return;const account=owner,id=epoch,c=new AbortController();controllers.add(c);exporting=true;render();const timer=window.DaynestMobile?.native?null:setTimeout(()=>c.abort(),30000);
     try{const name='daynest-personal-'+new Date().toISOString().slice(0,10)+'.json';if(window.DaynestMobile?.native){await window.DaynestMobile.downloadServer('/api/v1/exports/data',name,c.signal);}else{const response=await fetch('/api/v1/exports/data',{headers:{Authorization:'Bearer '+token()},signal:c.signal,cache:'no-store'});if(!response.ok||!response.headers.get('Content-Type')?.includes('application/json'))throw Error('个人导出未完成，请重试。');const blob=await exportBlob(response);if(!current(id,account))return;await saveBlob(blob,name,token());}if(current(id,account))$('export-state').textContent='已交给保存窗口或浏览器下载 · '+C.date(new Date().toISOString())+'。请自行确认保存位置；这不是完整服务备份。';}
@@ -52,7 +79,7 @@
   $('refresh').addEventListener('click',refresh);$('check').addEventListener('click',inspect);$('cancel').addEventListener('click',()=>checkController?.abort());
   for(const name of ['check','export','guide'])$('jump-'+name).addEventListener('click',()=>{const target=$(name+'-section');if(name==='guide')target.open=true;target.scrollIntoView({block:'start',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});target.focus({preventScroll:true});});
   tabs.forEach((t,i)=>{t.addEventListener('click',()=>activate(i));t.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const next=e.key==='Home'?0:e.key==='End'?1:1-i;activate(next);tabs[next].focus();});});
-  $('panel').addEventListener('click',e=>{const button=e.target.closest('[data-dc-view]');if(!button)return;const view=button.dataset.dcView;if(!['memos','inventory','moods','literature','explore','transfers'].includes(view))return;const nav=document.querySelector(`.sidebar [data-view="${view}"]`);if(nav){dialog.close();nav.click();}});
+  $('panel').addEventListener('click',e=>{const button=e.target.closest('[data-dc-view]');if(!button)return;const view=button.dataset.dcView;if(!['todo','ledger','moods','literature','transfers'].includes(view))return;const nav=document.querySelector(`.sidebar [data-view="${view}"]`);if(nav){dialog.close();nav.click();}});
   trigger.addEventListener('click',()=>{sync();activate(0,false);});document.getElementById('dg-open-data').addEventListener('click',()=>activate(1));
   dialog.addEventListener('close',()=>{cancel();render();});document.getElementById('logout').addEventListener('click',()=>{cancel();owner='';model=result=null;render();});
   document.addEventListener('daynest:account-ready',sync);window.addEventListener('storage',e=>{if(e.key==='studyflow.token'||e.key===null)sync();});new MutationObserver(sync).observe(app,{attributes:true,attributeFilter:['class']});

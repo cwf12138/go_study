@@ -37,7 +37,6 @@
     const moods={awful:'低落',bad:'不太好',low:'不太好',neutral:'平静',good:'不错',great:'很好'};
     for(const row of rows(overview,'mood_entries')){owned(row,user);if(row.date!==date||!moods[row.mood])fail();add('mood',row,`心情 · ${moods[row.mood]}`,{allDay:true});}
     for(const row of rows(overview,'fitness_days')){if(row.date!==date||!Number.isInteger(row.completed_sessions)||row.completed_sessions<0||!Number.isInteger(row.recorded_seconds)||row.recorded_seconds<0||typeof row.manual_check_in!=='boolean')fail();add('fitness',row,'运动 · 已锻炼',{allDay:true,description:`已完成 ${row.completed_sessions} 次训练 · 记录 ${Math.round(row.recorded_seconds/60)} 分钟${row.manual_check_in?' · 已手动打卡':''}`});}
-    for(const row of rows(overview,'care_entries')){if(row.date!==date||!id(row.item_id)||!['due','done'].includes(row.kind))fail();add('care',row,row.title,{allDay:true,status:row.kind,key:row.item_id+':'+row.kind});}
     if(items.length>MAX_ITEMS)throw Error('该日安排超过 300 项，未截断保存。');
     if(!text(info.lunar,200)||!text(info.solar_term||'',100)||!text(info.holiday_name||'',200))fail();
     return{date,lunar:info.lunar,solar_term:info.solar_term||'',holiday_name:info.holiday_name||'',festivals:tags(info.festivals),items:items.sort((a,b)=>(a.start_at?Date.parse(a.start_at):-Infinity)-(b.start_at?Date.parse(b.start_at):-Infinity)||a.key.localeCompare(b.key))};

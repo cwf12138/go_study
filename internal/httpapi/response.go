@@ -59,6 +59,8 @@ func writeError(w http.ResponseWriter, err error) {
 		status, code, message = http.StatusNotFound, "not_found", "resource not found"
 	case errors.Is(err, domain.ErrConflict):
 		status, code, message = http.StatusConflict, "conflict", "resource already exists"
+	case errors.Is(err, domain.ErrReadingSourceUnavailable):
+		status, code, message = http.StatusServiceUnavailable, "reading_source_unavailable", err.Error()
 	case errors.Is(err, domain.ErrInvalidState):
 		status, code, message = http.StatusConflict, "invalid_state", err.Error()
 	}

@@ -4,7 +4,7 @@
   let loadVersion = 0;
   let lastAttempt = 0;
 
-  const state = { feed: null, articles: [], library: [], overview: {}, books: [], selected: null, words: [], initialized: false, loading: false, query: "", category: "", level: "", token: "" };
+  const state = { feed: null, articles: [], practice: [], practiceLoading: false, mode: "news", library: [], overview: {}, books: [], selected: null, words: [], initialized: false, loading: false, query: "", category: "", level: "", token: "" };
   const $ = (selector) => document.querySelector(selector);
   const escapeHTML = (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 
@@ -45,7 +45,8 @@
     return new Intl.DateTimeFormat("zh-CN", { month: "short", day: "numeric" }).format(date);
   }
 
-  const categoryLabel = (value) => ({ world: "世界", science: "科学", technology: "科技", learning: "学习方法" }[value] || "综合");
+  const categoryLabel = (value) => ({ world: "生活", science: "科学", technology: "科技", space: "太空", learning: "学习方法" }[value] || "综合");
+  const articleDate = (article) => article.offline ? "原创练习" : formatPublished(article.published_at);
   const existingReading = (articleID) => state.library.find((item) => item.article?.id === articleID);
 
   function setRefreshBusy(busy) {
@@ -61,31 +62,77 @@
     if (token === state.token) return token;
     loadVersion++; state.loading = false;
     setRefreshBusy(false);
-    state.token = token; state.feed = null; state.articles = []; state.library = []; state.overview = {}; state.books = []; state.selected = null; state.words = []; state.initialized = false;
+    state.token = token; state.feed = null; state.articles = []; state.practice = []; state.practiceLoading = false; state.library = []; state.overview = {}; state.books = []; state.selected = null; state.words = []; state.initialized = false;
     return token;
   }
 
   function filteredArticles() {
     const query = state.query.toLowerCase();
-    return state.articles.filter((article) => (!state.category || article.category === state.category) && (!state.level || article.difficulty === state.level) && (!query || `${article.title} ${article.summary} ${article.source}`.toLowerCase().includes(query)));
+    const articles = state.mode === "practice" ? state.practice : state.articles;
+    return articles.filter((article) => (!state.category || article.category === state.category) && (!state.level || article.difficulty === state.level) && (!query || `${article.title} ${article.summary} ${article.source}`.toLowerCase().includes(query)));
   }
 
   function articleCard(article) {
     const reading = existingReading(article.id);
-    return `<article class="english-article-card"><div class="english-card-top"><span class="english-source-label">${escapeHTML(article.source)}</span><span class="english-level">${escapeHTML(article.difficulty)}</span></div><h3>${escapeHTML(article.title)}</h3><p>${escapeHTML(article.summary)}</p><div class="english-card-foot"><span>${categoryLabel(article.category)} · ${article.reading_minutes || 1} 分钟 · ${formatPublished(article.published_at)}</span><button type="button" data-english-open="${escapeHTML(article.id)}">${reading?.status === "completed" ? "再次阅读" : reading ? "继续阅读" : "开始精读"} →</button></div></article>`;
+    return `<article class="english-article-card"><div class="english-card-top"><span class="english-source-label">${escapeHTML(article.source)}</span><span class="english-level">${escapeHTML(article.difficulty)}</span></div><h3>${escapeHTML(article.title)}</h3><p>${escapeHTML(article.summary)}</p><div class="english-card-foot"><span>${categoryLabel(article.category)} · ${article.reading_minutes || 1} 分钟 · ${articleDate(article)}</span><button type="button" data-english-open="${escapeHTML(article.id)}">${reading?.status === "completed" ? "再次阅读" : reading ? "继续阅读" : "开始精读"} →</button></div></article>`;
   }
 
   function renderFeed() {
     const articles = filteredArticles();
     const featured = $("#english-featured"); const grid = $("#english-article-grid");
+    if (state.mode === "practice" && !state.practice.length) {
+      featured.innerHTML = state.practiceLoading ? '<div class="english-loading">正在打开练习库…</div>' : '<div class="english-loading">练习库暂未加载。<button class="quiet" type="button" data-english-practice-retry>重试</button></div>';
+      grid.replaceChildren();
+      return;
+    }
     if (!articles.length) {
       featured.innerHTML = '<div class="english-loading">没有符合当前筛选条件的内容。</div>';
       grid.innerHTML = '<div class="english-empty">换一个主题、难度或搜索词试试。</div>';
       return;
     }
     const lead = articles[0];
-    featured.innerHTML = `<div class="english-featured-content"><p class="eyebrow">TODAY'S PICK · ${escapeHTML(lead.source)}</p><h2>${escapeHTML(lead.title)}</h2><p>${escapeHTML(lead.summary)}</p><div class="english-featured-meta"><span class="english-level">${escapeHTML(lead.difficulty)}</span><span>${categoryLabel(lead.category)}</span><span>约 ${lead.reading_minutes || 1} 分钟</span><span>${formatPublished(lead.published_at)}</span></div><button class="english-featured-open" type="button" data-english-open="${escapeHTML(lead.id)}">进入沉浸阅读 →</button></div>`;
+    featured.innerHTML = `<div class="english-featured-content"><p class="eyebrow">TODAY'S PICK · ${escapeHTML(lead.source)}</p><h2>${escapeHTML(lead.title)}</h2><p>${escapeHTML(lead.summary)}</p><div class="english-featured-meta"><span class="english-level">${escapeHTML(lead.difficulty)}</span><span>${categoryLabel(lead.category)}</span><span>约 ${lead.reading_minutes || 1} 分钟</span><span>${articleDate(lead)}</span></div><button class="english-featured-open" type="button" data-english-open="${escapeHTML(lead.id)}">进入沉浸阅读 →</button></div>`;
     grid.innerHTML = articles.slice(1).map(articleCard).join("") || '<div class="english-empty">今天先认真读完这一篇吧。</div>';
+  }
+
+  async function loadPractice() {
+    const token = syncEnglishAccount();
+    if (!token || state.practiceLoading) return;
+    const status = $("#english-practice-status");
+    const describe = () => state.practice.length + " 篇原创短文 · 可按 B1–C1 难度筛选";
+    const embedded = state.articles.filter(article => article.offline);
+    if (embedded.length) state.practice = embedded;
+    if (state.practice.length) {
+      status.textContent = describe();
+      renderFeed();
+      return;
+    }
+    state.practiceLoading = true;
+    status.textContent = "正在加载原创短文…";
+    renderFeed();
+    try {
+      const feed = await englishAPI("/api/v1/english/articles?mode=practice");
+      if (token !== state.token || token !== (localStorage.getItem("studyflow.token") || "")) return;
+      state.practice = Array.isArray(feed?.articles) ? feed.articles.filter(article => article.offline) : [];
+      status.textContent = state.practice.length ? describe() : "请更新服务后重试加载练习库。";
+    } catch (error) {
+      if (token === state.token) status.textContent = error.message;
+    } finally {
+      if (token === state.token) {
+        state.practiceLoading = false;
+        if (state.mode === "practice") renderFeed();
+      }
+    }
+  }
+
+  function setReadingMode(mode) {
+    state.mode = mode;
+    document.querySelectorAll("[data-english-mode]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.englishMode === mode)));
+    $("#english-feed-status").classList.toggle("hidden", mode !== "news");
+    $("#english-practice-status").classList.toggle("hidden", mode !== "practice");
+    if (mode === "practice") loadPractice();
+    else if (state.feed) renderFeed();
+    else loadEnglish();
   }
 
   function renderSources() {
@@ -144,14 +191,15 @@
       renderFeed(); renderSources();
       if (refresh) {
         const added = state.articles.filter((article) => !article.offline && !oldIDs.has(article.id)).length;
-        if (feed.degraded) notify("已检查来源；部分来源暂不可用，详情见资讯源状态。", "error");
+        if (feed.offline) notify("当前可读原创练习。资讯源的检查结果已更新。");
+        else if (feed.degraded) notify(added ? added + " 篇新摘要已更新，部分来源暂不可用。" : "已更新可用来源的检查状态。");
         else notify(added ? `更新完成，新增 ${added} 篇摘要。` : "已检查最新资讯，暂无新增内容。");
       }
     } catch (error) {
       if (version !== loadVersion || token !== (localStorage.getItem("studyflow.token") || "")) return;
       $("#english-feed-status").classList.add("warning");
       $("#english-feed-status").textContent = `${error.message}${state.articles.length ? " 已保留上次内容。" : " 请点击更新内容重试。"}`;
-      if (!state.articles.length) $("#english-article-grid").innerHTML = `<div class="english-empty">${escapeHTML(error.message)}<br><button class="quiet" type="button" data-english-retry>重新加载</button></div>`;
+      if (state.mode === "news" && !state.articles.length) $("#english-article-grid").innerHTML = `<div class="english-empty">${escapeHTML(error.message)}<br><button class="quiet" type="button" data-english-retry>重新加载</button></div>`;
       notify(error.message, "error");
     } finally { if (version === loadVersion) { state.loading = false; setRefreshBusy(false); } }
   }
@@ -173,14 +221,19 @@
   }
 
   function openReader(articleID) {
-    const article = state.articles.find((item) => item.id === articleID) || state.library.find((item) => item.article?.id === articleID)?.article;
+    const article = state.articles.find((item) => item.id === articleID) || state.practice.find((item) => item.id === articleID) || state.library.find((item) => item.article?.id === articleID)?.article;
     if (!article) return; state.selected = article;
     const reading = existingReading(article.id); state.words = [...(reading?.new_words || [])];
     $("#english-reader-source").textContent = article.source; $("#english-reader-title").textContent = article.title;
     $("#english-reader-meta").innerHTML = `<span class="english-level">${escapeHTML(article.difficulty)}</span><span>${categoryLabel(article.category)}</span><span>约 ${article.reading_minutes || 1} 分钟</span><span>${article.word_count || 0} 词</span>`;
     $("#english-reader-summary").textContent = article.summary; $("#english-reading-notes").value = reading?.notes || ""; $("#english-wordbook-term").value = ""; $("#english-wordbook-definition").value = "";
-    const link = $("#english-original-link"); const notice = link.previousElementSibling;
-    if (article.offline || !article.url) { link.classList.add("hidden"); notice.textContent = "这是离线原创训练，不对应外部新闻原文。"; } else { link.classList.remove("hidden"); link.href = article.url; notice.textContent = "摘要用于学习导读，完整内容请前往发布方网站"; }
+    const link = $("#english-original-link"), notice = $("#english-original-notice");
+    const hasOriginal = !article.offline && /^https:\/\//i.test(article.url || "");
+    $("#english-original-actions").hidden = !hasOriginal;
+    if (hasOriginal) link.href = article.url;
+    else link.removeAttribute("href");
+    notice.textContent = hasOriginal ? "全文由原发布方提供" : "Daynest 原创短文";
+    window.DaynestReadingTranslation?.setSource("english", [article.title, article.summary].join("\n\n"));
     $("#english-save-reading").textContent = reading ? "更新阅读笔记" : "保存稍后读"; renderWordChips(); renderWordBooks(); $("#english-reader-dialog").showModal();
   }
 
@@ -211,6 +264,10 @@
 
   function bindEvents() {
     document.querySelector('[data-view="english"]')?.addEventListener("click", () => { syncEnglishAccount(); if (!state.initialized) loadEnglish(); });
+    document.querySelectorAll("[data-english-mode]").forEach(button => button.addEventListener("click", () => setReadingMode(button.dataset.englishMode)));
+    $("#english-featured").addEventListener("click", event => {
+      if (event.target.closest("[data-english-practice-retry]")) loadPractice();
+    });
     $("#english-refresh").addEventListener("click", () => loadEnglish(true));
     $("#english-search").addEventListener("input", () => { state.query = $("#english-search").value.trim(); renderFeed(); });
     $("#english-category").addEventListener("change", () => { state.category = $("#english-category").value; renderFeed(); });

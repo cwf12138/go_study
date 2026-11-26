@@ -21,7 +21,8 @@
   async function literatureRequest(path, options={}) {
     const headers=new Headers(options.headers||{}),token=localStorage.getItem("studyflow.token")||"";
     if(token)headers.set("Authorization",`Bearer ${token}`);if(options.body)headers.set("Content-Type","application/json");
-    const controller=new AbortController(),timer=window.setTimeout(()=>controller.abort(),25000);
+    const timeout=path.endsWith("/content")?60000:25000;
+    const controller=new AbortController(),timer=window.setTimeout(()=>controller.abort(),timeout);
     try{const response=await fetch(path,{...options,headers,signal:controller.signal});if(response.status===204)return null;const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(response.status===401?'登录已过期，请重新登录':payload?.error?.message||`请求失败（${response.status}）`);if(!payload||typeof payload!=="object"||!Object.hasOwn(payload,"data"))throw new Error("阅读服务返回格式不完整，请保留笔记后重试。");return payload.data}
     catch(error){if(error.name==='AbortError')throw new Error('请求超时，请检查网络后重试');throw error}
     finally{window.clearTimeout(timer)}
@@ -33,40 +34,101 @@
   const studyFor=(workID)=>state.studies.find((item)=>item.work_id===workID);
   const palette=(id)=>{const colors=[["#355b90","#182a4b"],["#8b553d","#3f2721"],["#4f6f60","#203a32"],["#65548f","#302746"],["#9a7538","#47381f"]];let hash=0;for(const char of id)hash=(hash*31+char.charCodeAt(0))>>>0;return colors[hash%colors.length]};
   function renderOverview(){const overview=state.overview||{};$("#lit-books-count").textContent=overview.books_in_shelf||0;$("#lit-completed-count").textContent=overview.books_completed||0;$("#lit-minutes-count").textContent=`${overview.reading_minutes||0} 分`;$("#lit-classics-count").textContent=overview.classics_studied||0;$("#classics-study-summary").innerHTML=`<span>已掌握<b>${overview.classics_mastered||0}</b></span><span>已收藏<b>${overview.classics_favorites||0}</b></span>`}
-  function renderCatalog(){const container=$("#ebook-catalog");$("#ebook-provider").textContent=state.catalogMeta.provider||"精选书目";$("#ebook-catalog-title").textContent=state.catalogMeta.query?`“${state.catalogMeta.query}”的搜索结果`:"精选世界名著";if(!state.catalog.length){container.innerHTML='<div class="literature-empty">没有找到可导入的公共领域纯文本版本。可以换用英文原名或作者搜索。</div>';return} container.innerHTML=state.catalog.map((book)=>{const reading=shelfReading(book.id),colors=palette(book.id);return `<article class="ebook-card"><div class="ebook-cover" style="--book-a:${colors[0]};--book-b:${colors[1]}"><span>${escapeHTML(book.title.slice(0,1))}</span></div><h4>${escapeHTML(book.title)}</h4><small>${escapeHTML(authorLabel(book))}</small><p>${escapeHTML(book.summary||"公共领域经典作品")}</p><div class="ebook-card-foot"><span>${book.download_count?`${Number(book.download_count).toLocaleString()} 次下载`:book.language?.toUpperCase()||"EN"}</span><button class="${reading?"quiet":"primary"}" type="button" data-ebook-add="${escapeHTML(book.id)}">${reading?"继续阅读":"下载到书房"}</button></div></article>`}).join("")}
+  const bookTitle = (book) => book.chinese_title || book.title;
+  function renderCatalog() {
+    const container = $("#ebook-catalog"), query = state.catalogMeta.query;
+    $("#ebook-provider").textContent = state.catalogMeta.degraded ? "精选书目 · 完整目录暂未同步" : query ? "Project Gutenberg 目录" : "编辑精选";
+    $("#ebook-catalog-title").textContent = query ? "“" + query + "”的搜索结果" : "精选世界名著";
+    if (!state.catalog.length) {
+      container.innerHTML = state.catalogMeta.degraded
+        ? '<div class="literature-empty">精选书库中没有匹配。可先查看精选，或等服务器同步目录后再试。</div>'
+        : '<div class="literature-empty">没有匹配的书目。试试英文原名、作者姓名或 Gutenberg 编号。</div>';
+      return;
+    }
+    container.innerHTML = state.catalog.map(book => {
+      const reading = shelfReading(book.id), colors = palette(book.id);
+      const label = book.included ? "内置全文" : "按需打开";
+      const action = reading ? "继续阅读" : book.included ? "立即阅读" : "加入并阅读";
+      return `<article class="ebook-card"><div class="ebook-cover" style="--book-a:${colors[0]};--book-b:${colors[1]}"><span>${escapeHTML(bookTitle(book).slice(0,1))}</span></div>
+        <div class="ebook-card-heading"><h4>${escapeHTML(bookTitle(book))}</h4>${book.chinese_title ? `<small>${escapeHTML(book.title)}</small>` : ""}<small>${escapeHTML(authorLabel(book))}</small></div>
+        ${book.summary ? `<p>${escapeHTML(book.summary)}</p>` : ""}
+        <div class="ebook-card-foot"><span class="ebook-source-badge${book.included ? " included" : ""}">${label}</span>
+        <button class="${reading?"quiet":"primary"}" type="button" data-ebook-add="${escapeHTML(book.id)}">${action}</button></div></article>`;
+    }).join("");
+  }
   function renderShelf(){
     const query=$("#shelf-query").value.trim().toLowerCase(),status=$("#shelf-status").value;
-    const books=state.shelf.filter(item=>(!status||item.status===status)&&`${item.book.title} ${authorLabel(item.book)}`.toLowerCase().includes(query)).sort((a,b)=>new Date(b.last_read_at||b.updated_at)-new Date(a.last_read_at||a.updated_at));
+    const books=state.shelf.filter(item=>(!status||item.status===status)&&`${item.book.title} ${item.book.chinese_title || ""} ${authorLabel(item.book)}`.toLowerCase().includes(query)).sort((a,b)=>new Date(b.last_read_at||b.updated_at)-new Date(a.last_read_at||a.updated_at));
     $("#ebook-shelf-meta").textContent=`${books.length} / ${state.shelf.length} 本`;
     const recent=[...state.shelf].filter(item=>item.status!=="completed").sort((a,b)=>new Date(b.last_read_at||b.updated_at)-new Date(a.last_read_at||a.updated_at))[0];
-    $("#reading-resume").innerHTML=recent?`<div><p class="eyebrow">CONTINUE YOUR STORY</p><h3>${escapeHTML(recent.book.title)}</h3><p>${escapeHTML(authorLabel(recent.book))} · 已读 ${Math.round(recent.progress||0)}%</p></div><button class="primary" type="button" data-ebook-open="${escapeHTML(recent.id)}">继续阅读 →</button>`:'<div><p class="eyebrow">YOUR QUIET CORNER</p><h3>给自己留一段安静阅读的时间</h3><p>从下方选一本书，下一次从这里继续。</p></div>';
-    $("#ebook-shelf").innerHTML=books.length?books.map(reading=>`<article class="ebook-shelf-row"><h4>${escapeHTML(reading.book.title)}</h4><small>${escapeHTML(authorLabel(reading.book))}</small><div class="ebook-shelf-progress"><i style="width:${Math.min(100,Math.max(0,reading.progress||0))}%"></i></div><div class="ebook-shelf-actions"><span>${reading.status==="completed"?"已读完":`${Math.round(reading.progress||0)}% · ${Math.floor((reading.reading_seconds||0)/60)} 分钟`}</span><div><button class="quiet" type="button" data-ebook-open="${escapeHTML(reading.id)}">阅读</button><button class="quiet danger-text" type="button" data-ebook-remove="${escapeHTML(reading.id)}">移除</button></div></div></article>`).join(""):'<div class="literature-empty">没有匹配的书籍。可以清空筛选，或在目录中添加一本书。</div>';
+    $("#reading-resume").innerHTML=recent?`<div><p class="eyebrow">CONTINUE YOUR STORY</p><h3>${escapeHTML(bookTitle(recent.book))}</h3><p>${escapeHTML(authorLabel(recent.book))} · 已读 ${Math.round(recent.progress||0)}%</p></div><button class="primary" type="button" data-ebook-open="${escapeHTML(recent.id)}">继续阅读 →</button>`:'<div><p class="eyebrow">YOUR QUIET CORNER</p><h3>给自己留一段安静阅读的时间</h3><p>从下方选一本书，下一次从这里继续。</p></div>';
+    $("#ebook-shelf").innerHTML=books.length?books.map(reading=>`<article class="ebook-shelf-row"><h4>${escapeHTML(bookTitle(reading.book))}</h4><small>${escapeHTML(authorLabel(reading.book))}</small><div class="ebook-shelf-progress"><i style="width:${Math.min(100,Math.max(0,reading.progress||0))}%"></i></div><div class="ebook-shelf-actions"><span>${reading.status==="completed"?"已读完":`${Math.round(reading.progress||0)}% · ${Math.floor((reading.reading_seconds||0)/60)} 分钟`}</span><div><button class="quiet" type="button" data-ebook-open="${escapeHTML(reading.id)}">阅读</button><button class="quiet danger-text" type="button" data-ebook-remove="${escapeHTML(reading.id)}">移除</button></div></div></article>`).join(""):'<div class="literature-empty">没有匹配的书籍。可以清空筛选，或在目录中添加一本书。</div>';
   }
   function filteredClassics(){const query=state.classicQuery.toLowerCase();return state.classics.filter((work)=>(!state.dynasty||work.dynasty===state.dynasty)&&(!state.genre||work.genre===state.genre)&&(!query||`${work.title} ${work.author} ${work.dynasty} ${(work.tags||[]).join(" ")} ${(work.text||[]).join(" ")}`.toLowerCase().includes(query)))}
   function renderClassicFeatured(work){const container=$("#classics-featured");if(!work){container.innerHTML='<div class="literature-empty">没有符合条件的篇目。</div>';return}container.innerHTML=`<div class="classics-featured-content"><p class="eyebrow">TODAY'S CLASSIC · ${escapeHTML(work.dynasty)}${escapeHTML(work.genre)}</p><h2>${escapeHTML(work.title)}</h2><small>${escapeHTML(work.author)} · ${escapeHTML(work.difficulty)}</small><blockquote>${escapeHTML((work.text||[])[0]||"")}</blockquote><button class="quiet" type="button" data-classic-open="${work.id}">进入研习 →</button></div>`}
   function renderClassics(){const items=filteredClassics();$("#classics-result-count").textContent=`${items.length} 篇`;renderClassicFeatured(items.find((work)=>work.featured)||items[0]);$("#classics-grid").innerHTML=items.length?items.map((work)=>{const study=studyFor(work.id);return `<article class="classic-card"><div class="classic-card-top"><span>${escapeHTML(work.dynasty)} · ${escapeHTML(work.genre)}</span><i>${study?.favorite?"★":""}</i></div><h4>${escapeHTML(work.title)}</h4><small>${escapeHTML(work.author)} · ${escapeHTML(work.difficulty)}</small><p>${escapeHTML((work.text||[]).join(" "))}</p><footer><span>${study?.status==="mastered"?"已掌握":study?`诵读 ${study.recitation_count||0} 次`:(work.tags||[]).slice(0,2).join(" · ")}</span><button type="button" data-classic-open="${work.id}">研习 →</button></footer></article>`}).join(""):'<div class="literature-empty">没有匹配的古诗文，清空筛选条件再试试。</div>'}
   function setMode(mode){state.mode=mode;$("#literature-books-view").classList.toggle("hidden",mode!=="books");$("#literature-classics-view").classList.toggle("hidden",mode!=="classics");$$('[data-literature-mode]').forEach((button)=>button.classList.toggle("active",button.dataset.literatureMode===mode))}
   async function loadLiterature(){
-    if(!syncAccount()||state.loading)return;state.loading=true;const token=state.token;
-    const jobs=[['catalog',value=>{state.catalog=value?.items||[];state.catalogMeta=value||{};renderCatalog()}],['shelf',value=>{state.shelf=value||[];renderShelf()}],['classics',value=>{state.classics=value||[];renderClassics()}],['classic-studies',value=>{state.studies=value||[];renderClassics()}],['overview',value=>{state.overview=value||{};renderOverview()}]];
+    if(!syncAccount()||state.loading)return;state.loading=true;const token=state.token, catalogVersion=searchVersion;
+    const jobs=[['catalog',value=>{if(catalogVersion!==searchVersion)return;state.catalog=value?.items||[];state.catalogMeta=value||{};renderCatalog()}],['shelf',value=>{state.shelf=value||[];renderShelf()}],['classics',value=>{state.classics=value||[];renderClassics()}],['classic-studies',value=>{state.studies=value||[];renderClassics()}],['overview',value=>{state.overview=value||{};renderOverview()}]];
     const results=await Promise.allSettled(jobs.map(async([path,render])=>{const value=await literatureAPI('/api/v1/literature/'+path);if(token===state.token)render(value)}));
     state.loading=false;if(token!==state.token)return;
     state.initialized=results.every(item=>item.status==='fulfilled');
     $("#literature-health").textContent=state.initialized?'书架与阅读记录已同步':'部分内容加载失败，已保留可用内容。点击“重新同步”重试。';
   }
-  async function searchBooks(event){event?.preventDefault();const query=$("#ebook-search").value.trim(),version=++searchVersion,token=state.token;$("#ebook-catalog").innerHTML='<div class="literature-loading">正在检索可阅读的纯文本版本…</div>';try{const catalog=await literatureAPI(`/api/v1/literature/catalog?q=${encodeURIComponent(query)}`);if(version!==searchVersion||token!==state.token)return;state.catalog=catalog?.items||[];state.catalogMeta=catalog||{};renderCatalog();if(catalog?.degraded)notify("在线目录暂不可用，当前展示本地精选匹配结果。","error")}catch(error){if(version!==searchVersion)return;$("#ebook-catalog").innerHTML=`<div class="literature-empty">${escapeHTML(error.message)}<br>请重新搜索或点击“查看精选”。</div>`;notify(error.message,"error")}}
-  async function addOrOpenBook(bookID,button){const existing=shelfReading(bookID);if(existing)return openEBook(existing.id);const book=state.catalog.find((item)=>item.id===bookID);if(!book)return;button.disabled=true;button.textContent="正在加入…";try{const reading=await literatureAPI("/api/v1/literature/shelf",{method:"POST",body:JSON.stringify({book})});state.shelf.unshift(reading);renderCatalog();renderShelf();state.overview=await literatureAPI("/api/v1/literature/overview");renderOverview();notify("书籍已加入书房，正在下载正文。");await openEBook(reading.id)}catch(error){notify(error.message,"error");renderCatalog()}}
+  async function searchBooks(event) {
+    event?.preventDefault();
+    const query = $("#ebook-search").value.trim(), version = ++searchVersion, token = state.token;
+    $("#ebook-catalog").innerHTML = '<div class="literature-loading">正在查找书目…</div>';
+    try {
+      const catalog = await literatureAPI("/api/v1/literature/catalog?q=" + encodeURIComponent(query));
+      if (version !== searchVersion || token !== state.token) return;
+      state.catalog = catalog?.items || [];
+      state.catalogMeta = catalog || {};
+      renderCatalog();
+    } catch (error) {
+      if (version !== searchVersion || token !== state.token) return;
+      renderCatalog();
+      notify(error.message, "error");
+    }
+  }
+  async function addOrOpenBook(bookID, button) {
+    const existing = shelfReading(bookID);
+    if (existing) return openEBook(existing.id);
+    const book = state.catalog.find(item => item.id === bookID);
+    if (!book || button.disabled) return;
+    button.disabled = true;
+    button.textContent = "正在加入…";
+    try {
+      const reading = await literatureAPI("/api/v1/literature/shelf", {method:"POST", body:JSON.stringify({book})});
+      if (!shelfReading(bookID)) state.shelf.unshift(reading);
+      renderCatalog();
+      renderShelf();
+      await openEBook(reading.id);
+      literatureAPI("/api/v1/literature/overview").then(value => {
+        state.overview = value;
+        renderOverview();
+      }).catch(() => {});
+    } catch (error) {
+      notify(error.message, "error");
+      renderCatalog();
+    }
+  }
 function renderChapters(){const seen=new Set(),chapters=[];(state.content?.pages||[]).forEach((page)=>{if(!seen.has(page.chapter)){seen.add(page.chapter);chapters.push({title:page.chapter,index:page.index})}});const options=chapters.map((chapter)=>`<option value="${chapter.index}">${escapeHTML(chapter.title)}</option>`).join("");$("#ebook-chapter-select").innerHTML=options;$("#ebook-chapter-list").innerHTML=chapters.map((chapter)=>`<button type="button" data-ebook-page="${chapter.index}">${escapeHTML(chapter.title)}</button>`).join("")}
-  function renderEBookPage(){const pages=state.content?.pages||[];if(!pages.length)return;state.page=Math.min(pages.length-1,Math.max(0,state.page));const page=pages[state.page];$("#reader-page-number").value=state.page+1;$("#ebook-page-chapter").textContent=page.chapter||"";$("#ebook-page-content").textContent=page.content;$("#ebook-reader-page").textContent=`${state.page+1} / ${pages.length}`;$("#ebook-page-footer").textContent=`第 ${state.page+1} 页，共 ${pages.length} 页`;const progress=pages.length===1?100:state.page*100/(pages.length-1);$("#ebook-reader-progress-bar").style.width=`${progress}%`;$("#ebook-page-prev").disabled=state.page===0;$("#ebook-page-next").disabled=state.page===pages.length-1;$("#ebook-chapter-select").value=String([...$("#ebook-chapter-select").options].reverse().find((option)=>Number(option.value)<=state.page)?.value||0);$$('[data-ebook-page]').forEach((button)=>button.classList.toggle("active",Number(button.dataset.ebookPage)<=state.page&&(!button.nextElementSibling||Number(button.nextElementSibling.dataset.ebookPage)>state.page)));$("#ebook-page-stage>article").scrollTop=0;renderEBookTools();scheduleProgressSave()}
+  function renderEBookPage(){const pages=state.content?.pages||[];if(!pages.length)return;state.page=Math.min(pages.length-1,Math.max(0,state.page));const page=pages[state.page];$("#reader-page-number").value=state.page+1;$("#ebook-page-chapter").textContent=page.chapter||"";$("#ebook-page-content").textContent=page.content;window.DaynestReadingTranslation?.setSource("ebook",page.content);$("#ebook-reader-page").textContent=`${state.page+1} / ${pages.length}`;$("#ebook-page-footer").textContent=`第 ${state.page+1} 页，共 ${pages.length} 页`;const progress=pages.length===1?100:state.page*100/(pages.length-1);$("#ebook-reader-progress-bar").style.width=`${progress}%`;$("#ebook-page-prev").disabled=state.page===0;$("#ebook-page-next").disabled=state.page===pages.length-1;$("#ebook-chapter-select").value=String([...$("#ebook-chapter-select").options].reverse().find((option)=>Number(option.value)<=state.page)?.value||0);$$('[data-ebook-page]').forEach((button)=>button.classList.toggle("active",Number(button.dataset.ebookPage)<=state.page&&(!button.nextElementSibling||Number(button.nextElementSibling.dataset.ebookPage)>state.page)));$("#ebook-page-stage>article").scrollTop=0;renderEBookTools();scheduleProgressSave()}
 function renderEBookTools(){const reading=state.currentReading;if(!reading)return;$("#ebook-bookmarks").innerHTML=reading.bookmarks?.length?reading.bookmarks.map((bookmark)=>`<article class="ebook-tool-item"><strong>${escapeHTML(bookmark.label||`第 ${bookmark.page_index+1} 页`)}</strong><p>${escapeHTML(bookmark.excerpt||"")}</p><footer><span>第 ${bookmark.page_index+1} 页</span><span><button type="button" data-bookmark-goto="${bookmark.page_index}">跳转</button><button type="button" data-bookmark-delete="${bookmark.id}">删除</button></span></footer></article>`).join(""):'<div class="literature-empty">还没有书签。</div>';$("#ebook-notes").innerHTML=reading.notes?.length?reading.notes.map((note)=>`<article class="ebook-tool-item"><p>${escapeHTML(note.content)}</p><footer><span>第 ${note.page_index+1} 页</span><span><button type="button" data-note-goto="${note.page_index}">跳转</button><button type="button" data-note-edit="${note.id}">编辑</button><button type="button" data-note-delete="${note.id}">删除</button></span></footer></article>`).join(""):'<div class="literature-empty">还没有阅读笔记。</div>'}
   async function openEBook(readingID){
     const reading=state.shelf.find(item=>item.id===readingID); if(!reading)return;
-    if(state.currentReading && !(await saveProgress())) return;
+    if($("#ebook-reader-dialog").open && state.currentReading && !(await saveProgress())) return;
     const version=++readerVersion;
     state.currentReading=reading; state.content=null; state.page=reading.page_index||0; state.readerStarted=0;
     $("#ebook-note-input").value="";
-    $("#ebook-reader-title").textContent=reading.book.title; $("#ebook-reader-author").textContent=authorLabel(reading.book);
-    $("#ebook-page-content").textContent="正在下载并整理正文…";
+    $("#ebook-reader-title").textContent=bookTitle(reading.book); $("#ebook-reader-author").textContent=authorLabel(reading.book);
+    $("#ebook-page-content").textContent="正在载入正文…";
+    window.DaynestReadingTranslation?.setSource("ebook");
+    $("#ebook-page-stage").setAttribute("aria-busy","true");
+    $("#reader-retry").classList.add("hidden");
+    $("#ebook-content-origin").textContent="";
     $("#ebook-reader-page").textContent="加载中";
     $("#ebook-chapter-list").replaceChildren(); $("#ebook-chapter-select").replaceChildren();
     $("#ebook-source-link").removeAttribute("href"); $("#ebook-license-notice").textContent="";
@@ -81,9 +143,17 @@ function renderEBookTools(){const reading=state.currentReading;if(!reading)retur
       state.content=content; state.readerStarted=document.hidden?0:Date.now();
       const source=content.book?.source_url||""; if(/^https:\/\//i.test(source))$("#ebook-source-link").href=source;
       $("#ebook-license-notice").textContent=content.license_notice||"";
+      $("#ebook-content-origin").textContent={included:"服务器内置全文",cache:"服务器缓存全文",online:"Gutenberg 在线全文"}[content.content_origin]||"";
       $("#reader-page-number").max=content.pages.length;
       renderChapters();renderEBookPage();
-    }catch(error){if(version!==readerVersion)return;$("#ebook-page-content").textContent=`正文暂不可用：${error.message}\n\n请点击下方“重试下载”。`;$("#reader-save-status").textContent="下载失败，可重试";notify(error.message,"error")}
+    } catch(error) {
+      if (version!==readerVersion) return;
+      $("#ebook-page-content").textContent=error.message;
+      $("#reader-save-status").textContent="正文暂未打开，书籍已留在书架";
+      $("#reader-retry").classList.remove("hidden");
+    } finally {
+      if (version===readerVersion) $("#ebook-page-stage").setAttribute("aria-busy","false");
+    }
   }
   function elapsedReadingSeconds(){if(!state.readerStarted)return 0;const seconds=Math.min(3600,Math.max(0,Math.floor((Date.now()-state.readerStarted)/1000)));state.readerStarted=Date.now();return seconds}
   async function saveProgress(status=""){
@@ -213,7 +283,7 @@ function renderEBookTools(){const reading=state.currentReading;if(!reading)retur
       if($("#ebook-note-input").value.trim()&&!window.confirm('有尚未保存的阅读笔记，仍要关闭吗？'))return;
       const pending=saveProgress();state.readerStarted=0;
       if(!(await pending))return;
-      readerVersion++;window.clearTimeout(state.saveTimer);state.readerStarted=0;window.speechSynthesis?.cancel();$("#ebook-reader-dialog").close();
+      readerVersion++;window.clearTimeout(state.saveTimer);state.readerStarted=0;state.currentReading=null;state.content=null;window.speechSynthesis?.cancel();$("#ebook-reader-dialog").close();
     };
     $("#ebook-reader-close").addEventListener('click',close,true);$("#ebook-reader-dialog").addEventListener('cancel',close,true);
     $("#ebook-finish-reading").addEventListener('click',async event=>{event.stopImmediatePropagation();if(state.content&&await saveProgress('completed'))notify('这本书已标记为读完。')},true);

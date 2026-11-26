@@ -88,6 +88,10 @@ func TestEnglishFeedRefreshFailureAndRecovery(t *testing.T) {
 	svc := New(store.NewMemory(), nil, nil)
 	now := time.Date(2026, 10, 7, 0, 0, 0, 0, time.UTC)
 	svc.now = func() time.Time { return now }
+	dir := t.TempDir()
+	if err := svc.SetReadingCache(dir); err != nil {
+		t.Fatal(err)
+	}
 	feed, err := svc.EnglishFeed(context.Background(), false)
 	if err != nil || feed.Offline || !feed.Degraded || len(feed.Articles) != 1 || feed.Sources[0].Error != "来源返回 HTTP 403" {
 		t.Fatalf("partial failure: %+v, %v", feed, err)
@@ -101,6 +105,12 @@ func TestEnglishFeedRefreshFailureAndRecovery(t *testing.T) {
 	}
 	fail.Store(true)
 	now = now.Add(30 * time.Second)
+	restarted := New(store.NewMemory(), nil, nil)
+	restarted.now = svc.now
+	if err := restarted.SetReadingCache(dir); err != nil {
+		t.Fatal(err)
+	}
+	svc = restarted
 	stale, err := svc.EnglishFeed(context.Background(), true)
 	if err != nil || calls.Load() != 4 || stale.Offline || !stale.Sources[1].Stale || len(stale.Articles) != 1 || !stale.Sources[1].LastSuccessAt.Equal(*feed.Sources[1].LastSuccessAt) {
 		t.Fatalf("manual refresh must preserve genuine last success: %+v, %v", stale, err)

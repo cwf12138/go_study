@@ -157,7 +157,6 @@
     (state.overview?.focus_sessions || []).forEach(item=>add(eventDay(item.started_at),{type:"focus",id:item.id,title:`专注 · ${item.title_snapshot || (state.overview?.tasks||[]).find(t=>t.id===item.task_id)?.title || "自由专注"}`,time:clock(new Date(item.started_at)),color:"#577e9a",raw:item}));
     (state.overview?.mood_entries || []).forEach((item) => add(item.date, { type: "mood", id: item.id, title: `心情 · ${calendarMood(item.mood).label}`, time: "记录", color: "#25ae85", raw: item }));
     (state.overview?.fitness_days || []).forEach((item) => add(item.date, { type: "fitness", id: 'fitness-day-'+item.date, title: '运动 · 已锻炼', time: '打卡', color: '#718b5d', raw: item }));
-    (state.overview?.care_entries || []).forEach((item,index)=>add(item.date,{type:'care',id:'care-'+item.item_id+'-'+index,title:(item.kind==='done'?'已照顾 · ':'保养 · ')+item.title,time:item.kind==='done'?'完成':'待办',color:'#46797d',raw:item}));
     map.forEach((items) => items.sort((a, b) => a.time.localeCompare(b.time)));
     return map;
   }
@@ -217,7 +216,7 @@
       columns += `<div class="calendar-time-column" data-calendar-date="${key}">${currentLine}${timedLayouts(timed, key).map(layout => timedEventHTML(layout.item, key, layout)).join("")}</div>`;
     }
     const fitnessDays=Array.from({length:count},(_,i)=>dateKey(addDays(start,i)));
-    const fitnessStrip=fitnessDays.some(day=>(events.get(day)||[]).some(item=>['fitness','care'].includes(item.type)))?`<div class="calendar-fitness-strip"><span>记录</span>${fitnessDays.map(day=>{const entries=(events.get(day)||[]).filter(item=>['fitness','care'].includes(item.type));return `<div>${entries.slice(0,3).map(item=>item.type==='fitness'?`<button type="button" data-calendar-fitness="${day}" title="${escapeHTML(fitnessDescription(item.raw))}">✓ 已锻炼</button>`:`<button type="button" data-calendar-care="${escapeHTML(item.raw.item_id)}">${escapeHTML(item.title)}</button>`).join('')}${entries.length>3?`<button type="button" data-calendar-date="${day}">另 ${entries.length-3} 条</button>`:''}</div>`;}).join('')}</div>`:'';
+    const fitnessStrip=fitnessDays.some(day=>(events.get(day)||[]).some(item=>item.type==='fitness'))?`<div class="calendar-fitness-strip"><span>记录</span>${fitnessDays.map(day=>{const entries=(events.get(day)||[]).filter(item=>item.type==='fitness');return `<div>${entries.slice(0,3).map(item=>`<button type="button" data-calendar-fitness="${day}" title="${escapeHTML(fitnessDescription(item.raw))}">✓ 已锻炼</button>`).join('')}${entries.length>3?`<button type="button" data-calendar-date="${day}">另 ${entries.length-3} 条</button>`:''}</div>`;}).join('')}</div>`:'';
     const allDay=fitnessDays.some(day=>(events.get(day)||[]).some(item=>item.type==='event'&&item.raw.all_day))?`<div class="calendar-all-day-strip"><span>全天</span>${fitnessDays.map(day=>`<div>${(events.get(day)||[]).filter(item=>item.type==='event'&&item.raw.all_day).map(item=>`<button type="button" ${eventAttributes(item)} style="--item-color:${item.color}">${escapeHTML(item.title)}</button>`).join('')}</div>`).join('')}</div>`:'';
     $("#calendar-canvas").innerHTML = `<div class="calendar-time-scroll"><div class="calendar-time-view" style="--day-count:${count}"><div class="calendar-time-head">${heads}</div>${allDay}${fitnessStrip}<div class="calendar-time-grid">${columns}</div></div></div>`;
     const selectedItems = events.get(state.selected) || [];
@@ -373,7 +372,7 @@
     const agenda = $("#calendar-day-agenda");
     $("#calendar-agenda-title").textContent = `${shortDate(fromDateKey(state.selected))} · ${items.length} 项安排`;
     agenda.classList.toggle("empty-state", !items.length);
-    agenda.innerHTML = items.length ? items.map((item) => `<div class="calendar-agenda-item" ${item.type === "event" ? `role="button" tabindex="0" aria-label="编辑 ${escapeHTML(item.title)}" ${eventAttributes(item)}` : ""}><span class="calendar-agenda-time">${escapeHTML(item.time)}</span><i class="calendar-agenda-color" style="--item-color:${item.color}"></i><span><b>${calendarItemTitle(item)}</b><small>${escapeHTML(item.type === "event" ? item.raw.category : item.type === "fitness" ? fitnessDescription(item.raw) : item.type === "focus" ? `${item.raw.actual_minutes} 分钟 · 已完成` : typeLabel(item.type))}</small>${(item.type === "todo" || (item.type === "focus" && item.raw.todo_id)) ? `<button type="button" class="calendar-fitness-link" ${item.raw.memo_action_id ? `data-action-link="${escapeHTML(item.raw.memo_action_id)}"` : `data-action-todo-context="${escapeHTML(item.type === "todo" ? item.id : item.raw.todo_id)}"`}>查看待办与专注 ↗</button>` : ""}${item.type === "fitness" ? `<button type="button" class="calendar-fitness-link" data-calendar-fitness="${escapeHTML(item.raw.date)}">查看运动记录 ↗</button>` : item.type === "care" ? `<button type="button" class="calendar-fitness-link" data-calendar-care="${escapeHTML(item.raw.item_id)}">查看保养事项 ↗</button>` : ""}</span></div>`).join("") : "这一天还没有安排。";
+    agenda.innerHTML = items.length ? items.map((item) => `<div class="calendar-agenda-item" ${item.type === "event" ? `role="button" tabindex="0" aria-label="编辑 ${escapeHTML(item.title)}" ${eventAttributes(item)}` : ""}><span class="calendar-agenda-time">${escapeHTML(item.time)}</span><i class="calendar-agenda-color" style="--item-color:${item.color}"></i><span><b>${calendarItemTitle(item)}</b><small>${escapeHTML(item.type === "event" ? item.raw.category : item.type === "fitness" ? fitnessDescription(item.raw) : item.type === "focus" ? `${item.raw.actual_minutes} 分钟 · 已完成` : typeLabel(item.type))}</small>${(item.type === "todo" || (item.type === "focus" && item.raw.todo_id)) ? `<button type="button" class="calendar-fitness-link" ${item.raw.memo_action_id ? `data-action-link="${escapeHTML(item.raw.memo_action_id)}"` : `data-action-todo-context="${escapeHTML(item.type === "todo" ? item.id : item.raw.todo_id)}"`}>查看待办与专注 ↗</button>` : ""}${item.type === "fitness" ? `<button type="button" class="calendar-fitness-link" data-calendar-fitness="${escapeHTML(item.raw.date)}">查看运动记录 ↗</button>` : ""}</span></div>`).join("") : "这一天还没有安排。";
   }
 
   function navigate(direction) {
@@ -435,7 +434,6 @@
     document.addEventListener('daynest:focus-changed',fitnessChanged);
     document.addEventListener('daynest:actions-changed',fitnessChanged);
     document.addEventListener('daynest:calendar-events-changed',fitnessChanged);
-    window.addEventListener('daynest:care-changed',fitnessChanged);
     window.addEventListener('daynest:calendar-date',event=>{const day=event.detail?.date;if(!token()||typeof day!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(day)||day<'2000-01-01'||day>'2100-12-31'||dateKey(fromDateKey(day))!==day)return;state.selected=day;state.anchor=fromDateKey(day);if($('#panel-calendar').classList.contains('active'))loadCalendar();});
     const tools = $("#calendar-tools-dialog");
     let toolsTrigger = null;
@@ -503,7 +501,7 @@
     if (typeof MutationObserver !== 'undefined') new MutationObserver(() => {
       if (token() && $('#panel-calendar').classList.contains('active') && !state.initialized) { state.initialized = true; loadCalendar(); }
     }).observe($('#panel-calendar'), { attributes: true, attributeFilter: ['class'] });
-    window.addEventListener("storage", e => { if (e.key === "studyflow.token") resetOwner(); else if(["daynest.fitness.changed","daynest.care.changed"].includes(e.key))fitnessChanged(); });
+    window.addEventListener("storage", e => { if (e.key === "studyflow.token") resetOwner(); else if(e.key==="daynest.fitness.changed")fitnessChanged(); });
 
     $("[data-view=calendar]")?.addEventListener("click", () => {
 	  activateCalendarPanel();
@@ -524,7 +522,6 @@
     $("#calendar-canvas").addEventListener("click", async (event) => {
 	  if (event.target.closest("[data-calendar-retry]")) { await loadCalendar(); return; }
       const fitnessButton=event.target.closest("[data-calendar-fitness]");if(fitnessButton){openFitness(fitnessButton.dataset.calendarFitness);return;}
-      const careButton=event.target.closest('[data-calendar-care]');if(careButton){openCare(careButton.dataset.calendarCare);return;}
       const eventButton = event.target.closest("[data-calendar-event]"); if (eventButton) { event.stopPropagation(); openCalendarItem(eventButton); return; }
       const timeColumn = event.target.closest('.calendar-time-column');
       if (timeColumn && !event.target.closest('button')) {
@@ -535,7 +532,7 @@
       const month = event.target.closest("[data-calendar-month]"); if (month) { state.anchor = new Date(state.anchor.getFullYear(), Number(month.dataset.calendarMonth), 1); state.selected = dateKey(state.anchor); setView("month"); return; }
       const day = event.target.closest("[data-calendar-date]"); if (day) { await selectDay(day.dataset.calendarDate, state.view === "day"); }
     });
-    $("#calendar-day-agenda").addEventListener("click", (event) => { const care=event.target.closest("[data-calendar-care]");if(care){openCare(care.dataset.calendarCare);return;}const fitness=event.target.closest("[data-calendar-fitness]");if(fitness){openFitness(fitness.dataset.calendarFitness);return;}const target = event.target.closest("[data-calendar-event]"); if (target) openCalendarItem(target); });
+    $("#calendar-day-agenda").addEventListener("click", (event) => { const fitness=event.target.closest("[data-calendar-fitness]");if(fitness){openFitness(fitness.dataset.calendarFitness);return;}const target = event.target.closest("[data-calendar-event]"); if (target) openCalendarItem(target); });
 	$("#calendar-history").addEventListener("click", (event) => { if (event.target.closest("[data-history-retry]")) loadHistory(state.selected); });
     window.addEventListener("keydown", (event) => {
       if (!$("#panel-calendar").classList.contains("active") || $("#calendar-event-dialog").open || tools.open || /INPUT|TEXTAREA|SELECT|BUTTON/.test(event.target.tagName) || event.target.isContentEditable || event.ctrlKey || event.metaKey || event.altKey) return;
@@ -578,7 +575,6 @@
   function shortDate(date) { return `${date.getMonth() + 1}月${date.getDate()}日`; }
   function fitnessDescription(day){return day.completed_sessions>0?`完成 / 补记 ${day.completed_sessions} 次 · 记录 ${Math.floor(day.recorded_seconds/60)} 分钟（含休息）${day.manual_check_in?' · 另有手动打卡':''}`:'手动打卡 · 未填写运动时长';}
   function openFitness(day){if(typeof window.dispatchEvent==='function'&&typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('daynest:fitness-date',{detail:{date:day}}));$('.nav-link[data-view="fitness"]')?.click();}
-  function openCare(id){$('.nav-link[data-view="care"]')?.click();if(typeof window.dispatchEvent==='function'&&typeof CustomEvent==='function')window.dispatchEvent(new CustomEvent('daynest:care-item',{detail:{id}}));}
   function fitnessChanged(){if(!token())return;state.fitnessDirty=true;if($('#panel-calendar').classList.contains('active')&&!state.loading)loadCalendar();}
   function clock(date) { return Number.isNaN(date.getTime()) ? "" : E?E.wall(date.toISOString()).slice(11):`${pad(date.getHours())}:${pad(date.getMinutes())}`; }
   function calendarMood(value) {
@@ -594,7 +590,7 @@
     const mood = calendarMood(item.raw?.mood);
     return `<img class="calendar-mood-icon" src="/static/mood-art/${mood.value}-flat-v2.png" width="20" height="20" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><span class="calendar-mood-label">${escapeHTML(item.title)}</span>`;
   }
-  function typeLabel(value) { return ({ event: "个人日程", plan: "学习计划", task: "学习任务", todo: "待办事项", mood: "心情日记", fitness: "运动日常", care: "生活保养站", focus: "已完成专注" })[value] || value; }
+  function typeLabel(value) { return ({ event: "个人日程", plan: "学习计划", task: "学习任务", todo: "待办事项", mood: "心情日记", fitness: "运动日常", focus: "已完成专注" })[value] || value; }
 
   bind();
 })();

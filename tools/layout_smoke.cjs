@@ -8,7 +8,7 @@ assert(css.includes('--page-width: 1680px'));
 assert(css.includes('--page-gutter: 22px'));
 assert(css.includes('--page-gutter: 15px'));
 assert(css.includes('calc((100% - var(--page-width)) / 2 + var(--page-gutter))'));
-for (const id of ['calendar', 'memos', 'planner']) {
+for (const id of ['calendar']) {
   assert(css.includes('#panel-' + id));
   assert(html.includes('id="panel-' + id + '"'));
 }

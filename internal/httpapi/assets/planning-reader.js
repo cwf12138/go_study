@@ -1,26 +1,26 @@
 (() => {
   'use strict';
   const C=window.DaynestReadCacheCore,P=window.DaynestPlanningCache,$=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  let section='notes',data=null,vault=null,identity=null,server='',selectedDate='',renderError='',lastBinding='';
-  try{const saved=sessionStorage.getItem('daynest.offline.section');if(['notes','todos','agenda','capture'].includes(saved))section=saved;}catch(_){}
-  const requested=location.hash.slice(1);if(['notes','todos','agenda','capture'].includes(requested))section=requested;
-  const labels={event:'个人日程',plan:'计划时段',task:'学习任务',todo:'待办',focus:'专注记录',mood:'心情',fitness:'运动',care:'生活保养'},states={open:'未完成',completed:'已完成',planned:'待进行',in_progress:'进行中',skipped:'已跳过',done:'已完成',due:'待照顾',cancelled:'已取消'},priorities={low:'低',medium:'普通',high:'重要'};
+  let section='todos',data=null,vault=null,identity=null,server='',selectedDate='',renderError='',lastBinding='';
+  try{const saved=sessionStorage.getItem('daynest.offline.section');if(['todos','agenda','capture'].includes(saved))section=saved;}catch(_){}
+  const requested=location.hash.slice(1);if(['todos','agenda','capture'].includes(requested))section=requested;
+  const labels={event:'个人日程',plan:'计划时段',task:'学习任务',todo:'待办',focus:'专注记录',mood:'心情',fitness:'运动'},states={open:'未完成',completed:'已完成',planned:'待进行',in_progress:'进行中',skipped:'已跳过',done:'已完成',due:'待照顾',cancelled:'已取消'},priorities={low:'低',medium:'普通',high:'重要'};
   const when=v=>new Date(v).toLocaleString('zh-CN',{timeZone:P.ZONE}),dateOnly=v=>P.today(new Date(v)),clock=v=>new Date(v).toLocaleTimeString('zh-CN',{timeZone:P.ZONE,hour:'2-digit',minute:'2-digit',hour12:false});
   function check(){try{const found=C.resolve(localStorage,server,localStorage.getItem('studyflow.token')||'');if(!found||found.userID!==identity?.userID||found.credentialTag!==identity?.credentialTag){load();return false;}if(parent!==window){const config=JSON.parse(localStorage.getItem('daynest.mobile.connection.v1')||'null');if(!config||C.origin(config.server)!==server){load();return false;}}return true;}catch(_){load();return false;}}
   function matches(row){const query=$('op-search').value.trim().toLocaleLowerCase();return !query||[row.title,row.notes||row.description||'',...(row.tags||[])].join('\n').toLocaleLowerCase().includes(query);}
   function filteredTodos(){return(data?.todo?.items||[]).filter(row=>matches(row)&&($('op-status').value==='all'||row.status===$('op-status').value)&&(!$('op-list').value||row.list_id===$('op-list').value)&&(!$('op-priority').value||row.priority===$('op-priority').value)&&($('op-scope').value==='all'||$('op-scope').value==='myday'&&row.my_day_date===P.today()||$('op-scope').value==='overdue'&&row.status==='open'&&row.due_at&&dateOnly(row.due_at)<P.today())).sort((a,b)=>Number(a.status==='completed')-Number(b.status==='completed')||(a.due_at?Date.parse(a.due_at):Infinity)-(b.due_at?Date.parse(b.due_at):Infinity)||a.title.localeCompare(b.title,'zh-CN'));}
-  function activeDay(){return data?.days.find(d=>d.date===selectedDate);}
+  function activeDay(){const snapshot=data?.days.find(d=>d.date===selectedDate);return snapshot&&{...snapshot,items:snapshot.items.filter(item=>item.type!=='care')};}
   function filteredAgenda(){return(activeDay()?.items||[]).filter(row=>matches(row)&&(!$('op-source').value||row.type===$('op-source').value));}
   function timeLabel(row){if(row.all_day||!row.start_at)return'全天';const start=selectedDate+'T00:00:00+08:00',end=P.nextDay(selectedDate)+'T00:00:00+08:00',from=Date.parse(row.start_at)<Date.parse(start)?'00:00':clock(row.start_at),to=row.end_at?(Date.parse(row.end_at)>=Date.parse(end)?'24:00':clock(row.end_at)):'';return from+(to?'–'+to:'')+((dateOnly(row.start_at)!==selectedDate||row.end_at&&Date.parse(row.end_at)>Date.parse(end))?' · 跨日':'');}
   function empty(message){$('op-content').innerHTML=`<div class="op-empty"><span aria-hidden="true">▤</span><h2>${esc(message)}</h2><p>在线时，从待办或智能日历的「离线资料」单独开启保留，并更新所需日期。</p></div>`;}
-  function render(){const planning=section==='todos'||section==='agenda';$('or-workspace').hidden=section!=='notes';$('or-library').hidden=section!=='notes';$('todo-outbox').hidden=section!=='capture';$('offline-planning').hidden=!planning;$('op-todo-filters').hidden=section!=='todos';$('op-day-filters').hidden=section!=='agenda';
+  function render(){const planning=section==='todos'||section==='agenda';$('todo-outbox').hidden=section!=='capture';$('offline-planning').hidden=!planning;$('op-todo-filters').hidden=section!=='todos';$('op-day-filters').hidden=section!=='agenda';
     document.querySelectorAll('[data-offline-section]').forEach(button=>{const active=button.dataset.offlineSection===section;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));});
     if(section==='capture'){document.dispatchEvent(new CustomEvent('daynest:outbox-show'));return;}document.querySelector('.or-badge').textContent='本机快照 · 只读';document.querySelector('.or-intro h1').textContent='离线，也能接着看。';document.querySelector('.or-intro .or-eyebrow').textContent='A QUIET PLACE TO READ';
     if(!planning)return;
     $('op-content').innerHTML='';$('op-read-at').textContent='';$('op-export').disabled=true;$('or-count').textContent='0';$('or-capacity-label').textContent='待办与当日安排 · 只读快照';
     if(!identity){$('or-status').textContent=renderError||'当前账号没有可核对的离线资料，请先在原服务在线登录。';empty('本机资料已锁定');return;}
     if(renderError||!data){$('or-status').textContent=renderError||'无法读取安排快照。';empty('安排快照未能读取');return;}
-    if(!data.enabled){$('or-status').textContent='待办与安排的离线保留尚未开启；备忘录的开关独立。';empty('为安排也留一份副本');return;}
+    if(!data.enabled){$('or-status').textContent='待办与安排的离线保留尚未开启。';empty('为安排也留一份副本');return;}
     if(data.invalidated_at){$('or-status').textContent=`${when(data.invalidated_at)} 发生本机在线修改，旧安排已作废，需联网更新。`;empty('正在等待新的确认结果');return;}
     if(section==='todos'){
       const snapshot=data.todo;if(!snapshot){$('or-status').textContent='尚未完整读取过待办清单。';empty('待办还没有准备好');return;}
@@ -37,15 +37,16 @@
     try{server=C.origin(new URLSearchParams(location.search).get('server')||location.origin);if(parent!==window){const config=JSON.parse(localStorage.getItem('daynest.mobile.connection.v1')||'null');if(!config||C.origin(config.server)!==server)throw Error('电脑连接已变化，请重新打开资料库。');}identity=C.resolve(localStorage,server,localStorage.getItem('studyflow.token')||'');if(identity){vault=P.create(localStorage,server,identity.userID);data=vault.read();const binding=server+':'+identity.userID+':'+identity.credentialTag;if(binding!==lastBinding){$('op-search').value='';$('op-status').value='all';$('op-scope').value='all';$('op-priority').value='';$('op-source').value='';selectedDate='';}lastBinding=binding;const before=previousList;$('op-list').innerHTML='<option value="">全部分类</option>'+(data.todo?.lists||[]).map(l=>`<option value="${esc(l.id)}">${esc(l.name)}</option>`).join('');if((data.todo?.lists||[]).some(l=>l.id===before))$('op-list').value=before;
         if(!data.days.some(d=>d.date===selectedDate))selectedDate=data.days.some(d=>d.date===P.today())?P.today():data.days[0]?.date||'';
         if(data.days.length)$('op-date').innerHTML=[...data.days].sort((a,b)=>b.date.localeCompare(a.date)).map(d=>`<option value="${d.date}">${d.date}${d.date===P.today()?' · 今天':''}</option>`).join('');$('op-date').value=selectedDate;
-      }}catch(error){data=null;identity=null;renderError=error.message;}if(!identity){lastBinding='';$('op-search').value='';selectedDate='';}render();
+      }}catch(error){data=null;identity=null;renderError=error.message;}if(!identity){lastBinding='';$('op-search').value='';selectedDate='';}
+    $('or-account').textContent=identity?identity.name+' · '+server+' · 本机资料':'当前没有可核对的本机账号资料。';render();
   }
-  function switchSection(next){section=next;try{sessionStorage.setItem('daynest.offline.section',section);history.replaceState(null,'',location.pathname+location.search+'#'+section);}catch(_){}if(section==='notes'){document.dispatchEvent(new CustomEvent('daynest:offline-show-notes'));$('or-capacity-label').innerHTML='最近打开的备忘录<br>最多保留 20 篇 · 1 MiB';}load();}
+  function switchSection(next){section=next;try{sessionStorage.setItem('daynest.offline.section',section);history.replaceState(null,'',location.pathname+location.search+'#'+section);}catch(_){}load();}
   document.querySelectorAll('[data-offline-section]').forEach(button=>button.addEventListener('click',()=>switchSection(button.dataset.offlineSection)));
   ['op-search','op-status','op-scope','op-list','op-priority','op-source'].forEach(id=>$(id).addEventListener(id==='op-search'?'input':'change',()=>{if(check())render();}));$('op-date').addEventListener('change',()=>{if(!check())return;selectedDate=$('op-date').value;render();});
   $('op-export').addEventListener('click',async()=>{if(!check())return;const snapshot=section==='todos'?data.todo:activeDay();if(!snapshot)return;const token=localStorage.getItem('studyflow.token');let text=`# ${section==='todos'?'待办清单':selectedDate+' 当日安排'}\n\n> 只读快照 · 保留于 ${when(snapshot.read_at)} · 北京时间 · 当前筛选结果\n\n`;
     if(section==='todos')text+=filteredTodos().map(row=>`- [${row.status==='completed'?'x':' '}] ${row.title}${row.due_at?'（截止 '+when(row.due_at)+'）':''}\n${row.notes?row.notes+'\n':''}${row.steps.map(step=>`  - [${step.completed?'x':' '}] ${step.title}`).join('\n')}`).join('\n\n');else text+=filteredAgenda().map(row=>`## ${timeLabel(row)} · ${row.title}\n${labels[row.type]}${row.location?' · '+row.location:''}\n\n${row.description}`).join('\n\n');
     const blob=new Blob([text],{type:'text/markdown;charset=utf-8'}),name=(section==='todos'?'待办清单':selectedDate+' 当日安排')+'.md';try{if(parent!==window&&parent.DaynestMobile?.saveBlob)await parent.DaynestMobile.saveBlob(blob,name,token);else{const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}}catch(error){if(check())$('or-status').textContent=error.message;}
   });
-  $('op-clear').addEventListener('click',()=>{if(!vault||!check()||!confirm('仅关闭并清空待办与日程快照？备忘录和电脑原文不受影响。'))return;try{vault.setEnabled(false);load();}catch(error){$('or-status').textContent=error.message;}});
+  $('op-clear').addEventListener('click',()=>{if(!vault||!check()||!confirm('仅关闭并清空待办与日程快照？在线记录不受影响。'))return;try{vault.setEnabled(false);load();}catch(error){$('or-status').textContent=error.message;}});
   window.addEventListener('storage',event=>{if(!event.key||event.key==='studyflow.token'||event.key==='daynest.mobile.connection.v1'||event.key.startsWith(C.prefix))load();});load();
 })();

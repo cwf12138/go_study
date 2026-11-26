@@ -9,8 +9,8 @@ let owner='alice',responseOverride=null,hold=false,pending=[],writes=0,requests=
 const nodes=new Map();
 function make(){const c=new Set();return{value:'',textContent:'',innerHTML:'',open:false,hidden:false,disabled:false,checked:false,tagName:'BUTTON',dataset:{},isConnected:true,handlers:{},classList:{add:x=>c.add(x),remove:x=>c.delete(x),contains:x=>c.has(x),toggle(x,v){if(v)c.add(x);else c.delete(x);}},addEventListener(k,f){this.handlers[k]=f;},showModal(){this.open=true;},close(){const before=this.open;this.open=false;if(before)this.handlers.close?.();},focus(){},select(){},scrollIntoView(){},querySelector(){return null;}};}
 const el=id=>{if(!nodes.has(id))nodes.set(id,make());return nodes.get(id);},E=id=>el('content-search-'+id);
-const hit=(id='memo-one',source='memos')=>({id,source,title:'中文 <img onerror=x>',snippet:'正文 中文 & detail',tags:['标签'],state:'备忘录',date:'2026-10-20',archived:false,updated_at:'2026-10-20T00:00:00Z',score:30,match_field:'内容'});
-const data=(items=[hit()])=>({items,query:'中文',total:items.length,available:items.length,page:1,page_size:20,truncated:false,counts:{memos:items.length},warnings:[]});
+const hit=(id='todo-one',source='todos')=>({id,source,title:'中文 <img onerror=x>',snippet:'正文 中文 & detail',tags:['标签'],state:'open',date:'2026-10-20',archived:false,updated_at:'2026-10-20T00:00:00Z',score:30,match_field:'内容'});
+const data=(items=[hit()])=>({items,query:'中文',total:items.length,available:items.length,page:1,page_size:20,truncated:false,counts:{todos:items.length},warnings:[]});
 const reply=out=>({ok:true,status:200,json:async()=>({data:out})});
 const ctx=vm.createContext({console,AbortController,setTimeout:()=>1,clearTimeout(){},navigator:{},localStorage:{getItem:()=>owner,setItem(){writes++;}},CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail;}},MutationObserver:class{constructor(f){observers.push(f);}observe(){}},document:{activeElement:make(),getElementById:el,querySelector(s){if(s==='dialog[open]')return E('dialog').open?E('dialog'):null;const match=s.match(/data-view="([^"]+)"/);return match?{click(){navigated=match[1];}}:null;},addEventListener(k,f){events[k]=f;},dispatchEvent(e){events[e.type]?.(e);}},window:{addEventListener(k,f){windowEvents[k]=f;},dispatchEvent(e){windowEvents[e.type]?.(e);}},async fetch(path,opts){requests.push({path,...opts});const out=responseOverride||data();responseOverride=null;if(hold)await new Promise(r=>pending.push(r));return reply(out);}});
 vm.runInContext(script.replace('reset();\n})();','window.searchTesting={state,search,open,openHit,highlight,reset};reset();\n})();'),ctx);
@@ -18,16 +18,17 @@ const A=ctx.window.searchTesting,settle=()=>new Promise(r=>setImmediate(r));
 (async()=>{
  assert(A,'test harness injection');A.open();assert(E('dialog').open);E('input').value='中文';assert(await A.search());
  assert.equal(requests.at(-1).path,'/api/v1/search');assert.equal(requests.at(-1).method,'POST');assert(!requests.at(-1).path.includes('中文'));assert.equal(requests.at(-1).headers.Authorization,'Bearer alice');
+ assert.deepEqual(JSON.parse(requests.at(-1).body).sources.sort(),['calendar','fitness','moods','todos']);
  assert(E('results').innerHTML.includes('<mark>中文</mark>'));assert(E('preview').innerHTML.includes('&lt;img'));assert(!E('preview').innerHTML.includes('<img'));assert(!E('open').hidden);
  A.state.query='[a] .*';assert(A.highlight('[a] .* <script>').includes('<mark>[a]</mark>'));assert(A.highlight('[a] .* <script>').includes('&lt;script&gt;'));
  A.state.selectedSources.clear();const before=requests.length;assert.equal(await A.search(),false);assert.equal(requests.length,before);assert(E('status').textContent.includes('至少选择'));
- A.state.selectedSources.add('memos');E('from').value='2026-02-30';assert.equal(await A.search(),false);E('from').value='';
- responseOverride={...data(),warnings:['todos']};A.state.selectedSources.add('todos');assert(await A.search());assert(E('warnings').textContent.includes('待办清单'));
+ A.state.selectedSources.add('todos');E('from').value='2026-02-30';assert.equal(await A.search(),false);E('from').value='';
+ responseOverride={...data(),warnings:['calendar']};A.state.selectedSources.add('calendar');assert(await A.search());assert(E('warnings').textContent.includes('个人日程'));
  responseOverride={...data(),available:501};assert.equal(await A.search(),false);assert.equal(A.state.items.length,0);assert(!E('retry').hidden);assert(E('input').value==='中文');
  responseOverride={...data(),items:[hit('bad','goals')]};assert.equal(await A.search(),false);
  responseOverride={...data(),total:21,available:21};assert(await A.search());assert(!E('pagination').hidden);assert.equal(E('page').textContent,'1 / 2');
  assert(await A.search());E('copy').handlers.click();await settle();assert(!E('copy-box').hidden);assert.equal(E('copy-text').value,hit().title);
- let opened;events['daynest:open-search-memo']=e=>opened=e.detail;A.openHit();assert.equal(navigated,'memos');assert.equal(opened.id,'memo-one');assert(!E('dialog').open);
+ A.openHit();assert.equal(navigated,'todo');assert(!E('dialog').open);
  A.open();await settle();hold=true;E('input').value='first';const first=A.search();await settle();E('input').value='second';const second=A.search();await settle();pending.pop()();assert(await second);pending.shift()();assert.equal(await first,false);
  E('input').value='private';const late=A.search();await settle();owner='bob';observers.forEach(f=>f());pending.shift()();assert.equal(await late,false);assert.equal(A.state.items.length,0);assert.equal(E('preview').innerHTML.includes('中文'),false);assert.equal(E('input').value,'');assert(!E('dialog').open);
  hold=false;events.keydown({defaultPrevented:false,isComposing:false,ctrlKey:true,shiftKey:true,metaKey:false,key:'F',target:{tagName:'BODY'},preventDefault(){}});assert(E('dialog').open);

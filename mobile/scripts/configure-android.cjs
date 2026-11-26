@@ -3,19 +3,22 @@ const root = path.resolve(__dirname, '..'), android = path.join(root, 'android')
 if (!fs.existsSync(path.join(android, 'app/src/main/AndroidManifest.xml'))) throw Error('先执行 npm run android:init 创建 Android 工程。');
 const java = path.join(android, 'app/src/main/java/app/daynest/personal'), xml = path.join(android, 'app/src/main/res/xml');
 fs.mkdirSync(java, { recursive: true }); fs.mkdirSync(xml, { recursive: true });
-for (const file of ['MainActivity.java', 'DaynestFilesPlugin.java', 'DaynestRemindersPlugin.java', 'CalendarReminderReceiver.java']) fs.copyFileSync(path.join(root, 'native', file), path.join(java, file));
+for (const file of ['MainActivity.java', 'DaynestFilesPlugin.java', 'DaynestRemindersPlugin.java', 'CalendarReminderReceiver.java', 'DaynestBrowsersPlugin.java']) fs.copyFileSync(path.join(root, 'native', file), path.join(java, file));
 fs.copyFileSync(path.join(root, 'native/network_security_config.xml'), path.join(xml, 'network_security_config.xml'));
 fs.copyFileSync(path.join(root, 'native/daynest_icon.xml'), path.join(android, 'app/src/main/res/drawable/daynest_icon.xml'));
 const manifest = path.join(android, 'app/src/main/AndroidManifest.xml');
 let content = fs.readFileSync(manifest, 'utf8');
+if (!content.includes('android.intent.category.APP_BROWSER')) {
+  const browserQuery = '        <intent>\n            <action android:name="android.intent.action.MAIN" />\n            <category android:name="android.intent.category.APP_BROWSER" />\n        </intent>\n';
+  content = content.includes('</queries>') ? content.replace('</queries>', browserQuery + '    </queries>') :
+    content.replace('<application', '<queries>\n' + browserQuery + '    </queries>\n\n    <application');
+}
 content = content.replace(/android:allowBackup="[^"]*"/, 'android:allowBackup="false"');
 content = content.replace(/android:icon="[^"]*"/, 'android:icon="@drawable/daynest_icon"').replace(/android:roundIcon="[^"]*"/, 'android:roundIcon="@drawable/daynest_icon"');
 if (!content.includes('android:networkSecurityConfig=')) content = content.replace('<application', '<application android:networkSecurityConfig="@xml/network_security_config"');
 if (!content.includes('android:windowSoftInputMode=')) content = content.replace('android:launchMode="singleTask"', 'android:launchMode="singleTask"\n            android:windowSoftInputMode="adjustResize"');
 if (!content.includes('android:name=".MallMapActivity"')) content = content.replace('</application>', `    <activity android:name=".MallMapActivity" android:exported="false" android:theme="@style/AppTheme.NoActionBar" />
     </application>`);
-if (!content.includes('android.permission.RECORD_AUDIO')) content = content.replace('</manifest>', '    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n</manifest>');
-if (!content.includes('android.permission.MODIFY_AUDIO_SETTINGS')) content = content.replace('</manifest>', '    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n</manifest>');
 // WebView requests foreground location only after the weather locate button.
 for (const permission of ['ACCESS_COARSE_LOCATION','ACCESS_FINE_LOCATION']) {
   if (!content.includes('android.permission.'+permission)) content = content.replace('</manifest>', '    <uses-permission android:name="android.permission.'+permission+'" />\n</manifest>');
