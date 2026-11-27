@@ -2,6 +2,47 @@
 
 规划基线：2026-10-29。本文的分阶段内容是开发建议，实际推进结果在下方单独记录；没有列为已交付的能力不代表已经实现或完成验收。
 
+### Android 0.12.4 · 平面卡通心情贴纸
+
+- 使用内置 ImageGen 将小幽灵重绘为平面卡通。五种装扮配合简化的眉眼和嘴形，在手机月历中区分心情。
+- 透明 PNG 位于 `internal/httpapi/assets/mood-art/*-wisp-v4.png`，日期圆圈与贴纸继续等大对齐。
+
+<details>
+<summary>贴纸重绘提示词</summary>
+
+Use case: style-transfer. Redraw the five ORIGINAL Daynest ghost stickers in the attached sheet as genuinely FLAT 2D CARTOON reaction stickers for a mobile calendar. The image is the edit target for character identity and order only. Keep the five costume identities, cozy ivory ghost bodies with scalloped hems, tiny simple dark faces, and position of each sticker in the 3 columns by 2 rows atlas. Row 1: worried chestnut acorn ghost, sad dusty blue hood ghost, calm violet witch hat ghost with a single crescent. Row 2: happy amber-halo ghost hugging a yellow star, delighted orange persimmon hood ghost, blank. DRAW NEW SIMPLIFIED SILHOUETTES, using a clean hand-drawn mascot style, a minimal rounded contour and flat opaque solid color fills. Inspired by 2D cartoon emoji and retro sticker sheets. Limit each part to one solid color, limit each entire ghost to 4 to 6 colors, use rounded inky marks for eyebrows and mouths and simple filled dots or crescents for eyes. Close front-on cartoon view, faces legible when shrunk to 36 pixels, and silhouettes of similar presence. 1536x1024 landscape canvas, 512x512 cells, one separate sticker centered per cell with at least 38 pixels of fully transparent padding in every direction. Genuine transparent alpha all around every sprite, with flat solid fully opaque shapes. Bottom-right cell must be completely empty. No gradients, modeled shadows, highlights, perspective, 3D rendering, plush or knitted materials, fabric fibers, painterly grain, decorative seams, background halo or white matte, card borders, lettering or brand identifiers.
+
+</details>
+
+### Android 0.12.3 · 心情贴纸与日期对齐
+
+- 使用内置 ImageGen 生成五个原创绒布小幽灵贴纸。心情日历、记录页、月度回顾和智能日历使用同一套图。月历日期圆圈与贴纸共享尺寸，逐行对齐。
+- 透明 PNG 位于 `internal/httpapi/assets/mood-art/*-wisp-v3.png`。
+
+<details>
+<summary>贴纸生成提示词</summary>
+
+Use case: illustration-story. Generate one sprite sheet for Daynest: five ORIGINAL cozy cloth-ghost mood stickers, with the look of soft hand-painted costume charms in a dark mobile mood journal. The reference aesthetic is tiny warm-ivory floating fabric spirits, squat rounded shapes with wavy scalloped cloth bottoms, softly textured edges, rich little costumes, and very small dark eyes and mouths. Avoid the glossy big-eyed anime aesthetic, flower heads, thick outlines and neon. Each spirit has the same original asymmetric cream felt-cloth body, a few soft off-white folds and nubby hands. The color and silhouette come from its costume. Use painterly wool, gouache shadows, slight retro-game edge softness, warm ivory highlights, and gentle low saturation. No recognizable IP. Genuine transparent background; exact regular three-column by two-row 3:2 atlas, with five centered separate stickers and an empty bottom-right square. Top-left: distressed, shrunken in a chestnut acorn hood with one leaf and a nervous mouth. Top-middle: low, slouching in a slate-blue knit cowl and drooping eyes. Top-right: neutral, warm-white face with tiny eyes and a subtly curved mouth, wears a floppy dusty-indigo stargazer's hood with a short wide brim and small crescent embroidery. Bottom-left: happy, eyes squeezed into upward arcs, smiling beneath a little floating amber loop and holding a tiny star-shaped pillow. Bottom-middle: great, eyes joyful and open smile while wearing a round muted orange persimmon costume with a few green leaves and clasped felt hands. Equal canvas padding so nothing overlaps neighboring cells. Every costume silhouette must be recognizable when rendered at 42 px. No backdrop, cast shadows outside the figures, frames, labels, text, branding, or visual elements in the sixth panel.
+
+</details>
+
+### Android 0.12.2 · 心情日历
+
+- 月历直接展示更大的心情表情，日期状态有实心与轮廓区分。点日期打开记录，月历底部可回到今天、快速记录或进入月度回顾。
+- 支持左右滑动翻月和按年月跳转。草稿保护与原有浅色、深色模式继续生效。
+- 月历下方使用内置 ImageGen 生成的暮秋湖畔插画。资源位于 `internal/httpapi/assets/mood-art/late-autumn-lake.webp`。
+
+<details>
+<summary>插画生成提示词</summary>
+
+Use case: illustration-story. Generate one original landscape-only backdrop for Daynest, a Chinese personal mood calendar. Wide landscape composition intended for a short banner at the very bottom of a mobile calendar. A tranquil late-autumn lakeside at blue hour with a low shoreline, rust-orange reeds and small pale daisies in the foreground, low forested islands receding into deep blue-green mist, a thin warm peach band on the horizon and subtle water reflections. Crisp hand-painted gouache, slightly grainy matte paper texture, restrained editorial illustration, thoughtful and calm rather than childish. Put the visual interest in the central horizontal band, with the upper third quiet and dark so it can fade into a teal background. Main colors deep petrol teal, mint and amber. Edge-to-edge art, no text, frames, logos, characters, snow, buildings, UI elements or outlines resembling calendar controls. Original composition.
+
+</details>
+
+### Android 0.12.1 · 精简「今天」
+
+- 移除日常习惯和快递收件卡片及相关操作。习惯打卡和包裹历史可从数据中心导出。
+
 ### Android 0.12.0 · 首页、频道与「我的」
 
 - 首页顶部集中内容搜索、常用记录操作和个人入口。今日、记录和学习栏目支持触屏和键盘切换。

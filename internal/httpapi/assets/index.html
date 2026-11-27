@@ -6,9 +6,7 @@
     <meta name="description" content="日常 Daynest：日程、待办、随手记录与个人成长的生活空间">
     <title>日常 · Daynest</title>
     <link rel="stylesheet" href="/static/styles.css?v=20260901-6">
-    <link rel="stylesheet" href="/static/habits.css?v=20260914-1">
-    <link rel="stylesheet" href="/static/habits-dashboard.css?v=20260923-1">
-    <link rel="stylesheet" href="/static/mood-journal.css?v=20260924-mood-unified">
+    <link rel="stylesheet" href="/static/mood-journal.css?v=20260924-mood-unified&mood=20261127&stickers=4">
     <link rel="stylesheet" href="/static/focus-studio.css?v=20260925-2">
     <link rel="stylesheet" href="/static/timeline.css?v=20260910-1&retired=20261126">
     <link rel="stylesheet" href="/static/sync-status.css?v=20260909-1">
@@ -31,7 +29,7 @@
     <link rel="stylesheet" href="/static/daily-card.css?v=20260923-dialog">
     <link rel="stylesheet" href="/static/ledger.css?v=20260922-1">
     <link rel="stylesheet" href="/static/calendar-editor.css?v=20261118-2">
-    <link rel="stylesheet" href="/static/calendar-experience.css?v=20260924-mood-icons">
+    <link rel="stylesheet" href="/static/calendar-experience.css?v=20260924-mood-icons&stickers=4">
     <link rel="stylesheet" href="/static/daynest.css?retired=20261126&v=20260925-1">
     <link rel="stylesheet" href="/static/toolkit.css?v=20261009-1&ui=20261126">
     <link rel="stylesheet" href="/static/toolkit-pocket.css?v=20261009-2&ui=20261126">
@@ -44,7 +42,6 @@
     <link rel="stylesheet" href="/static/content-search.css?v=20261020-1&retired=20261126">
     <link rel="stylesheet" href="/static/gentle-reminders.css?v=20261022-motion-2">
     <link rel="stylesheet" href="/static/important-days.css?v=20261022-1">
-    <link rel="stylesheet" href="/static/parcels.css?v=20261026-1">
     <link rel="stylesheet" href="/static/product-polish.css?v=20261026-1">
     <link rel="stylesheet" href="/static/navigation.css?v=20261027-1">
     <link rel="stylesheet" href="/static/diagnostics.css?v=20261030-1">
@@ -218,11 +215,10 @@
             <div class="today-shortcuts" aria-label="常用功能">
               <button type="button" data-goto="calendar"><span aria-hidden="true">▦</span><b>看看日程</b><small>安排今天</small></button>
               <button type="button" data-goto="todo"><span aria-hidden="true">✓</span><b>添加待办</b><small>卸下脑中琐事</small></button>
-              <button type="button" data-goto="moods"><span aria-hidden="true"><img src="/static/mood-art/good-flat-v2.png" width="32" height="32" alt=""></span><b>记录心情</b><small>此刻感觉如何</small></button>
+              <button type="button" data-goto="moods"><span aria-hidden="true"><img src="/static/mood-art/good-wisp-v4.png" width="32" height="32" alt=""></span><b>记录心情</b><small>此刻感觉如何</small></button>
               <button type="button" data-goto="focus"><span aria-hidden="true">◷</span><b>留点专注</b><small>做一件喜欢的事</small></button>
             </div>
             <div class="today-grid">
-              <article class="parcel-home"><div class="parcel-home-icon" aria-hidden="true">▱</div><div><p>出门前，顺手取一下。</p><strong id="parcel-home-count">快递收件</strong><span id="parcel-home-help">取件码与取件点，放在一处</span></div><button id="parcel-open" type="button" aria-haspopup="dialog" aria-controls="parcel-dialog">打开收件夹 ↗</button></article>
               <article class="id-home"><header><div><p>DATES TO KEEP CLOSE</p><h3>重要日子</h3><span id="id-count">留一点期待给未来。</span></div><button id="id-open" type="button" aria-haspopup="dialog" aria-controls="id-dialog">管理日子 ↗</button></header><div id="id-preview"></div></article>
               <article class="surface today-agenda"><div class="surface-head"><div><p class="eyebrow">TODAY</p><h3>今日安排</h3></div><button class="text-button" type="button" data-goto="calendar">打开日历 ↗</button></div><div id="today-agenda" role="status">正在整理今天的日程…</div></article>
               <article class="surface today-todos"><div class="surface-head"><div><p class="eyebrow">ONE THING AT A TIME</p><h3>今天要做</h3></div><button class="text-button" type="button" data-goto="todo">全部待办 ↗</button></div><div id="today-todos">正在整理待办…</div></article>
@@ -233,15 +229,6 @@
               <article class="metric-card accent-green"><span>今日专注分钟</span><strong id="metric-focus">–</strong><small id="week-focus">本周 0 分钟</small></article>
             </div>
             </details>
-          <section id="panel-habits" class="dashboard-habits">
-            <header class="habit-heading"><div><p class="eyebrow">SMALL THINGS, AT YOUR PACE</p><h3>日常习惯</h3><p>每周保持自己的节奏，不必每天都满分。</p></div><button id="habit-manage-toggle" class="quiet" type="button" aria-expanded="false" aria-controls="habit-management">管理与历史</button></header><div id="habit-quick-list" class="habit-quick-list"></div><details id="habit-management"><summary>展开管理与历史</summary>
-            <div class="habit-metrics"><article><span>正在养成</span><strong id="habit-active-count">—</strong></article><article><span>今日已打卡</span><strong id="habit-today-count">—</strong></article><article><span>本周已达标</span><strong id="habit-best-count">—</strong></article></div>
-            <div class="habit-toolbar"><label>查看<select id="habit-filter"><option value="active">正在养成</option><option value="archived">已暂停</option></select></label><button id="habit-reload" class="quiet" type="button">刷新记录</button><span id="habit-status" role="status" aria-live="polite">等待加载</span></div>
-            <div class="habit-workspace"><div><div id="habit-list" class="habit-list"></div><article class="surface habit-create"><p class="eyebrow">PLANT A NEW SEED</p><h3>培养一个小习惯</h3><form id="habit-form"><label>习惯名称<input id="habit-title" required maxlength="80" placeholder="例如：每天读 10 页书"></label><div class="habit-form-pair"><label>类型<select id="habit-icon"><option value="read">阅读</option><option value="listen">听力</option><option value="write">写作</option><option value="move">运动</option><option value="water">生活</option></select></label><label>记录时区<select id="habit-zone"><option value="Asia/Shanghai">中国标准时间</option><option value="UTC">UTC</option><option value="America/New_York">纽约时间</option></select></label></div><label>每周目标<select id="habit-weekly-target"><option value="7">每天（每周 7 天）</option><option value="5">每周 5 天</option><option value="3">每周 3 天</option><option value="2">每周 2 天</option><option value="1">每周 1 天</option><option value="4">每周 4 天</option><option value="6">每周 6 天</option></select></label><label>行动提示<textarea id="habit-description" maxlength="300" rows="2" placeholder="例如：睡前放下手机，读完一个小节"></textarea></label><button class="primary" type="submit">＋ 开始养成</button></form><p class="habit-footnote">每周按完成天数计数，一天最多一次；时区创建后固定。暂停保留记录，不会删除。</p></article></div>
-            <article class="surface habit-calendar-card"><p class="eyebrow">YOUR CONSISTENCY</p><h3 id="habit-detail-title">选择一个习惯</h3><p id="habit-detail-meta" class="habit-footnote">在月历中查看、补记或撤销打卡。</p><div class="habit-month-nav"><button id="habit-prev" class="quiet" type="button" aria-label="上个月">‹</button><strong id="habit-month-label"></strong><button id="habit-next" class="quiet" type="button" aria-label="下个月">›</button></div><div class="habit-weekdays" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div><div id="habit-calendar" class="habit-calendar"></div><div id="habit-detail-stats" class="habit-detail-stats"></div><button id="habit-current-month" class="text-button" type="button">回到当前月</button><p class="habit-footnote">点击日期即可打卡，再次点击可撤销。仅可记录创建日起至今天；暂停后只读。漏记不会清空累计记录。</p></article></div>
-          </details></section>
-            <div class="dashboard-main" style="margin-top:20px">
-            </div>
           </section>
 
           <section id="panel-toolkit" class="panel"><details class="workspace-extra"><summary>下一件小事</summary><section id="choice-room" class="playroom"><header><p class="eyebrow">下一件小事</p><h3>从手边的小事开始。</h3><p>写下现在想做的几件小事，转一下选一个开始。</p></header><div class="playroom-layout"><article class="surface choice-stage"><div class="choice-wheel-shell"><i aria-hidden="true"></i><canvas id="choice-wheel" width="600" height="600" aria-label="选择转盘，结果在下方以文字显示"></canvas></div><p id="choice-result" role="status" aria-live="polite">准备好选项，再转一下。</p><button id="choice-spin" class="primary" type="button">开始抽选</button><p id="choice-status" class="playroom-note" role="status" aria-live="polite"></p></article><aside class="surface"><div class="sound-preset-row"><button type="button" data-choice-preset="food">短暂休息</button><button type="button" data-choice-preset="weekend">推进一点</button></div><label>选项，每行一项（2–40 项）<textarea id="choice-options" rows="8" maxlength="3240" placeholder="散步&#10;看电影&#10;在家做饭"></textarea></label><label class="playroom-check"><input id="choice-unique" type="checkbox">不重复抽取，直到这一轮抽完</label><button id="choice-reset" class="quiet" type="button">重新开始这一轮</button><p class="playroom-note">每项最多 80 字，重复项自动合并。修改选项会重置这一轮；清单与最近 30 次结果仅保存于本浏览器的当前账号。</p><div class="choice-history-head"><h3>最近的决定</h3><button id="choice-clear" class="quiet" type="button">清空记录</button></div><ol id="choice-history"></ol></aside></div></section></details>
@@ -279,10 +266,10 @@
             <div class="mood-workspace">
               <div class="mood-main-column">
                 <article class="surface mood-calendar-card">
-                  <div class="mood-calendar-head"><div><h3 id="mood-month-title">本月</h3><p class="mood-section-caption">一个表情，留住一天。</p></div><div class="mood-month-actions"><button id="mood-prev-month" class="mood-icon-button" type="button" aria-label="上一个月">‹</button><button id="mood-next-month" class="mood-icon-button" type="button" aria-label="下一个月">›</button></div></div>
+                  <div class="mood-calendar-head"><div><h3><button id="mood-month-open" type="button" aria-haspopup="dialog" aria-controls="mood-month-dialog"><span id="mood-month-title" aria-live="polite">本月</span><span aria-hidden="true">⌄</span></button></h3><p class="mood-section-caption">一个表情，留住一天。</p></div><div class="mood-month-actions"><button id="mood-prev-month" class="mood-icon-button" type="button" aria-label="上一个月">‹</button><button id="mood-next-month" class="mood-icon-button" type="button" aria-label="下一个月">›</button></div></div>
                   <div class="mood-weekdays" aria-hidden="true"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
                   <div id="mood-calendar" class="mood-calendar" aria-label="心情日历"></div>
-                  <div class="mood-legend"><span><img class="mood-avatar" src="/static/mood-art/awful-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"> 很糟</span><span><img class="mood-avatar" src="/static/mood-art/low-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"> 低落</span><span><img class="mood-avatar" src="/static/mood-art/neutral-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"> 平静</span><span><img class="mood-avatar" src="/static/mood-art/good-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"> 不错</span><span><img class="mood-avatar" src="/static/mood-art/great-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"> 很好</span></div>
+                  <div class="mood-legend"><span><img class="mood-avatar" src="/static/mood-art/awful-wisp-v4.png" width="192" height="192" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"> 很糟</span><span><img class="mood-avatar" src="/static/mood-art/low-wisp-v4.png" width="192" height="192" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"> 低落</span><span><img class="mood-avatar" src="/static/mood-art/neutral-wisp-v4.png" width="192" height="192" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"> 平静</span><span><img class="mood-avatar" src="/static/mood-art/good-wisp-v4.png" width="192" height="192" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"> 不错</span><span><img class="mood-avatar" src="/static/mood-art/great-wisp-v4.png" width="192" height="192" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"> 很好</span></div>
                 </article>
                 <article class="surface mood-trend-card"><div class="mood-entry-head"><div><h3>心情的起伏</h3><p class="mood-section-caption">起起落落，都是生活。</p></div><span id="mood-trend-caption" class="mood-trend-caption">等待记录</span></div><div id="mood-trend" class="mood-trend" role="img" aria-label="本月心情走势图"></div></article>
               </div>
@@ -293,7 +280,7 @@
                   <button id="mood-reload" class="text-button" type="button" hidden>重新读取这一天</button>
                   <form id="mood-form" class="mood-form">
                     <input id="mood-value" type="hidden" value="neutral">
-                    <div><span class="mood-field-label">此刻，感觉怎么样？</span><p class="mood-picker-hint">选一个最接近此刻的你，不必勉强开心。</p><div class="mood-picker" role="radiogroup" aria-label="选择心情"><button type="button" data-mood-choice="awful" aria-label="很糟"><img class="mood-avatar" src="/static/mood-art/awful-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><small>很糟</small></button><button type="button" data-mood-choice="low" aria-label="低落"><img class="mood-avatar" src="/static/mood-art/low-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><small>低落</small></button><button type="button" data-mood-choice="neutral" aria-label="平静"><img class="mood-avatar" src="/static/mood-art/neutral-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><small>平静</small></button><button type="button" data-mood-choice="good" aria-label="不错"><img class="mood-avatar" src="/static/mood-art/good-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><small>不错</small></button><button type="button" data-mood-choice="great" aria-label="很好"><img class="mood-avatar" src="/static/mood-art/great-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><small>很好</small></button></div></div>
+                    <div><span class="mood-field-label">此刻，感觉怎么样？</span><p class="mood-picker-hint">选一个最接近此刻的你，不必勉强开心。</p><div class="mood-picker" role="radiogroup" aria-label="选择心情"><button type="button" data-mood-choice="awful" aria-label="很糟"><img class="mood-avatar" src="/static/mood-art/awful-wisp-v4.png" width="192" height="192" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><small>很糟</small></button><button type="button" data-mood-choice="low" aria-label="低落"><img class="mood-avatar" src="/static/mood-art/low-wisp-v4.png" width="192" height="192" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><small>低落</small></button><button type="button" data-mood-choice="neutral" aria-label="平静"><img class="mood-avatar" src="/static/mood-art/neutral-wisp-v4.png" width="192" height="192" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><small>平静</small></button><button type="button" data-mood-choice="good" aria-label="不错"><img class="mood-avatar" src="/static/mood-art/good-wisp-v4.png" width="192" height="192" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><small>不错</small></button><button type="button" data-mood-choice="great" aria-label="很好"><img class="mood-avatar" src="/static/mood-art/great-wisp-v4.png" width="192" height="192" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><small>很好</small></button></div></div>
                     <div class="mood-level-grid"><label>压力 <output id="mood-stress-value">3</output><input id="mood-stress" type="range" min="1" max="5" value="3"></label><label>精力 <output id="mood-energy-value">3</output><input id="mood-energy" type="range" min="1" max="5" value="3"></label></div>
                     <div><span class="mood-field-label">今天发生了什么？</span><div id="mood-activities" class="mood-activities"><button type="button" data-mood-activity="学习">学习</button><button type="button" data-mood-activity="工作">工作</button><button type="button" data-mood-activity="运动">运动</button><button type="button" data-mood-activity="社交">社交</button><button type="button" data-mood-activity="休息">休息</button><button type="button" data-mood-activity="睡眠不足">睡眠不足</button></div></div>
                     <label>日记<textarea id="mood-note" rows="5" maxlength="6000" placeholder="写下今天值得记住的片段、感受或念头…"></textarea></label>
@@ -305,6 +292,15 @@
               </div>
             </div>
           </section>
+
+          <dialog id="mood-month-dialog" aria-labelledby="mood-month-dialog-title">
+            <form id="mood-month-form">
+              <h3 id="mood-month-dialog-title">跳转月份</h3>
+              <label for="mood-month-input">选择年月</label>
+              <input id="mood-month-input" name="month" type="month" min="1900-01" max="2200-12" required>
+              <div><button id="mood-month-close" class="quiet" type="button">取消</button><button class="primary" type="submit">查看月历</button></div>
+            </form>
+          </dialog>
 
           <section id="panel-calendar" class="panel">
 
@@ -579,20 +575,6 @@
       <footer><p>仅检索所选来源里当前账号已保存的记录，不搜索回收站、时光信件、词库或外部网页全文。空格分隔的词须全部命中；不支持语义搜索。按 Esc 关闭。</p><span>本机检索 · 不保存搜索历史 · Ctrl+K 仍为快捷导航</span></footer>
     </dialog>
     <dialog id="id-dialog" class="id-dialog" aria-labelledby="id-heading"><header class="id-heading"><div><p>MAKE EVERY DAY MEAN SOMETHING</p><h2 id="id-heading">把重要的日子，放在心上。</h2><span>生日、纪念日，或是下一段旅程。</span></div><button id="id-close" type="button" aria-label="关闭重要日子">×</button></header><div class="id-body"><div class="id-toolbar"><button id="id-new" class="id-primary" type="button">＋ 添加日子</button><button id="id-refresh" type="button">↻ 刷新</button><input id="id-query" type="search" maxlength="80" aria-label="搜索重要日子" placeholder="搜索名称或备注…"><select id="id-view" aria-label="日子视图"><option value="all">全部日子</option><option value="soon">未来 30 天</option><option value="trash">回收站</option></select><select id="id-category" aria-label="日子分类"><option value="">全部分类</option><option value="birthday">生日</option><option value="anniversary">纪念日</option><option value="plan">计划</option><option value="other">其他</option></select><select id="id-sort" aria-label="排序"><option value="nearest">最近日期优先</option><option value="created">最近创建优先</option></select></div><p id="id-status" role="status" aria-live="polite"></p><div class="id-retry-actions"><button id="id-retry" type="button" hidden>原样重试保存</button><button id="id-reconcile" type="button" hidden>重新载入并核对</button></div><section id="id-editor" class="id-editor" hidden><h3 id="id-editor-title">添加重要日子</h3><form id="id-form"><label>名称<input id="id-title" maxlength="80" required placeholder="例如：我们的纪念日"></label><div class="id-form-grid"><label>日期（公历）<input id="id-date" type="date" min="1900-01-01" max="2200-12-31" required></label><label>分类<select id="id-edit-category"><option value="anniversary">纪念日</option><option value="birthday">生日</option><option value="plan">计划</option><option value="other">其他</option></select></label></div><label>备注<textarea id="id-note" rows="2" maxlength="1000" placeholder="想为这一天做些什么？"></textarea></label><div class="id-checks"><label><input id="id-annual" type="checkbox">每年重复</label><label><input id="id-pinned" type="checkbox">置顶显示</label></div><p>按北京时间自然日计算，不包含今天。2 月 29 日每年重复时，等待下一个闰年；不显示农历、不提供系统通知。</p><div class="id-form-actions"><button id="id-cancel" type="button">收起表单</button><button id="id-save" class="id-primary" type="submit">保存日子</button></div></form></section><div id="id-list" class="id-list"></div><div class="id-pagination"><button id="id-prev" type="button">上一页</button><span id="id-page">1 / 1</span><button id="id-next" type="button">下一页</button></div><footer>置顶日子优先显示。过去的一次性日子会显示已过去天数；每年重复显示下一次日期。移入回收站后可恢复，不会自动清除。数据按账号保存在服务器并纳入个人导出。</footer></div></dialog>
-    <dialog id="parcel-dialog" class="parcel-dialog" aria-labelledby="parcel-heading">
-      <header class="parcel-heading"><div><p>ONE LESS THING TO REMEMBER</p><h2 id="parcel-heading">你的包裹，都在这里。</h2><span>把取件码收好，路过时顺手带回家。</span></div><button id="parcel-close" type="button" aria-label="关闭快递收件">×</button></header>
-      <div class="parcel-body"><div class="parcel-overview"><span id="parcel-summary">待取 0 · 运输中 0 · 已取 0</span><div><button id="parcel-refresh" type="button">↻ 同步</button><button id="parcel-new" class="parcel-primary" type="button">＋ 记个包裹</button></div></div>
-        <div class="parcel-toolbar"><label class="parcel-sr-only" for="parcel-view">包裹状态</label><select id="parcel-view"><option value="ready">待取件</option><option value="transit">运输中</option><option value="picked">已取件</option><option value="all">全部包裹</option><option value="trash">回收站</option></select><input id="parcel-query" type="search" maxlength="100" placeholder="搜索名称、取件点或单号…" aria-label="搜索包裹"><select id="parcel-place" aria-label="筛选取件点"><option value="">全部取件点</option></select><label class="parcel-large-toggle"><input id="parcel-large" type="checkbox">取件大字模式 · 显示全部码</label></div>
-        <p id="parcel-status" class="parcel-status" role="status" aria-live="polite"></p><div class="parcel-recovery"><button id="parcel-retry" type="button" hidden>原样重试保存</button><button id="parcel-reconcile" type="button" hidden>重新读取并核对</button></div>
-        <section id="parcel-editor" class="parcel-editor" hidden><h3 id="parcel-editor-title">收好一条取件通知</h3><form id="parcel-form"><fieldset id="parcel-fields"><div class="parcel-form-grid"><label>取件点<input id="parcel-location" maxlength="120" placeholder="例如：小区北门驿站"></label><label>取件码<input id="parcel-code" maxlength="40" autocomplete="off" placeholder="例如：8-2-1234"></label></div>
-          <details class="parcel-sms"><summary>从取件短信中提取取件码</summary><p>仅在本机识别“取件码 / 取货码 / 提货码”后的常见格式，不读取手机短信，也不保存原短信。</p><textarea id="parcel-sms" rows="2" maxlength="1500" placeholder="主动粘贴取件通知，不需要身份证或验证码。"></textarea><button id="parcel-sms-apply" type="button">填入取件码</button><p id="parcel-sms-status" role="status"></p></details>
-          <details class="parcel-more"><summary>状态、名称与最晚取件日（可选）</summary><div class="parcel-form-grid"><label>包裹名称（可选）<input id="parcel-title" maxlength="80" placeholder="不填则显示“快递包裹”"></label><label>状态<select id="parcel-edit-status"><option value="ready">待取件</option><option value="transit">运输中</option><option value="picked">已取件</option></select></label><label>快递公司（可选）<input id="parcel-carrier" maxlength="30" placeholder="例如：顺丰 / 中通"></label><label>自定最晚取件日（可选）<input id="parcel-deadline" type="date" min="2000-01-01" max="2200-12-31"></label></div></details>
-          <details class="parcel-more"><summary>单号与备注（可选）</summary><label>运单号<input id="parcel-tracking" maxlength="60" autocomplete="off"></label><label>备注<textarea id="parcel-note" maxlength="1000" rows="2" placeholder="例如：晚上 8 点前经过时取走。"></textarea></label></details></fieldset><div class="parcel-form-actions"><button id="parcel-cancel" type="button">收起并清空表单</button><button id="parcel-save" class="parcel-primary" type="submit">保存包裹</button></div></form></section>
-        <div id="parcel-list" class="parcel-list"></div><div class="parcel-pagination"><button id="parcel-prev" type="button">上一页</button><span id="parcel-page">1 / 1</span><button id="parcel-next" type="button">下一页</button></div>
-        <div id="parcel-manual-box" class="parcel-manual" hidden><label for="parcel-manual">手动复制取件码，请勿向陌生人展示</label><textarea id="parcel-manual" rows="2" readonly></textarea></div>
-        <footer>取件码默认遮住；关闭窗口或改变筛选后重新隐藏。包裹状态和最晚取件日由你手动记录，不是实时物流、不读取短信、不发送系统通知。取件码与地址按账号保存在服务器快照中，未加密，个人数据导出也会包含这些内容，请妥善保管。</footer>
-      </div>
-    </dialog>
     <dialog id="gr-dialog" class="gr-dialog" aria-labelledby="gr-title" aria-describedby="gr-intro">
       <header class="gr-head"><div><p class="gr-eyebrow">A LITTLE CARE, EVERY DAY</p><h2 id="gr-title">忙碌之间，照顾一下自己。</h2><p id="gr-intro">喝一点水，起身活动。让小小的停顿，自然发生。</p></div><button id="gr-close" class="gr-icon-button" type="button" aria-label="关闭轻提醒">×</button></header>
       <div class="gr-body">
@@ -674,7 +656,7 @@
     <script src="/static/auth-state.js?v=20261103-1" defer></script>
     <script src="/static/diagnostics-core.js?v=20261030-1" defer></script>
     <script src="/static/diagnostics.js?v=20261030-1" defer></script>
-    <script src="/static/data-center-core.js?v=20261125&care=retired&retired=20261126" defer></script>
+    <script src="/static/data-center-core.js?v=20261125&care=retired&retired=20261126&home=20261127" defer></script>
     <script src="/static/data-center.js?v=20261125&retired=20261126" defer></script>
     <script src="/static/navigation-core.js?v=20261027-1&care=retired&retired=20261126" defer></script>
     <script src="/static/product-scope.js?v=20261112-1&retired=20261126" defer></script>
@@ -689,12 +671,10 @@
     <script src="/static/todo-drafts.js?v=20261109-1" defer></script>
     <script src="/static/todo-editor.js?v=20261108-1&save=20261105" defer></script>
     <script src="/static/todo-ai.js?v=20261122" defer></script>
-    <script src="/static/app.js?v=20261103-session&actions=20261103&offline=1&planning=2&outbox=3&todos=20261105&save=20261105&today=20261122&learn=20261124-retired&memories=retired&care=retired&retired=20261126" defer></script>
+    <script src="/static/app.js?v=20261103-session&actions=20261103&offline=1&planning=2&outbox=3&todos=20261105&save=20261105&today=20261122&learn=20261124-retired&memories=retired&care=retired&retired=20261126&home=20261127&mood=20261127&stickers=4" defer></script>
     <script src="/static/gentle-reminders-core.js?v=20261022-1" defer></script>
     <script src="/static/important-days-core.js?v=20261022-1" defer></script>
     <script src="/static/important-days.js?v=20261022-1" defer></script>
-    <script src="/static/parcels-core.js?v=20261026-1" defer></script>
-    <script src="/static/parcels.js?v=20261026-1" defer></script>
     <script src="/static/gentle-reminders-motion.js?v=20261022-motion-2" defer></script>
     <script src="/static/gentle-reminders.js?v=20261022-motion-2" defer></script>
     <script src="/static/subscriptions-core.js?v=20261011-1" defer></script>
@@ -711,7 +691,6 @@
     <script src="/static/toolkit-pocket-core.js?v=20261009-text&ui=20261126" defer></script>
     <script src="/static/toolkit-pocket.js?v=20261009-text&ui=20261126" defer></script>
     <script src="/static/ledger.js?v=20260922-1" defer></script>
-    <script src="/static/habits.js?v=20260923-dashboard" defer></script>
     <script src="/static/timeline.js?v=20260910-1&retired=20261126" defer></script>
     <script src="/static/weather.js?v=20261009-1" defer></script>
     <script src="/static/holiday.js?v=20261009-1" defer></script>
@@ -719,7 +698,7 @@
     <script src="/static/calendar-drafts-core.js?v=20261118-2" defer></script>
     <script src="/static/calendar-drafts.js?v=20261109-1" defer></script>
     <script src="/static/calendar-editor.js?v=20261118-2&save=20261105" defer></script>
-    <script src="/static/calendar.js?v=20261020-care-1&actions=20261103&planning=2&editing=20261118-2&care=retired" defer></script>
+    <script src="/static/calendar.js?v=20261020-care-1&actions=20261103&planning=2&editing=20261118-2&care=retired&stickers=4" defer></script>
     <script src="/static/commands.js?v=20260925-daynest&retired=20261126" defer></script>
     <script src="/static/content-search.js?v=20261124-20261020-1&care=retired&retired=20261126" defer></script>
     <script src="/static/transfers-core.js?v=20261021-1" defer></script>

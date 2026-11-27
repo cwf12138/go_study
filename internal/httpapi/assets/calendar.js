@@ -588,7 +588,7 @@
   function calendarItemTitle(item) {
     if (item.type !== "mood") return escapeHTML(item.title);
     const mood = calendarMood(item.raw?.mood);
-    return `<img class="calendar-mood-icon" src="/static/mood-art/${mood.value}-flat-v2.png" width="20" height="20" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><span class="calendar-mood-label">${escapeHTML(item.title)}</span>`;
+    return `<img class="calendar-mood-icon" src="/static/mood-art/${mood.value}-wisp-v4.png" width="20" height="20" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async"><span class="calendar-mood-label">${escapeHTML(item.title)}</span>`;
   }
   function typeLabel(value) { return ({ event: "个人日程", plan: "学习计划", task: "学习任务", todo: "待办事项", mood: "心情日记", fitness: "运动日常", focus: "已完成专注" })[value] || value; }
 

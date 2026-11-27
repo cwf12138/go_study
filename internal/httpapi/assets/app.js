@@ -99,8 +99,8 @@
 
   function moodAvatar(value) {
     const mood = moodOptions.find(option => option.value === value);
-    if (!mood) return '<span class="mood-unrecorded" aria-hidden="true">·</span>';
-    return `<img class="mood-avatar" src="/static/mood-art/${mood.value}-flat-v2.png" width="80" height="80" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async">`;
+    if (!mood) return "";
+    return `<img class="mood-avatar" src="/static/mood-art/${mood.value}-wisp-v4.png" width="192" height="192" alt="" aria-hidden="true" draggable="false" loading="lazy" decoding="async">`;
   }
 
   async function api(path, options = {}) {
@@ -363,16 +363,14 @@
       view = view === "tasks" ? "todo" : view === "planner" ? "calendar" : "vocabulary";
       history = "replace";
     }
-    if (["memos", "inventory", "lab", "knowledge"].includes(view)) {
+    if (["memos", "inventory", "lab", "knowledge", "habits", "parcels"].includes(view)) {
       view = "dashboard";
       history = "replace";
     }
-    if (view === "habits") view = "dashboard";
     if (view === "projects" || view === "travel" || view === "splits" || view === "whiteboards") view = "dashboard";
     const labels = {
       dashboard: ["DAYNEST · YOUR EVERYDAY", "今天"],
       timeline: ["LIFE TIMELINE", "生活足迹"],
-      habits: ["HABIT GARDEN", "习惯花园"],
       moods: ["MOOD JOURNAL", "心情日记"],
       calendar: ["SMART CALENDAR", "智能日历"],
       ledger: ["LIFE LEDGER", "生活账本"],
@@ -604,6 +602,7 @@
     const leadingDays = (firstDay.getDay() + 6) % 7;
     const daysInMonth = new Date(year, month, 0).getDate();
     const entryByDate = new Map(state.moodEntries.map((entry) => [entry.date, entry]));
+    const currentDate = localDateKey(new Date());
     const cells = [];
     for (let index = 0; index < leadingDays; index += 1) cells.push('<span class="mood-day empty" aria-hidden="true"></span>');
     for (let day = 1; day <= daysInMonth; day += 1) {
@@ -613,8 +612,9 @@
       const classes = ["mood-day"];
       if (entry) classes.push("has-entry");
       if (date === state.moodSelectedDate) classes.push("selected");
-      if (date === localDateKey(new Date())) classes.push("today");
-      cells.push(`<button class="${classes.join(" ")}" type="button" data-mood-date="${date}" data-emotion="${option?.value || 'none'}" aria-pressed="${date === state.moodSelectedDate}" ${date === localDateKey(new Date()) ? 'aria-current="date"' : ''} aria-label="${date}${option ? `，${option.label}` : "，尚未记录"}${entry?.note ? '，有日记' : ''}"><span class="mood-date">${day}</span><span class="mood-face">${moodAvatar(entry?.mood)}</span>${entry?.note ? '<i class="mood-diary-dot" aria-hidden="true"></i>' : ''}</button>`);
+      if (date === currentDate) classes.push("today");
+      if (date > currentDate) classes.push("future");
+      cells.push(`<button class="${classes.join(" ")}" type="button" data-mood-date="${date}" data-emotion="${option?.value || 'none'}" aria-pressed="${date === state.moodSelectedDate}" ${date === currentDate ? 'aria-current="date"' : ''} aria-label="${date}${option ? `，${option.label}` : date > currentDate ? "，未来日期，尚未记录" : "，尚未记录"}${entry?.note ? '，有日记' : ''}"><span class="mood-date">${day}</span><span class="mood-face">${moodAvatar(entry?.mood)}</span>${entry?.note ? '<i class="mood-diary-dot" aria-hidden="true"></i>' : ''}</button>`);
     }
     calendar.innerHTML = cells.join("");
     $("#mood-month-title").textContent = new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long" }).format(firstDay);
@@ -706,7 +706,7 @@
     const points = entries.map((entry) => ({ ...entry, day: Number(entry.date.slice(-2)), x: x(Number(entry.date.slice(-2))), y: y(entry.score) }));
     const average = Number(state.moodInsights?.average_mood || 0).toFixed(1);
     caption.textContent = `已记录 ${entries.length} 天 · 平均 ${average}`;
-    const grid = moodOptions.map((option, index) => `<line x1="${left}" y1="${y(index + 1)}" x2="${width - right}" y2="${y(index + 1)}" class="mood-trend-grid"/><image href="/static/mood-art/${option.value}-flat-v2.png" x="-2" y="${y(index + 1) - 15}" width="30" height="30" preserveAspectRatio="xMidYMid meet" clip-path="url(#mood-chart-badge)"/>`).join("");
+    const grid = moodOptions.map((option, index) => `<line x1="${left}" y1="${y(index + 1)}" x2="${width - right}" y2="${y(index + 1)}" class="mood-trend-grid"/><image href="/static/mood-art/${option.value}-wisp-v4.png" x="-2" y="${y(index + 1) - 15}" width="30" height="30" preserveAspectRatio="xMidYMid meet"/>`).join("");
     const segments = []; let segment = [];
     for (const point of points) { if (segment.length && point.day !== segment[segment.length-1].day + 1) { segments.push(segment); segment=[]; } segment.push(point); }
     if (segment.length) segments.push(segment);
@@ -718,7 +718,7 @@
     const labels = [1, Math.ceil(daysInMonth / 2), daysInMonth].map((day) => `<text x="${x(day)}" y="${height - 8}" text-anchor="middle" class="mood-trend-axis">${day}日</text>`).join("");
     container.className = "mood-trend";
     container.setAttribute("aria-label", `本月心情记录，未记录日期不连线。${entries.map(entry=>`${entry.date} ${moodOptions[entry.score-1].label}`).join('；')}`);
-    container.innerHTML = `<svg viewBox="0 0 ${width} ${height}" aria-hidden="true"><defs><clipPath id="mood-chart-badge" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath></defs>${grid}${polylines}${dots}${labels}</svg><p class="mood-chart-note">每个圆点代表一次记录，空白日期不推测。心情没有标准答案。</p>`;
+    container.innerHTML = `<svg viewBox="0 0 ${width} ${height}" aria-hidden="true">${grid}${polylines}${dots}${labels}</svg><p class="mood-chart-note">每个圆点代表一次记录，空白日期不推测。心情没有标准答案。</p>`;
   }
 
   let moodLoadVersion = 0;
@@ -735,19 +735,28 @@
     renderMoods();
   }
 
-  async function shiftMoodMonth(offset) {
-    if (!canLeaveMoodDraft()) return;
-    const [year, month] = state.moodMonth.split("-").map(Number);
-    const next = new Date(year, month - 1 + offset, 1);
-    state.moodMonth = monthKey(next);
-    state.moodLoadedMonth="";state.moodLoadError="";
-    if (!state.moodSelectedDate.startsWith(state.moodMonth)) state.moodSelectedDate = `${state.moodMonth}-01`;
-    state.moodEntries = []; state.moodInsights = null; renderMoods();
-    try {
-      await refreshMoods();
-    } catch (error) {
-      notify(error.message, "error");
+  async function selectMoodMonth(month, selectedDate) {
+    if (!/^(?:19[0-9]{2}|20[0-9]{2}|21[0-9]{2}|2200)-(?:0[1-9]|1[0-2])$/.test(month)) return;
+    const today = localDateKey(new Date());
+    const day = selectedDate || (today.startsWith(month + "-") ? today : month + "-01");
+    const monthChanged = month !== state.moodMonth;
+    const dayChanged = day !== state.moodSelectedDate;
+    if ((monthChanged || dayChanged) && !canLeaveMoodDraft()) return;
+    state.moodSelectedDate = day;
+    if (monthChanged) {
+      state.moodMonth = month;
+      state.moodLoadedMonth = state.moodLoadError = "";
+      state.moodEntries = [];
+      state.moodInsights = null;
     }
+    if (monthChanged || dayChanged) renderMoods();
+    if (state.moodLoadedMonth === month) return;
+    try { await refreshMoods(); } catch (error) { notify(error.message, "error"); }
+  }
+
+  function shiftMoodMonth(offset) {
+    const [year, month] = state.moodMonth.split("-").map(Number);
+    return selectMoodMonth(monthKey(new Date(year, month - 1 + offset, 1)));
   }
 
   async function saveMoodEntry(event) {
@@ -1666,12 +1675,21 @@
     $("#mood-prev-month").addEventListener("click", () => shiftMoodMonth(-1));
     $("#mood-reload").addEventListener("click",()=>refreshMoods().catch(e=>notify(e.message,"error")));
     $("#mood-form").addEventListener("input", markMoodDraft);
-    $("#mood-today").addEventListener("click", async () => {
-      if (!canLeaveMoodDraft()) return;
-      state.moodMonth = monthKey(new Date()); state.moodSelectedDate = localDateKey(new Date());
-      state.moodLoadedMonth="";state.moodLoadError="";
-      state.moodEntries=[];state.moodInsights=null;renderMoods();
-      try { await refreshMoods(); } catch (error) { notify(error.message,"error"); }
+    $("#mood-today").addEventListener("click", () => {
+      const today = new Date();
+      return selectMoodMonth(monthKey(today), localDateKey(today));
+    });
+    const moodMonthDialog = $("#mood-month-dialog");
+    $("#mood-month-open").addEventListener("click", () => {
+      $("#mood-month-input").value = state.moodMonth;
+      moodMonthDialog.showModal();
+    });
+    $("#mood-month-close").addEventListener("click", () => moodMonthDialog.close());
+    $("#mood-month-form").addEventListener("submit", event => {
+      event.preventDefault();
+      const month = $("#mood-month-input").value;
+      moodMonthDialog.close();
+      if (month !== state.moodMonth) selectMoodMonth(month);
     });
     $(".mood-picker").addEventListener("keydown", event => {
       const buttons=$$('[data-mood-choice]'), index=buttons.indexOf(event.target);

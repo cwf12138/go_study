@@ -78,7 +78,7 @@ export function installMobileUX() {
     const englishLibrary = byID('english-library');
     const actions = {
       dashboard: ['随手记', '+'], calendar: ['新建日程', '+', 'calendar-create'], todo: ['添加待办', '+'],
-      moods: ['记录今天的心情', '记今天'], ledger: ['记一笔', '+', 'ledger-new'],
+      ledger: ['记一笔', '+', 'ledger-new'],
       subscriptions: ['添加订阅', '+', 'sub-new'],
       fitness: ['补记运动', '补记', 'fit-log-open'], meals: ['填写用餐需求', '选一餐', 'food-prompt', 'focus'],
       vocabulary: ['选择或安装词书', '词书', 'vocab-open-catalog'],
@@ -460,7 +460,14 @@ function installMobileMood(narrow) {
   const panel = document.getElementById('panel-moods');
   if (!panel) return null;
   const title = panel.querySelector('#mood-selected-date');
-  const month = panel.querySelector('#mood-month-title'), today = panel.querySelector('#mood-today');
+  const month = panel.querySelector('#mood-month-open'), today = panel.querySelector('#mood-today');
+  const calendar = panel.querySelector('#mood-calendar');
+  const footer = document.createElement('div');
+  footer.className = 'mobile-mood-footer';
+  const scene = document.createElement('div');
+  scene.className = 'mobile-mood-scene';
+  scene.setAttribute('aria-hidden', 'true');
+  calendar.after(footer, scene);
   const form = panel.querySelector('#mood-form');
   const panes = [
     ['calendar', '日历', month], ['entry', '写记录', title], ['review', '月度回顾', panel.querySelector('.mood-trend-card h3')],
@@ -469,7 +476,8 @@ function installMobileMood(narrow) {
   tabs.setAttribute('role', 'group'); tabs.setAttribute('aria-label', '心情日历视图');
   for (const [name, label, heading] of panes) {
     const button = document.createElement('button'); button.type = 'button'; button.dataset.mobileMoodTab = name;
-    button.textContent = label; tabs.append(button); heading.tabIndex = -1;
+    button.textContent = label; tabs.append(button);
+    if (heading.tagName !== 'BUTTON') heading.tabIndex = -1;
   }
   const optional = document.createElement('details'); optional.className = 'mobile-mood-optional';
   const summary = document.createElement('summary'); summary.textContent = '压力、精力与其他细节'; optional.append(summary);
@@ -482,6 +490,10 @@ function installMobileMood(narrow) {
   function setPane(pane, focus = false) {
     if (panel.dataset.mobileMoodPane !== pane && pane === 'entry') optional.open = false;
     panel.dataset.mobileMoodPane = pane;
+    const calendarShown = narrow.matches && pane === 'calendar';
+    if (calendarShown && tabs.parentElement !== footer) footer.append(tabs);
+    if (!calendarShown && tabs.parentElement !== panel) panel.prepend(tabs);
+    tabs.querySelector('[data-mobile-mood-tab="entry"]').textContent = calendarShown ? '＋ 记今天' : '写记录';
     for (const button of tabs.children) button.setAttribute('aria-pressed', String(button.dataset.mobileMoodTab === pane));
     if (!focus || !narrow.matches) return;
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -491,8 +503,8 @@ function installMobileMood(narrow) {
   function layout() {
     tabs.hidden = optional.hidden = !narrow.matches;
     if (narrow.matches) {
-      panel.querySelector('.mood-month-actions').prepend(today);
-      today.textContent = '今天';
+      footer.prepend(today);
+      today.textContent = '回今天';
       optional.append(...fields);
     } else {
       todayAnchor.after(today); today.textContent = '回到今天';
@@ -502,21 +514,40 @@ function installMobileMood(narrow) {
   }
   tabs.addEventListener('click', event => {
     const pane = event.target.closest('[data-mobile-mood-tab]')?.dataset.mobileMoodTab;
-    if (pane) setPane(pane);
+    if (pane === 'entry' && panel.dataset.mobileMoodPane === 'calendar') recordToday();
+    else if (pane) setPane(pane, true);
   });
   document.addEventListener('daynest:mood-date-selected', () => {
     if (narrow.matches && panel.classList.contains('active')) setPane('entry', true);
   });
+  function recordToday() {
+    if (!narrow.matches) return;
+    const selectedToday = '.mood-day.today[aria-pressed="true"]';
+    if (!panel.querySelector(selectedToday)) today.click();
+    if (panel.querySelector(selectedToday)) setPane('entry', true);
+  }
+  let swipeStart = null;
+  calendar.addEventListener('touchstart', event => {
+    swipeStart = event.touches.length === 1 ? event.touches[0] : null;
+  }, {passive:true});
+  calendar.addEventListener('touchcancel', () => { swipeStart = null; }, {passive:true});
+  calendar.addEventListener('touchend', event => {
+    const start = swipeStart;
+    swipeStart = null;
+    if (!narrow.matches || !start || event.touches.length || !event.cancelable) return;
+    const end = [...event.changedTouches].find(touch => touch.identifier === start.identifier);
+    if (!end) return;
+    const dx = end.clientX - start.clientX;
+    const dy = end.clientY - start.clientY;
+    if (Math.abs(dx) < 48 || Math.abs(dx) < 1.45 * Math.abs(dy)) return;
+    event.preventDefault();
+    panel.querySelector(dx < 0 ? '#mood-next-month' : '#mood-prev-month').click();
+  }, {passive:false});
   narrow.addEventListener('change', layout); layout();
   return {
     reset() { if (panel.dataset.mobileMoodPane !== 'calendar') setPane('calendar'); },
     calendar() { if (narrow.matches) setPane('calendar', true); },
-    today() {
-      if (!narrow.matches) return;
-      const selectedToday = '.mood-day.today[aria-pressed="true"]';
-      if (!panel.querySelector(selectedToday)) today.click();
-      if (panel.querySelector(selectedToday)) setPane('entry', true);
-    },
+    today: recordToday,
     back() {
       if (!narrow.matches || panel.dataset.mobileMoodPane === 'calendar') return false;
       setPane('calendar', true); return true;

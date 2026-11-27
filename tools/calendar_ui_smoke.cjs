@@ -78,15 +78,15 @@ moodTest.state.selected = '2026-09-01';
 moodTest.state.overview = { mood_entries: moods.map((mood, i) => ({ id: String(i), mood, date: '2026-09-0' + (i + 1) })) };
 moodTest.renderCalendar();
 for (const mood of moods) {
-  const asset = '/static/mood-art/' + mood + '-flat-v2.png';
+  const asset = '/static/mood-art/' + mood + '-wisp-v4.png';
   assert.ok(canvas.innerHTML.includes('src="' + asset + '"'), 'month view must use journal artwork: ' + mood);
-  assert.ok(fs.existsSync(path.join(__dirname, '..', 'internal', 'httpapi', 'assets', 'mood-art', mood + '-flat-v2.png')));
+  assert.ok(fs.existsSync(path.join(__dirname, '..', 'internal', 'httpapi', 'assets', 'mood-art', mood + '-wisp-v4.png')));
 }
-assert.ok(getElement('#calendar-day-agenda').innerHTML.includes('awful-flat-v2.png'), 'agenda uses same mood badge');
+assert.ok(getElement('#calendar-day-agenda').innerHTML.includes('awful-wisp-v4.png'), 'agenda uses same mood badge');
 assert.ok(getElement('#calendar-day-agenda').innerHTML.includes('心情 · 很糟'), 'visible text explains mood');
 assert.doesNotMatch(canvas.innerHTML, /😣|🙁|😐|🙂|😄/);
 assert.equal(moodTest.calendarItemTitle({ type: 'event', title: '<script>' }), '&lt;script&gt;');
-assert.match(moodTest.calendarItemTitle({ type: 'mood', title: '<img>', raw: { mood: '"><script>' } }), /neutral-flat-v2.png/);
+assert.match(moodTest.calendarItemTitle({ type: 'mood', title: '<img>', raw: { mood: '"><script>' } }), /neutral-wisp-v4.png/);
 assert.ok(moodTest.calendarItemTitle({ type: 'mood', title: '<img>', raw: {} }).includes('&lt;img&gt;'));
 moodTest.state.query = '低落';
 assert.equal([...moodTest.itemsByDate().values()].flat().length, 1, 'mood labels remain searchable');

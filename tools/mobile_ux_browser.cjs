@@ -95,12 +95,20 @@ async function go(view) {
       await contained(page.locator('#mobile-tabs'), 'bottom tabs');
       const action = await page.locator('#mobile-page-action').boundingBox();
       const leadingControl = await page.locator(view === 'dashboard' ? '#content-search-trigger' : '#page-title').boundingBox();
-      assert(action && leadingControl && leadingControl.x + leadingControl.width <= action.x + 1, `${view} primary action should be reachable beside its leading control`);
+      if (view === "moods") assert(await page.locator("#mood-month-open").isVisible());
+      else assert(action && leadingControl && leadingControl.x + leadingControl.width <= action.x + 1, `${view} primary action should be reachable beside its leading control`);
       pass('layout_' + view + '_' + width);
     }
   }
   await page.setViewportSize({ width: 360, height: 800 });
   await go('dashboard');
+  assert.equal(await page.locator('#panel-habits,#parcel-dialog,#parcel-open').count(), 0);
+  await page.click('#id-open');
+  await page.locator('#id-dialog[open]').waitFor();
+  await page.evaluate(() => window.__nativeEvents.backButton({ canGoBack: true }));
+  await page.locator('#id-dialog[open]').waitFor({ state: 'detached' });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  pass('today_removes_habits_and_parcels_and_keeps_important_dates');
   assert.equal(await page.locator('.today-grid > article').first().getAttribute('class'), 'surface today-agenda');
   const agenda = await page.locator('.today-agenda').boundingBox();
   const tabbar = await page.locator('#mobile-tabs').boundingBox();
@@ -185,7 +193,64 @@ async function go(view) {
   const moodGrid = await page.locator('#mood-calendar').boundingBox();
   const moodTabs = await page.locator('#mobile-tabs').boundingBox();
   assert(moodGrid && moodTabs && moodGrid.y + moodGrid.height < moodTabs.y, 'mood calendar fits above the bottom tabs');
-  await page.screenshot({ path: path.join(out, 'mood-calendar.png') });
+  const currentMoodDate = await page.locator('#mood-calendar [aria-current=date]').getAttribute('data-mood-date');
+  const [moodYear, moodMonth] = currentMoodDate.split('-').map(Number);
+  const previousMonth = new Date(Date.UTC(moodYear,moodMonth-2,1)).toISOString().slice(0,7);
+  const showcase = ['good','neutral','great','low','good','awful','neutral','great','good','low'];
+  for (const [index,mood] of showcase.entries()) {
+    const date = previousMonth + '-' + String(3 + index * 2).padStart(2,'0');
+    const response = await fetch(origin+'/api/v1/moods/'+date, {
+      method:'PUT',headers:{Authorization:'Bearer '+account.token,'Content-Type':'application/json'},
+      body:JSON.stringify({mood,stress:3,energy:3,note:index===3?'散步后轻松了些':'',activities:[],tags:[]}),
+    });
+    assert(response.ok,'fixture mood created');
+  }
+  await page.click('#mood-month-open');
+  await page.fill('#mood-month-input', previousMonth);
+  await page.click('#mood-month-form button[type=submit]');
+  await page.waitForFunction(n=>document.querySelectorAll('#mood-calendar .has-entry').length===n,showcase.length);
+  await page.locator('#mood-calendar .mood-avatar').evaluateAll(images => Promise.all(images.map(img => img.decode())));
+  for (const width of [320,360,390]) {
+    await page.setViewportSize({width,height:800});
+    const sizes = await page.locator('#mood-calendar').evaluate(calendar=>{
+      const recorded = calendar.querySelector('.mood-day.has-entry');
+      const rowTop = recorded.getBoundingClientRect().top;
+      const unrecorded = [...calendar.querySelectorAll('button.mood-day:not(.has-entry)')]
+        .find(day=>Math.abs(day.getBoundingClientRect().top-rowTop)<1);
+      const image = recorded.querySelector('.mood-avatar').getBoundingClientRect();
+      const circle = unrecorded.querySelector('.mood-date').getBoundingClientRect();
+      return {width:image.width,height:image.height,circleWidth:circle.width,circleHeight:circle.height,
+        topOffset:image.top-circle.top};
+    });
+    assert(sizes.width>=36 && Math.abs(sizes.topOffset)<1, JSON.stringify({viewport:width,...sizes}));
+    assert.equal(sizes.width,sizes.circleWidth);
+    assert.equal(sizes.height,sizes.circleHeight);
+  }
+  await page.setViewportSize({width:360,height:800});
+  assert.equal(await page.locator('#mood-calendar img[src$="-wisp-v4.png"]').count(),showcase.length);
+  pass('all_mood_stickers_and_date_circles_have_equal_size_and_alignment');
+  assert(await page.locator('.mobile-mood-scene').isVisible());
+  assert(await page.evaluate(async()=>{
+    const img=new Image();
+    img.src='/static/mood-art/late-autumn-lake.webp';
+    await img.decode();
+    return img.naturalWidth===1152;
+  }));
+  await page.screenshot({ path:path.join(out,'mood-calendar.png'),animations:'disabled' });
+  await page.evaluate(()=>document.getElementById('theme-toggle').click());
+  await page.screenshot({ path:path.join(out,'mood-calendar-dark.png'),animations:'disabled' });
+  await page.evaluate(()=>document.getElementById('theme-toggle').click());
+  await page.evaluate(()=>{
+    const calendar=document.getElementById('mood-calendar');
+    const start=new Touch({identifier:1,target:calendar,clientX:264,clientY:308});
+    const end=new Touch({identifier:1,target:calendar,clientX:82,clientY:316});
+    calendar.dispatchEvent(new TouchEvent('touchstart',{touches:[start],bubbles:true}));
+    calendar.dispatchEvent(new TouchEvent('touchend',{changedTouches:[end],bubbles:true,cancelable:true}));
+  });
+  await page.waitForFunction(date=>document.querySelector('#mood-calendar [aria-current=date]')?.dataset.moodDate===date,currentMoodDate);
+  assert(await page.locator('.mood-calendar-card').isVisible());
+  pass('mood_month_picker_swipe_and_original_art');
+
   await page.click('#mood-calendar button[aria-current=date]');
   await page.locator('.mood-entry-card').waitFor();
   assert.equal(await page.locator('#mood-stress').isVisible(), false);
@@ -205,13 +270,13 @@ async function go(view) {
   assert(await page.locator('.mood-calendar-card').isVisible());
   await page.click('[data-mobile-mood-tab=review]');
   assert(await page.locator('.mood-insights-card').isVisible());
-  await page.click('#mobile-page-action');
+  await page.click('[data-mobile-mood-tab=entry]');
   assert.equal(await page.inputValue('#mood-note'), '心情日历手机测试');
   await page.fill('#mood-note', '留在编辑器中的草稿');
   await page.click('#mobile-tabs [data-mobile-view=moods]');
   await page.locator('#mood-calendar button:not(.today)').first().click();
   assert(await page.locator('.mood-calendar-card').isVisible());
-  await page.click('#mobile-page-action');
+  await page.click('[data-mobile-mood-tab=entry]');
   assert.equal(await page.inputValue('#mood-note'), '留在编辑器中的草稿');
   await page.click('#mood-form button[type=submit]');
   await page.waitForFunction(() => document.querySelector('#mood-draft-status').textContent.includes('已提交'));

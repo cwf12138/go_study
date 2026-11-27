@@ -20,6 +20,12 @@ function harness(){
 }
 (async()=>{
  const h=harness(),{C,E}=h;
+ const historical=C.categories([
+   {key:'habits',count:1,personal_json:true},
+   {key:'parcels',count:2,personal_json:true},
+ ]).find(group=>group.id==='legacy');
+ assert.deepEqual(Array.from(historical.rows, row=>row.key), ['habits','parcels']);
+ assert.equal(historical.count,3);
  assert(C.valid(overview()));assert(!C.valid({...overview(),records:{...overview().records,objects:9}}));assert(!C.valid({...overview(),records:{state:'available',objects:1,collections:[{count:1,personal_json:true}]}}));assert(!C.valid({...overview(),full_backup_restore_verified:true}));assert(!C.valid({...overview(),attachments:{...overview().attachments,state:'unavailable'}}));
  assert(C.integrity(report()));assert(!C.integrity({...report(),verified:2}));assert(!C.integrity({...report(),backup_restore_verified:true}));assert(!C.integrity({...report(),issues:[{...report().issues[0],state:'verified'}]}));assert(!C.integrity({...report(),issues:[{...report().issues[0],name:'../secret'}]}));
  assert.equal(C.categories(overview().records.collections).find(group=>group.id==='legacy').count,3);assert.equal(C.bytes(1048576),'1.0 MiB');assert.equal(C.summary(report())[2],'error');assert(C.guide.includes('--service-stopped'));assert(C.guide.includes('--apply'));

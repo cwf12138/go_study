@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
-	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -134,12 +133,5 @@ func TestParcelsHTTPPersistence(t *testing.T) {
 	bundle, err := svc.ExportUserData(context.Background(), user)
 	if err != nil || bundle.Counts["parcels"] != 1 {
 		t.Fatal("export", err, bundle.Counts)
-	}
-	for _, asset := range []string{"parcels-core.js", "parcels.js", "parcels.css"} {
-		rr := httptest.NewRecorder()
-		h.ServeHTTP(rr, httptest.NewRequest("GET", "/static/"+asset, nil))
-		if rr.Code != 200 {
-			t.Fatal(asset, rr.Code)
-		}
 	}
 }

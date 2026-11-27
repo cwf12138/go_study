@@ -1,5 +1,6 @@
 /* Mood journal: quiet surfaces, expressive records, one color per emotion. */
 #panel-moods {
+  --mood-icon-size: 38px;
   --journal-accent: #566b5b;
   --journal-paper: color-mix(in srgb, var(--paper) 97%, #efd064);
   --journal-soft: color-mix(in srgb, var(--journal-accent) 6%, var(--paper));
@@ -27,17 +28,49 @@
 #panel-moods .surface h3 { margin:0; font-size:20px; font-weight:650; letter-spacing:-.02em; }
 #panel-moods .mood-section-caption { margin:6px 0 0; color:var(--muted); font-size:13px; line-height:1.6; }
 #panel-moods .mood-month-actions { display:flex; gap:6px; }
+#mood-month-open {
+  display:inline-flex; min-height:44px; align-items:center; justify-content:center; gap:7px; padding:4px 5px;
+  border:0; border-radius:10px; background:transparent; color:inherit; font:inherit; white-space:nowrap;
+}
+#mood-month-open span:last-child { color:var(--muted); font-size:.82em; }
+#mood-month-open:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
+#mood-month-dialog {
+  width:min(360px, calc(100vw - 28px)); max-width:100%; padding:20px; border:1px solid var(--line); border-radius:18px;
+  background:var(--paper); color:var(--ink);
+}
+#mood-month-dialog::backdrop { background:#10272180; }
+#mood-month-form { display:grid; gap:12px; }
+#mood-month-form h3 { margin:0; font-size:20px; }
+#mood-month-form label { color:var(--muted); font-size:14px; }
+#mood-month-form input { min-height:44px; font-size:16px; }
+#mood-month-form > div { display:flex; justify-content:flex-end; gap:8px; }
+#mood-month-form button { min-height:44px; }
 #panel-moods .mood-icon-button { width:40px; height:40px; padding:0; border:0; border-radius:50%; background:var(--journal-soft); color:var(--ink); font-size:25px; }
 #panel-moods .mood-weekdays { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); margin:28px 0 12px; text-align:center; color:var(--muted); font-size:13px; font-weight:500; }
 #panel-moods .mood-calendar { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); grid-auto-rows:minmax(76px,1fr); gap:6px; flex:1; min-height:380px; margin:0 0 22px; }
-#panel-moods .mood-day { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; min-width:0; min-height:76px; padding:8px 2px; border:1px solid transparent; border-radius:14px; background:transparent; color:var(--ink); transition:background .18s,border-color .18s; }
+#panel-moods .mood-day {
+  position:relative; display:grid; grid-template-rows:var(--mood-icon-size) 20px;
+  justify-items:center; align-items:center; align-content:center; gap:4px; min-width:0; min-height:76px;
+  padding:6px 2px; border:1px solid transparent; border-radius:14px; background:transparent; color:var(--ink);
+  transition:background .18s,border-color .18s;
+}
 #panel-moods .mood-day.empty { pointer-events:none; }
 #panel-moods .mood-day.selected { border-color:var(--journal-accent); background:var(--journal-soft); box-shadow:none; }
-#panel-moods .mood-date { order:2; padding:1px 5px; font-size:13px; line-height:1.5; font-variant-numeric:tabular-nums; }
-#panel-moods .mood-day.today .mood-date { border-radius:999px; background:var(--journal-accent); color:var(--paper); }
-#panel-moods .mood-face { display:grid; place-items:center; order:1; width:38px; height:38px; margin:0; font-size:0; }
-#panel-moods .mood-avatar { display:block; width:38px; height:38px; border-radius:50%; object-fit:cover; flex-shrink:0; pointer-events:none; user-select:none; }
-#panel-moods .mood-unrecorded { display:block; width:32px; height:32px; border:1px dashed var(--journal-border); border-radius:50%; color:transparent; }
+#panel-moods .mood-date { grid-area:2 / 1; padding:1px 5px; font-size:13px; line-height:1.5; font-variant-numeric:tabular-nums; }
+#panel-moods .mood-face,
+#panel-moods .mood-day:not(.has-entry) .mood-date {
+  grid-area:1 / 1; display:grid; place-items:center;
+  box-sizing:border-box; margin:0;
+  width:var(--mood-icon-size); height:var(--mood-icon-size);
+}
+#panel-moods .mood-day:not(.has-entry) .mood-date {
+  padding:0; border:1px solid var(--journal-border); border-radius:50%;
+}
+#panel-moods .mood-day.future:not(.has-entry) .mood-date { border-style:dashed; }
+#panel-moods .mood-day.today .mood-date { border-color:var(--journal-accent); border-radius:999px; background:var(--journal-accent); color:var(--paper); }
+#panel-moods .mood-day:not(.has-entry) .mood-face { display:none; }
+#panel-moods .mood-avatar { display:block; width:38px; height:38px; object-fit:contain; flex-shrink:0; pointer-events:none; user-select:none; }
+#panel-moods .mood-face .mood-avatar { width:100%; height:100%; }
 #panel-moods .mood-diary-dot { position:absolute; right:6px; top:8px; width:4px; height:4px; border-radius:50%; background:var(--mood-ink,var(--journal-accent)); }
 #panel-moods .mood-legend { display:flex; justify-content:center; flex-wrap:wrap; gap:8px 14px; margin:0; padding:18px 0 0; border-top:1px solid var(--journal-border); }
 #panel-moods .mood-legend span { display:inline-flex; align-items:center; gap:5px; padding:0; color:var(--muted); font-size:12px; background:none; }
@@ -95,7 +128,7 @@
 #panel-moods .mood-trend-caption { color:var(--muted); font-size:12px; text-align:right; max-width:145px; }
 #panel-moods button:focus-visible, #panel-moods input:focus-visible, #panel-moods textarea:focus-visible { outline:2px solid var(--journal-accent); outline-offset:3px; }
 @media(hover:hover) {
-  #panel-moods .mood-day:not(.empty):hover { background:var(--journal-soft); }
+  #panel-moods .mood-day:not(.empty):hover { background:var(--journal-soft); transform:none; }
   #panel-moods .mood-picker button:hover { background:color-mix(in srgb,var(--mood-tint) 12%,var(--journal-paper)); }
   #panel-moods .mood-picker button:hover .mood-avatar { transform:translateY(-2px); }
   #panel-moods .mood-form .primary:hover { filter:brightness(1.08); }
@@ -115,10 +148,8 @@
   #panel-moods .surface { padding:20px 16px; border-radius:17px; }
   #panel-moods .mood-workspace { gap:16px; }
   #panel-moods .surface h3 { font-size:18px; }
-  #panel-moods .mood-calendar { gap:3px; grid-auto-rows:minmax(68px,1fr); }
+  #panel-moods .mood-calendar { --mood-icon-size: 30px; gap:3px; grid-auto-rows:minmax(68px,1fr); }
   #panel-moods .mood-day { min-height:68px; border-radius:11px; }
-  #panel-moods .mood-face, #panel-moods .mood-face .mood-avatar { width:30px; height:30px; }
-  #panel-moods .mood-unrecorded { width:28px; height:28px; }
   #panel-moods .mood-legend { gap:8px 10px; }
   #panel-moods .mood-legend .mood-avatar { width:18px; height:18px; }
   #panel-moods .mood-picker { gap:4px; }

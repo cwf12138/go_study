@@ -11,13 +11,13 @@ win.entered=user=>createdUser=user;vm.runInNewContext(code,ctx);const app=win.te
 const response=(data,status=200)=>({ok:status>=200&&status<300,status,headers:{get:()=>''},json:async()=>({data})});
 (async()=>{
  app.showView('calendar');assert.equal(win.location.hash,'#calendar');assert.equal(navs[1].attrs['aria-current'],'page');assert.equal(doc.title,'智能日历 · 日常 Daynest');const count=win.history.calls.length;app.showView('calendar');assert.equal(win.history.calls.length,count,'same-page activation must not add history');
- for(const retired of ['memos','inventory','lab','knowledge']){
+ for(const retired of ['memos','inventory','lab','knowledge','habits','parcels']){
    win.location.hash='#'+retired;
    app.showView(app.viewFromURL(),{history:'replace'});
    assert.equal(app.state.currentView,'dashboard');
    assert.equal(win.location.hash,'#dashboard');
  }
- assert.deepEqual(win.history.calls.slice(count),Array.from({length:4},()=>['replace','#dashboard']));
+ assert.deepEqual(win.history.calls.slice(count),Array.from({length:6},()=>['replace','#dashboard']));
  app.showView('calendar"]');assert.equal(app.state.currentView,'dashboard');
  ctx.fetch=async()=>({ok:true,status:200,json:async()=>({items:[]})});await assert.rejects(app.api('/api/v1/tasks'),/格式不完整/);
  ctx.fetch=async()=>({ok:true,status:204});assert.equal(await app.api('/api/v1/tasks/id',{method:'DELETE'}),null);

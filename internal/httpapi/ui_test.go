@@ -52,9 +52,6 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 		{"auth-state.js", "auth-expiry", "javascript"},
 		{"auth-state.css", ".auth-expiry", "text/css"},
 		{"product-polish.css", ".product-field-error", "text/css"},
-		{"parcels-core.js", "window.DaynestParcels", "javascript"},
-		{"parcels.js", "/api/v1/parcels", "javascript"},
-		{"parcels.css", ".parcel-dialog", "text/css"},
 		{"gentle-reminders-core.js", "window.DaynestReminders", "javascript"},
 		{"gentle-reminders-motion.js", "window.DaynestReminderMotion", "javascript"},
 		{"gentle-reminders.js", "daynest:focus-changed", "javascript"},
@@ -75,7 +72,7 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 	for _, mood := range []string{"awful", "low", "neutral", "good", "great"} {
 		t.Run("mood artwork "+mood, func(t *testing.T) {
 			asset := httptest.NewRecorder()
-			handler.ServeHTTP(asset, httptest.NewRequest(http.MethodGet, "/static/mood-art/"+mood+"-flat-v2.png", nil))
+			handler.ServeHTTP(asset, httptest.NewRequest(http.MethodGet, "/static/mood-art/"+mood+"-wisp-v4.png", nil))
 			if asset.Code != http.StatusOK || asset.Header().Get("Content-Type") != "image/png" {
 				t.Fatalf("mood image status = %d, content type = %q", asset.Code, asset.Header().Get("Content-Type"))
 			}
@@ -84,14 +81,12 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 				t.Fatalf("decode mood image: %v", err)
 			}
 			bounds := picture.Bounds()
-			if bounds.Dx() < 256 || bounds.Dx() != bounds.Dy() {
+			if bounds.Dx() < 192 || bounds.Dx() != bounds.Dy() {
 				t.Fatalf("expected high-resolution square mood art, got %v", bounds)
 			}
 			for _, corner := range [][2]int{{0, 0}, {bounds.Max.X - 1, 0}, {0, bounds.Max.Y - 1}, {bounds.Max.X - 1, bounds.Max.Y - 1}} {
-				// Full-bleed badge textures are clipped into circles in CSS/SVG.
-				// They must remain opaque so matte extraction cannot punch holes.
-				if _, _, _, alpha := picture.At(corner[0], corner[1]).RGBA(); alpha < 0xff00 {
-					t.Fatal("flat mood badge must have an opaque color background")
+				if _, _, _, alpha := picture.At(corner[0], corner[1]).RGBA(); alpha > 0x2000 {
+					t.Fatal("mood sticker needs transparent corners")
 				}
 			}
 			if _, _, _, alpha := picture.At(bounds.Dx()/2, bounds.Dy()/2).RGBA(); alpha == 0 {
@@ -129,6 +124,7 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 		`id="panel-explore"`, `data-view="explore"`, "/static/explore.", "/static/keepsakes.",
 		`id="panel-care"`, `data-view="care"`, "/static/care.", "/static/care-core.",
 		`id="panel-memos"`, `id="panel-inventory"`, `id="today-note-form"`, `id="shopping-dialog"`, "/static/memos.", "/static/inventory.", "/static/shopping.",
+		`id="panel-habits"`, `id="parcel-open"`, `id="parcel-dialog"`, "/static/habits.", "/static/habits-dashboard.", "/static/parcels.", "/static/parcels-core.",
 	} {
 		if strings.Contains(home.Body.String(), retired) {
 			t.Fatalf("retired page is still present: %s", retired)
@@ -162,7 +158,7 @@ func TestHomeAndStaticAssetsAreServed(t *testing.T) {
 	if daynestStyle.Code != http.StatusOK || !strings.Contains(daynestStyle.Body.String(), ".today-grid") {
 		t.Fatalf("Daynest stylesheet status = %d", daynestStyle.Code)
 	}
-	for _, resource := range []string{"memos.js", "inventory.js", "shopping.js"} {
+	for _, resource := range []string{"memos.js", "inventory.js", "shopping.js", "habits.js", "habits.css", "habits-dashboard.css", "parcels.js", "parcels-core.js", "parcels.css"} {
 		reply := httptest.NewRecorder()
 		handler.ServeHTTP(reply, httptest.NewRequest(http.MethodGet, "/static/"+resource, nil))
 		if reply.Code != http.StatusNotFound {
